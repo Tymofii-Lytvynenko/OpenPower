@@ -1,6 +1,7 @@
 arcade
+arcade-imgui
+imgui
 esper
 sqlalchemy
 numpy
-dearpygui
 pillow
