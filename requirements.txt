@@ -5,3 +5,6 @@ sqlalchemy
 numpy
 opencv-python
 rtoml
+geopandas 
+rasterio
+shapely
