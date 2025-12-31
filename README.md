@@ -1,7 +1,3 @@
-Here is the updated, complete **Technical Specification** for the OpenPower repository. It incorporates the "Hybrid Data" approach (TOML/TSV), the "Vertical Slicing" architecture, and the full "Server-Authoritative" network model.
-
-You can save this as `README.md` or `docs/ARCHITECTURE.md`.
-
 ```markdown
 # OpenPower: Technical Specification & Architecture
 

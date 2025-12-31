@@ -1,0 +1,259 @@
+import os
+import json
+import time
+import cv2
+import numpy as np
+from typing import Tuple, List, Optional, Union
+
+class ProvinceAtlas:
+    """
+    Manages the province map image, caching, and spatial queries.
+    """
+
+    def __init__(self, image_path: str, cache_dir: str = ".cache"):
+        """
+        Initialize the atlas. Loads from cache if valid, otherwise processes the PNG.
+
+        Args:
+            image_path (str): Path to the source 'provinces.png' file.
+            cache_dir (str): Folder to store the optimized .npy and .json files.
+        """
+        self.image_path = image_path
+        self.cache_dir = cache_dir
+        
+        # Ensure cache directory exists
+        os.makedirs(self.cache_dir, exist_ok=True)
+
+        # distinct filenames for cache
+        base_name = os.path.splitext(os.path.basename(image_path))[0]
+        self.cache_file = os.path.join(cache_dir, f"{base_name}_packed.npy")
+        self.meta_file = os.path.join(cache_dir, f"{base_name}_meta.json")
+
+        # Load the map data (either from disk or by rebuilding)
+        self.packed_map = self._load_map_data()
+        
+        # Cache dimensions for bounds checking
+        self.height, self.width = self.packed_map.shape
+
+    # =========================================================================
+    # INTERNAL: Caching & Loading Logic
+    # =========================================================================
+
+    def _load_map_data(self) -> np.ndarray:
+        """Determines whether to load from cache or rebuild from source."""
+        if not os.path.exists(self.image_path):
+            raise FileNotFoundError(f"Source image not found: {self.image_path}")
+
+        current_mtime = os.path.getmtime(self.image_path)
+
+        # 1. Try to load valid cache
+        if self._is_cache_valid(current_mtime):
+            print(f"[ProvinceAtlas] Loading fast cache from: {self.cache_file}")
+            return np.load(self.cache_file)
+
+        # 2. Rebuild if stale or missing
+        print("[ProvinceAtlas] Source changed. Rebuilding cache (this happens once)...")
+        return self._rebuild_cache(current_mtime)
+
+    def _is_cache_valid(self, current_mtime: float) -> bool:
+        """Checks if .npy exists and metadata timestamp matches source."""
+        if not os.path.exists(self.cache_file) or not os.path.exists(self.meta_file):
+            return False
+        try:
+            with open(self.meta_file, 'r') as f:
+                meta = json.load(f)
+                return meta.get('mtime') == current_mtime
+        except (json.JSONDecodeError, KeyError, OSError):
+            return False
+
+    def _rebuild_cache(self, current_mtime: float) -> np.ndarray:
+        """Reads PNG, packs RGB into Int32, and saves to disk."""
+        t0 = time.time()
+        
+        # Load standard BGR image via OpenCV
+        img = cv2.imread(self.image_path)
+        if img is None:
+            raise ValueError("Failed to decode image. Ensure it is a valid PNG/JPG.")
+
+        # --- THE SPEED TRICK ---
+        # Convert 3-channel (B, G, R) into 1-channel (Int32).
+        # Formula: ID = B | (G << 8) | (R << 16)
+        # We use .astype(np.int32) to prevent 8-bit overflow during shifting.
+        b, g, r = cv2.split(img)
+        packed = b.astype(np.int32) | (g.astype(np.int32) << 8) | (r.astype(np.int32) << 16)
+
+        # Save binary data
+        np.save(self.cache_file, packed)
+
+        # Save metadata
+        with open(self.meta_file, 'w') as f:
+            json.dump({'mtime': current_mtime}, f)
+
+        print(f"[ProvinceAtlas] Cache built in {time.time() - t0:.2f}s")
+        return packed
+
+    # =========================================================================
+    # PUBLIC: Helpers (Color <-> ID)
+    # =========================================================================
+
+    def pack_color(self, r: int, g: int, b: int) -> int:
+        """Converts an RGB tuple to the internal Packed ID (int)."""
+        # Note: OpenCV reads as BGR, so we pack accordingly logic: B is lowest byte
+        return int(b) | (int(g) << 8) | (int(r) << 16)
+
+    def unpack_color(self, packed_id: int) -> Tuple[int, int, int]:
+        """Converts an internal Packed ID (int) back to (R, G, B)."""
+        b = packed_id & 255
+        g = (packed_id >> 8) & 255
+        r = (packed_id >> 16) & 255
+        return (r, g, b)
+
+    # =========================================================================
+    # PUBLIC: Core Operations
+    # =========================================================================
+
+    def get_province_at(self, x: int, y: int) -> Optional[int]:
+        """
+        Returns the Region ID (int) at the specific coordinate.
+        
+        Returns:
+            int: The packed region ID.
+            None: If coordinates are out of bounds.
+        """
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            return None
+        # NumPy array is accessed as [row, col] -> [y, x]
+        return int(self.packed_map[y, x])
+
+    def get_color_at(self, x: int, y: int) -> Optional[Tuple[int, int, int]]:
+        """Returns the (R, G, B) tuple at the specific coordinate."""
+        pid = self.get_province_at(x, y)
+        if pid is None:
+            return None
+        return self.unpack_color(pid)
+
+    def get_region_pixels(self, region_id: int) -> np.ndarray:
+        """
+        Finds all pixel coordinates belonging to a specific Region ID.
+        
+        Returns:
+            np.ndarray: A list of [x, y] coordinates (Size: N x 2).
+        """
+        # np.where returns (y_indices, x_indices)
+        y, x = np.where(self.packed_map == region_id)
+        # Stack them into (x, y) pairs
+        return np.column_stack((x, y))
+
+    def get_region_boundaries(self, region_id: int) -> List[np.ndarray]:
+        """
+        Calculates the polygon contours (boundaries) of a region.
+        
+        Returns:
+            List[np.ndarray]: A list of polygons. Each polygon is an array of (x,y) points.
+            Useful for drawing region borders.
+        """
+        # Create a boolean mask for this region (1 where match, 0 elsewhere)
+        # Must be uint8 for OpenCV contours
+        mask = (self.packed_map == region_id).astype(np.uint8) * 255
+        
+        # RETR_EXTERNAL = only outer borders (ignores holes inside the region)
+        # CHAIN_APPROX_SIMPLE = compresses straight lines (saves memory)
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        return contours
+
+    def get_country_mask(self, province_ids: List[int]) -> np.ndarray:
+        """
+        Creates a boolean mask for a country composed of multiple provinces.
+        
+        Args:
+            province_ids: A list of integer IDs (packed colors) belonging to the country.
+            
+        Returns:
+            np.ndarray: A boolean matrix (True where pixel belongs to country).
+        """
+        # np.isin is optimized C-code for "check if pixel value exists in list"
+        return np.isin(self.packed_map, province_ids)
+
+    def render_country_overlay(self, 
+                             province_ids: List[int], 
+                             border_color: Tuple[int, int, int] = (255, 255, 255),
+                             thickness: int = 3) -> np.ndarray:
+        """
+        Generates a transparent image (BGRA) containing only the border of the merged country.
+        
+        Args:
+            province_ids: List of province IDs to merge.
+            border_color: RGB tuple for the border line.
+            thickness: Thickness of the border line.
+            
+        Returns:
+            np.ndarray: An image array of shape (H, W, 4) - BGRA format.
+        """
+        # 1. Get merged boolean mask
+        mask_bool = self.get_country_mask(province_ids)
+        
+        # 2. Convert to uint8 for OpenCV (0 or 255)
+        mask_uint8 = mask_bool.astype(np.uint8) * 255
+        
+        # 3. Find outer contours of the *combined* shape
+        contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # 4. Draw contours onto a blank transparent image
+        # Create zero array (Height, Width, 4 channels)
+        overlay = np.zeros((self.height, self.width, 4), dtype=np.uint8)
+        
+        # Convert RGB input to BGR for OpenCV
+        bgr_color = (border_color[2], border_color[1], border_color[0])
+        
+        # Draw (color + alpha=255)
+        cv2.drawContours(overlay, contours, -1, bgr_color + (255,), thickness)
+        
+        return overlay
+
+# =========================================================================
+# EXAMPLE USAGE
+# =========================================================================
+if __name__ == "__main__":
+    # Mock setup
+    IMG_PATH = "provinces.png"
+    
+    # Create a dummy image if it doesn't exist (for testing this script)
+    if not os.path.exists(IMG_PATH):
+        print("Creating dummy test image...")
+        dummy = np.zeros((500, 500, 3), dtype=np.uint8)
+        cv2.rectangle(dummy, (50, 50), (200, 200), (255, 0, 0), -1) # Blue Region
+        cv2.rectangle(dummy, (250, 50), (400, 200), (0, 255, 0), -1) # Green Region
+        cv2.imwrite(IMG_PATH, dummy)
+
+    # 1. Initialize Atlas
+    atlas = ProvinceAtlas(IMG_PATH)
+    print(f"Atlas loaded. Dimensions: {atlas.width}x{atlas.height}")
+
+    # 2. Test Coordinate Lookup
+    test_x, test_y = 100, 100
+    region_id = atlas.get_province_at(test_x, test_y)
+    color = atlas.get_color_at(test_x, test_y)
+    print(f"Pixel at ({test_x}, {test_y}): ID={region_id}, RGB={color}")
+
+    # 3. Test Region Boundaries
+    # Get contours for the region ID we found
+    if region_id is not None:
+        contours = atlas.get_region_boundaries(region_id)
+        print(f"Region {region_id} has {len(contours)} contour(s).")
+
+    # 4. Test Country Merging
+    # Let's pretend Blue (255,0,0) and Green (0,255,0) are one country
+    blue_id = atlas.pack_color(0, 0, 255) # BGR: 255,0,0 -> RGB: 0,0,255 (wait, OpenCV is BGR)
+    # Be careful: In script I pack as B + (G<<8) + (R<<16).
+    # So if OpenCV reads (255, 0, 0) -> B=255, G=0, R=0.
+    # packed = 255 + 0 + 0 = 255.
+    
+    green_id = atlas.pack_color(0, 255, 0) 
+    
+    # Get overlay of merged country
+    overlay = atlas.render_country_overlay([blue_id, green_id], thickness=5)
+    
+    # Save overlay to verify
+    cv2.imwrite("country_debug.png", overlay)
+    print("Saved 'country_debug.png' with the merged borders.")
+
