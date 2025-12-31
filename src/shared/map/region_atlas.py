@@ -5,9 +5,9 @@ import cv2
 import numpy as np
 from typing import Tuple, List, Optional, Union
 
-class ProvinceAtlas:
+class RegionAtlas:
     """
-    Manages the province map image, caching, and spatial queries.
+    Manages the region map image, caching, and spatial queries.
     """
 
     def __init__(self, image_path: str, cache_dir: str = ".cache"):
@@ -15,7 +15,7 @@ class ProvinceAtlas:
         Initialize the atlas. Loads from cache if valid, otherwise processes the PNG.
 
         Args:
-            image_path (str): Path to the source 'provinces.png' file.
+            image_path (str): Path to the source 'regions.png' file.
             cache_dir (str): Folder to store the optimized .npy and .json files.
         """
         self.image_path = image_path
@@ -48,11 +48,11 @@ class ProvinceAtlas:
 
         # 1. Try to load valid cache
         if self._is_cache_valid(current_mtime):
-            print(f"[ProvinceAtlas] Loading fast cache from: {self.cache_file}")
+            print(f"[RegionAtlas] Loading fast cache from: {self.cache_file}")
             return np.load(self.cache_file)
 
         # 2. Rebuild if stale or missing
-        print("[ProvinceAtlas] Source changed. Rebuilding cache (this happens once)...")
+        print("[RegionAtlas] Source changed. Rebuilding cache (this happens once)...")
         return self._rebuild_cache(current_mtime)
 
     def _is_cache_valid(self, current_mtime: float) -> bool:
@@ -89,7 +89,7 @@ class ProvinceAtlas:
         with open(self.meta_file, 'w') as f:
             json.dump({'mtime': current_mtime}, f)
 
-        print(f"[ProvinceAtlas] Cache built in {time.time() - t0:.2f}s")
+        print(f"[RegionAtlas] Cache built in {time.time() - t0:.2f}s")
         return packed
 
     # =========================================================================
@@ -112,7 +112,7 @@ class ProvinceAtlas:
     # PUBLIC: Core Operations
     # =========================================================================
 
-    def get_province_at(self, x: int, y: int) -> Optional[int]:
+    def get_region_at(self, x: int, y: int) -> Optional[int]:
         """
         Returns the Region ID (int) at the specific coordinate.
         
@@ -127,7 +127,7 @@ class ProvinceAtlas:
 
     def get_color_at(self, x: int, y: int) -> Optional[Tuple[int, int, int]]:
         """Returns the (R, G, B) tuple at the specific coordinate."""
-        pid = self.get_province_at(x, y)
+        pid = self.get_region_at(x, y)
         if pid is None:
             return None
         return self.unpack_color(pid)
@@ -161,28 +161,28 @@ class ProvinceAtlas:
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         return contours
 
-    def get_country_mask(self, province_ids: List[int]) -> np.ndarray:
+    def get_country_mask(self, region_ids: List[int]) -> np.ndarray:
         """
-        Creates a boolean mask for a country composed of multiple provinces.
+        Creates a boolean mask for a country composed of multiple regions.
         
         Args:
-            province_ids: A list of integer IDs (packed colors) belonging to the country.
+            region_ids: A list of integer IDs (packed colors) belonging to the country.
             
         Returns:
             np.ndarray: A boolean matrix (True where pixel belongs to country).
         """
         # np.isin is optimized C-code for "check if pixel value exists in list"
-        return np.isin(self.packed_map, province_ids)
+        return np.isin(self.packed_map, region_ids)
 
     def render_country_overlay(self, 
-                             province_ids: List[int], 
+                             region_ids: List[int], 
                              border_color: Tuple[int, int, int] = (255, 255, 255),
                              thickness: int = 3) -> np.ndarray:
         """
         Generates a transparent image (BGRA) containing only the border of the merged country.
         
         Args:
-            province_ids: List of province IDs to merge.
+            region_ids: List of region IDs to merge.
             border_color: RGB tuple for the border line.
             thickness: Thickness of the border line.
             
@@ -190,7 +190,7 @@ class ProvinceAtlas:
             np.ndarray: An image array of shape (H, W, 4) - BGRA format.
         """
         # 1. Get merged boolean mask
-        mask_bool = self.get_country_mask(province_ids)
+        mask_bool = self.get_country_mask(region_ids)
         
         # 2. Convert to uint8 for OpenCV (0 or 255)
         mask_uint8 = mask_bool.astype(np.uint8) * 255
@@ -215,7 +215,7 @@ class ProvinceAtlas:
 # =========================================================================
 if __name__ == "__main__":
     # Mock setup
-    IMG_PATH = "provinces.png"
+    IMG_PATH = "regions.png"
     
     # Create a dummy image if it doesn't exist (for testing this script)
     if not os.path.exists(IMG_PATH):
@@ -226,12 +226,12 @@ if __name__ == "__main__":
         cv2.imwrite(IMG_PATH, dummy)
 
     # 1. Initialize Atlas
-    atlas = ProvinceAtlas(IMG_PATH)
+    atlas = RegionAtlas(IMG_PATH)
     print(f"Atlas loaded. Dimensions: {atlas.width}x{atlas.height}")
 
     # 2. Test Coordinate Lookup
     test_x, test_y = 100, 100
-    region_id = atlas.get_province_at(test_x, test_y)
+    region_id = atlas.get_region_at(test_x, test_y)
     color = atlas.get_color_at(test_x, test_y)
     print(f"Pixel at ({test_x}, {test_y}): ID={region_id}, RGB={color}")
 

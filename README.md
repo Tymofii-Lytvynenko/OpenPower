@@ -12,7 +12,7 @@
 * **Rendering:** [Arcade](https://api.arcade.academy/) (OpenGL 3.3+).
 * **UI:** [Arcade-ImGui](https://github.com/hbldh/arcade-imgui) (Dear ImGui bindings).
 * **Data Configuration:** [rtoml](https://pypi.org/project/rtoml/) (High-performance Rust-based TOML parser/writer).
-* **Bulk Data:** CSV/TSV (Standard Library) for large datasets like map provinces.
+* **Bulk Data:** CSV/TSV (Standard Library) for large datasets like map regions.
 * **Runtime Database:** [SQLAlchemy](https://www.sqlalchemy.org/) (SQLite) for caching and save games.
 * **Localization:** GNU Gettext (`.po` / `.mo` files).
 
@@ -38,14 +38,14 @@ OpenPower/
 │   │   ├── info.json           # Metadata
 │   │   ├── assets/             # Binary Media
 │   │   │   ├── maps/
-│   │   │   │   ├── provinces.png   # Color ID Map (10k x 5k)
+│   │   │   │   ├── regions.png   # Color ID Map (10k x 5k)
 │   │   │   │   └── terrain.png     # Visual Texture
 │   │   │   └── locales/        # i18n (.po files)
 │   │   │
 │   │   ├── data/               # STATIC DATA (Source of Truth)
 │   │   │   ├── countries/      # TOML files (e.g., ua.toml)
 │   │   │   ├── map/
-│   │   │   │   └── provinces.tsv   # Bulk Data (ID, Name, Terrain)
+│   │   │   │   └── regions.tsv   # Bulk Data (ID, Name, Terrain)
 │   │   │   └── rules.toml      # Global constants
 │   │   │
 │   │   └── logic/              # DYNAMIC RULES (Python - Vertical Slicing)
@@ -66,7 +66,7 @@ OpenPower/
     │   ├── commands.py         # Network DTOs (CmdSetTax, CmdMoveUnit)
     │   └── constants.py
     │
-    ├── core/                   # [BACKEND] Simulation Server (Headless)
+    ├── server/                 # [BACKEND] Simulation Server (Headless)
     │   ├── loader.py           # VFS & TOML/TSV Parsing
     │   ├── bootstrap.py        # ETL Pipeline: Merge Mods -> Fill SQLite
     │   ├── mod_loader.py       # Recursively imports `modules/*/logic/*.py`
@@ -111,10 +111,10 @@ tax_rate = 0.18
 
 ### B. Bulk Data: TSV/CSV
 
-Used for: Province definitions (10,000+ rows).
+Used for: Region definitions (10,000+ rows).
 
 * **Why:** TOML/JSON is too verbose for flat arrays. TSV is compact and fast to parse.
-* **Example (`provinces.tsv`):**
+* **Example (`regions.tsv`):**
 ```tsv
 id  name    terrain_id  owner_id
 1   Kyiv    plains      UA
@@ -186,9 +186,9 @@ Rendering is handled in layers by `Arcade`.
 
 1. **Map Layer:** Renders the terrain texture.
 2. **Political Layer (Shader):**
-* Uses a Fragment Shader and the `provinces.png` (Color ID Map).
-* Lookups the Province ID from the pixel color.
-* Lookups the Owner ID from the Province data.
+* Uses a Fragment Shader and the `regions.png` (Color ID Map).
+* Lookups the Region ID from the pixel color.
+* Lookups the Owner ID from the Region data.
 * Renders the Owner's color (with alpha blending).
 
 
