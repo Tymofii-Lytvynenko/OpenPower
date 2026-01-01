@@ -1,4 +1,3 @@
-```markdown
 # OpenPower: Technical Specification & Architecture
 
 **OpenPower** is a modular, data-driven grand strategy engine written in Python. It is designed as a modern, open-source spiritual successor to *SuperPower 2*, emphasizing extreme moddability, performance, and clear architectural separation between the **Engine** (Infrastructure) and the **Game** (Content & Rules).
