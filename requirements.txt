@@ -1,6 +1,6 @@
 arcade
+PyOpenGL
 imgui-bundle
-esper
 polars==1.36.1
 numpy
 opencv-python

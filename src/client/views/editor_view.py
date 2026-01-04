@@ -4,6 +4,7 @@ from pathlib import Path
 from src.client.camera_controller import CameraController
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.ui.imgui_controller import ImGuiController
+from src.client.ui.editor_layout import EditorLayout
 
 # Project root calculation
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
@@ -22,6 +23,7 @@ class EditorView(arcade.View):
         self.camera_controller: CameraController = None
         self.map_renderer: MapRenderer = None
         self.imgui_controller: ImGuiController = None
+        self.editor_layout: EditorLayout = None
 
         # Cameras
         self.world_camera: arcade.Camera = None
@@ -50,6 +52,7 @@ class EditorView(arcade.View):
 
         # 4. UI
         self.imgui_controller = ImGuiController(self.window)
+        self.editor_layout = EditorLayout()
         
         print("[EditorView] Setup complete.")
 
@@ -72,16 +75,15 @@ class EditorView(arcade.View):
         # 2. UI Layer
         self.ui_camera.use()
         
-        # Basic Debug Overlay
-        arcade.draw_text("EDITOR MODE", 10, self.window.height - 30, arcade.color.WHITE, 20, bold=True)
-        
-        info_text = f"Zoom: {self.camera_controller.zoom:.2f} | Pos: {int(self.camera_controller.position.x)}, {int(self.camera_controller.position.y)}"
-        if self.selected_region_id:
-            info_text += f" | Selected ID: {self.selected_region_id}"
+        # 3. Render ImGui Interface
+        if self.editor_layout:
+             # Calculate FPS safely
+            fps = 1.0 / self.window.last_update_duration if self.window.last_update_duration > 0 else 60.0
             
-        arcade.draw_text(info_text, 10, self.window.height - 50, arcade.color.LIGHT_GRAY, 12)
+            # Pass the state to the layout
+            self.editor_layout.render(self.selected_region_id, fps)
 
-        # ImGui Render (if you have active widgets)
+        # Finalize ImGui render (flush to GPU)
         self.imgui_controller.render()
 
     def on_update(self, delta_time: float):
