@@ -104,4 +104,5 @@ class MapRenderer:
         return sprite
 
     def get_center(self) -> arcade.math.Vector2:
-        return arcade.math.Vector2(self.width / 2, self.height / 2)
+        """Returns the center of the map as a simple tuple."""
+        return (self.width / 2, self.height / 2)

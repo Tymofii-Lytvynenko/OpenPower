@@ -1,6 +1,6 @@
 import arcade
 from imgui_bundle import imgui
-from imgui_bundle.python_backends.opengl_base_backend import OpenGL3Backend
+from imgui_bundle.python_backends.opengl_backend_programmable import ProgrammablePipelineRenderer as OpenGL3Backend
 
 class ImGuiController:
     """
