@@ -1,229 +1,179 @@
 # OpenPower: Technical Specification & Architecture
 
-**OpenPower** is a modular, data-driven grand strategy engine written in Python. It is designed as a modern, open-source spiritual successor to *SuperPower 2*, emphasizing extreme moddability, performance, and clear architectural separation between the **Engine** (Infrastructure) and the **Game** (Content & Rules).
+**OpenPower** is a modular, data-driven grand strategy engine written in Python. It is designed as a modern, open-source spiritual successor to *SuperPower 2*.
+
+The engine moves away from traditional Object-Oriented Programming (OOP) and Entity-Component-Systems (ECS) in favor of **Data-Oriented Design (DOD)**. By leveraging **Polars**, the engine processes game state as massive in-memory tables, allowing for vectorized performance that rivals C++ engines while maintaining the moddability of Python.
 
 ---
 
 ## 1. Technology Stack
 
 * **Language:** Python 3.10+
-* **Core Architecture:** [Esper](https://github.com/benmoran/esper) (Entity-Component-System).
+* **Core Engine:** [Polars](https://pola.rs/) (High-performance DataFrames, written in Rust).
 * **Rendering:** [Arcade](https://api.arcade.academy/) (OpenGL 3.3+).
-* **UI:** [Arcade-ImGui](https://github.com/hbldh/arcade-imgui) (Dear ImGui bindings).
-* **Data Configuration:** [rtoml](https://pypi.org/project/rtoml/) (High-performance Rust-based TOML parser/writer).
-* **Bulk Data:** CSV/TSV (Standard Library) for large datasets like map regions.
-* **Runtime Database:** [SQLAlchemy](https://www.sqlalchemy.org/) (SQLite) for caching and save games.
-* **Localization:** GNU Gettext (`.po` / `.mo` files).
+* **UI:** [imgui-bundle](https://github.com/pthom/imgui_bundle) (Dear ImGui bindings).
+* **Data Configuration:** [rtoml](https://pypi.org/project/rtoml/) (Fastest Rust-based TOML parser).
+* **Bulk Data:** TSV/CSV (Standard Library) for map regions and population grids.
+* **Serialization:** [Apache Arrow](https://arrow.apache.org/) (via Polars IPC) for instant Save/Load.
 
 ---
 
 ## 2. Project Structure
 
-The project strictly separates **Infrastructure** (`src/`) from **Content** (`modules/`).
+The project follows a **Composition over Inheritance** philosophy. Data (`state`) is strictly separated from Behavior (`pipeline`).
 
 ```text
 OpenPower/
 ├── .venv/                      # Virtual Environment
 ├── mods.json                   # Load Order Configuration
 ├── main.py                     # Application Entry Point
-├── requirements.txt            # Dependencies
-│
-├── cache/                      # Ephemeral Runtime Data
-│   └── game.db                 # SQLite DB (Generated from TOML/TSV on launch)
-├── saves/                      # User Save Files (Serialized SQLite snapshots)
+├── cache/                      # Runtime fast-load cache
 │
 ├── modules/                    # --- GAMEPLAY CONTENT & LOGIC ---
-│   ├── base/                   # The Vanilla Game (treated as a Mod)
-│   │   ├── info.json           # Metadata
-│   │   ├── assets/             # Binary Media
-│   │   │   ├── maps/
-│   │   │   │   ├── regions.png   # Color ID Map (10k x 5k)
-│   │   │   │   └── terrain.png     # Visual Texture
-│   │   │   └── locales/        # i18n (.po files)
+│   ├── base/
+│   │   ├── assets/             # Binary Media (Textures, Audio)
+│   │   │   └── map/
+│   │   │       └── regions.png # Color ID Map
 │   │   │
-│   │   ├── data/               # STATIC DATA (Source of Truth)
-│   │   │   ├── countries/      # TOML files (e.g., ua.toml)
+│   │   ├── data/               # SOURCE DATA (Human Readable)
+│   │   │   ├── countries/      # TOML files (e.g., USA.toml)
 │   │   │   ├── map/
-│   │   │   │   └── regions.tsv   # Bulk Data (ID, Name, Terrain)
-│   │   │   └── rules.toml      # Global constants
+│   │   │   │   └── regions.tsv # Static Region Definitions (ID, Terrain)
+│   │   │   └── scenarios/
+│   │   │       └── 2025/       # Scenario Data
+│   │   │           └── pop.tsv # Dynamic Population Data
 │   │   │
-│   │   └── logic/              # DYNAMIC RULES (Python - Vertical Slicing)
-│   │       ├── economy/        # Feature: Economy
-│   │       │   ├── components.py   # @dataclass Economy
-│   │       │   └── systems.py      # @register_system EconomySystem
-│   │       ├── warfare/        # Feature: Warfare
-│   │       │   ├── units.py
-│   │       │   └── combat.py
-│   │       └── main.py         # Logic entry point
-│   │
-│   └── user_mod/               # Example Mod
-│       ├── data/               # Overrides base TOMLs
-│       └── logic/              # Injects new mechanics (e.g., Radiation)
+│   │   └── logic/              # BEHAVIOR (Pure Python Functions)
+│   │       ├── economy.py      # def system_tax_income(state)
+│   │       ├── demography.py   # def system_growth(state)
+│   │       └── military.py
 │
-└── src/                        # --- ENGINE INFRASTRUCTURE (Immutable) ---
-    ├── shared/                 # Code shared between Client & Server
-    │   ├── commands.py         # Network DTOs (CmdSetTax, CmdMoveUnit)
-    │   └── constants.py
-    │
-    ├── server/                 # [BACKEND] Simulation Server (Headless)
-    │   ├── loader.py           # VFS & TOML/TSV Parsing
-    │   ├── bootstrap.py        # ETL Pipeline: Merge Mods -> Fill SQLite
-    │   ├── mod_loader.py       # Recursively imports `modules/*/logic/*.py`
-    │   ├── auto_registry.py    # Decorator logic (@register_system)
-    │   ├── i18n.py             # Gettext wrapper
+└── src/                        # --- ENGINE INFRASTRUCTURE ---
+    ├── server/
+    │   ├── state/              # [DATA LAYER]
+    │   │   ├── store.py        # GameState class (Dict of DataFrames)
+    │   │   └── schema.py       # Column type definitions
     │   │
-    │   ├── network/            # Server Socket & Packet Handling
-    │   ├── persistence/        # Save/Load Managers
-    │   ├── db/                 # SQLAlchemy Models (Schema)
-    │   └── ecs/                # World Manager
+    │   ├── io/                 # [INPUT/OUTPUT LAYER]
+    │   │   ├── loader.py       # TOML/TSV -> Polars DataFrame
+    │   │   ├── writer.py       # DataFrame -> .arrow (Save Game)
+    │   │   └── resources.py    # VFS (Virtual File System)
+    │   │
+    │   └── pipeline/           # [EXECUTION LAYER]
+    │       ├── runner.py       # Main Loop (Tick Orchestrator)
+    │       └── registry.py     # Auto-discovery of logic functions
     │
-    └── client/                 # [FRONTEND] Visualization Client
-        ├── window.py           # Main Arcade Window
-        ├── ui/                 # ImGui Generators (Reflection-based)
-        └── renderers/          # Visual Layers (Map Shader, Units)
+    └── client/                 # [VISUALIZATION LAYER]
+        ├── map_view.py         # Arcade Window & Shader Logic
+        ├── bridge.py           # Polars -> Numpy (Zero-copy GPU transfer)
+        └── ui/                 # ImGui Interface
 
 ```
 
 ---
 
-## 3. Data Architecture (The Hybrid Approach)
+## 3. Data Architecture (The "Compiler" Approach)
 
-To balance **Developer Experience (DX)** with **Performance**, we use a hybrid data strategy.
+We treat game data as a compilation process: **Human Source -> Machine State**.
 
-### A. Configuration: TOML (`rtoml`)
+### A. Source: TOML & TSV (For Humans)
 
-Used for: Countries, Units, Technologies, Game Rules.
+Optimized for readability and version control (Git).
 
-* **Why:** Human-readable, supports comments (`#`), structured hierarchy (`[section]`).
-* **Performance:** `rtoml` (Rust) parses files instantly.
-* **Example (`ua.toml`):**
-```toml
-id = "UA"
-name = "Ukraine"
-[economy]
-budget = 50_000_000
-tax_rate = 0.18
+1. **Entities (Countries, Units):** **TOML** (`rtoml`).
+* *Why:* Structured, hierarchical, supports comments.
+* *Example:* `ua.toml` defines budget, tags, and political structure.
 
-```
+
+2. **Arrays (Regions, Population):** **TSV** (Tab-Separated Values).
+* *Why:* Easy to edit in Excel/Spreadsheets. Compact for 10,000+ rows.
+* *Example:* `regions.tsv` contains `id`, `terrain_id`, `owner_id`.
 
 
 
-### B. Bulk Data: TSV/CSV
+### B. Runtime: Polars DataFrames (For Logic)
 
-Used for: Region definitions (10,000+ rows).
+Optimized for SIMD vectorization and CPU cache locality.
 
-* **Why:** TOML/JSON is too verbose for flat arrays. TSV is compact and fast to parse.
-* **Example (`regions.tsv`):**
-```tsv
-id  name    terrain_id  owner_id
-1   Kyiv    plains      UA
-2   Lviv    hills       UA
+* **Initialization:** On launch, the `loader.py` reads all TOML/TSV files from all active mods.
+* **Compilation:** It converts them into `pl.DataFrame` objects stored in `GameState`.
+* **Indexing:** Data is processed by Columns, not Rows.
 
-```
+### C. Storage: Apache Arrow (For Speed)
 
-
-
-### C. Runtime Cache: SQLite
-
-The engine **never** reads TOML/TSV during gameplay.
-
-1. **Bootstrap:** On launch, the engine merges data from all mods.
-2. **Hydration:** Merged data is inserted into `cache/game.db` (SQLite).
-3. **Gameplay:** ECS entities are created by querying SQLite.
+* **Save Game:** The engine dumps the in-memory DataFrames directly to disk using Polars IPC (`.arrow`).
+* **Speed:** Saving/Loading takes milliseconds because no parsing is required (memory dump).
 
 ---
 
-## 4. Logic & Modding (Vertical Slicing)
+## 4. Logic & Modding (The Pipeline)
 
-Game logic is organized by **Feature**, not by file type.
+Instead of "Systems" in an ECS that loop over entities, we use **Pipeline Functions** that transform tables.
 
-### The Logic Folder
+### Composition via Joins
 
-Located in `modules/base/logic/`. Contains pure Python code.
+Logic is composed by joining tables. If a mod adds "Radiation", it does not modify the `Region` class. It simply adds a `radiation` table and joins it during calculation.
 
-* **Components:** Standard Python `dataclasses`.
-* **Systems:** `esper.Processor` subclasses.
-
-### Auto-Registration
-
-To avoid manual boilerplate, systems register themselves via decorators.
-
-**File: `modules/base/logic/economy/systems.py**`
+**Example System (`modules/base/logic/economy.py`):**
 
 ```python
-from src.core.auto_registry import register_system
-import esper
+import polars as pl
 
-@register_system(priority=10)
-class EconomySystem(esper.Processor):
-    def process(self, dt):
-        # ... logic implementation ...
-        pass
+def system_calculate_taxes(state):
+    # 1. Access Tables
+    regions = state.get_table("regions")
+    countries = state.get_table("countries")
+
+    # 2. Vectorized Aggregation (No Python Loops!)
+    # SQL equivalent: SELECT owner_id, SUM(pop * tax) ... GROUP BY owner_id
+    income_agg = (
+        regions
+        .group_by("owner_id")
+        .agg((pl.col("population") * 0.1).sum().alias("tax_income"))
+    )
+
+    # 3. Update State via Join
+    state.tables["countries"] = (
+        countries
+        .join(income_agg, left_on="id", right_on="owner_id", how="left")
+        .with_columns(
+            (pl.col("budget") + pl.col("tax_income").fill_null(0)).alias("budget")
+        )
+        .drop("tax_income")
+    )
 
 ```
 
-The `src/core/mod_loader.py` recursively scans the `logic` folders of all active mods and executes these files, triggering the registration.
-
 ---
 
-## 5. Networking & State Management
+## 5. Rendering Pipeline (Zero-Copy)
 
-The architecture uses a **Command Pattern** to ensure determinism and separation of concerns.
+Rendering is decoupled from simulation. The visual layer reads the DataFrames and converts them to GPU buffers without iterating in Python.
 
-1. **Input:** Player interacts with UI (e.g., changes tax slider).
-2. **Command:** Client generates a DTO: `CmdSetTax(country="UA", val=0.2)`.
-3. **Transmission:** Command is serialized and sent to the Server (Localhost or Remote).
-4. **Execution:** Server validates the command and updates the ECS Component.
-5. **Replication:** Server broadcasts a `WorldUpdate` packet to all clients.
-6. **Rendering:** Clients update their local mirror and render the frame.
-
----
-
-## 6. Rendering Pipeline
-
-Rendering is handled in layers by `Arcade`.
-
-1. **Map Layer:** Renders the terrain texture.
-2. **Political Layer (Shader):**
-* Uses a Fragment Shader and the `regions.png` (Color ID Map).
-* Lookups the Region ID from the pixel color.
-* Lookups the Owner ID from the Region data.
-* Renders the Owner's color (with alpha blending).
+1. **Map Layer:**
+* `regions.png` provides the geometry (Color ID map).
+* A Fragment Shader looks up the pixel color.
+* **The Bridge:** `client/bridge.py` extracts the `owner_id` column from the `regions` DataFrame, converts it to a `numpy` array (zero-copy), and uploads it to a Texture Buffer (TBO).
+* The Shader uses the TBO to color the region based on the owner's color.
 
 
-3. **Object Layer:** Sprites for units/cities.
-4. **UI Layer (ImGui):**
-* **Reflection UI:** Automatically generates inspector windows by reading the type hints of ECS Components (`budget: float` -> Input Float).
+2. **UI Layer:**
+* ImGUI bundle reads directly from Polars DataFrames to render tables and inspector windows.
 
 
 
 ---
 
-## 7. Internationalization (i18n)
-
-* **Format:** GNU Gettext (`.po` files).
-* **Workflow:**
-* Python code uses `tr("KEY")`.
-* Data files (TOML) store keys: `name_key = "UNIT_TANK"`.
-* UI resolves keys to text at render time.
-
-
-
----
-
-## 8. Development Workflow
+## 6. Development Workflow
 
 1. **Setup:** `pip install -r requirements.txt`.
 2. **Run Game:** `python main.py`.
-3. **Run Editor:** `python main.py --editor` (Reuses engine with Editor UI tools).
+3. **Edit Map:**
+* Open `modules/base/data/map/regions.tsv` in **LibreOffice or something else**.
+* Change terrain/ownership.
+* Restart game.
+
+
 4. **Create Mod:**
-* Create `modules/my_mod/`.
-* Add `data/countries/ua.toml` to override base stats.
-* Add `logic/my_sys.py` to inject Python code.
-* Add to `mods.json`.
-
-
-
-```
-
-```
+* Create `modules/my_mod/data/countries/NCR.toml`.
+* The engine automatically detects, loads, and merges it into the `countries` DataFrame.
