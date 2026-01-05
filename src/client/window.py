@@ -1,27 +1,19 @@
 import arcade
+from src.server.session import GameSession
+from src.shared.config import GameConfig
 from src.client.views.editor_view import EditorView
 
-# Window configuration
-SCREEN_WIDTH = 1280
-SCREEN_HEIGHT = 720
-SCREEN_TITLE = "OpenPower Engine"
-
 class MainWindow(arcade.Window):
-    """
-    The main application window that manages different views (Editor, Game, Menu).
-    """
-    def __init__(self):
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, resizable=True)
-        
-    def setup(self):
-        """Initializes the window and sets the starting view."""
-        # Defaulting to EditorView for now. CLI arguments can be added here later 
-        # to allow selecting different modes on startup.
-        start_view = EditorView()
-        self.show_view(start_view)
+    def __init__(self, session: GameSession, config: GameConfig):
+        super().__init__(1280, 720, "OpenPower Editor", resizable=True)
+        self.session = session
+        self.game_config = config
+        self.center_window()
 
-    def on_resize(self, width, height):
-        """Passes the resize event to the active view."""
-        super().on_resize(width, height)
-        # Explicitly passing resize to the super class, which in Arcade 
-        # normally handles view resizing automatically for the current view.
+    def setup(self):
+        print("[Window] Initializing...")
+        start_view = EditorView(self.session, self.game_config)
+        self.show_view(start_view)
+        
+    def on_update(self, delta_time: float):
+        self.session.tick(delta_time)

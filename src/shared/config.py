@@ -4,17 +4,17 @@ from typing import List
 
 class GameConfig:
     """
-    Central configuration handler for the project.
+    Central configuration handler for the OpenPower engine.
     
     Responsibilities:
-    1. Resolve file paths (removing hardcoded strings from other files).
-    2. Manage the list of active mods (read from mods.json).
-    3. Define where to read data from (Load Order) and where to write changes (Save Target).
+    1. Resolve file paths dynamically (removing hardcoded strings).
+    2. Manage the Mod Load Order via 'mods.json'.
+    3. Provide access to Data and Asset directories.
     """
     def __init__(self, project_root: Path):
         self.project_root = project_root
         
-        # Standard directory structure
+        # Standard directory structure definitions
         self.modules_dir = project_root / "modules"
         self.cache_dir = project_root / ".cache"
         self.mods_file = project_root / "mods.json"
@@ -34,14 +34,14 @@ class GameConfig:
                 # Expected format: {"active_mods": ["base", "my_mod"]}
                 if "active_mods" in data and isinstance(data["active_mods"], list):
                     self.active_mods = data["active_mods"]
-                    print(f"[Config] Loaded mod order: {self.active_mods}")
+                    print(f"[Config] Active Mods: {self.active_mods}")
         except Exception as e:
             print(f"[Config] Warning: Failed to parse mods.json: {e}")
 
     def get_data_dirs(self) -> List[Path]:
         """
         Returns a list of data directories for all active mods.
-        Used by DataLoader to merge data from multiple sources.
+        Used by DataLoader to scan for content.
         """
         paths = []
         for mod in self.active_mods:
@@ -53,15 +53,13 @@ class GameConfig:
     def get_write_data_dir(self) -> Path:
         """
         Returns the directory where the Editor should save changes.
-        For the MVP, we default to the 'base' module. 
-        In the future, this could be the specific mod being developed.
+        For MVP, we save to the 'base' module.
         """
         return self.modules_dir / "base" / "data"
 
     def get_asset_path(self, relative_path: str) -> Path:
         """
         Finds an asset (image/sound) by searching through active mods.
-        Example: get_asset_path("map/regions.png")
         """
         # Search in reverse order (Mods override Base)
         for mod in reversed(self.active_mods):
@@ -69,5 +67,5 @@ class GameConfig:
             if candidate.exists():
                 return candidate
         
-        # Fallback to base even if missing, to let the caller handle the error
+        # Fallback
         return self.modules_dir / "base" / "assets" / relative_path

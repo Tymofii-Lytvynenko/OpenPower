@@ -1,82 +1,72 @@
-# src/client/ui/editor_layout.py
 from imgui_bundle import imgui
+import polars as pl
+from src.client.network_client import NetworkClient
 
 class EditorLayout:
-    """
-    Handles the high-level layout of the Editor UI panels.
-    Follows Composition over Inheritance: EditorView delegates UI rendering to this class.
-    """
-    def __init__(self):
-        pass
+    def __init__(self, net_client: NetworkClient):
+        self.net = net_client
+        self.on_focus_request = None 
+        self.show_region_list = False
 
-    def render(self, selected_region_id: int | None, fps: float):
-        """
-        Draws all active editor panels.
+    def render(self, selected_region_int_id: int | None, fps: float):
+        self._render_menu()
+        self._render_inspector(selected_region_int_id)
+        if self.show_region_list:
+            self._render_region_list()
         
-        Args:
-            selected_region_id: The ID of the currently selected region (or None).
-            fps: Current frames per second for debug info.
-        """
-        self._render_main_menu()
-        self._render_inspector(selected_region_id)
-        self._render_debug_info(fps)
-
-    def _render_main_menu(self):
-        if imgui.begin_main_menu_bar():
-            if imgui.begin_menu("File"):
-                if imgui.menu_item("Save Map", "Ctrl+S")[0]:
-                    print("Save requested (not implemented)")
-                if imgui.menu_item("Exit", "Alt+F4")[0]:
-                    print("Exit requested")
-                imgui.end_menu()
-            
-            if imgui.begin_menu("View"):
-                imgui.menu_item("Toggle Grid")
-                imgui.end_menu()
-                
-            imgui.end_main_menu_bar()
-
-    def _render_inspector(self, region_id: int | None):
-        """
-        Displays details about the selected region.
-        """
-        # Set a fixed position/size for the first run, or let the user float it
-        imgui.set_next_window_size((300, 400), imgui.Cond_.first_use_ever)
-        
-        if imgui.begin("Region Inspector"):
-            if region_id is not None:
-                imgui.text_colored((0.2, 1.0, 0.2, 1.0), f"SELECTED REGION ID: {region_id}")
-                imgui.separator()
-                
-                # Placeholder for future data editing
-                imgui.text("Ownership: Neutral")
-                imgui.text("Population: 0")
-                
-                if imgui.button("Claim Region"):
-                    print(f"Logic to claim region {region_id}")
-            else:
-                imgui.text_disabled("No region selected.")
-                imgui.text_wrapped("Click on the map to inspect a region.")
-        
+        # Debug Overlay
+        imgui.set_next_window_pos((10, 50), imgui.Cond_.first_use_ever)
+        imgui.begin("Debug", flags=imgui.WindowFlags_.always_auto_resize | imgui.WindowFlags_.no_decoration)
+        imgui.text(f"FPS: {1.0/fps:.1f}" if fps > 0 else "--")
         imgui.end()
 
-    def _render_debug_info(self, fps: float):
-        """Simple overlay for performance stats."""
-        bg_flags = imgui.WindowFlags_.no_decoration | imgui.WindowFlags_.always_auto_resize | imgui.WindowFlags_.no_saved_settings | imgui.WindowFlags_.no_focus_on_appearing | imgui.WindowFlags_.no_nav
-        
-        # Position in top-right corner
-        viewport = imgui.get_main_viewport()
-        work_pos = viewport.work_pos
-        work_size = viewport.work_size
-        pad = 10.0
-        
-        pos = (work_pos.x + work_size.x - pad, work_pos.y + pad + 20) # +20 to avoid menu bar
-        pivot = (1.0, 0.0)
-        
-        imgui.set_next_window_pos(pos, imgui.Cond_.always, pivot)
-        imgui.set_next_window_bg_alpha(0.35)
-        
-        if imgui.begin("DebugOverlay", flags=bg_flags):
-            imgui.text(f"FPS: {fps:.1f}")
-            imgui.text("Mode: Editor")
+    def _render_menu(self):
+        if imgui.begin_main_menu_bar():
+            if imgui.begin_menu("File"):
+                if imgui.menu_item("Save Regions", "Ctrl+S")[0]:
+                    self.net.request_save()
+                imgui.end_menu()
+            if imgui.begin_menu("View"):
+                _, self.show_region_list = imgui.menu_item("Region List", "", self.show_region_list)
+                imgui.end_menu()
+            imgui.end_main_menu_bar()
+
+    def _render_inspector(self, region_int_id: int | None):
+        imgui.begin("Region Inspector")
+        if region_int_id is not None:
+            state = self.net.get_state()
+            regions = state.get_table("regions")
+            
+            try:
+                # Fast Lookup by Int ID
+                row = regions.filter(pl.col("id") == region_int_id).row(0, named=True)
+                
+                imgui.text_colored((0, 1, 0, 1), f"{row.get('name', 'Unknown')}")
+                
+                # Show HEX to user (Human Readable ID)
+                imgui.text(f"Hex ID: {row.get('hex', 'N/A')}")
+                
+                imgui.separator()
+                imgui.text(f"Owner: {row.get('owner', 'None')}")
+                imgui.text(f"Type: {row.get('type', '-')}")
+                
+            except Exception:
+                imgui.text_colored((1, 0, 0, 1), "Region not defined in TSV")
+                imgui.text(f"Raw Int: {region_int_id}")
+        else:
+            imgui.text_disabled("Select a region on map...")
+        imgui.end()
+
+    def _render_region_list(self):
+        if imgui.begin("All Regions", True)[1]:
+            state = self.net.get_state()
+            regions = state.get_table("regions").head(200) # Limit for UI perf
+            
+            for row in regions.iter_rows(named=True):
+                # Display Name + Hex
+                label = f"{row.get('name', '?')} ({row.get('hex', '?')})"
+                if imgui.selectable(label)[0]:
+                    if self.on_focus_request:
+                        # Assuming center_x/y exist
+                        self.on_focus_request(row.get('center_x', 0), row.get('center_y', 0))
         imgui.end()
