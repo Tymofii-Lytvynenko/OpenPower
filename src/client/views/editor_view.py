@@ -23,6 +23,7 @@ class EditorView(arcade.View):
     def __init__(self, session: GameSession, config: GameConfig):
         super().__init__()
         self.game_config = config
+        self.is_panning_map = False
         
         # 1. Initialize Network Bridge
         self.net = NetworkClient(session)
@@ -91,41 +92,48 @@ class EditorView(arcade.View):
         # 1. Pass input to ImGui first
         self.imgui_controller.on_mouse_press(x, y, button, modifiers)
         
-        # 2. If ImGui is using the mouse, ignore map interaction
+        # 2. Check if ImGui wants the mouse right now
         if self.imgui_controller.io.want_capture_mouse:
+            self.is_panning_map = False # ImGui has priority
             return
 
         # 3. Handle Map Interaction
-        # Left Click: Select Region
         if button == arcade.MOUSE_BUTTON_LEFT:
             self._handle_selection(x, y)
         
-        # Note: Middle/Right click usually initiates a drag, which is handled in on_mouse_drag
+        # 4. Prepare for panning logic
+        # If Right or Middle click is pressed, and ImGui didn't take it, allow panning
+        if button == arcade.MOUSE_BUTTON_RIGHT or button == arcade.MOUSE_BUTTON_MIDDLE:
+            self.is_panning_map = True
+
+    def on_mouse_release(self, x: int, y: int, button: int, modifiers: int):
+        self.imgui_controller.on_mouse_release(x, y, button, modifiers)
+        
+        # Stop panning when buttons are released
+        if button == arcade.MOUSE_BUTTON_RIGHT or button == arcade.MOUSE_BUTTON_MIDDLE:
+            self.is_panning_map = False
 
     def on_mouse_drag(self, x: int, y: int, dx: int, dy: int, buttons: int, modifiers: int):
         """
         Handle mouse movement while a button is held down (Panning).
         """
+        # 1. ALWAYS update ImGui position, otherwise UI sliders won't drag correctly!
         self.imgui_controller.on_mouse_drag(x, y, dx, dy, buttons, modifiers)
-        if self.imgui_controller.io.want_capture_mouse:
-            return
 
-        # Pan Map with Middle Mouse (Wheel Click) or Right Mouse
-        if buttons & arcade.MOUSE_BUTTON_MIDDLE or buttons & arcade.MOUSE_BUTTON_RIGHT:
-            # We must adjust the delta by the zoom level.
-            # If we are zoomed in (zoom > 1), a small mouse move covers less world distance.
-            # If we are zoomed out (zoom < 1), it covers more.
-            # Formula: world_delta = screen_delta / zoom
-            
-            scale = 1.0 / self.camera_controller.zoom
-            
-            # Update the camera position (Subtract delta to create "Grab and Pull" feel)
-            # If I drag mouse LEFT (-dx), Camera moves RIGHT (+x) to show what was on the right.
-            new_x = self.camera_controller.position[0] - (dx * scale)
-            new_y = self.camera_controller.position[1] - (dy * scale)
-            
-            self.camera_controller.position = (new_x, new_y)
-            self.camera_controller.update_arcade_camera(self.world_camera)
+        # 2. Map Panning Logic
+        # We only pan if we decided we were panning during on_mouse_press.
+        # This prevents the camera from getting stuck if we drag FROM map OVER UI.
+        if self.is_panning_map:
+            # Check if correct buttons are still held (safety check)
+            if buttons & arcade.MOUSE_BUTTON_MIDDLE or buttons & arcade.MOUSE_BUTTON_RIGHT:
+                scale = 1.0 / self.camera_controller.zoom
+                
+                # Invert logic: Move mouse LEFT -> Camera moves RIGHT
+                new_x = self.camera_controller.position.x - (dx * scale)
+                new_y = self.camera_controller.position.y - (dy * scale)
+                
+                self.camera_controller.position = Vec2(new_x, new_y)
+                self.camera_controller.update_arcade_camera(self.world_camera)
 
     def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int):
         """Handle zoom events (Mouse Wheel Scroll)."""

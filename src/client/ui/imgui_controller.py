@@ -100,6 +100,15 @@ class ImGuiController:
         Propagates mouse wheel events.
         """
         self.io.add_mouse_wheel_event(scroll_x, scroll_y)
+        
+    def on_mouse_drag(self, x: float, y: float, dx: float, dy: float, buttons: int, modifiers: int):
+        """
+        Propagates mouse drag events to ImGui.
+        Arcade separates motion and drag, but ImGui needs to know cursor position in both cases.
+        """
+        self.io.add_mouse_pos_event(x, self.window.height - y)
+
+        self._update_modifiers(modifiers)
 
     def on_key_press(self, key: int, modifiers: int):
         """
