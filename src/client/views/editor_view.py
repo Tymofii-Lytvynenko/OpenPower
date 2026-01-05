@@ -3,7 +3,7 @@ from pyglet.math import Vec2
 
 from src.server.session import GameSession
 from src.shared.config import GameConfig
-from client.services.network_client_service import NetworkClient
+from src.client.services.network_client_service import NetworkClient
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.ui.editor_layout import EditorLayout
 from src.client.services.imgui_service import ImGuiService
@@ -85,7 +85,7 @@ class EditorView(arcade.View):
         self.highlight_layer.draw()
         
         # 3. UI Generation
-        self.ui_layout.render(self.selected_region_int_id, 1.0/60.0)
+        self.ui_layout.render(self.selected_region_int_id, self.imgui.io.framerate)
 
         # 4. UI Render (Overlay)
         self.window.use() 
