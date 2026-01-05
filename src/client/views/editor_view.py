@@ -155,6 +155,13 @@ class EditorView(arcade.View):
         # For now, we zoom towards the center of the camera
         
         self.camera_controller.update_arcade_camera(self.world_camera)
+        
+    def on_mouse_motion(self, x: int, y: int, dx: int, dy: int):
+        """
+        Критично важливо: передаємо рух миші в ImGui, 
+        навіть коли кнопки не натиснуті.
+        """
+        self.imgui_controller.on_mouse_motion(x, y, dx, dy)
 
     def on_key_press(self, symbol: int, modifiers: int):
         """Handle hotkeys."""
