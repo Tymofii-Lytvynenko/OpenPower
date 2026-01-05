@@ -42,8 +42,12 @@ class MainWindow(arcade.Window):
         # 1. Call standard Arcade resize (handles projection matrices)
         super().on_resize(width, height)
         
-        # 2. Propagate to the current view using a standard interface
-        # We check hasattr to support Views that might not use ImGui.
+        # 2. FORCE Viewport update (Safety measure against ImGui interfering)
+        # Sometimes ImGui leaves the viewport in a weird state.
+        self.ctx.viewport = (0, 0, width, height)
+        self.ctx.scissor = None # Ensure full screen is writable
+        
+        # 3. Propagate to View/ImGuiService
         if self.current_view and hasattr(self.current_view, "on_resize"):
             self.current_view.on_resize(int(width), int(height))
 

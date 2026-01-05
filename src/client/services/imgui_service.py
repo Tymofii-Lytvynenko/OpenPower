@@ -78,6 +78,19 @@ class ImGuiService:
         imgui.render()
         draw_data = imgui.get_draw_data()
         self.renderer.render(draw_data)
+        
+        # --- FIX: CRITICAL RESET FOR ARCADE ---
+        # ImGui enables GL_SCISSOR_TEST to clip UI elements. If we don't disable it,
+        # Arcade's subsequent `self.clear()` will only clear the tiny scissor box 
+        # left by ImGui, leaving "garbage" artifacts on the rest of the screen.
+        try:
+            # Arcade 3.0 way to disable scissor test
+            self.window.ctx.scissor = None
+        except Exception:
+            # Fallback for older OpenGL contexts or Pyglet direct access if needed
+            from pyglet.gl import glDisable, GL_SCISSOR_TEST
+            glDisable(GL_SCISSOR_TEST)
+
         self._frame_started = False
 
     # --- Input Handling (Returns True if ImGui captured the event) ---

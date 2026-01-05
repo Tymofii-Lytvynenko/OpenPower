@@ -66,6 +66,7 @@ class EditorView(arcade.View):
     def on_resize(self, width: int, height: int):
         """Syncs resize events with ImGui."""
         self.imgui.resize(width, height)
+        self.world_camera.match_window()
 
     def on_show_view(self):
         """Initial setup when view appears."""
