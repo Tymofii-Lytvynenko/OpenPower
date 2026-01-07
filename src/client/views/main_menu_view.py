@@ -6,9 +6,13 @@ from src.client.ui.theme import GAMETHEME
 from src.shared.config import GameConfig
 from src.server.session import GameSession
 
-# Import views to switch to
+# Views
 from src.client.views.editor_view import EditorView
 from src.client.views.game_view import GameView
+from src.client.views.loading_view import LoadingView
+
+# Tasks
+from src.client.tasks.editor_loading_task import EditorLoadingTask, EditorContext
 
 class MainMenuView(arcade.View):
     """
@@ -26,7 +30,6 @@ class MainMenuView(arcade.View):
 
     def on_show_view(self):
         print("[MainMenuView] Entered Main Menu")
-        # Set placeholder black background
         self.window.background_color = arcade.color.BLACK
 
     def on_resize(self, width: int, height: int):
@@ -35,42 +38,29 @@ class MainMenuView(arcade.View):
     def on_draw(self):
         self.clear()
         
-        # Start UI Frame
         self.imgui.new_frame(1.0 / 60.0)
-        
-        # Apply Theme
         self.ui.setup_frame()
-        
-        # Render the Menu Logic
         self._render_menu_window()
-        
-        # Draw to screen
         self.imgui.render()
 
     def _render_menu_window(self):
-        """Defines the layout and logic of the main menu."""
         screen_w, screen_h = self.window.get_size()
         
-        # Use Composer to draw the panel
         if self.ui.begin_centered_panel("Main Menu", screen_w, screen_h, width=350, height=450):
             
             self.ui.draw_title("OPEN POWER")
             
             # -- Menu Buttons --
             if self.ui.draw_menu_button("SINGLE PLAYER"):
-                # Transition to GameView
                 game_view = GameView()
                 self.window.show_view(game_view)
             
             if self.ui.draw_menu_button("MAP EDITOR"):
-                # Transition to EditorView
-                editor = EditorView(self.session, self.config)
-                self.window.show_view(editor)
+                self._launch_editor()
             
             if self.ui.draw_menu_button("SETTINGS"):
                 print("Settings clicked (Not Implemented)")
             
-            # Spacer
             from imgui_bundle import imgui
             imgui.dummy((0, 50)) 
             
@@ -79,6 +69,22 @@ class MainMenuView(arcade.View):
                 sys.exit()
 
             self.ui.end_panel()
+
+    def _launch_editor(self):
+        """
+        Initiates the loading sequence for the editor.
+        """
+        # 1. Create the Task
+        task = EditorLoadingTask(self.session, self.config)
+        
+        # 2. Define success callback
+        def on_editor_loaded(context: EditorContext):
+            # Pass the loaded context to the view
+            return EditorView(context, self.config)
+            
+        # 3. Show Loading Screen
+        loader = LoadingView(task, on_success=on_editor_loaded)
+        self.window.show_view(loader)
 
     # --- Input Delegation ---
     

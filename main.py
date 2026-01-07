@@ -20,10 +20,6 @@ def main():
     print(f"[Main] Project Root: {config.project_root}")
     print(f"[Main] Active Mods: {config.active_mods}")
     
-    # --- CRITICAL FIX ---
-    # DELETE the line: session = GameSession(config)
-    # The session is not created here anymore. It is created by the Loading Screen.
-    
     # 4. Start the Window with ONLY config
     window = MainWindow(config)
     

@@ -1,31 +1,34 @@
 import arcade
 from pyglet.math import Vec2
 
-from src.server.session import GameSession
 from src.shared.config import GameConfig
 from src.client.services.network_client_service import NetworkClient
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.ui.editor_layout import EditorLayout
 from src.client.services.imgui_service import ImGuiService
 from src.client.camera_controller import CameraController
+# Import the Context type for type hinting
+from src.client.tasks.editor_loading_task import EditorContext
 
 class EditorView(arcade.View):
     """
     The main visual interface for the Map Editor.
-    
-    Refactoring Status:
-        - Implements Composition (Network, ImGui, Layout, MapRenderer, CameraController).
-        - Logic for inputs is delegated to specific components.
     """
 
-    def __init__(self, session: GameSession, config: GameConfig):
+    def __init__(self, context: EditorContext, config: GameConfig):
+        """
+        Args:
+            context: Pre-loaded assets (Atlas, Network, Path) from the LoadingTask.
+            config: Global game config.
+        """
         super().__init__()
         self.game_config = config
         self.is_panning_map = False
         self.background_color = arcade.color.DARK_SLATE_GRAY
         
         # --- 1. Composition: Logic Components ---
-        self.net = NetworkClient(session)
+        # Use the pre-loaded network client
+        self.net = context.net_client
         self.imgui = ImGuiService(self.window)
         
         # --- 2. Composition: UI Layout ---
@@ -33,29 +36,20 @@ class EditorView(arcade.View):
         self.ui_layout.on_focus_request = self.focus_on_coordinates
         
         # --- 3. Composition: Visual Components ---
-        
-        # Resolve Map Path
-        map_path = None
-        for data_dir in config.get_data_dirs():
-            candidate = data_dir / "regions" / "regions.png"
-            if candidate.exists():
-                map_path = candidate
-                break
-        
-        if not map_path:
-             map_path = config.get_asset_path("map/regions.png")
+        if not context.map_path.exists():
+             print(f"[EditorView] CRITICAL: Map path from context invalid: {context.map_path}")
 
-        if not map_path or not map_path.exists():
-             print(f"[EditorView] CRITICAL: 'regions.png' not found.")
-             # Fallback to project root placeholder if needed
-             map_path = config.project_root / "missing_map_placeholder.png"
-
-        self.map_renderer = MapRenderer(map_path, config.cache_dir)
+        # Initialize Renderer using the PRE-LOADED Atlas (CPU work already done).
+        # The MapRenderer will only handle the GPU Sprite creation here.
+        self.map_renderer = MapRenderer(
+            map_path=context.map_path, 
+            cache_dir=config.cache_dir,
+            preloaded_atlas=context.atlas
+        )
         
         # --- 4. Composition: Camera System ---
         self.world_camera = arcade.Camera2D()
         
-        # Initialize Controller centered on the map
         center_pos = self.map_renderer.get_center()
         self.camera_controller = CameraController(center_pos)
         
@@ -64,16 +58,13 @@ class EditorView(arcade.View):
         self.highlight_layer = arcade.SpriteList()
 
     def on_resize(self, width: int, height: int):
-        """Syncs resize events with ImGui."""
         self.imgui.resize(width, height)
         self.world_camera.match_window()
 
     def on_show_view(self):
-        """Initial setup when view appears."""
         self.camera_controller.update_arcade_camera(self.world_camera)
 
     def on_draw(self):
-        """Render loop."""
         self.clear()
         
         # 1. UI Update
@@ -94,16 +85,13 @@ class EditorView(arcade.View):
     # --- Input Delegation ---
 
     def on_mouse_press(self, x: int, y: int, button: int, modifiers: int):
-        # 1. ImGui Priority
         if self.imgui.on_mouse_press(x, y, button, modifiers):
             self.is_panning_map = False 
             return
 
-        # 2. Map Interaction
         if button == arcade.MOUSE_BUTTON_LEFT:
             self._handle_selection(x, y)
         
-        # 3. Camera Control State
         if button == arcade.MOUSE_BUTTON_RIGHT or button == arcade.MOUSE_BUTTON_MIDDLE:
             self.is_panning_map = True
 
@@ -119,7 +107,6 @@ class EditorView(arcade.View):
             return
 
         if self.is_panning_map:
-            # Delegate math to Controller
             self.camera_controller.pan(dx, dy)
             self.camera_controller.update_arcade_camera(self.world_camera)
 
@@ -127,7 +114,6 @@ class EditorView(arcade.View):
         if self.imgui.on_mouse_scroll(x, y, scroll_x, scroll_y):
             return
         
-        # Delegate logic to Controller
         self.camera_controller.zoom_scroll(scroll_y)
         self.camera_controller.update_arcade_camera(self.world_camera)
         
@@ -150,8 +136,6 @@ class EditorView(arcade.View):
     # --- Internal Helpers ---
 
     def _handle_selection(self, screen_x: int, screen_y: int):
-        """Converts screen click -> World Pos -> Region ID."""
-        # Unproject allows us to get the world coordinates considering the camera
         world_pos = self.world_camera.unproject((screen_x, screen_y))
         
         region_int_id = self.map_renderer.get_region_id_at_world_pos(world_pos.x, world_pos.y)
@@ -159,7 +143,6 @@ class EditorView(arcade.View):
         if region_int_id is not None:
             self.selected_region_int_id = region_int_id
             
-            # Update visual highlight
             self.highlight_layer.clear()
             highlight_sprite = self.map_renderer.create_highlight_sprite(
                 [region_int_id], 
@@ -172,11 +155,6 @@ class EditorView(arcade.View):
             self.highlight_layer.clear()
 
     def focus_on_coordinates(self, x: float, y: float):
-        """
-        Callback used by UI to jump to a specific region center.
-        We flip Y here because UI/Data usually treats Y=0 as Top, while World is Bottom.
-        """
         world_y = self.map_renderer.height - y
-        
         self.camera_controller.jump_to(x, world_y)
         self.camera_controller.update_arcade_camera(self.world_camera)
