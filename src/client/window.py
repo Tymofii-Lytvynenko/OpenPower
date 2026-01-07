@@ -1,33 +1,39 @@
 import arcade
-from src.server.session import GameSession
 from src.shared.config import GameConfig
-from src.client.views.editor_view import EditorView
+from src.client.views.loading_view import LoadingView
 from src.client.views.main_menu_view import MainMenuView
+from src.client.services.startup_task import StartupTask
 
 class MainWindow(arcade.Window):
-    """
-    The main application window container.
     
-    It serves as the top-level lifecycle manager but delegates specific logic
-    to Views (EditorView, GameView).
-    """
-    
-    def __init__(self, session: GameSession, config: GameConfig):
-        # Initialize standard Arcade window
-        super().__init__(1280, 720, "OpenPower Editor", resizable=True)
-        self.session = session
+    def __init__(self, config: GameConfig):
+        super().__init__(1280, 720, "OpenPower Engine", resizable=True)
         self.game_config = config
         self.center_window()
-        
-        # Set a minimum size to prevent layout crashes in ImGui/Arcade on
-        # extremely small window resizes (e.g., < 100px).
         self.set_minimum_size(800, 600)
+        
+        # Session starts as None; populated by LoadingView later
+        self.session = None 
 
     def setup(self):
-        print("[Window] Initializing...")
-        #start_view = EditorView(self.session, self.game_config)
-        start_view = MainMenuView(self.session, self.game_config)
-        self.show_view(start_view)
+        print("[Window] Booting...")
+        
+        # 1. Create the Task Object (The 'Disc')
+        # This object implements the logic to load the server
+        task = StartupTask(self.game_config)
+        
+        # 2. Define the callback (What happens when the Task finishes)
+        def on_boot_complete(result_session):
+            print("[Window] Engine Ready.")
+            self.session = result_session
+            # Switch to Main Menu with the ready session
+            return MainMenuView(self.session, self.game_config)
+
+        # 3. Create the View (The 'Player')
+        # We pass the Task object, not a raw function
+        loader = LoadingView(task, on_success=on_boot_complete)
+        
+        self.show_view(loader)
         
     def on_resize(self, width: float, height: float):
         """
@@ -55,4 +61,6 @@ class MainWindow(arcade.Window):
 
     def on_update(self, delta_time: float):
         """Global game tick."""
-        self.session.tick(delta_time)
+        # Only tick the engine if loading is complete and session is ready.
+        if self.session:
+            self.session.tick(delta_time)

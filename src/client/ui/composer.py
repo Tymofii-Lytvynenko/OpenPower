@@ -79,3 +79,43 @@ class UIComposer:
         # 4. Spacing (Using Dummy for safety)
         imgui.separator()
         imgui.dummy((0.0, 10.0))
+        
+    def draw_progress_bar(self, fraction: float, text: str = "", width: float = -1, height: float = 20):
+        """
+        Draws a custom, sharp, industrial-style progress bar.
+        
+        Args:
+            fraction: 0.0 to 1.0
+            text: Text overlay (e.g. "Loading Regions...")
+        """
+        if width < 0:
+            width = imgui.get_content_region_avail().x
+            
+        # Draw background (Darker slot)
+        p = imgui.get_cursor_screen_pos()
+        draw_list = imgui.get_window_draw_list()
+        
+        bg_col = imgui.get_color_u32((0.0, 0.1, 0.15, 1.0))
+        fill_col = imgui.get_color_u32(self.theme.button_active) # Use active button cyan color
+        text_col = imgui.get_color_u32((1, 1, 1, 1))
+        
+        # 1. Background Rect
+        draw_list.add_rect_filled(p, (p.x + width, p.y + height), bg_col)
+        
+        # 2. Fill Rect (The actual progress)
+        fill_width = max(2.0, width * fraction) # Ensure at least 2px so it's visible at start
+        draw_list.add_rect_filled(p, (p.x + fill_width, p.y + height), fill_col)
+        
+        # 3. Border (The "SP2" thin cyan line)
+        border_col = imgui.get_color_u32(self.theme.border)
+        draw_list.add_rect(p, (p.x + width, p.y + height), border_col)
+        
+        # 4. Text Overlay (Centered)
+        text_size = imgui.calc_text_size(text)
+        text_x = p.x + (width - text_size.x) / 2
+        text_y = p.y + (height - text_size.y) / 2
+        draw_list.add_text((text_x, text_y), text_col, text)
+        
+        # Advance cursor so the next item doesn't overlap
+        imgui.dummy((width, height))
+        imgui.dummy((0.0, 5.0)) # Spacing

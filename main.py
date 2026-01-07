@@ -3,45 +3,35 @@ import sys
 from pathlib import Path
 
 # 1. Setup Python Path
-# This line ensures that Python can locate the 'src' package regardless of 
-# the terminal's current working directory.
 ROOT_DIR = Path(__file__).parent.resolve()
 sys.path.append(str(ROOT_DIR))
 
 # 2. Imports
-# These must be imported AFTER adding ROOT_DIR to sys.path
 from src.shared.config import GameConfig
-from src.server.session import GameSession
+# Note: We do NOT import GameSession here anymore.
 from src.client.window import MainWindow
 
 def main():
     print("--- OpenPower Engine Initializing ---")
     
     # 3. Initialize Configuration
-    # The GameConfig class scans the directory structure, loads 'mods.json',
-    # and determines where data and assets are located.
     config = GameConfig(ROOT_DIR)
     
     print(f"[Main] Project Root: {config.project_root}")
     print(f"[Main] Active Mods: {config.active_mods}")
     
-    # 4. Start the Game Server (Host Session)
-    # In a Single-Player environment, the 'Server' runs locally in the same process.
-    # This step triggers the DataLoader to read all TSV files into memory (Polars).
-    session = GameSession(config)
+    # --- CRITICAL FIX ---
+    # DELETE the line: session = GameSession(config)
+    # The session is not created here anymore. It is created by the Loading Screen.
     
-    # 5. Start the Game Client (Window)
-    # We inject the 'session' (to access game state) and 'config' (to find assets)
-    # into the main window. This completes the dependency injection chain.
-    window = MainWindow(session, config)
+    # 4. Start the Window with ONLY config
+    window = MainWindow(config)
     
-    # 6. Setup & Run
-    # Calls the internal setup of the window (which loads the EditorView).
+    # 5. Setup & Run
+    # This triggers window.setup() -> LoadingView -> StartupTask -> GameSession.create_local()
     window.setup()
     
-    print("--- Initialization Complete. Starting Game Loop. ---")
-    
-    # Start the Arcade event loop (blocking call)
+    print("--- Window Created. Handing off to Loading Screen. ---")
     arcade.run()
 
 if __name__ == "__main__":
