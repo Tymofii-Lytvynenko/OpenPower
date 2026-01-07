@@ -2,7 +2,7 @@ import arcade
 from src.shared.config import GameConfig
 from src.client.views.loading_view import LoadingView
 from src.client.views.main_menu_view import MainMenuView
-from src.client.services.startup_task import StartupTask
+from src.client.tasks.startup_task import StartupTask
 
 class MainWindow(arcade.Window):
     
