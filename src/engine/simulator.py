@@ -1,70 +1,90 @@
-from typing import List
-import polars as pl
-
+from typing import List, Dict
+from graphlib import TopologicalSorter, CycleError
 from src.server.state import GameState
-from src.shared.actions import GameAction, ActionSetRegionOwner, ActionSetTax
-from src.engine.systems import territory, economy
+from src.shared.actions import GameAction
+from src.engine.interfaces import ISystem
 
 class Engine:
     """
-    The deterministic core of the OpenPower simulation.
-    
-    Design Philosophy:
-        The Engine is 'Functional' in nature.
-        Input: State + Actions + Time
-        Output: New State
-        
-        It is completely decoupled from the Client, Server, or Network. 
-        This allows us to run this logic on a headless Linux server 
-        or inside a local Pytest suite with zero changes.
+    The core logic driver. 
+    Orchestrates systems using a Dependency Graph to determine execution order.
     """
+    
+    def __init__(self):
+        # Map: "base.economy" -> EconomySystem instance
+        self.systems_map: Dict[str, ISystem] = {}
+        
+        # The finalized, sorted list used in the loop
+        self.execution_order: List[ISystem] = []
+        
+        # Dirty flag to trigger rebuild on next tick if systems changed
+        self._is_dirty = False
 
-    @staticmethod
-    def step(state: GameState, actions: List[GameAction], delta_time: float):
+    def register_systems(self, systems: List[ISystem]):
         """
-        Advances the simulation by one 'Tick'.
-        
-        Args:
-            state: The mutable GameState container holding all dataframes.
-            actions: A list of Player/AI commands to process this tick.
-            delta_time: Time elapsed in seconds (used for movement, production progress).
+        Registers a batch of systems and marks the graph for rebuild.
         """
+        for system in systems:
+            if system.id in self.systems_map:
+                print(f"[Engine] Warning: System '{system.id}' is being overwritten!")
+            self.systems_map[system.id] = system
         
-        # 1. Process Discrete Actions (Command Pattern)
-        # Actions are processed sequentially. This ensures determinism:
-        # if Player A captures a region and Player B nukes it in the same tick,
-        # the order in the list determines the outcome.
-        for action in actions:
-            Engine._apply_action(state, action)
+        self._is_dirty = True
+
+    def _rebuild_execution_order(self):
+        """
+        Uses Topological Sort to resolve dependencies.
+        """
+        print("[Engine] Building dependency graph...")
+        sorter = TopologicalSorter()
+        
+        # 1. Build the graph structure
+        for sys_id, system in self.systems_map.items():
+            # Add node and its edges (dependencies)
+            sorter.add(sys_id, *system.dependencies)
+
+        try:
+            # 2. Resolve order (returns generator of IDs)
+            sorted_ids = list(sorter.static_order())
             
-        # 2. Continuous Simulation (Systems)
-        # Here we would call systems that run every frame/tick, regardless of user input.
-        # Examples: Unit movement, factory production, population growth.
-        # economy.calculate_daily_income(state) # Uncomment when implemented
-        
-        # 3. Update Meta-State
-        # Increment the internal clock.
-        state.globals["tick"] += 1
-
-    @staticmethod
-    def _apply_action(state: GameState, action: GameAction):
-        """
-        Routes a generic GameAction to the specific system logic.
-        Uses Python 3.10+ Structural Pattern Matching for readable control flow.
-        """
-        match action:
-            # --- Map / Territory Logic ---
-            case ActionSetRegionOwner(player_id, region_id, new_owner_tag):
-                # In the future, we can add a check here:
-                # if logic.can_modify_map(player_id): ...
-                territory.apply_region_ownership_change(state, region_id, new_owner_tag)
-
-            # --- Economy / Political Logic ---
-            case ActionSetTax(player_id, country_tag, new_rate):
-                economy.apply_tax_change(state, country_tag, new_rate)
+            # 3. Map IDs back to Instances
+            # Note: sorted_ids may contain IDs of dependencies that aren't registered 
+            # (if a mod declares a dependency on a missing system). We filter those out.
+            self.execution_order = [
+                self.systems_map[sys_id] 
+                for sys_id in sorted_ids 
+                if sys_id in self.systems_map
+            ]
             
-            # --- Fallback ---
-            case _:
-                # This catches any action types defined in shared/actions.py 
-                # but not yet implemented in the Engine.
-                print(f"[Engine] WARNING: Received unhandled action type: {type(action).__name__}")
+            # Debug output
+            order_names = [s.id for s in self.execution_order]
+            print(f"[Engine] Graph resolved. Execution Order: {order_names}")
+            
+            self._is_dirty = False
+
+        except CycleError as e:
+            # Critical error: A depends on B, and B depends on A
+            print(f"[Engine] CRITICAL ERROR: Circular dependency detected in systems! {e}")
+            # In production, you might want to crash explicitly or load a safe-mode fallback
+            raise e
+        except Exception as e:
+            print(f"[Engine] Error building system graph: {e}")
+            raise e
+
+    def step(self, state: GameState, actions: List[GameAction], delta_time: float):
+        """
+        Runs one tick of the simulation using the sorted graph.
+        """
+        # Rebuild graph if new systems were registered (e.g. hot-reloading)
+        if self._is_dirty:
+            self._rebuild_execution_order()
+
+        # 1. Update Global Time
+        state.globals["tick"] = state.globals.get("tick", 0) + 1
+        
+        # 2. Run All Systems in Strict Order
+        for system in self.execution_order:
+            try:
+                system.update(state, delta_time)
+            except Exception as e:
+                print(f"[Engine] Error in system '{system.id}': {e}")

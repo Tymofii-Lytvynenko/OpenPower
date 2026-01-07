@@ -1,0 +1,8 @@
+id = "base"
+name = "OpenPower Core"
+version = "0.0.1 Prototype"
+dependencies = []
+
+[metadata]
+author = "Tymofii Lytvynenko"
+description = "The base game logic."

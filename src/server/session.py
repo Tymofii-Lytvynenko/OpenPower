@@ -2,48 +2,53 @@ from pathlib import Path
 from typing import List
 
 from src.server.state import GameState
-from src.server.io.loader import DataLoader
-from src.server.io.exporter import DataExporter
+from src.server.io.data_load_manager import DataLoader
+from src.server.io.data_export_manager import DataExporter
+from src.engine.mod_manager import ModManager
 from src.engine.simulator import Engine
 from src.shared.actions import GameAction
+from src.shared.config import GameConfig
 
 class GameSession:
     """
     The 'Host' of the game. It manages the lifecycle of the simulation.
-    
-    Responsibilities:
-    1. Initialization: Loads data using DataLoader.
-    2. Loop: Ticks the Engine with a delta_time.
-    3. Networking: Receives actions from clients (even if local).
-    4. Persistence: Handles saving/loading.
     """
     def __init__(self, root_dir: Path):
         self.root_dir = root_dir
+        self.config = GameConfig(root_dir)
         
-        # 1. Initialize IO subsystems
-        self.loader = DataLoader(root_dir)
-        self.exporter = DataExporter(root_dir)
+        # 1. Initialize Mod System
+        # We must resolve mods BEFORE loading data or systems.
+        self.mod_manager = ModManager(self.config)
         
-        # 2. Load the World
-        # This creates the initial GameState from files.
+        # This builds the dependency graph and determines valid load order
+        active_mods = self.mod_manager.resolve_load_order()
+        
+        # Update config so DataLoader knows where to look for TSV files
+        # (Assuming GameConfig has a method or list for this)
+        self.config.active_mods = [m.id for m in active_mods] 
+
+        # 2. Initialize IO subsystems
+        self.loader = DataLoader(self.config)
+        self.exporter = DataExporter(self.config)
+        self.engine = Engine() # Instance the Engine
+        
+        # 3. Load the World Data (Tables)
         self.state: GameState = self.loader.load_initial_state()
         
-        # 3. Action Queue
-        # We buffer actions received from the network/UI and apply them
-        # all at once during the next tick. This ensures thread safety.
+        # 4. Load and Register Logic (Systems)
+        systems = self.mod_manager.load_systems()
+        self.engine.register_systems(systems)
+        
         self.action_queue: List[GameAction] = []
 
     def tick(self, delta_time: float):
-        """
-        The heartbeat of the server. Called 60 times per second by the Main Loop.
-        """
         if not self.action_queue and delta_time <= 0:
             return
 
-        # Pass the queue to the Engine to process logic
-        Engine.step(self.state, self.action_queue, delta_time)
+        # Pass the instance method of the engine
+        self.engine.step(self.state, self.action_queue, delta_time)
         
-        # Clear queue after processing
         self.action_queue.clear()
 
     def receive_action(self, action: GameAction):
