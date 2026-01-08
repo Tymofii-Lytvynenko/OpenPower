@@ -1,260 +1,257 @@
-id	flag
-COL	
-MAF	
-SPM	
-SGS	
-NLD	
-TKM	
-DEU	
-LTU	
-BGR	
-POL	
-XTR	
-PHL	
-VIR	
-GRL	
-TUV	
-LCA	
-MRT	
-ASM	
-SLB	
-SWE	
-EST	
-DMA	
-DOM	
-TWN	
-SHN	
-GBR	
-COD	
-GMB	
-URY	
-GRC	
-KWT	
-GRD	
-MYS	
-CAN	
-BMU	
-FRA	
-MOZ	
-HTI	
-AUS	
-MLI	
-ABW	
-LSO	
-UMI	
-MHL	
-NIU	
-PRK	
-LIE	
-SYR	
-PSE	
-LBN	
-GTM	
-TON	
-TUR	
-USA	
-VGB	
-KHM	
-TLS	
-COG	
-FLK	
-TCA	
-GAB	
-KNA	
-QAT	
-UKR	
-UZB	
-ROU	
-SXM	
-CMR	
-VNM	
-CHE	
-JOR	
-LBR	
-TKL	
-LVA	
-AIA	
-BTN	
-AZE	
-BHR	
-KIR	
-ITA	
-MCO	
-MMR	
-MWI	
-BLM	
-FSM	
-CYP	
-CAF	
-BWA	
-ISR	
-HND	
-SAU	
-KGZ	
-KOR	
-GEO	
-IRN	
-SGP	
-IOT	
-ALB	
-BOL	
-ARE	
-BIH	
-EGY	
-COK	
-HMD	
-FJI	
-PAN	
-TZA	
-MNP	
-SWZ	
-VCT	
-MUS	
-ZMB	
-AFG	
-PAK	
-TCD	
-OMN	
-PCN	
-XSO	
-SVK	
-CYM	
-BHS	
-HUN	
-GUY	
-LAO	
-MDV	
-RWA	
-GUM	
-TTO	
-AUT	
-PRY	
-HRV	
-SLE	
-SRB	
-MAR	
-PLW	
-PRT	
-SUR	
-MKD	
-ATF	
-YEM	
-BRB	
-SVN	
-ARM	
-CRI	
-GHA	
-IRQ	
-KAZ	
-UGA	
-BRN	
-PYF	
-WLF	
-IND	
-NIC	
-WSM	
-MSR	
-GIN	
-IRL	
-AND	
-TUN	
-CHN	
-IDN	
-GUF	
-HKG	
-DNK	
-FIN	
-NPL	
-VUT	
-NER	
-BDI	
-PRI	
-CUW	
-MNE	
-ESH	
-LKA	
-ETH	
-NZL	
-NAM	
-LUX	
-SLV	
-NCL	
-CPV	
-ATA	
-PNG	
-JPN	
-STP	
-ECU	
-MDA	
-TJK	
-NGA	
-BLR	
-VAT	
-CUB	
-XKK	
-VEN	
-DJI	
-LBY	
-ATG	
-NOR	
-NRU	
-COM	
-AGO	
-SMR	
-GNB	
-JAM	
-ERI	
-ZWE	
-BLZ	
-SSD	
-MEX	
-SEN	
-MAC	
-NFK	
-TGO	
-CIV	
-MLT	
-ZAF	
-CHL	
-BRA	
-BEN	
-MDG	
-RUS	
-GNQ	
-MNG	
-BFA	
-KEN	
-ISL	
-BGD	
-SDN	
-BEL	
-ESP	
-CZE	
-PER	
-SOM	
-ARG	
-DZA	
-SYC	
-THA	
-ALD	
-ATC	
-CLP	
-CSI	
-CYN	
-ESB	
-FRO	
-GGY	
-GIB	
-IMN	
-IOA	
-JEY	
-KAB	
-KAS	
-KOS	
-PGA	
-PSX	
-SAH	
-SDS	
-SOL	
-USG	
-WSB	
+id	flag	un_member	is_playable	controlled_by
+ABW		false	false	NLD
+AFG		true	true	
+AGO		true	true	
+AIA		false	false	GBR
+ALB		true	true	
+ALD		false	false	FIN
+AND		true	true	
+ARE		true	true	
+ARG		true	true	
+ARM		true	true	
+ASM		false	false	USA
+ATA		false	false	
+ATC		false	false	AUS
+ATF		false	false	FRA
+ATG		true	true	
+AUS		true	true	
+AUT		true	true	
+AZE		true	true	
+BDI		true	true	
+BEL		true	true	
+BEN		true	true	
+BFA		true	true	
+BGD		true	true	
+BGR		true	true	
+BHR		true	true	
+BHS		true	true	
+BIH		true	true	
+BLM		false	false	FRA
+BLR		true	true	
+BLZ		true	true	
+BMU		false	false	GBR
+BOL		true	true	
+BRA		true	true	
+BRB		true	true	
+BRN		true	true	
+BTN		true	true	
+BWA		true	true	
+CAF		true	true	
+CAN		true	true	
+CHE		true	true	
+CHL		true	true	
+CHN		true	true	
+CIV		true	true	
+CLP		false	false	FRA
+CMR		true	true	
+COD		true	true	
+COG		true	true	
+COK		false	false	NZL
+COL		true	true	
+COM		true	true	
+CPV		true	true	
+CRI		true	true	
+CSI		false	false	AUS
+CUB		true	true	
+CUW		false	false	NLD
+CYM		false	false	GBR
+CYN		false	false	TUR
+CYP		true	true	
+CZE		true	true	
+DEU		true	true	
+DJI		true	true	
+DMA		true	true	
+DNK		true	true	
+DOM		true	true	
+DZA		true	true	
+ECU		true	true	
+EGY		true	true	
+ERI		true	true	
+ESB		false	false	GBR
+ESH		false	false	MAR
+ESP		true	true	
+EST		true	true	
+ETH		true	true	
+FIN		true	true	
+FJI		true	true	
+FLK		false	false	GBR
+FRA		true	true	
+FRO		false	false	DNK
+FSM		true	true	
+GAB		true	true	
+GBR		true	true	
+GEO		true	true	
+GGY		false	false	GBR
+GHA		true	true	
+GIB		false	false	GBR
+GIN		true	true	
+GMB		true	true	
+GNB		true	true	
+GNQ		true	true	
+GRC		true	true	
+GRD		true	true	
+GRL		false	false	DNK
+GTM		true	true	
+GUF		false	false	FRA
+GUM		false	false	USA
+GUY		true	true	
+HKG		false	false	CHN
+HMD		false	false	AUS
+HND		true	true	
+HRV		true	true	
+HTI		true	true	
+HUN		true	true	
+IDN		true	true	
+IMN		false	false	GBR
+IND		true	true	
+IOA		false	false	GBR
+IOT		false	false	GBR
+IRL		true	true	
+IRN		true	true	
+IRQ		true	true	
+ISL		true	true	
+ISR		true	true	
+ITA		true	true	
+JAM		true	true	
+JEY		false	false	GBR
+JOR		true	true	
+JPN		true	true	
+KAB		false	false	PAK
+KAS		false	false	IND
+KAZ		true	true	
+KEN		true	true	
+KGZ		true	true	
+KHM		true	true	
+KIR		true	true	
+KNA		true	true	
+KOR		true	true	
+KOS		false	true	
+KWT		true	true	
+LAO		true	true	
+LBN		true	true	
+LBR		true	true	
+LBY		true	true	
+LCA		true	true	
+LIE		true	true	
+LKA		true	true	
+LSO		true	true	
+LTU		true	true	
+LUX		true	true	
+LVA		true	true	
+MAC		false	false	CHN
+MAF		false	false	FRA
+MAR		true	true	
+MCO		true	true	
+MDA		true	true	
+MDG		true	true	
+MDV		true	true	
+MEX		true	true	
+MHL		true	true	
+MKD		true	true	
+MLI		true	true	
+MLT		true	true	
+MMR		true	true	
+MNE		true	true	
+MNG		true	true	
+MNP		false	false	USA
+MOZ		true	true	
+MRT		true	true	
+MSR		false	false	GBR
+MUS		true	true	
+MWI		true	true	
+MYS		true	true	
+NAM		true	true	
+NCL		false	false	FRA
+NER		true	true	
+NFK		false	false	AUS
+NGA		true	true	
+NIC		true	true	
+NIU		false	false	NZL
+NLD		true	true	
+NOR		true	true	
+NPL		true	true	
+NRU		true	true	
+NZL		true	true	
+OMN		true	true	
+PAK		true	true	
+PAN		true	true	
+PCN		false	false	GBR
+PER		true	true	
+PGA		false	false	CHN
+PHL		true	true	
+PLW		true	true	
+PNG		true	true	
+POL		true	true	
+PRI		false	false	USA
+PRK		true	true	
+PRT		true	true	
+PRY		true	true	
+PSE		false	true	
+PSX		false	false	PSE
+PYF		false	false	FRA
+QAT		true	true	
+ROU		true	true	
+RUS		true	true	
+RWA		true	true	
+SAH		false	false	MAR
+SAU		true	true	
+SDN		true	true	
+SDS		false	false	SDN
+SEN		true	true	
+SGP		true	true	
+SGS		false	false	GBR
+SHN		false	false	GBR
+SLB		true	true	
+SLE		true	true	
+SLV		true	true	
+SMR		true	true	
+SOL		false	false	SOM
+SOM		true	true	
+SPM		false	false	FRA
+SRB		true	true	
+SSD		true	true	
+STP		true	true	
+SUR		true	true	
+SVK		true	true	
+SVN		true	true	
+SWE		true	true	
+SWZ		true	true	
+SXM		false	false	NLD
+SYC		true	true	
+SYR		true	true	
+TCA		false	false	GBR
+TCD		true	true	
+TGO		true	true	
+THA		true	true	
+TJK		true	true	
+TKL		false	false	NZL
+TKM		true	true	
+TLS		true	true	
+TON		true	true	
+TTO		true	true	
+TUN		true	true	
+TUR		true	true	
+TUV		true	true	
+TWN		false	false	CHN
+TZA		true	true	
+UGA		true	true	
+UKR		true	true	
+UMI		false	false	USA
+URY		true	true	
+USA		true	true	
+USG		false	false	USA
+UZB		true	true	
+VAT		false	true	
+VCT		true	true	
+VEN		true	true	
+VGB		false	false	GBR
+VIR		false	false	USA
+VNM		true	true	
+VUT		true	true	
+WLF		false	false	FRA
+WSB		false	false	GBR
+WSM		true	true	
+YEM		true	true	
+ZAF		true	true	
+ZMB		true	true	
+ZWE		true	true	
