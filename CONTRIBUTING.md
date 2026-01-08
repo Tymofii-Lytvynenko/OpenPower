@@ -1,0 +1,1 @@
+By contributing to this project, you agree that your contributions will be licensed under the project's current license and that the project owner reserves the right to change the license in the future.

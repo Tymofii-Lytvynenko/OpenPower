@@ -1,6 +1,7 @@
 from imgui_bundle import imgui
 import polars as pl
 from typing import Optional
+from datetime import datetime, timedelta
 from src.client.services.network_client_service import NetworkClient
 
 class GameLayout:
@@ -16,6 +17,9 @@ class GameLayout:
         # UI State
         self.map_mode = "political" # Default for gameplay
         self.show_debug = False
+        
+        # Date Configuration
+        self.start_date = datetime(2001, 1, 1, 0, 0)
 
     def render(self, selected_region_id: Optional[int], fps: float):
         """Main render pass."""
@@ -53,9 +57,9 @@ class GameLayout:
             imgui.separator()
             
             # 2. Time & Speed
-            # In a real game, 'tick' would be converted to YYYY-MM-DD
             tick = state.globals.get("tick", 0)
-            imgui.text(f"Date: 2001-01-{1 + (tick // 24):02d}") 
+            date_str = self._format_date(tick)
+            imgui.text(f"Date: {date_str}") 
             
             # Spacer
             imgui.dummy((20, 0))
@@ -112,3 +116,12 @@ class GameLayout:
                 imgui.text_disabled("Select a province...")
                 
         imgui.end()
+
+    def _format_date(self, tick: int) -> str:
+        """
+        Converts engine ticks to a formatted date string.
+        Assuming 1 tick = 1 hour.
+        Format: DD.MM.YYYY HH:MM
+        """
+        current_time = self.start_date + timedelta(hours=tick)
+        return current_time.strftime("%d.%m.%Y %H:%M")
