@@ -126,28 +126,101 @@ class EditorLayout:
                 # Polars optimization: filter and take 1
                 row = regions.filter(pl.col("id") == region_int_id).row(0, named=True)
                 
-                # Header
+                # --- HEADER ---
                 imgui.text_colored((0, 1, 1, 1), f"REGION: {row.get('name', 'Unknown')}")
                 imgui.separator()
                 
-                # Technical Data
-                imgui.text(f"ID: {region_int_id}")
-                imgui.text(f"Color Hex: {row.get('hex', 'N/A')}")
-                
-                imgui.dummy((0, 10)) # Spacing
-                
-                # Gameplay Data
-                imgui.text("Political:")
-                imgui.bullet_text(f"Owner: {row.get('owner', 'None')}")
-                imgui.bullet_text(f"Core:  {row.get('is_core', False)}")
+                # --- TECHNICAL ---
+                if imgui.tree_node("Technical Data"):
+                    imgui.text(f"ID: {region_int_id}")
+                    imgui.text(f"Color Hex: {row.get('hex', 'N/A')}")
+                    imgui.text(f"Center: ({row.get('center_x', 0)}, {row.get('center_y', 0)})")
+                    imgui.tree_pop()
                 
                 imgui.dummy((0, 10))
                 
+                # --- GEOGRAPHY ---
                 imgui.text("Geography:")
                 imgui.bullet_text(f"Type:  {row.get('type', 'Plains')}")
+                imgui.bullet_text(f"Biome: {row.get('biome', 'Temperate')}")
                 
-            except Exception:
+                imgui.dummy((0, 10))
+
+                # --- DEMOGRAPHICS (New) ---
+                imgui.text("Demographics:")
+                
+                # safely get values, defaulting to 0 if column missing
+                p14 = row.get('pop_14', 0)
+                p15 = row.get('pop_15_64', 0)
+                p65 = row.get('pop_65', 0)
+                total_pop = p14 + p15 + p65
+                
+                imgui.bullet_text(f"Total: {total_pop:,}")
+                
+                if total_pop > 0:
+                    imgui.indent()
+                    imgui.text_disabled(f"0-14:  {p14:,} ({p14/total_pop:.1%})")
+                    imgui.text_disabled(f"15-64: {p15:,} ({p15/total_pop:.1%})")
+                    imgui.text_disabled(f"65+:   {p65:,} ({p65/total_pop:.1%})")
+                    imgui.unindent()
+                
+                imgui.dummy((0, 10))
+
+                # --- POLITICAL & OWNER (New) ---
+                imgui.text("Political Context:")
+                owner_tag = row.get('owner', 'None')
+                
+                if owner_tag and owner_tag != "None":
+                    imgui.bullet_text(f"Owner: {owner_tag}")
+                    
+                    # Look up Country Data
+                    try:
+                        countries = state.get_table("countries")
+                        c_row = countries.filter(pl.col("id") == owner_tag)
+                        
+                        if not c_row.is_empty():
+                            c_data = c_row.row(0, named=True)
+                            
+                            imgui.indent()
+                            imgui.separator()
+                            
+                            # Stability (Green if high, Red if low)
+                            stab = c_data.get("gvt_stability", 50)
+                            col = (0, 1, 0, 1) if stab >= 50 else (1, 0.2, 0.2, 1)
+                            imgui.text("Stability: ")
+                            imgui.same_line()
+                            imgui.text_colored(col, f"{stab}%")
+                            
+                            imgui.text(f"Approval:  {c_data.get('gvt_approval', 0)}%")
+                            imgui.text(f"Treasury:  ${c_data.get('money_balance', 0):,}")
+                            imgui.text(f"Tax Rate:  {c_data.get('global_tax_perc', 0)}%")
+                            
+                            imgui.separator()
+                            imgui.unindent()
+                        else:
+                            imgui.indent()
+                            imgui.text_colored((1, 0.5, 0, 1), "[Country data missing]")
+                            imgui.unindent()
+                            
+                    except Exception as e:
+                        # Fallback if countries table isn't loaded yet
+                        imgui.text_disabled(f"[Data lookup failed: {e}]")
+                else:
+                    imgui.bullet_text("Owner: Unclaimed / Wilderness")
+
+                imgui.dummy((0, 10))
+                
+                # --- CORE STATUS ---
+                is_core = row.get('is_core', False)
+                if is_core:
+                    imgui.text_colored((0, 1, 0, 1), "[CORE REGION]")
+                else:
+                    imgui.text_disabled("[Non-Core / Colony]")
+                
+            except Exception as e:
                 imgui.text_colored((1, 0, 0, 1), "Region Data Error")
+                if imgui.is_item_hovered():
+                    imgui.set_tooltip(str(e))
         else:
             imgui.text_disabled("Select a region on the map\nto view details.")
             

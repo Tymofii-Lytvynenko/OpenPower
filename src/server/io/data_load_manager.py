@@ -135,22 +135,50 @@ class DataLoader:
         return main_df
 
     def _load_countries(self) -> pl.DataFrame:
-        all_dfs = []
+        """
+        Loads 'countries.tsv' and merges any 'countries_*.tsv' extensions.
+        """
+        print("[DataLoader] Loading Countries...")
+        
+        main_df = pl.DataFrame()
+        
+        # 1. Find the Master Table (countries.tsv)
         for data_dir in self.config.get_data_dirs():
-            # TSV
-            tsv_path = data_dir / "countries" / "countries.tsv"
-            if tsv_path.exists():
-                all_dfs.append(self._read_clean_tsv(tsv_path))
-            
-            # TOML
-            toml_dir = data_dir / "countries"
-            if toml_dir.exists():
-                for f in toml_dir.glob("*.toml"):
-                    try:
-                        data = rtoml.load(f)
-                        if "id" not in data: data["id"] = f.stem
-                        clean = {k:v for k,v in data.items() if not k.startswith("_")}
-                        all_dfs.append(pl.DataFrame([clean]))
-                    except: pass
-        if not all_dfs: return pl.DataFrame()
-        return pl.concat(all_dfs, how="diagonal").unique(subset=["id"], keep="last")
+            master_path = data_dir / "countries" / "countries.tsv"
+            if master_path.exists():
+                main_df = self._read_clean_tsv(master_path)
+                break # Found master, stop searching
+        
+        if main_df.is_empty():
+            return pl.DataFrame()
+
+        # 2. Find and Merge Extensions (eco, pol, dem, mil)
+        # We look in ALL active mod directories for extra data
+        for data_dir in self.config.get_data_dirs():
+            target_dir = data_dir / "countries"
+            if not target_dir.exists(): continue
+
+            for file_path in target_dir.glob("countries_*.tsv"):
+                # Skip the master file if strictly named countries_countries.tsv (unlikely)
+                
+                print(f"[DataLoader] Merging country data: {file_path.name}")
+                aux_df = self._read_clean_tsv(file_path)
+                
+                # Check if join key exists
+                if "id" not in aux_df.columns:
+                    print(f"   [Warning] {file_path.name} missing 'id' column. Skipping.")
+                    continue
+
+                # Merge: Left Join ensures we only add data for countries that exist in master
+                # We do NOT use suffixes here because we want clean column names like 'money_balance'
+                # directly in the main table.
+                main_df = main_df.join(aux_df, on="id", how="left")
+
+        # 3. Fill N/A for numeric columns (Safety)
+        # This prevents crashes if a country is missing from 'countries_eco.tsv'
+        num_cols = [c for c, t in main_df.schema.items() if t in (pl.Float64, pl.Int64, pl.Int32)]
+        if num_cols:
+            main_df = main_df.with_columns(pl.col(num_cols).fill_null(0))
+
+        print(f"[DataLoader] Countries loaded: {len(main_df)} rows, {len(main_df.columns)} columns.")
+        return main_df
