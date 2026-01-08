@@ -8,7 +8,8 @@ from src.server.session import GameSession
 
 # Views
 from src.client.views.editor_view import EditorView
-from src.client.views.game_view import GameView
+# from src.client.views.game_view import GameView # Removed, we go to NewGameView first
+from src.client.views.new_game_view import NewGameView 
 from src.client.views.loading_view import LoadingView
 
 # Tasks
@@ -52,8 +53,9 @@ class MainMenuView(arcade.View):
             
             # -- Menu Buttons --
             if self.ui.draw_menu_button("SINGLE PLAYER"):
-                game_view = GameView()
-                self.window.show_view(game_view)
+                # Transition to New Game selection screen
+                next_view = NewGameView(self.session, self.config)
+                self.window.show_view(next_view)
             
             if self.ui.draw_menu_button("MAP EDITOR"):
                 self._launch_editor()
