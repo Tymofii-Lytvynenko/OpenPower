@@ -82,6 +82,9 @@ class Engine:
         # 1. Update Global Time
         state.globals["tick"] = state.globals.get("tick", 0) + 1
         
+        # 2. Inject Current Actions
+        state.current_actions = actions
+        
         # 2. Run All Systems in Strict Order
         for system in self.execution_order:
             try:

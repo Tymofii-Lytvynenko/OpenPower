@@ -1,4 +1,5 @@
 from typing import List
+from modules.base.systems.time_system import TimeSystem
 from src.engine.interfaces import ISystem
 
 # We import the systems that belong to this module
@@ -9,6 +10,7 @@ def register() -> List[ISystem]:
     this module contributes to the game loop.
     """
     return [
+        TimeSystem(),
         # Order in this list doesn't matter anymore!
         # The Engine sorts them automatically based on their .dependencies property.
         #TerritorySystem(),
