@@ -8,7 +8,6 @@ sys.path.append(str(ROOT_DIR))
 
 # 2. Imports
 from src.shared.config import GameConfig
-# Note: We do NOT import GameSession here anymore.
 from src.client.window import MainWindow
 
 def main():
