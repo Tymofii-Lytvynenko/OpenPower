@@ -40,32 +40,25 @@ class Engine:
         
         # 1. Build the graph structure
         for sys_id, system in self.systems_map.items():
-            # Add node and its edges (dependencies)
             sorter.add(sys_id, *system.dependencies)
 
         try:
-            # 2. Resolve order (returns generator of IDs)
+            # 2. Resolve order
             sorted_ids = list(sorter.static_order())
             
             # 3. Map IDs back to Instances
-            # Note: sorted_ids may contain IDs of dependencies that aren't registered 
-            # (if a mod declares a dependency on a missing system). We filter those out.
             self.execution_order = [
                 self.systems_map[sys_id] 
                 for sys_id in sorted_ids 
                 if sys_id in self.systems_map
             ]
             
-            # Debug output
             order_names = [s.id for s in self.execution_order]
             print(f"[Engine] Graph resolved. Execution Order: {order_names}")
-            
             self._is_dirty = False
 
         except CycleError as e:
-            # Critical error: A depends on B, and B depends on A
-            print(f"[Engine] CRITICAL ERROR: Circular dependency detected in systems! {e}")
-            # In production, you might want to crash explicitly or load a safe-mode fallback
+            print(f"[Engine] CRITICAL ERROR: Circular dependency detected! {e}")
             raise e
         except Exception as e:
             print(f"[Engine] Error building system graph: {e}")
@@ -75,19 +68,23 @@ class Engine:
         """
         Runs one tick of the simulation using the sorted graph.
         """
-        # Rebuild graph if new systems were registered (e.g. hot-reloading)
         if self._is_dirty:
             self._rebuild_execution_order()
 
-        # 1. Update Global Time
+        # 1. Reset Frame State
+        # Events are transient; they only exist for the duration of the current tick.
+        state.events.clear()
+
+        # 2. Inject Inputs
         state.globals["tick"] = state.globals.get("tick", 0) + 1
-        
-        # 2. Inject Current Actions
         state.current_actions = actions
         
-        # 2. Run All Systems in Strict Order
+        # 3. Run All Systems in Strict Order
+        # TimeSystem will likely run first (if dep graph is correct), generating events.
+        # Economy/Politics systems will run later, consuming those events.
         for system in self.execution_order:
             try:
                 system.update(state, delta_time)
             except Exception as e:
+                # In production, we might want to isolate the crash so the whole server doesn't die.
                 print(f"[Engine] Error in system '{system.id}': {e}")
