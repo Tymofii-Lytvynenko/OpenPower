@@ -1,5 +1,6 @@
 import arcade
 import sys
+import os
 from pathlib import Path
 
 # 1. Setup Python Path
@@ -12,6 +13,7 @@ from src.client.window import MainWindow
 
 def main():
     print("--- OpenPower Engine Initializing ---")
+    print(f"Process ID (PID): {os.getpid()}")
     
     # 3. Initialize Configuration
     config = GameConfig(ROOT_DIR)
