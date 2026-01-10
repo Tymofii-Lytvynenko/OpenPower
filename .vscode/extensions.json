@@ -1,6 +1,7 @@
 {
     "recommendations": [
         "repreng.csv",
-        "tamasfe.even-better-toml"
+        "tamasfe.even-better-toml",
+        "shinotatwu-ds.file-tree-generator"
     ]
 }
