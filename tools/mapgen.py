@@ -7,13 +7,13 @@ Architecture: "Color-As-ID"
 2. Database: Maps HEX colors (Visual IDs) to Game Data.
 
 Features:
-- **Micro-Nation Merging**: Automatically fuses tiny subdivisions (e.g., Liechtenstein's 11 communes)
-  into single regions to prevent pixel collisions and improve gameplay UX.
-- **Data**: Extracts ISO codes, names, and calculates real surface area (km²).
+- **CLI Options**: Support for reusing colors from previous builds.
+- **Micro-Nation Merging**: Automatically fuses tiny subdivisions.
 - **TSV Export**: Uses Tab-Separated Values for robust string handling.
-- **Smart Rescue**: Uses a spiral search algorithm with collision protection to ensure 
-  tiny islands are not overwritten by neighbors.
-- **Verification**: Mathematically proves map integrity before finishing.
+- **Smart Rescue**: Spiral search algorithm to save islands.
+- **Verification**: Mathematically proves map integrity.
+
+https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/ne_10m_admin_1_states_provinces.zip
 
 Dependencies:
     pip install geopandas pandas rasterio numpy opencv-python unidecode pyproj
@@ -23,6 +23,7 @@ import os
 import sys
 import csv
 import random
+import argparse
 import geopandas as gpd
 import pandas as pd
 from rasterio import features
@@ -51,8 +52,6 @@ CONFIG = {
     "background_id": 0,
     
     # List of Country Codes (ISO A3) to force-merge into single regions.
-    # Why: In a global strategy game, having 11 tiny provinces for Liechtenstein 
-    # causes rendering errors and makes clicking impossible.
     "merge_list": [
         "LIE", # Liechtenstein
         "SMR", # San Marino
@@ -64,17 +63,29 @@ CONFIG = {
     ]
 }
 
-def generate_random_colors(count):
+def hex_to_rgb(hex_str):
+    """Converts #RRGGBB string to (r, g, b) tuple."""
+    hex_str = hex_str.lstrip('#')
+    return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+
+def rgb_to_hex(r, g, b):
+    """Converts RGB tuple to standard HEX string #RRGGBB."""
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+def generate_random_colors(count, exclude_colors=None):
     """
-    Generates unique random RGB tuples.
+    Generates unique random RGB tuples, ensuring no collisions with existing colors.
     
-    Why:
-        Random colors are essential for modding. Mathematical sequential IDs 
-        (like #000001, #000002) are visually indistinguishable to humans.
-        Random colors allow modders to pick regions easily in Paint.NET.
+    Args:
+        count (int): Number of new colors needed.
+        exclude_colors (set): Set of (r,g,b) tuples that are already taken.
     """
     print(f"Generating {count} unique visual colors...")
-    colors = set()
+    if exclude_colors is None:
+        exclude_colors = set()
+    
+    # Initialize with excluded colors to prevent duplicates
+    colors = set(exclude_colors)
     result_list = []
     
     while len(result_list) < count:
@@ -90,83 +101,104 @@ def generate_random_colors(count):
             
     return result_list
 
-def rgb_to_hex(r, g, b):
-    """Converts RGB tuple to standard HEX string #RRGGBB."""
-    return f"#{r:02X}{g:02X}{b:02X}"
-
 def sanitize_text(text):
     """
     Sanitizes string data for game engine compatibility.
-    
-    1. Fixes 'Mojibake' (Windows CP1252 vs UTF-8 encoding errors).
-    2. Transliterates to ASCII (removes diacritics) using unidecode.
+    1. Fixes 'Mojibake'.
+    2. Transliterates to ASCII.
     """
     if not isinstance(text, str):
         return ""
     
-    # Step 1: Attempt to fix common Windows encoding corruption
     try:
         fixed_text = text.encode('cp1252').decode('utf-8')
     except (UnicodeEncodeError, UnicodeDecodeError):
         fixed_text = text
 
-    # Step 2: Enforce ASCII (e.g., "München" -> "Munchen")
     return unidecode(fixed_text).strip()
 
 def merge_micro_nations(gdf, codes_to_merge):
     """
     Combines all regions of specific countries into a single geometry.
-    
-    Why:
-        Fixes the "Liechtenstein Paradox" where excessive administrative divisions
-        in micro-nations are smaller than 1 pixel, causing validation failures.
     """
     print(f"Optimizing: Merging micro-nations {codes_to_merge}...")
     
     for code in codes_to_merge:
-        # Filter rows belonging to this country
         subset = gdf[gdf['adm0_a3'] == code]
         
         if subset.empty or len(subset) <= 1:
-            continue # Skip if country missing or already has only 1 region
+            continue 
             
         print(f"  -> Merging {len(subset)} regions for {code}...")
         
-        # 1. Fuse geometries into one polygon (Union)
-        # unary_union is efficient and handles MultiPolygons correctly
         unified_geom = subset.geometry.unary_union
         
-        # 2. Create a representative row
-        # We take metadata from the first region, but overwrite Name and Type
         new_row = subset.iloc[0].copy()
         new_row['geometry'] = unified_geom
-        
-        # Get country name (fallback to code if name missing)
         c_name = subset.iloc[0].get('admin', code) 
         new_row['name'] = c_name
         new_row['name_en'] = c_name
-        new_row['type_en'] = "Sovereign State" # Reset local admin type
+        new_row['type_en'] = "Sovereign State" 
         
-        # 3. Remove old rows from main DataFrame
         gdf = gdf[gdf['adm0_a3'] != code]
-        
-        # 4. Append new unified row
-        # We must create a temporary GeoDataFrame to concatenate safely
         new_gdf = gpd.GeoDataFrame([new_row], crs=gdf.crs)
         gdf = pd.concat([gdf, new_gdf], ignore_index=True)
         
     return gdf
 
+def load_existing_colors(tsv_path):
+    """
+    Parses an existing TSV to create a mapping of Regions -> Colors.
+    
+    Returns:
+        tuple: (lookup_dict, used_colors_set)
+        lookup_dict format: {(Owner_Code, Region_Name): (r, g, b)}
+    """
+    print(f"Loading existing colors from {tsv_path}...")
+    lookup = {}
+    used_colors = set()
+    
+    if not os.path.exists(tsv_path):
+        print("Warning: TSV file not found. Proceeding with fresh generation.")
+        return lookup, used_colors
+
+    try:
+        df = pd.read_csv(tsv_path, sep='\t')
+        for _, row in df.iterrows():
+            # Create a unique key based on Owner + Name
+            # We must sanitize here because the new Shapefile data will also be sanitized
+            # before comparison.
+            r_name = str(row.get('name', '')).strip()
+            r_owner = str(row.get('owner', '')).strip()
+            hex_val = str(row.get('hex', ''))
+            
+            if hex_val and r_name and r_owner:
+                color_rgb = hex_to_rgb(hex_val)
+                key = (r_owner, r_name)
+                
+                lookup[key] = color_rgb
+                used_colors.add(color_rgb)
+                
+    except Exception as e:
+        print(f"Error reading TSV: {e}. Proceeding with fresh generation.")
+    
+    print(f"  -> Loaded {len(lookup)} existing color definitions.")
+    return lookup, used_colors
+
 def main():
-    print(f"--- Starting Ultimate Map Generation ---")
+    # === ARGUMENT PARSING ===
+    parser = argparse.ArgumentParser(description="Map & Database Generator")
+    parser.add_argument("--reuse-tsv", type=str, help="Path to an existing TSV to reuse HEX colors from.", default=None)
+    args = parser.parse_args()
+
+    print(f"--- Starting Map Generation ---")
 
     # 1. Input Validation
     if not os.path.exists(CONFIG["input_shp"]):
         print(f"ERROR: Input file {CONFIG['input_shp']} not found.")
         sys.exit(1)
 
-    print("Reading Shapefile (Forcing UTF-8)...")
-    # GeoPandas often defaults to system encoding (CP1252 on Windows).
+    print("Reading Shapefile...")
     try:
         gdf = gpd.read_file(CONFIG["input_shp"], encoding='utf-8')
     except Exception:
@@ -174,35 +206,70 @@ def main():
         gdf = gpd.read_file(CONFIG["input_shp"])
 
     # 2. Optimization: Merge Micro-Nations
-    # This modifies the geometry before any processing happens.
     gdf = merge_micro_nations(gdf, CONFIG['merge_list'])
 
-    total_regions = len(gdf)
-
     # 3. Physics Calculation: Real Area (km²)
-    print("Calculating real surface area (reprojecting to metric)...")
-    
-    # Why: WGS84 (degrees) distorts size near poles.
-    # We reproject to 'Cylindrical Equal Area' to get fair gameplay values.
+    print("Calculating real surface area...")
     gdf_metric = gdf.to_crs({'proj': 'cea'})
-    
-    # Convert m² to km²
     gdf['area_km2'] = (gdf_metric.geometry.area / 1e6).astype(int)
 
-    # 4. ID and Color Assignment
-    # We assign a temporary integer ID (1..N) to handle rasterization cleanly.
+    # 4. ID and Color Assignment Logic
+    total_regions = len(gdf)
     gdf['temp_id'] = range(1, total_regions + 1)
     
-    random_colors = generate_random_colors(total_regions)
-    id_to_color_map = {i + 1: color for i, color in enumerate(random_colors)}
+    # Storage for the final colors
+    id_to_color_map = {}
+    
+    # Logic for Reuse vs New
+    existing_lookup = {}
+    used_colors = set()
+    
+    if args.reuse_tsv:
+        existing_lookup, used_colors = load_existing_colors(args.reuse_tsv)
+    
+    regions_needing_new_colors = []
+    
+    print("Assigning colors to regions...")
+    for _, row in gdf.iterrows():
+        t_id = row['temp_id']
+        
+        # Construct the key to match against the TSV
+        # 1. Get Name
+        raw_name = row.get('name', 'Unknown')
+        name_en = row.get('name_en', None)
+        if name_en and isinstance(name_en, str) and len(name_en) > 1:
+            display_name = sanitize_text(name_en)
+        else:
+            display_name = sanitize_text(raw_name)
+            
+        # 2. Get Owner
+        owner_code = row.get('adm0_a3', 'UNK').replace('-99', 'UNK')
+        
+        key = (owner_code, display_name)
+        
+        # Check if we have this region in history
+        if key in existing_lookup:
+            # REUSE COLOR
+            id_to_color_map[t_id] = existing_lookup[key]
+        else:
+            # MARK FOR NEW GENERATION
+            regions_needing_new_colors.append(t_id)
 
-    transform = from_bounds(*CONFIG['bounds'], CONFIG['width'], CONFIG['height'])
+    # Generate fresh colors for any region not found in the TSV
+    if regions_needing_new_colors:
+        print(f"  -> Generating {len(regions_needing_new_colors)} NEW colors...")
+        new_colors = generate_random_colors(len(regions_needing_new_colors), exclude_colors=used_colors)
+        
+        for idx, t_id in enumerate(regions_needing_new_colors):
+            id_to_color_map[t_id] = new_colors[idx]
+    else:
+        print("  -> All regions matched existing colors.")
 
     # 5. Metadata Extraction & TSV Export
-    print("Processing metadata...")
+    print("Processing metadata and export...")
+    transform = from_bounds(*CONFIG['bounds'], CONFIG['width'], CONFIG['height'])
     
     tsv_rows = []
-    # Rich header for gameplay logic
     tsv_header = [
         "hex", "name", "owner", "iso_region", "type", 
         "macro_region", "postal", "area_km2", "center_x", "center_y"
@@ -215,18 +282,16 @@ def main():
         t_id = int(row['temp_id'])
         r, g, b = id_to_color_map[t_id]
         
-        # Calculate pixel centroid for camera focus
+        # Calculate pixel centroid
         geom = row.geometry
         center_geo = geom.centroid
         c_row, c_col = rowcol(transform, center_geo.x, center_geo.y)
         c_x = int(max(0, min(c_col, CONFIG['width'] - 1)))
         c_y = int(max(0, min(c_row, CONFIG['height'] - 1)))
 
-        # Metadata extraction logic
+        # Metadata extraction
         raw_name = row.get('name', 'Unknown')
         name_en = row.get('name_en', None)
-        
-        # Prefer English name, fallback to Local name
         if name_en and isinstance(name_en, str) and len(name_en) > 1:
             display_name = sanitize_text(name_en)
         else:
@@ -239,7 +304,6 @@ def main():
         postal = sanitize_text(row.get('postal', ''))
         area = int(row['area_km2'])
 
-        # UX: Use HEX strings so modders can copy-paste from Photoshop
         hex_color = rgb_to_hex(r, g, b)
         
         tsv_rows.append([
@@ -251,7 +315,6 @@ def main():
 
     print(f"Saving Database: {CONFIG['output_tsv']}...")
     with open(CONFIG["output_tsv"], "w", encoding="utf-8-sig", newline='') as f:
-        # Delimiter '\t' makes it a TSV file
         writer = csv.writer(f, delimiter='\t')
         writer.writerows(tsv_rows)
 
@@ -265,24 +328,19 @@ def main():
         transform=transform,
         fill=CONFIG['background_id'],
         dtype=np.uint32,
-        all_touched=False # Clean borders
+        all_touched=False
     )
 
-    # 7. Rescue Logic (Smart Spiral with Collision Protection)
-    print("Rescuing small regions (Smart Spiral)...")
-    
-    # Identify which regions failed to render
+    # 7. Rescue Logic (Smart Spiral)
+    print("Rescuing small regions...")
     present_ids = np.unique(raster_ids)
     missing_ids = np.setdiff1d(gdf['temp_id'].values, present_ids)
     
     if len(missing_ids) > 0:
         print(f"  -> Attempting to rescue {len(missing_ids)} regions...")
-        
-        # We must protect these missing IDs from overwriting EACH OTHER.
         protected_ids = set(missing_ids)
         placed_count = 0
         
-        # Generator for spiral coordinates
         def get_spiral(start_x, start_y, max_r):
             yield start_x, start_y
             for r in range(1, max_r + 1):
@@ -298,19 +356,16 @@ def main():
             c_x, c_y = center_lookup[m_id]
             best_candidate = None
             
-            # Increase radius to 30 to account for merged micro-nations if they are still small
             for try_x, try_y in get_spiral(c_x, c_y, 30):
                 if not (0 <= try_x < CONFIG['width'] and 0 <= try_y < CONFIG['height']):
                     continue
                 
                 current_pixel_val = raster_ids[try_y, try_x]
                 
-                # Priority 1: Water
                 if current_pixel_val == CONFIG['background_id']:
                     best_candidate = (try_x, try_y)
                     break 
                 
-                # Priority 2: Land (not protected)
                 if current_pixel_val not in protected_ids:
                     if best_candidate is None:
                         best_candidate = (try_x, try_y)
@@ -335,7 +390,6 @@ def main():
         print("SUCCESS: 100% Integrity. All regions are present on the map.")
     else:
         print(f"WARNING: Verification FAILED. {len(lost_regions)} regions are missing!")
-        print("\n--- MISSING REGIONS REPORT ---")
         missing_info = gdf[gdf['temp_id'].isin(lost_regions)]
         for _, row in missing_info.iterrows():
             r_name = row.get('name_en', row.get('name', 'Unknown'))
@@ -344,9 +398,12 @@ def main():
 
     # 9. Image Encoding
     print("Encoding visual map...")
-    palette = np.zeros((total_regions + 2, 3), dtype=np.uint8)
+    # Palette index must accommodate the highest temporary ID
+    max_id = gdf['temp_id'].max()
+    palette = np.zeros((max_id + 2, 3), dtype=np.uint8)
+    
     for t_id, (r, g, b) in id_to_color_map.items():
-        palette[t_id] = [b, g, r] # BGR
+        palette[t_id] = [b, g, r] # BGR for OpenCV
 
     bgr_image = palette[raster_ids]
     
