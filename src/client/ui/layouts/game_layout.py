@@ -1,36 +1,98 @@
 from imgui_bundle import imgui
-import polars as pl
 from typing import Optional
+import polars as pl
 
 from src.client.services.network_client_service import NetworkClient
 from src.client.ui.panels.region_inspector import RegionInspectorPanel
+from src.client.ui.composer import UIComposer
+from src.client.ui.theme import GAMETHEME
+
+# Panels
+from src.client.ui.panels.politics_panel import PoliticsPanel
+from src.client.ui.panels.military_panel import MilitaryPanel
+from src.client.ui.panels.economy_panel import EconomyPanel
+
 from src.shared.actions import ActionSetGameSpeed, ActionSetPaused
 
 class GameLayout:
-    """
-    Manages the ImGui layout for the active Gameplay session.
-    """
     def __init__(self, net_client: NetworkClient, player_tag: str):
         self.net = net_client
         self.player_tag = player_tag
+        self.composer = UIComposer(GAMETHEME)
         
-        # Reuse the generic inspector
+        # Sub-panels
         self.inspector = RegionInspectorPanel()
+        self.panel_politics = PoliticsPanel()
+        self.panel_military = MilitaryPanel()
+        self.panel_economy = EconomyPanel()
         
-        # UI State
-        self.map_mode = "political" 
+        # --- Visibility State ---
+        # Defaults to True to match the screenshot "Busy UI" look
+        self.show_politics = True
+        self.show_military = True
+        self.show_economy = True
+        
+        self.map_mode = "political"
 
     def render(self, selected_region_id: Optional[int], fps: float):
-        """Main render pass."""
-        # 1. Fetch authoritative state once per frame
+        self.composer.setup_frame()
         state = self.net.get_state()
 
-        # 2. Render Sub-components
+        # 1. Render Floating Panels (If toggled on)
+        if self.show_politics:
+            # We assume the Panel classes use composer.begin_panel now
+            self.panel_politics.render(self.composer, state)
+            
+        if self.show_military:
+            self.panel_military.render(self.composer, state)
+            
+        if self.show_economy:
+            self.panel_economy.render(self.composer, state, self.player_tag)
+
+        # 2. Render UI Controls
         self._render_top_bar(state, fps)
+        self._render_toggle_bar()  # <--- NEW: Bottom Left Buttons
         self._render_time_controls(state)
         
-        # 3. Render Inspector
-        self.inspector.render(selected_region_id, state)
+        # 3. Contextual Inspector
+        if selected_region_id is not None:
+             self.inspector.render(selected_region_id, state)
+
+    def _render_toggle_bar(self):
+        """
+        Renders the 3 toggle buttons at the bottom left of the screen.
+        """
+        screen_h = imgui.get_main_viewport().size.y
+        
+        # Position: Bottom Left, slightly padded
+        # Window height ~ 80px to fit button (50) + bar (5) + padding
+        imgui.set_next_window_pos((10, screen_h - 90)) 
+        
+        flags = (imgui.WindowFlags_.no_decoration | 
+                 imgui.WindowFlags_.no_move | 
+                 imgui.WindowFlags_.always_auto_resize | 
+                 imgui.WindowFlags_.no_background) # Transparent bg for the buttons container
+
+        if imgui.begin("ToggleBar", True, flags)[0]:
+            
+            # 1. Politics Toggle (Yellow/Gold)
+            # Using simple text icons for now, replace with textures later if needed
+            if self.composer.draw_icon_toggle("POL", GAMETHEME.col_politics, self.show_politics):
+                self.show_politics = not self.show_politics
+            
+            imgui.same_line()
+            
+            # 2. Military Toggle (Red)
+            if self.composer.draw_icon_toggle("MIL", GAMETHEME.col_military, self.show_military):
+                self.show_military = not self.show_military
+            
+            imgui.same_line()
+            
+            # 3. Economy Toggle (Green)
+            if self.composer.draw_icon_toggle("ECO", GAMETHEME.col_economy, self.show_economy):
+                self.show_economy = not self.show_economy
+                
+        imgui.end()
 
     def _render_top_bar(self, state, fps: float):
         """
@@ -72,7 +134,7 @@ class GameLayout:
 
     def _render_time_controls(self, state):
         """
-        Renders the SP2-style bottom center time control panel.
+        Renders the- bottom center time control panel.
         """
         viewport = imgui.get_main_viewport()
         screen_w = viewport.size.x
