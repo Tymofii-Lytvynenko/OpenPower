@@ -9,13 +9,9 @@ from typing import List, Tuple, Optional, Dict
 from array import array
 
 # Import the shaders strings defined above
-from src.shared.map.shaders import VERTEX_SHADER, FRAGMENT_SHADER 
+from src.shared.map.shader_registry import ShaderRegistry
 
 class RegionAtlas:
-    """
-    (Your existing class, slightly stripped for brevity, 
-     plus a new method to generate the GPU buffer)
-    """
     def __init__(self, image_path: str):
         self.image_path = image_path
         # Load Raw Image for CPU queries
@@ -154,9 +150,9 @@ class MapRenderer:
         )
 
         # 4. Compile Shader
-        self.program = self.ctx.program(
-            vertex_shader=VERTEX_SHADER,
-            fragment_shader=FRAGMENT_SHADER
+        self.program = self.window.ctx.load_program(
+            vertex_shader = str(ShaderRegistry.POLITICAL_VS),
+            fragment_shader = str(ShaderRegistry.POLITICAL_FS)
         )
         
         # Set Initial Uniforms
