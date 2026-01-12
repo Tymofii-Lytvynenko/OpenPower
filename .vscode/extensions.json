@@ -4,6 +4,7 @@
         "tamasfe.even-better-toml",
         "shinotatwu-ds.file-tree-generator",
         "dtoplak.vscode-glsllint",
-        "moshfeu.diff-merge"
+        "moshfeu.diff-merge",
+        "tyriar.luna-paint"
     ]
 }
