@@ -1,0 +1,16 @@
+# mapgen.toml
+
+[io]
+input_shp = ".temp/ne_10m_admin_1_states_provinces_lakes.shp"
+output_png = ".temp/regions.png"
+output_tsv = ".temp/regions.tsv"
+
+[map]
+width = 16000
+height = 8000
+background_id = 0
+bounds = [-180.0, -90.0, 180.0, 90.0]
+
+[processing]
+# List of ISO codes to merge
+merge_list = ["LIE", "SMR", "VAT", "MCO", "AND", "TUV", "NRU"]
