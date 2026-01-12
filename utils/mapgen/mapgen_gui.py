@@ -115,7 +115,7 @@ class MapGenApp:
 
         # 2. Setup Arguments for mapgen.main()
         original_argv = sys.argv
-        sys.argv = ["mapgen.py"] # Fake the script name
+        sys.argv = ["mapgen.py"]
         if self.use_reuse_tsv.get():
             sys.argv.extend(["--reuse-tsv", self.reuse_tsv_path.get()])
 
