@@ -13,7 +13,7 @@ from unidecode import unidecode
 import rtoml
 
 # === CONFIG LOADING ===
-def load_config(config_path="utils/mapgen.toml"):
+def load_config(config_path="utils/mapgen/mapgen.toml"):
     """Loads configuration from TOML file."""
     if not os.path.exists(config_path):
         print(f"Error: Configuration file '{config_path}' not found.")
