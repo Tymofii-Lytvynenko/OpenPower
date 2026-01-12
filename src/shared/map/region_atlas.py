@@ -25,6 +25,11 @@ class RegionAtlas:
         b, g, r = cv2.split(self.raw_img)
         self.packed_map = b.astype(np.int32) | (g.astype(np.int32) << 8) | (r.astype(np.int32) << 16)
 
+        # Clean up
+        del b, g, r
+        del self.raw_img
+        import gc; gc.collect()
+
     def get_region_at(self, x: int, y: int) -> int:
         """CPU query for mouse interaction."""
         if 0 <= x < self.width and 0 <= y < self.height:

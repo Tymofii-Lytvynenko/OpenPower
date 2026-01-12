@@ -177,6 +177,10 @@ class MapRenderer:
             data=img_rgb.tobytes(),
             filter=(self.ctx.NEAREST, self.ctx.NEAREST)
         )
+        
+        del img
+        del img_rgb
+        import gc; gc.collect()
 
         # 3. Lookup Texture (2D for 16M support)
         self.lut_dim = 4096 
