@@ -3,6 +3,7 @@ from typing import Optional
 
 from src.client.services.network_client_service import NetworkClient
 from src.client.ui.layouts.base_layout import BaseLayout
+from src.client.ui.theme import GAMETHEME
 
 class EditorLayout(BaseLayout):
     """
@@ -66,10 +67,11 @@ class EditorLayout(BaseLayout):
                  imgui.WindowFlags_.no_inputs | 
                  imgui.WindowFlags_.no_focus_on_appearing)
                  
-        imgui.push_style_color(imgui.Col_.window_bg, (0, 0, 0, 0.5))
+        # Use theme for semi-transparent overlay background
+        imgui.push_style_color(imgui.Col_.window_bg, GAMETHEME.col_overlay_bg)
         
         if imgui.begin("Overlay", flags=flags):
-            imgui.text_colored((0, 1, 0, 1), f"FPS: {fps:.0f}")
+            imgui.text_colored(GAMETHEME.col_positive, f"FPS: {fps:.0f}")
             imgui.text(f"Layer: {self.current_layer_label}")
             imgui.separator()
             imgui.text_disabled("Right Click: Pan Map")

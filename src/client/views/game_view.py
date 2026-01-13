@@ -9,6 +9,7 @@ from src.client.ui.layouts.game_layout import GameLayout
 from src.client.controllers.camera_controller import CameraController
 from src.client.controllers.viewport_controller import ViewportController
 from src.client.utils.color_generator import generate_political_colors
+from src.client.ui.theme import GAMETHEME
 
 class GameView(BaseImGuiView):
     def __init__(self, session, config, player_tag, initial_pos: tuple[float, float] = None):
@@ -50,7 +51,7 @@ class GameView(BaseImGuiView):
         self.selected_region_id = None
 
     def on_show_view(self):
-        self.window.background_color = arcade.color.BLACK
+        self.window.background_color = GAMETHEME.bg_color_main
         self.cam_ctrl.sync_with_arcade(self.world_cam)
         self._refresh_political_map()
 

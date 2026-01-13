@@ -1,6 +1,7 @@
 import arcade
 from src.shared.config import GameConfig
 from src.client.services.imgui_service import ImGuiService
+from src.client.ui.theme import GAMETHEME
 
 # Base Class
 from src.client.views.base_view import BaseImGuiView
@@ -52,7 +53,7 @@ class EditorView(BaseImGuiView):
         self.selected_region_id = None
 
     def on_show_view(self):
-        self.window.background_color = arcade.color.BLACK
+        self.window.background_color = GAMETHEME.bg_color_main
         # Ensure camera is synced before first frame
         self.cam_ctrl.sync_with_arcade(self.world_cam)
         # Generate initial political map

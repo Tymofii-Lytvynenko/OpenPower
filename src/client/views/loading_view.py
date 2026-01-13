@@ -77,7 +77,7 @@ class LoadingView(arcade.View):
             
             if self.error:
                 from imgui_bundle import imgui
-                imgui.text_colored((1, 0, 0, 1), "OPERATION FAILED")
+                imgui.text_colored(GAMETHEME.col_error, "OPERATION FAILED")
 
             self.ui.end_panel()
 

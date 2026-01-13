@@ -1,6 +1,7 @@
 from imgui_bundle import imgui
 from src.client.ui.composer import UIComposer
 from src.server.state import GameState
+from src.client.ui.theme import GAMETHEME
 
 class PoliticsPanel:
     def render(self, composer: UIComposer, state: GameState):
@@ -16,20 +17,15 @@ class PoliticsPanel:
             composer.draw_section_header("IDEOLOGY", show_more_btn=False)
             
             # --- READING STATE ---
-            # We try to read the actual value from the GameState.
-            # If not found, default to 0.5
             current_ideology = 0.5 
-            # Example real lookup (commented out until table exists):
+            # Example real lookup:
             # if "politics" in state.tables:
             #     current_ideology = state.tables["politics"]["ruling_party_alignment"]
 
-            imgui.push_style_color(imgui.Col_.slider_grab, (0.4, 0.6, 0.4, 1.0))
-            imgui.push_style_color(imgui.Col_.frame_bg, (0.1, 0.1, 0.1, 1.0))
+            imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.col_slider_accent)
+            imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.col_frame_bg)
             
             # --- RENDERING ONLY ---
-            # We pass "" as the label to hide it, and store the result in `changed, value`
-            # Crucially: We do NOT write `value` back to `state`. 
-            # If `changed` is true, we would dispatch a `GameAction`.
             changed, new_val = imgui.slider_float("##ideology", current_ideology, 0.0, 1.0, "")
             
             if changed:
@@ -50,16 +46,16 @@ class PoliticsPanel:
 
             # 3. Meters (Read Only)
             composer.draw_section_header("APPROVAL", show_more_btn=False)
-            composer.draw_meter("", 51.7, (0.0, 0.6, 0.0)) 
+            composer.draw_meter("", 51.7, GAMETHEME.col_meter_positive) 
 
             composer.draw_section_header("PRESSURE", show_more_btn=False)
-            composer.draw_meter("", 0.0, (0.7, 0.1, 0.1)) 
+            composer.draw_meter("", 0.0, GAMETHEME.col_meter_negative) 
 
             composer.draw_section_header("STABILITY", show_more_btn=False)
-            composer.draw_meter("", 56.7, (0.0, 0.6, 0.0)) 
+            composer.draw_meter("", 56.7, GAMETHEME.col_meter_positive) 
 
             composer.draw_section_header("CORRUPTION", show_more_btn=False)
-            composer.draw_meter("", 47.2, (0.7, 0.1, 0.1)) 
+            composer.draw_meter("", 47.2, GAMETHEME.col_meter_negative) 
             
             imgui.dummy((0, 10))
             

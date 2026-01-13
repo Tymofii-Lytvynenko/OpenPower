@@ -1,5 +1,6 @@
 from imgui_bundle import imgui
 from src.client.ui.composer import UIComposer
+from src.client.ui.theme import GAMETHEME
 
 class MilitaryPanel:
     def render(self, composer: UIComposer, state):
@@ -13,8 +14,8 @@ class MilitaryPanel:
             
             # Table: 3 Columns [Type, Count, Rank]
             table_flags = (imgui.TableFlags_.borders_inner_h | 
-                           imgui.TableFlags_.pad_outer_x)
-                           
+                            imgui.TableFlags_.pad_outer_x)
+                            
             if imgui.begin_table("MilTable", 3, table_flags):
                 # Setup Headers
                 imgui.table_setup_column("", imgui.TableColumnFlags_.width_fixed, 80)
@@ -61,7 +62,7 @@ class MilitaryPanel:
             # 4. Missile Defense
             composer.draw_section_header("MISSILE DEFENSE", show_more_btn=False)
             
-            imgui.text_colored((0.8, 0.2, 0.2, 1.0), "N/A")
+            imgui.text_colored(GAMETHEME.col_negative, "N/A")
             
             imgui.same_line()
             imgui.set_cursor_pos_x(imgui.get_content_region_avail().x - 90)

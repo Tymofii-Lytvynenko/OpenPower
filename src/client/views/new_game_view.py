@@ -86,7 +86,7 @@ class NewGameView(arcade.View):
             imgui.dummy((300, 0))
             
             if self.selected_country_id:
-                imgui.text_colored((0, 1, 1, 1), f"Selected: {self.selected_country_id}")
+                imgui.text_colored(GAMETHEME.col_accent_main, f"Selected: {self.selected_country_id}")
                 imgui.separator()
                 
                 # Fetch details using Polars through the state snapshot

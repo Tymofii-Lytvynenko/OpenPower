@@ -1,11 +1,11 @@
 import polars as pl
 from imgui_bundle import imgui
 from src.client.ui.composer import UIComposer
+from src.client.ui.theme import GAMETHEME
 
 class EconomyPanel:
     def render(self, composer: UIComposer, state, player_tag: str):
-        # Position: Right Side (Dynamically calculated usually, here fixed for demo)
-        # Using a default position that puts it on the right 1/3
+        # Position: Right Side
         vp_w = imgui.get_main_viewport().size.x
         expanded, _ = composer.begin_panel("ECONOMY", vp_w - 280, 100, 260, 450)
         
@@ -14,8 +14,8 @@ class EconomyPanel:
             composer.draw_section_header("ECONOMIC MODEL", show_more_btn=False)
             
             # Styled Slider
-            imgui.push_style_color(imgui.Col_.frame_bg, (0.1, 0.1, 0.1, 1))
-            imgui.push_style_color(imgui.Col_.slider_grab, (0.0, 0.6, 0.0, 1))
+            imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.col_frame_bg)
+            imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.col_slider_accent)
             
             # Mock value: 0.2 (Mostly State Controlled)
             imgui.slider_float("##eco_model", 0.2, 0.0, 1.0, "")
@@ -31,7 +31,7 @@ class EconomyPanel:
             # 2. Economic Health
             composer.draw_section_header("ECONOMIC HEALTH")
             # Mock value 22.1%
-            composer.draw_meter("", 22.1, (0.0, 0.5, 0.0)) 
+            composer.draw_meter("", 22.1, GAMETHEME.col_meter_positive) 
 
             # 3. Budget Section
             composer.draw_section_header("BUDGET")
@@ -44,11 +44,8 @@ class EconomyPanel:
             if "countries" in state.tables:
                 try:
                     df = state.tables["countries"]
-                    # Try to fetch real balance if available
                     res = df.filter(pl.col("id") == player_tag).select("money_balance")
                     if not res.is_empty():
-                        # Just overriding income for demo purposes to show data flow
-                        # In real app, you'd have columns for income/expenses separately
                         pass 
                 except Exception:
                     pass
@@ -58,17 +55,17 @@ class EconomyPanel:
             
             # Calculated Balance
             balance = income - expenses
-            col_bal = (1.0, 0.2, 0.2, 1.0) if balance < 0 else (0.2, 1.0, 0.2, 1.0)
+            col_bal = GAMETHEME.col_negative if balance < 0 else GAMETHEME.col_positive
             composer.draw_currency_row("BALANCE", balance, col_bal)
             
             # Available (Treasury) - Mock Debt
-            composer.draw_currency_row("AVAILABLE", -25000193956, (0.8, 0.2, 0.2, 1.0))
+            composer.draw_currency_row("AVAILABLE", -25000193956, GAMETHEME.col_negative)
             
             imgui.dummy((0, 8))
 
             # 4. Resources
             composer.draw_section_header("RESOURCES")
-            composer.draw_meter("", 66.0, (0.0, 0.5, 0.0))
+            composer.draw_meter("", 66.0, GAMETHEME.col_meter_positive)
             
             imgui.dummy((0, 15))
             

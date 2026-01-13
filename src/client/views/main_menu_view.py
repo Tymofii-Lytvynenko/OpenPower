@@ -8,7 +8,6 @@ from src.server.session import GameSession
 
 # Views
 from src.client.views.editor_view import EditorView
-# from src.client.views.game_view import GameView # Removed, we go to NewGameView first
 from src.client.views.new_game_view import NewGameView 
 from src.client.views.loading_view import LoadingView
 
@@ -31,7 +30,7 @@ class MainMenuView(arcade.View):
 
     def on_show_view(self):
         print("[MainMenuView] Entered Main Menu")
-        self.window.background_color = arcade.color.BLACK
+        self.window.background_color = GAMETHEME.bg_color_main
 
     def on_resize(self, width: int, height: int):
         self.imgui.resize(width, height)
