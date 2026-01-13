@@ -6,89 +6,86 @@ uniform sampler2D u_map_texture;
 uniform sampler2D u_lookup_texture; 
 uniform vec2      u_texture_size;   
 uniform float     u_opacity;        
-uniform int       u_overlay_mode;   
-// Removed u_selected_id (Selection is now handled via Alpha channel in u_lookup_texture)
+uniform int       u_overlay_mode;
+uniform float     u_lut_dim;        // Now 256.0
+uniform int       u_selected_id;    // Contains Dense ID
 
+// Decodes RGB texture back to Integer Index
+// R=High Byte, B=Low Byte
 int get_id(vec2 uv) {
     vec4 c = texture(u_map_texture, uv);
     int r = int(round(c.r * 255.0));
     int g = int(round(c.g * 255.0));
     int b = int(round(c.b * 255.0));
+    // Must match Python packing: (r << 16) | (g << 8) | b
     return b + (g * 256) + (r * 65536);
 }
 
 vec4 get_country_color(int id) {
-    int width = 4096;
+    int width = int(u_lut_dim);
     int x = id % width;
     int y = id / width;
     return texelFetch(u_lookup_texture, ivec2(x, y), 0);
 }
 
+bool is_id_selected(int id) {
+    if (id == u_selected_id) return true;
+    if (get_country_color(id).a > 0.9) return true;
+    return false;
+}
+
 void main() {
     int region_id = get_id(v_uv);
-    if (region_id == 0) discard; 
-
-    // 1. Fetch Data
-    vec4 lut_data = get_country_color(region_id);
+    // Note: ID 0 is usually valid in Dense Map, so we assume your re-indexing 
+    // keeps 'Void' or 'Water' as a specific ID or handles it via alpha.
+    // If your dense map starts at 0, check your logic for 'empty' space.
+    // For now, if index is 0, we can assume it's valid region #0 unless you reserved it.
     
-    // 2. Selection Logic (Alpha > 0.9 means "Selected")
-    // This allows multiple regions (a whole country) to be "selected" at once.
-    bool is_selected = (lut_data.a > 0.9);
+    // Safety check for lookup
+    if (region_id < 0) discard;
 
-    // 3. Neighbor Sampling (Same logic as your snippet: Right and Up)
+    bool is_selected = is_id_selected(region_id);
+
     vec2 step = 1.0 / u_texture_size;
     int id_r = get_id(v_uv + vec2(step.x, 0.0));
     int id_u = get_id(v_uv + vec2(0.0, step.y));
 
-    // 4. Border Logic
-    bool is_region_border = false;      // Internal dark lines between regions
-    bool is_selection_border = false;   // External yellow line around the selection
+    bool is_region_border = false;
+    bool is_selection_border = false;
 
-    // A. Detect Region Borders (Always visible in Political Mode)
     if (region_id != id_r || region_id != id_u) {
         is_region_border = true;
     }
 
-    // B. Detect Selection Outline (Only if selected)
     if (is_selected) {
-        // If neighbor is different ID...
         if (region_id != id_r) {
-            // ...check if neighbor is NOT part of the selection.
-            if (get_country_color(id_r).a < 0.9) is_selection_border = true;
+            if (!is_id_selected(id_r)) is_selection_border = true;
         }
         if (region_id != id_u) {
-            if (get_country_color(id_u).a < 0.9) is_selection_border = true;
+            if (!is_id_selected(id_u)) is_selection_border = true;
         }
     }
     
-    // 5. Coloring (Political Mode)
+    vec4 lut_data = get_country_color(region_id);
+    vec3 final_rgb = lut_data.rgb;
+
     if (u_overlay_mode == 1) {
-        vec3 final_rgb = lut_data.rgb;
+        if (is_region_border) final_rgb *= 0.6; 
 
-        // Apply dark border to ALL regions (Your "beautiful borders")
-        if (is_region_border) {
-             final_rgb *= 0.6; 
-        }
-
-        // Apply Selection Highlights
         if (is_selection_border) {
-            final_rgb = vec3(1.0, 1.0, 0.0); // Yellow Outline
+            final_rgb = vec3(1.0, 1.0, 0.0);
         } else if (is_selected) {
-            final_rgb += 0.15; // Brightness boost for selected interior
+            final_rgb += 0.15;
         }
-
         f_color = vec4(final_rgb, u_opacity);
-        return;
     }
-
-    // 6. Coloring (Terrain Mode - Overlay Only)
-    if (u_overlay_mode == 0) {
+    else {
         if (is_selection_border) {
-            f_color = vec4(1.0, 1.0, 1.0, 1.0); // Yellow Outline
+            f_color = vec4(1.0, 1.0, 1.0, 1.0);
         } else if (is_selected) {
-            f_color = vec4(1.0, 1.0, 1.0, 0.15); // Faint fill
+            f_color = vec4(1.0, 1.0, 1.0, 0.15);
         } else {
-            f_color = vec4(0.0); // Transparent
+            f_color = vec4(0.0);
         }
     }
 }
