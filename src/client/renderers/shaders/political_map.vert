@@ -1,11 +1,15 @@
 #version 330
+
+// Inputs from Arcade/Python
 in vec2 in_vert;
 in vec2 in_uv;
 
+// Outputs to Fragment Shader
 out vec2 v_uv;
 
-uniform mat4 u_view;
+// Matrix Uniforms
 uniform mat4 u_projection;
+uniform mat4 u_view;
 
 void main() {
     v_uv = in_uv;

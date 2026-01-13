@@ -14,7 +14,6 @@ class SelectionMode(Enum):
 class ViewportController:
     """
     Mediator between Raw Input, the Camera, and the Map Renderer.
-    Responsibility: 'What happens when I click the map?'
     """
     def __init__(self, 
                  camera_ctrl: CameraController, 
@@ -29,16 +28,12 @@ class ViewportController:
         self.net = net_client
         self.on_selection_change = on_selection_change
         
-        # Internal state to track panning
         self._is_panning = False
         self.selection_mode = SelectionMode.REGION
 
     def set_selection_mode(self, mode: SelectionMode):
-        """Switches how clicks are interpreted."""
         self.selection_mode = mode
-        # Reset current visual state to prevent artifacts
-        self.renderer.set_highlight([]) 
-        self.renderer.clear_country_highlight()
+        self.renderer.clear_highlight() 
         self.on_selection_change(None)
 
     def on_mouse_press(self, x: float, y: float, button: int):
@@ -65,47 +60,37 @@ class ViewportController:
         self.cam_ctrl.sync_with_arcade(self.world_cam)
 
     def _handle_selection(self, screen_x: float, screen_y: float):
-        """
-        Translates screen click to world map selection.
-        """
         world_pos = self.world_cam.unproject((screen_x, screen_y))
         
-        # Query the renderer for the specific ID under the cursor
+        # 1. Get Region ID from Map Data (CPU)
         region_id = self.renderer.get_region_id_at_world_pos(world_pos.x, world_pos.y)
         
         if region_id is None or region_id <= 0:
             self.renderer.clear_highlight()
-            self.renderer.clear_country_highlight()
             self.on_selection_change(None)
             return
 
-        if self.selection_mode == SelectionMode.REGION:
-            # Highlight only the specific region clicked
-            self.renderer.clear_country_highlight()
-            self.renderer.set_highlight([region_id])
-            self.on_selection_change(region_id)
+        # 2. Determine which IDs to highlight based on mode
+        highlight_ids = [region_id]
 
-        elif self.selection_mode == SelectionMode.COUNTRY:
-            # Identify the owner and highlight all their regions
+        if self.selection_mode == SelectionMode.COUNTRY:
             state = self.net.get_state()
-            owner_tag = "None"
-            
             if "regions" in state.tables:
                 try:
-                    # Lookup owner in Polars table
-                    row = state.tables["regions"].filter(pl.col("id") == region_id)
-                    if not row.is_empty():
-                        owner_tag = row["owner"][0]
-                except Exception:
-                    pass
+                    df = state.tables["regions"]
+                    # Find owner of the clicked region
+                    owner_rows = df.filter(pl.col("id") == region_id)
+                    
+                    if not owner_rows.is_empty():
+                        owner = owner_rows["owner"][0]
+                        # If it's a valid country, select ALL regions with that owner
+                        if owner and owner != "None":
+                            highlight_ids = df.filter(pl.col("owner") == owner)["id"].to_list()
+                except Exception as e:
+                    print(f"[Viewport] Selection Error: {e}")
 
-            if owner_tag and owner_tag != "None":
-                # Renderer dims the rest of the world and brightens the country
-                self.renderer.set_country_highlight(owner_tag)
-                # We still report the specific region ID to the UI for inspection data
-                self.on_selection_change(region_id)
-            else:
-                # Land with no owner or water
-                self.renderer.clear_country_highlight()
-                self.renderer.set_highlight([region_id])
-                self.on_selection_change(region_id)
+        # 3. Update Renderer Visuals
+        self.renderer.set_highlight(highlight_ids)
+        
+        # 4. Update UI Panel (Show info for the specific clicked region)
+        self.on_selection_change(region_id)

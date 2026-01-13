@@ -2,7 +2,7 @@ import arcade
 import arcade.gl
 import numpy as np
 from array import array
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Set
 from pathlib import Path
 from pyglet import gl
 
@@ -21,13 +21,15 @@ class MapRenderer:
         self.width = map_data.width
         self.height = map_data.height
         
-        self.selected_id = -1
+        # Store a Set for O(1) lookups during texture generation
+        self.selected_ids: Set[int] = set()
+        
+        # NOTE: 4096*4096 is large. Ensure your IDs fit within 16 million.
         self.lut_dim = 4096 
 
-        # State cache for country highlighting
+        # State cache
         self._cached_ownership: Dict[int, str] = {}
         self._cached_colors: Dict[str, Tuple[int, int, int]] = {}
-        self._current_highlight_tag: Optional[str] = None
 
         self.terrain_sprite: Optional[arcade.Sprite] = None
         self._init_resources(terrain_img_path)
@@ -41,7 +43,7 @@ class MapRenderer:
             self.terrain_sprite.center_x = self.width / 2
             self.terrain_sprite.center_y = self.height / 2
 
-        # Main Texture Generation
+        # Main Texture Generation (RGB = Region ID)
         b = (self.map_data.packed_map & 0xFF).astype(np.uint8)
         g = ((self.map_data.packed_map >> 8) & 0xFF).astype(np.uint8)
         r = ((self.map_data.packed_map >> 16) & 0xFF).astype(np.uint8)
@@ -57,6 +59,7 @@ class MapRenderer:
             filter=(self.ctx.NEAREST, self.ctx.NEAREST)
         )
         
+        # Lookup Texture: RGBA (RGB=Color, A=SelectionStatus)
         self.lookup_texture = self.ctx.texture(
             (self.lut_dim, self.lut_dim),
             components=4,
@@ -88,42 +91,34 @@ class MapRenderer:
         self.program['u_texture_size'] = (float(self.width), float(self.height))
 
     def update_political_layer(self, region_ownership: Dict[int, str], country_colors: Dict[str, Tuple[int, int, int]]):
-        """Saves data for potential redraws and updates GPU."""
+        """Updates internal state and pushes new colors to GPU."""
         self._cached_ownership = region_ownership
         self._cached_colors = country_colors
-        self._upload_lut(highlight_tag=self._current_highlight_tag)
+        self._upload_lut()
 
-    def set_country_highlight(self, tag: str):
-        """Highlights all regions belonging to a specific country tag."""
-        self._current_highlight_tag = tag
-        self.selected_id = -1 # Disable white outline for single region
-        self._upload_lut(highlight_tag=tag)
-
-    def clear_country_highlight(self):
-        """Restores map to normal state."""
-        self._current_highlight_tag = None
-        self._upload_lut(highlight_tag=None)
-
-    def _upload_lut(self, highlight_tag: Optional[str] = None):
-        """Writes data to the Lookup Texture. Dims colors not matching highlight_tag."""
+    def _upload_lut(self):
+        """
+        Writes data to the Lookup Texture.
+        Key Mechanism: We use the Alpha channel to indicate selection.
+        Alpha 255 (1.0) = Selected
+        Alpha 200 (~0.78) = Unselected
+        """
+        # Initialize huge buffer
         lut_data = np.full((self.lut_dim * self.lut_dim, 4), 0, dtype=np.uint8)
-        lut_data[:, 3] = 255 
+        
+        # Default unselected state (Alpha 200)
+        lut_data[:, 3] = 200 
 
         for rid, tag in self._cached_ownership.items():
             if rid < len(lut_data):
                 color = self._cached_colors.get(tag, (100, 100, 100))
                 
-                if highlight_tag is not None:
-                    if tag == highlight_tag:
-                        # Focused country: Full Brightness
-                        lut_data[rid] = [color[0], color[1], color[2], 255]
-                    else:
-                        # Background countries: Dimmed
-                        lut_data[rid] = [int(color[0]*0.25), int(color[1]*0.25), int(color[2]*0.25), 255]
-                else:
-                    # Default: Normal Brightness
-                    lut_data[rid] = [color[0], color[1], color[2], 255]
+                # If this ID is in our selected set, bump Alpha to 255
+                alpha = 255 if rid in self.selected_ids else 200
+                
+                lut_data[rid] = [color[0], color[1], color[2], alpha]
 
+        # Upload to GPU
         self.lookup_texture.write(lut_data.tobytes())
 
     def draw(self, mode: str = "terrain"):
@@ -136,7 +131,9 @@ class MapRenderer:
         
         self.program['u_view'] = self.window.ctx.view_matrix
         self.program['u_projection'] = self.window.ctx.projection_matrix
-        self.program['u_selected_id'] = int(self.selected_id)
+        
+        # FIX: Removed self.program['u_selected_id'] assignment. 
+        # The shader no longer has this uniform, so setting it caused the crash.
         
         if mode == "political":
             self.program['u_overlay_mode'] = 1
@@ -148,10 +145,18 @@ class MapRenderer:
         self.quad_geometry.render(self.program)
 
     def set_highlight(self, region_ids: List[int]):
+        """Sets the active selection and updates the texture."""
         if not region_ids:
-            self.selected_id = -1
+            self.selected_ids = set()
         else:
-            self.selected_id = region_ids[0]
+            self.selected_ids = set(region_ids)
+            
+        # Re-upload texture so the shader sees the new Alpha values
+        self._upload_lut()
+
+    def clear_highlight(self):
+        self.selected_ids = set()
+        self._upload_lut()
 
     def get_region_id_at_world_pos(self, world_x: float, world_y: float) -> int:
         img_y = int(self.height - world_y)
