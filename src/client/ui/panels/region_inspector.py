@@ -73,7 +73,7 @@ class RegionInspectorPanel:
             row = row_df.row(0, named=True)
             
             # Title
-            imgui.text_colored(GAMETHEME.col_accent_main, f"REGION: {row.get('name', 'Unknown')}")
+            imgui.text_colored(GAMETHEME.col_active_accent, f"REGION: {row.get('name', 'Unknown')}")
             
             # Focus Button
             imgui.same_line()

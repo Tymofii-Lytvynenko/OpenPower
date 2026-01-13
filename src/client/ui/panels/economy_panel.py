@@ -14,8 +14,8 @@ class EconomyPanel:
             composer.draw_section_header("ECONOMIC MODEL", show_more_btn=False)
             
             # Styled Slider
-            imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.col_frame_bg)
-            imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.col_slider_accent)
+            imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.popup_bg)
+            imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.col_active_accent)
             
             # Mock value: 0.2 (Mostly State Controlled)
             imgui.slider_float("##eco_model", 0.2, 0.0, 1.0, "")
@@ -31,7 +31,7 @@ class EconomyPanel:
             # 2. Economic Health
             composer.draw_section_header("ECONOMIC HEALTH")
             # Mock value 22.1%
-            composer.draw_meter("", 22.1, GAMETHEME.col_meter_positive) 
+            composer.draw_meter("", 22.1, GAMETHEME.col_positive) 
 
             # 3. Budget Section
             composer.draw_section_header("BUDGET")
@@ -65,7 +65,7 @@ class EconomyPanel:
 
             # 4. Resources
             composer.draw_section_header("RESOURCES")
-            composer.draw_meter("", 66.0, GAMETHEME.col_meter_positive)
+            composer.draw_meter("", 66.0, GAMETHEME.col_positive)
             
             imgui.dummy((0, 15))
             

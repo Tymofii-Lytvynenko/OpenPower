@@ -30,7 +30,7 @@ class MainMenuView(arcade.View):
 
     def on_show_view(self):
         print("[MainMenuView] Entered Main Menu")
-        self.window.background_color = GAMETHEME.bg_color_main
+        self.window.background_color = GAMETHEME.col_black
 
     def on_resize(self, width: int, height: int):
         self.imgui.resize(width, height)
@@ -46,7 +46,7 @@ class MainMenuView(arcade.View):
     def _render_menu_window(self):
         screen_w, screen_h = self.window.get_size()
         
-        if self.ui.begin_centered_panel("Main Menu", screen_w, screen_h, width=350, height=450):
+        if self.ui.begin_centered_panel("Main Menu", screen_w, screen_h, w=350, h=450):
             
             self.ui.draw_title("OPENPOWER")
             

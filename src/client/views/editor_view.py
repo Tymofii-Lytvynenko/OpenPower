@@ -27,7 +27,7 @@ class EditorView(BaseImGuiView):
         self.imgui = ImGuiService(self.window)  # Required by BaseImGuiView
         
         # 2. UI Layout
-        self.layout = EditorLayout(self.net)
+        self.layout = EditorLayout(self.net, None) # ViewportController set later
         
         # 3. Visuals (Map Renderer)
         self.renderer = MapRenderer(
@@ -53,7 +53,7 @@ class EditorView(BaseImGuiView):
         self.selected_region_id = None
 
     def on_show_view(self):
-        self.window.background_color = GAMETHEME.bg_color_main
+        self.window.background_color = GAMETHEME.col_black
         # Ensure camera is synced before first frame
         self.cam_ctrl.sync_with_arcade(self.world_cam)
         # Generate initial political map

@@ -51,7 +51,7 @@ class GameView(BaseImGuiView):
         self.selected_region_id = None
 
     def on_show_view(self):
-        self.window.background_color = GAMETHEME.bg_color_main
+        self.window.background_color = GAMETHEME.col_black
         self.cam_ctrl.sync_with_arcade(self.world_cam)
         self._refresh_political_map()
 

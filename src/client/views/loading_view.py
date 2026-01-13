@@ -31,7 +31,8 @@ class LoadingView(arcade.View):
         self.error = None
 
     def on_show_view(self):
-        self.window.background_color = arcade.color.BLACK
+        # Removed hardcoded arcade.color.BLACK
+        self.window.background_color = GAMETHEME.col_black
         self.thread.start()
 
     def _worker(self):
@@ -68,7 +69,7 @@ class LoadingView(arcade.View):
         screen_w, screen_h = self.window.get_size()
         
         # Draw the universal loader panel
-        if self.ui.begin_centered_panel("Loader", screen_w, screen_h, width=400, height=150):
+        if self.ui.begin_centered_panel("Loader", screen_w, screen_h, w=400, h=150):
             
             self.ui.draw_title("PROCESSING")
             

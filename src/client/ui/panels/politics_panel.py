@@ -22,8 +22,8 @@ class PoliticsPanel:
             # if "politics" in state.tables:
             #     current_ideology = state.tables["politics"]["ruling_party_alignment"]
 
-            imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.col_slider_accent)
-            imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.col_frame_bg)
+            imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.col_active_accent)
+            imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.popup_bg)
             
             # --- RENDERING ONLY ---
             changed, new_val = imgui.slider_float("##ideology", current_ideology, 0.0, 1.0, "")
@@ -46,16 +46,16 @@ class PoliticsPanel:
 
             # 3. Meters (Read Only)
             composer.draw_section_header("APPROVAL", show_more_btn=False)
-            composer.draw_meter("", 51.7, GAMETHEME.col_meter_positive) 
+            composer.draw_meter("", 51.7, GAMETHEME.col_positive) 
 
             composer.draw_section_header("PRESSURE", show_more_btn=False)
-            composer.draw_meter("", 0.0, GAMETHEME.col_meter_negative) 
+            composer.draw_meter("", 0.0, GAMETHEME.col_negative) 
 
             composer.draw_section_header("STABILITY", show_more_btn=False)
-            composer.draw_meter("", 56.7, GAMETHEME.col_meter_positive) 
+            composer.draw_meter("", 56.7, GAMETHEME.col_positive) 
 
             composer.draw_section_header("CORRUPTION", show_more_btn=False)
-            composer.draw_meter("", 47.2, GAMETHEME.col_meter_negative) 
+            composer.draw_meter("", 47.2, GAMETHEME.col_negative) 
             
             imgui.dummy((0, 10))
             

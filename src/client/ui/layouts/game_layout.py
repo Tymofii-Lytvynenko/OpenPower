@@ -100,7 +100,7 @@ class GameLayout(BaseLayout):
         """Helper for selection mode buttons."""
         if is_active:
             imgui.push_style_color(imgui.Col_.button, GAMETHEME.col_active_accent)
-            imgui.push_style_color(imgui.Col_.text, GAMETHEME.col_text_bright)
+            imgui.push_style_color(imgui.Col_.text, GAMETHEME.col_info)
         else:
             imgui.push_style_color(imgui.Col_.button, GAMETHEME.col_inactive_bg)
             imgui.push_style_color(imgui.Col_.text, GAMETHEME.col_text_disabled)
@@ -112,7 +112,7 @@ class GameLayout(BaseLayout):
 
     def _render_top_bar(self, state, fps: float):
         if imgui.begin_main_menu_bar():
-            imgui.text_colored(GAMETHEME.col_accent_main, f"[{self.player_tag}]")
+            imgui.text_colored(GAMETHEME.col_active_accent, f"[{self.player_tag}]")
             
             balance = 0
             try:
@@ -168,7 +168,7 @@ class GameLayout(BaseLayout):
             date_str = t.date_str
             text_w = imgui.calc_text_size(date_str).x
             imgui.set_cursor_pos_x((panel_w - text_w) / 2)
-            imgui.text_colored(GAMETHEME.col_accent_main, date_str)
+            imgui.text_colored(GAMETHEME.col_active_accent, date_str)
             
             imgui.dummy((0, 2)) 
 
@@ -198,7 +198,7 @@ class GameLayout(BaseLayout):
     def _draw_speed_button(self, label: str, is_active: bool, width: float, callback):
         if is_active:
             imgui.push_style_color(imgui.Col_.button, GAMETHEME.col_active_accent)
-            imgui.push_style_color(imgui.Col_.text, GAMETHEME.col_text_bright)
+            imgui.push_style_color(imgui.Col_.text, GAMETHEME.text_main)
         else:
             imgui.push_style_color(imgui.Col_.button, GAMETHEME.col_button_idle)
             imgui.push_style_color(imgui.Col_.text, GAMETHEME.col_button_text_idle)
