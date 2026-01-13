@@ -22,8 +22,6 @@ class MapRenderer:
         self.height = map_data.height
         
         # MAPPINGS
-        # Real ID = The RGB color int from the file (Sparse: 10, 500500, 16777215)
-        # Dense ID = The sequential index for the shader (Dense: 1, 2, 3...)
         self.real_to_dense: Dict[int, int] = {}
         self.dense_to_real: List[int] = []
 
@@ -31,50 +29,49 @@ class MapRenderer:
         self.single_select_dense_id = -1
         self.multi_select_dense_ids = set()
         
-        # OPTIMIZED: 256x256 covers 65,536 regions. 
-        # Since we are re-indexing, we don't need 4096 anymore.
-        self.lut_dim = 256
+        # OPTIMIZED: 256x256 covers 65,536 regions.
+        self.lut_dim = 4096
+        # Init with 0 (Transparent)
         self.lut_data = np.full((self.lut_dim * self.lut_dim, 4), 0, dtype=np.uint8)
-        self.lut_data[:, 3] = 200 # Default Alpha
 
         self._cached_ownership: Dict[int, str] = {}
         self._cached_colors: Dict[str, Tuple[int, int, int]] = {}
         self.prev_multi_select_dense_ids = set()
 
         self.terrain_sprite: Optional[arcade.Sprite] = None
-        self._init_resources(terrain_img_path)
+        
+        # --- ORDER MATTERS HERE ---
+        self._init_resources(terrain_img_path) 
         self._init_glsl()
 
     def _init_resources(self, terrain_path: Path):
+        # Create a SpriteList to hold the terrain
+        self.terrain_list = arcade.SpriteList()
+
         if terrain_path.exists():
             self.terrain_sprite = arcade.Sprite(terrain_path)
             self.terrain_sprite.width = self.width
             self.terrain_sprite.height = self.height
             self.terrain_sprite.center_x = self.width / 2
             self.terrain_sprite.center_y = self.height / 2
+            
+            # Add the sprite to the list
+            self.terrain_list.append(self.terrain_sprite)
+        else:
+            print(f"CRITICAL ERROR: Terrain path not found: {terrain_path}")
+            self.terrain_sprite = None
 
-        # --- STEP 1: RE-INDEXING THE MAP ---
-        # Find all unique Region IDs (RGB values) in the map data.
-        # return_inverse=True gives us the map reconstructed with sequential indices (0, 1, 2...)
-        # This is the heavy lifting done ONCE at startup.
+        # 2. Re-Index Map (The Optimization)
         print(f"[MapRenderer] Indexing regions...")
         unique_ids, dense_map = np.unique(self.map_data.packed_map, return_inverse=True)
         
-        # Store mappings
         self.dense_to_real = unique_ids
-        # Create a fast lookup dict
         self.real_to_dense = { real_id: i for i, real_id in enumerate(unique_ids) }
         
-        print(f"[MapRenderer] Found {len(unique_ids)} unique regions. Remapped to dense indices.")
+        print(f"[MapRenderer] Remapped {len(unique_ids)} regions.")
 
-        # --- STEP 2: CREATE TEXTURE FROM DENSE INDICES ---
-        # Now we pack the SEQUENTIAL indices (0, 1, 2...) into the texture pixels
-        # instead of the large RGB values.
-        # We assume dense_map is flat from np.unique, so we reshape it.
+        # 3. Create Map Texture (Dense Indices)
         dense_map = dense_map.reshape((self.height, self.width)).astype(np.uint32)
-
-        # Pack into RGB bytes (Standard packing: R=High, B=Low or vice versa depending on your shader)
-        # Using R = (id >> 16), G = (id >> 8), B = id
         r = ((dense_map >> 16) & 0xFF).astype(np.uint8)
         g = ((dense_map >> 8) & 0xFF).astype(np.uint8)
         b = (dense_map & 0xFF).astype(np.uint8)
@@ -91,13 +88,17 @@ class MapRenderer:
             filter=(self.ctx.NEAREST, self.ctx.NEAREST)
         )
         
+        # 4. Create AND WRITE Lookup Texture
         self.lookup_texture = self.ctx.texture(
             (self.lut_dim, self.lut_dim),
             components=4,
             filter=(self.ctx.NEAREST, self.ctx.NEAREST)
         )
+        # FIX: Write the initial transparent data immediately!
+        self.lookup_texture.write(self.lut_data.tobytes())
 
     def _init_glsl(self):
+        # Standard full-screen quad
         buffer_data = array('f', [
             0.0, 0.0, 0.0, 0.0,
              self.width, 0.0, 1.0, 0.0,
@@ -130,49 +131,42 @@ class MapRenderer:
         self.lookup_texture.write(self.lut_data.tobytes())
 
     def _rebuild_lut_array(self):
-        """
-        Maps the game state (Real IDs) to the Shader Data (Dense Indices).
-        """
-        self.lut_data.fill(0)
-        self.lut_data[:, 3] = 200
+        # Reset to 0 (Transparent)
+        self.lut_data.fill(0) 
 
-        # Iterate through the ownership dict (Key = Real ID)
         for real_id, tag in self._cached_ownership.items():
-            # Translate Real ID -> Dense ID
             if real_id in self.real_to_dense:
                 dense_id = self.real_to_dense[real_id]
                 
+                # Safety check for size
                 if dense_id < len(self.lut_data):
+                    # Background (ID 0) should generally remain ignored/transparent
+                    # unless your game treats the sea as an ownable province.
+                    if dense_id == 0: continue 
+
                     color = self._cached_colors.get(tag, (100, 100, 100))
                     alpha = 255 if dense_id in self.multi_select_dense_ids else 200
                     self.lut_data[dense_id] = [color[0], color[1], color[2], alpha]
 
     def _update_selection_texture(self):
-        # 1. Turn OFF old
-        if self.prev_multi_select_dense_ids:
-            for idx in self.prev_multi_select_dense_ids:
-                if idx < len(self.lut_data): self.lut_data[idx, 3] = 200
+        # Turn OFF old
+        for idx in self.prev_multi_select_dense_ids:
+            if idx < len(self.lut_data) and idx != 0: 
+                self.lut_data[idx, 3] = 200
 
-        # 2. Turn ON new
-        if self.multi_select_dense_ids:
-            for idx in self.multi_select_dense_ids:
-                if idx < len(self.lut_data): self.lut_data[idx, 3] = 255
+        # Turn ON new
+        for idx in self.multi_select_dense_ids:
+            if idx < len(self.lut_data) and idx != 0: 
+                self.lut_data[idx, 3] = 255
 
         self.prev_multi_select_dense_ids = self.multi_select_dense_ids.copy()
         self.lookup_texture.write(self.lut_data.tobytes())
 
     def set_highlight(self, real_region_ids: List[int]):
-        """
-        Translates Real IDs (RGB) to Dense IDs (Index) before highlighting.
-        """
         if not real_region_ids:
-            self.single_select_dense_id = -1
-            if self.multi_select_dense_ids:
-                self.multi_select_dense_ids = set()
-                self._update_selection_texture()
+            self.clear_highlight()
             return
 
-        # Translate IDs
         valid_dense_ids = []
         for rid in real_region_ids:
             if rid in self.real_to_dense:
@@ -182,13 +176,11 @@ class MapRenderer:
             return
 
         if len(valid_dense_ids) == 1:
-            # FAST PATH
             self.single_select_dense_id = valid_dense_ids[0]
             if self.multi_select_dense_ids:
                 self.multi_select_dense_ids = set()
                 self._update_selection_texture()
         else:
-            # BULK PATH
             self.single_select_dense_id = -1
             new_set = set(valid_dense_ids)
             if new_set != self.multi_select_dense_ids:
@@ -202,10 +194,21 @@ class MapRenderer:
             self._update_selection_texture()
 
     def draw(self, mode: str = "terrain"):
-        if self.terrain_sprite and mode == "terrain":
-            self.terrain_sprite.draw()
+        # 1. Draw Terrain
+        # FIX: Always draw terrain if it exists. 
+        # Even in political mode, you usually want the map underneath.
+        if self.terrain_list:
+            self.terrain_list.draw()
 
+        # 2. OPTIMIZATION: 
+        # Only skip if in terrain mode AND nothing is selected.
+        if mode == "terrain" and self.single_select_dense_id == -1 and not self.multi_select_dense_ids:
+            return
+
+        # 3. GL Setup
         self.ctx.enable(self.ctx.BLEND)
+        self.ctx.blend_func = self.ctx.BLEND_DEFAULT
+        
         self.map_texture.use(0)
         self.lookup_texture.use(1)
         
@@ -213,12 +216,13 @@ class MapRenderer:
         self.program['u_projection'] = self.window.ctx.projection_matrix
         self.program['u_selected_id'] = int(self.single_select_dense_id)
         
+        # 4. Mode Logic
         if mode == "political":
             self.program['u_overlay_mode'] = 1
             self.program['u_opacity'] = 0.9
         else:
             self.program['u_overlay_mode'] = 0
-            self.program['u_opacity'] = 1.0
+            self.program['u_opacity'] = 1.0 # Ensure opacity is set even in terrain mode
 
         self.quad_geometry.render(self.program)
 
@@ -226,5 +230,4 @@ class MapRenderer:
         img_y = int(self.height - world_y)
         if not (0 <= world_x < self.width and 0 <= img_y < self.height):
             return 0
-        # This returns the REAL ID (RGB) because map_data.packed_map was untouched
         return self.map_data.get_region_id(int(world_x), img_y)
