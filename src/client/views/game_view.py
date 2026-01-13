@@ -1,5 +1,6 @@
 import arcade
 from typing import Optional, TYPE_CHECKING
+from pathlib import Path
 
 from src.shared.config import GameConfig
 from src.client.services.network_client_service import NetworkClient
@@ -34,24 +35,34 @@ class GameView(BaseImGuiView):
         self.layout = GameLayout(self.net, player_tag)
         
         # 3. Map System 
+        # UPDATED: We use the session.map_data (Core) directly.
+        # We also re-resolve the texture paths for the Renderer (Client).
+        
+        # Logic: Try to find the same map image the server loaded
         map_path = config.get_asset_path("map/regions.png")
-        # Fallback to session atlas path if specific asset missing (dynamic loading)
-        if not map_path.exists() and session.atlas:
-            from pathlib import Path
-            map_path = Path(session.atlas.image_path)
+        if not map_path.exists():
+            # Fallback attempts
+            for data_dir in config.get_data_dirs():
+                candidate = data_dir / "regions" / "regions.png"
+                if candidate.exists():
+                    map_path = candidate
+                    break
 
-        terrain_path = config.get_asset_path("maps/terrain.png")
+        terrain_path = config.get_asset_path("map/terrain.png")
 
+        # UPDATED: New Constructor Signature
         self.renderer = MapRenderer(
-            map_path=map_path,
-            terrain_path=terrain_path,
-            cache_dir=config.cache_dir,
-            preloaded_atlas=session.atlas 
+            map_data=session.map_data, # Core Logic Object (Headless Safe)
+            map_img_path=map_path,     # Path for GPU Texture Loading
+            terrain_img_path=terrain_path
         )
         
         # 4. Controllers
         self.world_cam = arcade.Camera2D()
-        self.cam_ctrl = CameraController(self.renderer.get_center())
+        
+        # Get center from renderer logic
+        center_x, center_y = self.renderer.width / 2, self.renderer.height / 2
+        self.cam_ctrl = CameraController((center_x, center_y))
         
         self.viewport_ctrl = ViewportController(
             camera_ctrl=self.cam_ctrl,
@@ -79,7 +90,9 @@ class GameView(BaseImGuiView):
         region_map = dict(zip(df["id"], df["owner"]))
         unique_owners = df["owner"].unique().to_list()
         
+        # Generate colors for dynamic/modded countries
         color_map = generate_political_colors(unique_owners)
+        
         self.renderer.update_political_layer(region_map, color_map)
 
     def on_selection_changed(self, region_id: int | None):
@@ -91,7 +104,10 @@ class GameView(BaseImGuiView):
         
         # World Render
         self.world_cam.use()
-        self.renderer.draw_map(mode=self.layout.map_mode)
+        
+        # UPDATED: map_mode logic is handled by the renderer.draw argument
+        mode = "political" if self.layout.map_mode == "political" else "terrain"
+        self.renderer.draw(mode=mode)
         
         # UI Render
         self.window.use()

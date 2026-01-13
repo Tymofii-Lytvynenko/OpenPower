@@ -7,8 +7,8 @@ class ShaderRegistry:
     """Centralized paths for all GLSL source files."""
     
     # Paths relative to the client folder
-    POLITICAL_V = ROOT / "renderers" / "shaders" / "political.vert"
-    POLITICAL_F = ROOT / "renderers" / "shaders" / "political.frag"
+    POLITICAL_V = ROOT / "renderers" / "shaders" / "political_map.vert"
+    POLITICAL_F = ROOT / "renderers" / "shaders" / "political_map.frag"
 
     @classmethod
     def load_bundle(cls, vert_path: Path, frag_path: Path) -> dict:

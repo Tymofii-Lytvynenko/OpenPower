@@ -3,7 +3,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from src.server.session import GameSession
 from src.shared.config import GameConfig
-from src.shared.map.region_atlas import RegionAtlas
+
+# UPDATED: Import Core Data class instead of Shared Atlas
+from src.core.map_data import RegionMapData
 from src.client.services.network_client_service import NetworkClient
 
 @dataclass
@@ -14,7 +16,7 @@ class EditorContext:
     """
     map_path: Path
     terrain_path: Path      # Path to the artistic background (terrain)
-    atlas: RegionAtlas      # Pre-calculated OpenCV/NumPy data
+    map_data: RegionMapData # Pre-calculated OpenCV/NumPy data (CPU Only)
     net_client: NetworkClient
 
 class EditorLoadingTask:
@@ -22,9 +24,9 @@ class EditorLoadingTask:
     Handles the heavy lifting of preparing the Editor.
     
     Why this is needed:
-        The RegionAtlas uses OpenCV and NumPy to process the map image.
+        The RegionMapData uses OpenCV and NumPy to process the map image.
         On large maps (4k+), this can take 1-5 seconds. Doing this on the
-        main thread would freeze the UI. We also resolve file paths here.
+        main thread would freeze the UI. 
     """
 
     def __init__(self, session: GameSession, config: GameConfig):
@@ -51,12 +53,13 @@ class EditorLoadingTask:
         time.sleep(0.1) 
 
         # 2. Load Region Data (Heavy CPU Work)
-        self.status_text = "Processing Region Atlas (CV2)..."
+        self.status_text = "Processing Region Data (CV2)..."
         self.progress = 0.3
         
-        # We perform the heavy CV2/NumPy analysis here using the technical map (regions).
-        # This is safe to do in a thread because it doesn't touch OpenGL.
-        atlas = RegionAtlas(str(map_path))
+        # UPDATED: We use the Core class. 
+        # This is safe to run in a thread because it touches no OpenGL context.
+        # It just does math on pixels.
+        map_data = RegionMapData(str(map_path))
         
         # 3. Initialize Network
         self.status_text = "Connecting to Session..."
@@ -71,7 +74,7 @@ class EditorLoadingTask:
         return EditorContext(
             map_path=map_path,
             terrain_path=terrain_path,
-            atlas=atlas,
+            map_data=map_data,
             net_client=net_client
         )
 
@@ -98,8 +101,8 @@ class EditorLoadingTask:
         Finds the artistic terrain background.
         Convention: It lives in the same folder as regions.png usually.
         """
-
-        candidate = self.config.get_asset_path("maps/terrain.png")
+        # Check standard location in assets
+        candidate = self.config.get_asset_path("map/terrain.png")
         if candidate and candidate.exists():
             return candidate
 

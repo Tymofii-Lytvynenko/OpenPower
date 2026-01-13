@@ -5,12 +5,13 @@ from src.shared.config import GameConfig
 from src.shared.actions import GameAction
 
 # Logic & Data Systems
-# (Adjusted imports to match your project structure provided in the snippet)
 from src.engine.mod_manager import ModManager
 from src.server.io.data_load_manager import DataLoader
 from src.server.io.data_export_manager import DataExporter
 from src.engine.simulator import Engine
-from src.shared.map.region_atlas import RegionAtlas
+
+# UPDATED: Import the headless map data handler from Core
+from src.core.map_data import RegionMapData
 
 if TYPE_CHECKING:
     from src.server.state import GameState
@@ -22,8 +23,7 @@ class GameSession:
     Architecture Note:
         This class uses the Factory Method pattern (`create_local`).
         The `__init__` method is lightweight and strictly for Dependency Injection.
-        Heavy loading logic is handled in `create_local` to allow the Client UI
-        to display a progress bar.
+        Heavy loading logic is handled in `create_local`.
     """
 
     def __init__(self, 
@@ -31,11 +31,11 @@ class GameSession:
                  loader: DataLoader, 
                  exporter: DataExporter, 
                  engine: Engine,
-                 atlas: RegionAtlas,
+                 map_data: RegionMapData, # UPDATED Type Hint
                  initial_state: 'GameState'):
         """
         Internal Constructor.
-        Receives fully initialized subsystems. Do not call this directly to load a game.
+        Receives fully initialized subsystems. Do not call directly.
         Use `GameSession.create_local()` instead.
         """
         self.config = config
@@ -45,7 +45,7 @@ class GameSession:
         self.loader = loader
         self.exporter = exporter
         self.engine = engine
-        self.atlas = atlas
+        self.map_data = map_data # UPDATED Attribute
         
         # Game Data
         self.state = initial_state
@@ -56,18 +56,7 @@ class GameSession:
     @classmethod
     def create_local(cls, config: GameConfig, progress_cb: Optional[Callable[[float, str], None]] = None) -> 'GameSession':
         """
-        Factory Method: Orchestrates the full startup sequence for a Local Single-Player Game.
-        
-        Responsibilities:
-            1. Resolve Mods.
-            2. Initialize IO (Loader/Exporter).
-            3. Parse Data (TSV tables).
-            4. Compile Graphics (Atlas).
-            5. Initialize Engine & Systems.
-        
-        Args:
-            config: Game paths and settings.
-            progress_cb: Callback(fraction, text) for the Loading Screen UI.
+        Factory Method: Orchestrates the full startup sequence for a Local Game.
         """
         def report(p: float, text: str):
             if progress_cb: progress_cb(p, text)
@@ -89,13 +78,12 @@ class GameSession:
             exporter = DataExporter(config)
 
             # --- Step 3: World Data Loading (50%) ---
-            # This is usually the heaviest IO step (parsing TSVs)
             report(0.3, "Server: Loading world database...")
             initial_state = loader.load_initial_state()
 
-            # --- Step 4: Map/Atlas Compilation (70%) ---
-            # Heavy CPU/GPU operation (processing the regions.png image)
-            report(0.6, "Server: Compiling region atlas...")
+            # --- Step 4: Map Data Processing (70%) ---
+            # UPDATED: We now load the map using OpenCV via Core (Headless safe)
+            report(0.6, "Server: Processing map data...")
             
             # Resolve map path logic
             map_path = None
@@ -108,7 +96,8 @@ class GameSession:
             if not map_path:
                 map_path = config.get_asset_path("map/regions.png")
 
-            atlas = RegionAtlas(str(map_path))
+            # Initialize the Core MapData component
+            map_data = RegionMapData(str(map_path))
 
             # --- Step 5: Engine & Systems (90%) ---
             report(0.8, "Server: Registering game systems...")
@@ -122,7 +111,7 @@ class GameSession:
             report(1.0, "Server: Ready.")
             
             # Create the instance with all prepared data
-            return cls(config, loader, exporter, engine, atlas, initial_state)
+            return cls(config, loader, exporter, engine, map_data, initial_state)
 
         except Exception as e:
             print(f"[GameSession] Critical Startup Error: {e}")
@@ -140,19 +129,13 @@ class GameSession:
     def receive_action(self, action: GameAction):
         """
         Endpoint for Clients to submit commands.
-        In the future, this will be connected to a TCP/UDP socket.
         """
         # TODO: Add validation here (e.g., "Is Player X allowed to move Unit Y?")
         self.action_queue.append(action)
 
-    def get_state_snapshot(self) -> GameState:
+    def get_state_snapshot(self) -> 'GameState':
         """
         Returns the data for rendering.
-        
-        Network Note:
-            In a real network implementation, this would serialise 
-            the GameState (or a delta) to Apache Arrow bytes.
-            For local single-player, we just return the object reference (Zero-Copy).
         """
         return self.state
 
