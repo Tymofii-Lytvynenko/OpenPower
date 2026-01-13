@@ -4,48 +4,43 @@ from imgui_bundle import imgui
 @dataclass
 class UITheme:
     """
-    Revised Dark Theme for OpenPower UI.
-    Style: "Electric Deep" - High contrast, slight midnight-blue tint in backgrounds, 
-    vibrant cyan-blue highlights.
+    Revised Dark Theme.
     """
     
     # =========================================================
-    # 1. SEMANTIC COLORS (Logic & Gameplay)
+    # 1. SEMANTIC COLORS
     # =========================================================
 
-    # Main Accent: Electric Sky Blue
-    # Much brighter than before to "pop" against dark backgrounds
-    col_active_accent: tuple   = (0.11, 0.65, 0.92, 1.00)  
-    col_inactive_accent: tuple = (0.11, 0.65, 0.92, 0.40)  # Lower alpha, kept hue
-    col_border_accent: tuple   = (0.11, 0.65, 0.92, 0.80)  
+    # Main Accent
+    col_active_accent: tuple   = (0.28, 0.56, 1.00, 1.00)  
+    col_inactive_accent: tuple = (0.28, 0.56, 1.00, 0.40)
+    col_border_accent: tuple   = (0.28, 0.56, 1.00, 0.80)  
     
     # Text Colors
-    # Slight off-white (blue tint) reduces eye strain compared to pure 1.0 white
-    col_text_bright: tuple     = (0.95, 0.96, 0.98, 1.00)  
-    col_text_disabled: tuple   = (0.50, 0.52, 0.56, 1.00)  # Cool gray
+    col_text_bright: tuple     = (0.95, 0.96, 0.98, 1.00)
+    col_text_disabled: tuple   = (0.36, 0.42, 0.47, 1.00)
     
-    # Game Pillars (Brighter, cleaner tones)
-    col_politics: tuple = (1.00, 0.85, 0.25, 1.00)  # Vibrant Gold
-    col_military: tuple = (1.00, 0.35, 0.35, 1.00)  # Soft bright Red
-    col_economy: tuple  = (0.30, 0.95, 0.60, 1.00)  # Emerald Green
+    # Game Pillars
+    col_politics: tuple = (1.00, 0.85, 0.25, 1.00)
+    col_military: tuple = (1.00, 0.35, 0.35, 1.00)
+    col_economy: tuple  = (0.30, 0.95, 0.60, 1.00)
 
     # Status Colors
     col_positive: tuple = (0.30, 0.95, 0.60, 1.00)
     col_negative: tuple = (1.00, 0.35, 0.35, 1.00)
     col_error: tuple    = (1.00, 0.20, 0.20, 1.00)
-    col_info: tuple     = (0.11, 0.65, 0.92, 1.00)
+    col_info: tuple     = (0.28, 0.56, 1.00, 1.00)
     col_warning: tuple  = (1.00, 0.65, 0.00, 1.00)
     
     # Backgrounds & Special Areas
-    # Using "Midnight Grey" (very dark blue-grey) instead of pure grey
-    col_overlay_bg: tuple   = (0.05, 0.05, 0.07, 0.85)
+    col_overlay_bg: tuple   = (0.08, 0.08, 0.08, 0.94)
     col_black: tuple        = (0.00, 0.00, 0.00, 1.00)
-    col_panel_bg: tuple     = (0.11, 0.11, 0.13, 1.00)  # Main panel color
-    col_inactive_bg: tuple  = (0.18, 0.18, 0.20, 1.00)
+    col_panel_bg: tuple     = (0.11, 0.15, 0.17, 1.00)
+    col_inactive_bg: tuple  = (0.15, 0.18, 0.22, 1.00)
 
-    # Custom Button Colors (for manual layouts)
-    col_button_idle: tuple      = (0.20, 0.21, 0.24, 1.00)
-    col_button_text_idle: tuple = (0.90, 0.90, 0.92, 1.00)
+    # Custom Button Colors
+    col_button_idle: tuple      = (0.20, 0.25, 0.29, 1.00)
+    col_button_text_idle: tuple = (0.95, 0.96, 0.98, 1.00)
 
     # =========================================================
     # 2. IMGUI INTERNAL STYLE ATTRIBUTES
@@ -53,72 +48,88 @@ class UITheme:
     
     # Text & Window
     text_main: tuple      = (0.95, 0.96, 0.98, 1.00)
-    text_dim: tuple       = (0.50, 0.52, 0.56, 1.00)
+    text_dim: tuple       = (0.36, 0.42, 0.47, 1.00)
     
-    # The base window color. Deep, dark charcoal/blue
-    window_bg: tuple      = (0.09, 0.09, 0.11, 1.00)
-    child_bg: tuple       = (0.00, 0.00, 0.00, 0.00)
-    popup_bg: tuple       = (0.08, 0.08, 0.10, 0.96)
+    window_bg: tuple      = (0.11, 0.15, 0.17, 1.00)
+    child_bg: tuple       = (0.15, 0.18, 0.22, 1.00)
+    popup_bg: tuple       = (0.08, 0.08, 0.08, 0.94)
     
-    # Borders: Subtle but visible
-    border: tuple         = (1.00, 1.00, 1.00, 0.15) 
+    # Borders
+    border: tuple         = (0.08, 0.10, 0.12, 1.00)
     border_shadow: tuple  = (0.00, 0.00, 0.00, 0.00)
     
-    # Input Fields (Darker than window to create depth)
-    frame_bg: tuple         = (0.05, 0.05, 0.06, 1.00) 
-    frame_bg_hovered: tuple = (0.15, 0.15, 0.18, 1.00)
-    frame_bg_active: tuple  = (0.20, 0.20, 0.24, 1.00)
+    # Input Fields
+    frame_bg: tuple         = (0.20, 0.25, 0.29, 1.00)
+    frame_bg_hovered: tuple = (0.12, 0.20, 0.28, 1.00)
+    frame_bg_active: tuple  = (0.09, 0.12, 0.14, 1.00)
     
     # Title Bars
-    title_bg: tuple           = (0.09, 0.09, 0.11, 1.00)
-    title_bg_active: tuple    = (0.09, 0.09, 0.11, 1.00)
+    title_bg: tuple           = (0.09, 0.12, 0.14, 0.65)
+    title_bg_active: tuple    = (0.08, 0.10, 0.12, 1.00)
     title_bg_collapsed: tuple = (0.00, 0.00, 0.00, 0.51)
     
-    menubar_bg: tuple = (0.12, 0.12, 0.14, 1.00)
+    menubar_bg: tuple = (0.15, 0.18, 0.22, 1.00)
     
-    # Scrollbars (Minimalist)
-    scrollbar_bg: tuple          = (0.02, 0.02, 0.02, 0.00) # Transparent track
-    scrollbar_grab: tuple        = (0.31, 0.31, 0.33, 1.00)
-    scrollbar_grab_hovered: tuple = (0.41, 0.41, 0.43, 1.00)
-    scrollbar_grab_active: tuple  = (0.51, 0.51, 0.53, 1.00)
+    # Scrollbars
+    scrollbar_bg: tuple          = (0.02, 0.02, 0.02, 0.39)
+    scrollbar_grab: tuple        = (0.20, 0.25, 0.29, 1.00)
+    scrollbar_grab_hovered: tuple = (0.18, 0.22, 0.25, 1.00)
+    scrollbar_grab_active: tuple  = (0.09, 0.21, 0.31, 1.00)
     
-    # Checkbox & Sliders (Using the Accent)
-    check_mark: tuple         = (0.11, 0.65, 0.92, 1.00)
-    slider_grab: tuple        = (0.11, 0.65, 0.92, 1.00)
-    slider_grab_active: tuple = (0.00, 0.80, 1.00, 1.00) # Even brighter on active
+    # Checkbox & Sliders
+    check_mark: tuple         = (0.28, 0.56, 1.00, 1.00)
+    slider_grab: tuple        = (0.28, 0.56, 1.00, 1.00)
+    slider_grab_active: tuple = (0.37, 0.61, 1.00, 1.00)
     
     # Buttons
-    # Idle: Dark Grey | Hover: Light Grey | Active: Accent Blue
-    button_normal: tuple = (0.20, 0.21, 0.23, 1.00)
-    button_hover: tuple  = (0.28, 0.29, 0.32, 1.00)
-    button_active: tuple = (0.11, 0.65, 0.92, 1.00) # Solid accent when clicked
+    button_normal: tuple = (0.20, 0.25, 0.29, 1.00)
+    button_hover: tuple  = (0.28, 0.56, 1.00, 1.00)
+    button_active: tuple = (0.06, 0.53, 0.98, 1.00)
     
-    # Headers (Used in Selectables, Collapsing Headers)
-    header_bg: tuple      = (0.20, 0.21, 0.23, 1.00)
-    header_hovered: tuple = (0.28, 0.29, 0.32, 1.00)
-    header_active: tuple  = (0.11, 0.65, 0.92, 0.60) 
+    # Headers
+    header_bg: tuple      = (0.20, 0.25, 0.29, 0.55)
+    header_hovered: tuple = (0.26, 0.59, 0.98, 0.80)
+    header_active: tuple  = (0.26, 0.59, 0.98, 1.00)
     
     # Separators
-    separator: tuple         = (0.28, 0.28, 0.30, 1.00)
-    separator_hovered: tuple = (0.11, 0.65, 0.92, 0.78)
-    separator_active: tuple  = (0.11, 0.65, 0.92, 1.00)
+    separator: tuple         = (0.20, 0.25, 0.29, 1.00)
+    separator_hovered: tuple = (0.10, 0.40, 0.75, 0.78)
+    separator_active: tuple  = (0.10, 0.40, 0.75, 1.00)
     
-    # Tables
-    table_header_bg: tuple     = (0.15, 0.15, 0.18, 1.00)
+    # Tabs
+    tab: tuple            = (0.11, 0.15, 0.17, 1.00)
+    tab_hovered: tuple    = (0.26, 0.59, 0.98, 0.80)
+    tab_active: tuple     = (0.20, 0.25, 0.29, 1.00)
+    tab_unfocused: tuple  = (0.11, 0.15, 0.17, 1.00)
+    tab_unfocused_active: tuple = (0.11, 0.15, 0.17, 1.00)
+
+    # Resize Grip
+    resize_grip: tuple         = (0.26, 0.59, 0.98, 0.25)
+    resize_grip_hovered: tuple = (0.26, 0.59, 0.98, 0.67)
+    resize_grip_active: tuple  = (0.26, 0.59, 0.98, 0.95)
+
+    # Plotting
+    plot_lines: tuple        = (0.61, 0.61, 0.61, 1.00)
+    plot_lines_hovered: tuple = (1.00, 0.43, 0.35, 1.00)
+    plot_histogram: tuple    = (0.90, 0.70, 0.00, 1.00)
+    plot_histogram_hovered: tuple = (1.00, 0.60, 0.00, 1.00)
+
+    # Navigation & Special
+    text_selected_bg: tuple = (0.26, 0.59, 0.98, 0.35)
+    drag_drop_target: tuple = (1.00, 1.00, 0.00, 0.90)
+    nav_windowing_highlight: tuple = (1.00, 1.00, 1.00, 0.70)
+    nav_windowing_dim_bg: tuple = (0.80, 0.80, 0.80, 0.20)
+    modal_window_dim_bg: tuple  = (0.80, 0.80, 0.80, 0.35)
+
+    # Table
+    table_header_bg: tuple     = (0.20, 0.25, 0.29, 0.55)
     table_border_strong: tuple = (0.31, 0.31, 0.35, 1.00)
     table_border_light: tuple  = (0.23, 0.23, 0.25, 1.00)
     table_row_bg: tuple        = (0.00, 0.00, 0.00, 0.00)
     table_row_bg_alt: tuple    = (1.00, 1.00, 1.00, 0.03)
 
-    # Tab bars
-    tab: tuple          = (0.15, 0.15, 0.17, 1.00)
-    tab_hovered: tuple  = (0.11, 0.65, 0.92, 0.80)
-    tab_active: tuple   = (0.11, 0.65, 0.92, 1.00)
-    tab_unfocused: tuple = (0.10, 0.10, 0.12, 1.00)
-    tab_unfocused_active: tuple = (0.20, 0.21, 0.23, 1.00)
-
-    # Geometry Defaults (Keep modern rounded corners)
-    rounding: float = 6.0
+    # Geometry Defaults
+    rounding: float = 4.0 
 
     def apply_global_styles(self):
         """
@@ -133,16 +144,16 @@ class UITheme:
         style.window_rounding = self.rounding
         style.window_border_size = 1.0
         style.window_min_size = (32.0, 32.0)
-        style.window_title_align = (0.5, 0.5) # Center titles looks modern
+        style.window_title_align = (0.5, 0.5)
         
         style.child_rounding = self.rounding
         style.child_border_size = 1.0
         style.popup_rounding = self.rounding
         style.popup_border_size = 1.0
         
-        style.frame_padding = (6.0, 4.0) # Slightly bigger for ease of click
-        style.frame_rounding = 4.0 # Rounded inputs
-        style.frame_border_size = 0.0 # Modern flat inputs usually lack borders unless active
+        style.frame_padding = (6.0, 4.0)
+        style.frame_rounding = 4.0
+        style.frame_border_size = 0.0
         
         style.item_spacing = (10.0, 6.0)
         style.item_inner_spacing = (6.0, 4.0)
@@ -156,7 +167,7 @@ class UITheme:
         style.grab_rounding = 4.0
         
         style.tab_rounding = 4.0
-        style.tab_border_size = 0.0 # Clean tabs
+        style.tab_border_size = 0.0
         
         # 2. Map Color Properties
         def c(idx, val): style.set_color_(idx, val)
@@ -213,13 +224,25 @@ class UITheme:
         c(imgui.Col_.separator, self.separator)
         c(imgui.Col_.separator_hovered, self.separator_hovered)
         c(imgui.Col_.separator_active, self.separator_active)
-        c(imgui.Col_.resize_grip, (0,0,0,0)) # Clean look, hide resize grip corner
-        c(imgui.Col_.resize_grip_hovered, self.col_active_accent)
-        c(imgui.Col_.resize_grip_active, self.col_active_accent)
-        c(imgui.Col_.plot_lines, self.col_active_accent)
-        c(imgui.Col_.plot_lines_hovered, self.col_text_bright)
-        c(imgui.Col_.plot_histogram, self.col_active_accent)
-        c(imgui.Col_.plot_histogram_hovered, self.col_text_bright)
+        
+        # Resizing
+        c(imgui.Col_.resize_grip, self.resize_grip)
+        c(imgui.Col_.resize_grip_hovered, self.resize_grip_hovered)
+        c(imgui.Col_.resize_grip_active, self.resize_grip_active)
+        
+        # Plotting
+        c(imgui.Col_.plot_lines, self.plot_lines)
+        c(imgui.Col_.plot_lines_hovered, self.plot_lines_hovered)
+        c(imgui.Col_.plot_histogram, self.plot_histogram)
+        c(imgui.Col_.plot_histogram_hovered, self.plot_histogram_hovered)
+        
+        # Special / Nav
+        c(imgui.Col_.text_selected_bg, self.text_selected_bg)
+        c(imgui.Col_.drag_drop_target, self.drag_drop_target)
+        # NavHighlight skipped per request
+        c(imgui.Col_.nav_windowing_highlight, self.nav_windowing_highlight)
+        c(imgui.Col_.nav_windowing_dim_bg, self.nav_windowing_dim_bg)
+        c(imgui.Col_.modal_window_dim_bg, self.modal_window_dim_bg)
         
         # Tables
         c(imgui.Col_.table_header_bg, self.table_header_bg)
@@ -227,10 +250,6 @@ class UITheme:
         c(imgui.Col_.table_border_light, self.table_border_light)
         c(imgui.Col_.table_row_bg, self.table_row_bg)
         c(imgui.Col_.table_row_bg_alt, self.table_row_bg_alt)
-        
-        c(imgui.Col_.text_selected_bg, (0.11, 0.65, 0.92, 0.35))
-        c(imgui.Col_.nav_windowing_highlight, self.col_active_accent)
-        c(imgui.Col_.nav_windowing_dim_bg, (0.0, 0.0, 0.0, 0.6))
 
 # Initialize Singleton
 GAMETHEME = UITheme()
