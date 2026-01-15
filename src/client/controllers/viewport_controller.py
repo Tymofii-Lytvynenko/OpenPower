@@ -19,13 +19,13 @@ class ViewportController:
     Handles Input -> Camera, Input -> Selection, and State -> Visual Layers.
     """
     def __init__(self, 
-                 camera_ctrl: CameraController, 
+                 cam_ctrl: CameraController, 
                  world_camera: arcade.Camera2D,
                  map_renderer: MapRenderer,
                  net_client: NetworkClient,
                  on_selection_change: Callable[[Optional[int]], None]):
         
-        self.cam = camera_ctrl
+        self.cam = cam_ctrl
         self.world_cam = world_camera
         self.renderer = map_renderer
         self.net = net_client
