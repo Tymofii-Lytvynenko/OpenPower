@@ -22,7 +22,19 @@ class BaseImGuiView(arcade.View):
         if self.imgui:
             self.imgui.resize(width, height)
         self.on_game_resize(width, height)
-
+        
+    def on_game_update(self, delta_time: float): 
+        pass
+    
+    def on_update(self, delta_time: float):
+        """
+        Automatically syncs the physics engine time with the UI engine.
+        """
+        if self.imgui:
+            self.imgui.update_time(delta_time)
+        
+        self.on_game_update(delta_time)
+        
     # --- INPUT PLUMBING ---
     # These methods automatically check ImGui first.
 

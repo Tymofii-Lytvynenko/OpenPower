@@ -84,11 +84,11 @@ class EditorView(BaseImGuiView):
         self.clear()
         
         # 1. Start UI Frame
-        self.imgui.new_frame(1.0 / 60.0)
+        self.imgui.new_frame()
         
         # 2. Draw World
         self.world_cam.use()
-        self.renderer.draw_map(mode=self.layout.get_current_render_mode())
+        self.renderer.draw(mode=self.layout.get_current_render_mode())
         
         # 3. Generate UI
         self.window.use()

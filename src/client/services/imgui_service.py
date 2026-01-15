@@ -38,6 +38,9 @@ class ImGuiService:
         
         # State tracking to prevent rendering before a frame is started
         self._frame_started = False
+        
+        # Store delta time here to decouple Update from Render
+        self._current_delta_time = 1.0 / 60.0
 
     def resize(self, width: int, height: int):
         """
@@ -51,24 +54,47 @@ class ImGuiService:
         """
         self.io.display_size = (width, height)
 
-    def new_frame(self, delta_time: float):
-        """Prepares the ImGui context for a new frame."""
+    def update_time(self, delta_time: float):
+        """
+        Called by the View's on_update to sync game speed with UI speed.
+        """
+        self._current_delta_time = delta_time
+
+    def new_frame(self):
+        """Prepares the ImGui context using the actual stored delta time."""
         if self._frame_started:
-            # If update is called twice without render (edge case), clean up previous frame
             imgui.end_frame()
 
-        self.io.delta_time = delta_time
+        # 1. Use the real delta time captured from the game loop
+        self.io.delta_time = self._current_delta_time
         
-        # Ensure display size is accurate (handles DPI scaling/maximizing dynamically)
+        # 2. Sync Display Size
         width, height = self.window.get_size()
         self.io.display_size = (width, height)
         
-        # Handle High-DPI screens (Mac Retina / Windows Scaling)
+        # 3. Sync DPI
         pixel_ratio = self.window.get_pixel_ratio()
         self.io.display_framebuffer_scale = (pixel_ratio, pixel_ratio)
 
         imgui.new_frame()
         self._frame_started = True
+
+    def render(self):
+        """Finalizes the frame and issues the OpenGL draw calls."""
+        if not self._frame_started:
+            return
+
+        imgui.render()
+        draw_data = imgui.get_draw_data()
+        self.renderer.render(draw_data)
+        
+        try:
+            self.window.ctx.scissor = None
+        except Exception:
+            from pyglet.gl import glDisable, GL_SCISSOR_TEST
+            glDisable(GL_SCISSOR_TEST)
+
+        self._frame_started = False
 
     def render(self):
         """Finalizes the frame and issues the OpenGL draw calls."""

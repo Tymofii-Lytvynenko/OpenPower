@@ -50,7 +50,7 @@ class NewGameView(arcade.View):
 
     def on_draw(self):
         self.clear()
-        self.imgui.new_frame(1.0 / 60.0)
+        self.imgui.new_frame()
         self.ui.setup_frame()
         self._render_ui()
         self.imgui.render()

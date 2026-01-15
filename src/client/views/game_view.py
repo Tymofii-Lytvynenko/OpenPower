@@ -69,12 +69,20 @@ class GameView(BaseImGuiView):
 
     def on_draw(self):
         self.clear()
-        self.imgui.new_frame(1.0 / 60.0)
+        
+        # 1. Start ImGui frame using the time synced in on_update
+        self.imgui.new_frame()
+        
+        # 2. Draw World
         self.world_cam.use()
         mode = "political" if self.layout.map_mode == "political" else "terrain"
         self.renderer.draw(mode=mode)
+        
+        # 3. Draw UI
         self.window.use()
+        # Pass the calculated FPS to the layout
         self.layout.render(self.selected_region_id, self.imgui.io.framerate)
+        
         self.imgui.render()
 
     # NOTE: No on_update here. The MainWindow drives the session.tick().

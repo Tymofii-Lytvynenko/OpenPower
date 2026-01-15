@@ -63,7 +63,7 @@ class LoadingView(arcade.View):
 
     def on_draw(self):
         self.clear()
-        self.imgui.new_frame(1.0 / 60.0)
+        self.imgui.new_frame()
         self.ui.setup_frame()
 
         screen_w, screen_h = self.window.get_size()
