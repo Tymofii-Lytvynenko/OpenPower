@@ -1,3 +1,18 @@
 {
-"isGitignoreExtActive": true,
+    "isGitignoreExtActive": true,
+    // 1. Вмикаємо сувору перевірку Pylance
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticMode": "workspace",
+    // 2. Перетворюємо попередження на яскраві помилки
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportUndefinedVariable": "error",
+        "reportGeneralTypeIssues": "warning",
+        "reportAttributeAccessIssue": "error",
+        "reportOptionalMemberAccess": "warning"
+    },
+    // 3. Додаткові зручності для розробки
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    }
 }
