@@ -140,24 +140,24 @@ class UITheme:
         # 1. Geometry & Layout
         style.alpha = 1.0
         style.disabled_alpha = 0.50
-        style.window_padding = (10.0, 10.0)
+        style.window_padding = (10.0, 10.0)  # pyright: ignore[reportAttributeAccessIssue]
         style.window_rounding = self.rounding
         style.window_border_size = 1.0
-        style.window_min_size = (32.0, 32.0)
-        style.window_title_align = (0.5, 0.5)
+        style.window_min_size = (32.0, 32.0) # pyright: ignore[reportAttributeAccessIssue]
+        style.window_title_align = (0.5, 0.5) # pyright: ignore[reportAttributeAccessIssue]
         
         style.child_rounding = self.rounding
         style.child_border_size = 1.0
         style.popup_rounding = self.rounding
         style.popup_border_size = 1.0
         
-        style.frame_padding = (6.0, 4.0)
+        style.frame_padding = (6.0, 4.0) # pyright: ignore[reportAttributeAccessIssue]
         style.frame_rounding = 4.0
         style.frame_border_size = 0.0
         
-        style.item_spacing = (10.0, 6.0)
-        style.item_inner_spacing = (6.0, 4.0)
-        style.cell_padding = (6.0, 4.0)
+        style.item_spacing = (10.0, 6.0) # pyright: ignore[reportAttributeAccessIssue]
+        style.item_inner_spacing = (6.0, 4.0) # pyright: ignore[reportAttributeAccessIssue]
+        style.cell_padding = (6.0, 4.0) # pyright: ignore[reportAttributeAccessIssue]
         style.indent_spacing = 20.0
         
         style.scrollbar_size = 12.0
