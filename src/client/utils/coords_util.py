@@ -28,4 +28,4 @@ def calculate_centroid(regions_df: pl.DataFrame, map_height: float) -> Optional[
         return None
 
     # 2. Convert result to World Space (Inverted Y)
-    return image_to_world(avg_x, avg_y, map_height)
+    return image_to_world(avg_x, avg_y, map_height) # type: ignore

@@ -65,6 +65,7 @@ class BaseImGuiView(arcade.View):
         self.on_game_mouse_scroll(x, y, scroll_x, scroll_y)
 
     # --- ABSTRACT HOOKS ---
+    def on_game_mouse_motion(self, x, y, dx, dy): pass
     def on_game_resize(self, w, h): pass
     def on_game_update(self, dt): pass
     def on_game_mouse_press(self, x, y, btn, mod): pass
