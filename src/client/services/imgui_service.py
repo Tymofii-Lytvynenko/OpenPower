@@ -52,7 +52,7 @@ class ImGuiService:
             ImGui renders at the old resolution while the window is at the new one, 
             causing visual artifacts or 'black bars'.
         """
-        self.io.display_size = (width, height)
+        self.io.display_size = imgui.ImVec2(float(width), float(height))
 
     def update_time(self, delta_time: float):
         """
@@ -70,31 +70,14 @@ class ImGuiService:
         
         # 2. Sync Display Size
         width, height = self.window.get_size()
-        self.io.display_size = (width, height)
+        self.io.display_size = imgui.ImVec2(float(width), float(height))
         
         # 3. Sync DPI
         pixel_ratio = self.window.get_pixel_ratio()
-        self.io.display_framebuffer_scale = (pixel_ratio, pixel_ratio)
+        self.io.display_framebuffer_scale = imgui.ImVec2(pixel_ratio, pixel_ratio)
 
         imgui.new_frame()
         self._frame_started = True
-
-    def render(self):
-        """Finalizes the frame and issues the OpenGL draw calls."""
-        if not self._frame_started:
-            return
-
-        imgui.render()
-        draw_data = imgui.get_draw_data()
-        self.renderer.render(draw_data)
-        
-        try:
-            self.window.ctx.scissor = None
-        except Exception:
-            from pyglet.gl import glDisable, GL_SCISSOR_TEST
-            glDisable(GL_SCISSOR_TEST)
-
-        self._frame_started = False
 
     def render(self):
         """Finalizes the frame and issues the OpenGL draw calls."""
@@ -199,7 +182,7 @@ class ImGuiService:
         if button == arcade.MOUSE_BUTTON_MIDDLE: return 2
         return -1
 
-    def _create_key_map(self) -> dict[int, int]:
+    def _create_key_map(self) -> dict[int, imgui.Key]:
         """Maps Arcade key constants to ImGui Key constants."""
         return {
             arcade.key.ESCAPE: imgui.Key.escape,
