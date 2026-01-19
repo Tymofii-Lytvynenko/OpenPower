@@ -12,6 +12,7 @@ from src.client.ui.layouts.editor_layout import EditorLayout
 from src.client.controllers.camera_controller import CameraController
 from src.client.controllers.viewport_controller import ViewportController
 from src.client.utils.color_generator import generate_political_colors
+from src.client.utils.coords_util import calculate_centroid
 from src.client.tasks.editor_loading_task import EditorContext
 
 class EditorView(BaseImGuiView):
@@ -24,17 +25,16 @@ class EditorView(BaseImGuiView):
         
         # 1. Infrastructure Services
         self.net = context.net_client
-        self.imgui = ImGuiService(self.window)  # Required by BaseImGuiView
+        self.imgui: ImGuiService = ImGuiService(self.window)
         
         # 2. UI Layout
         self.layout = EditorLayout(self.net, None) # ViewportController set later
         
         # 3. Visuals (Map Renderer)
         self.renderer = MapRenderer(
-            map_path=context.map_path, 
-            terrain_path=context.terrain_path, 
-            cache_dir=config.cache_dir, 
-            preloaded_atlas=context.atlas
+            map_img_path=context.map_path, 
+            terrain_img_path=context.terrain_path,
+            map_data=context.map_data
         )
         
         # 4. Camera System
@@ -47,7 +47,8 @@ class EditorView(BaseImGuiView):
             cam_ctrl=self.cam_ctrl,
             world_camera=self.world_cam,
             map_renderer=self.renderer,
-            on_selection_change=self.on_selection_changed
+            on_selection_change=self.on_selection_changed,
+            net_client=self.net
         )
         
         self.selected_region_id = None

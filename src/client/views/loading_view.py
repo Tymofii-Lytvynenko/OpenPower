@@ -14,7 +14,7 @@ class LoadingView(arcade.View):
     def __init__(self, 
                  task: LoadingTask, 
                  on_success: Callable[[Any], arcade.View],
-                 on_failure: Callable[[Exception], None] = None):
+                 on_failure: Callable[[Exception], None] | None = None):
         
         super().__init__()
         self.task = task

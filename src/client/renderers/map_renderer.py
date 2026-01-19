@@ -44,6 +44,10 @@ class MapRenderer:
         self._init_resources(terrain_img_path) 
         self._init_glsl()
 
+    def get_center(self) -> Tuple[float, float]:
+        """Returns the world center coordinates of the map."""
+        return self.width / 2.0, self.height / 2.0
+    
     def _init_resources(self, terrain_path: Path):
         # Create a SpriteList to hold the terrain
         self.terrain_list = arcade.SpriteList()

@@ -12,11 +12,14 @@ from src.client.utils.color_generator import generate_political_colors
 from src.client.ui.theme import GAMETHEME
 
 class GameView(BaseImGuiView):
-    def __init__(self, session, config, player_tag, initial_pos: tuple[float, float] = None):
+    # FIX 1: Update type hint to accept None (tuple[...] | None)
+    def __init__(self, session, config, player_tag, initial_pos: tuple[float, float] | None = None):
         super().__init__()
         self.config = config
         self.net = NetworkClient(session)
-        self.imgui = ImGuiService(self.window)
+        
+        # FIX 2: Explicitly annotate type here so Pylance knows it's not None anymore
+        self.imgui: ImGuiService = ImGuiService(self.window)
         
         map_path = config.get_asset_path("map/regions.png")
         terrain_path = config.get_asset_path("map/terrain.png")
@@ -37,7 +40,6 @@ class GameView(BaseImGuiView):
             
         self.cam_ctrl = CameraController((start_x, start_y))
         
-        # Updated: Pass self.net to the viewport controller
         self.viewport_ctrl = ViewportController(
             cam_ctrl=self.cam_ctrl,
             world_camera=self.world_cam,
@@ -46,7 +48,6 @@ class GameView(BaseImGuiView):
             on_selection_change=self.on_selection_changed
         )
         
-        # Updated: Pass viewport_ctrl to layout
         self.layout = GameLayout(self.net, player_tag, self.viewport_ctrl)
         self.selected_region_id = None
 
@@ -70,7 +71,7 @@ class GameView(BaseImGuiView):
     def on_draw(self):
         self.clear()
         
-        # 1. Start ImGui frame using the time synced in on_update
+        # 1. Start ImGui frame
         self.imgui.new_frame()
         
         # 2. Draw World
@@ -80,13 +81,9 @@ class GameView(BaseImGuiView):
         
         # 3. Draw UI
         self.window.use()
-        # Pass the calculated FPS to the layout
         self.layout.render(self.selected_region_id, self.imgui.io.framerate)
         
         self.imgui.render()
-
-    # NOTE: No on_update here. The MainWindow drives the session.tick().
-    # This View is purely for visualization of that state.
 
     # --- IMPLEMENTING BASE HOOKS ---
     def on_game_resize(self, width, height):

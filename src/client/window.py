@@ -35,7 +35,8 @@ class MainWindow(arcade.Window):
         
         self.show_view(loader)
         
-    def on_resize(self, width: float, height: float):
+    # Change type hints from float to int to match Arcade's native types
+    def on_resize(self, width: int, height: int):
         """
         Handles window resizing events.
         
@@ -48,16 +49,18 @@ class MainWindow(arcade.Window):
             or 'black zones' during window maximization.
         """
         # 1. Call standard Arcade resize (handles projection matrices)
+        # Pylance is happy because we are now passing ints
         super().on_resize(width, height)
         
         # 2. FORCE Viewport update (Safety measure against ImGui interfering)
         # Sometimes ImGui leaves the viewport in a weird state.
+        # Pylance is happy because viewport expects a tuple of ints
         self.ctx.viewport = (0, 0, width, height)
         self.ctx.scissor = None # Ensure full screen is writable
         
         # 3. Propagate to View/ImGuiService
         if self.current_view and hasattr(self.current_view, "on_resize"):
-            self.current_view.on_resize(int(width), int(height))
+            self.current_view.on_resize(width, height)
 
     def on_update(self, delta_time: float):
         """Global game tick."""
