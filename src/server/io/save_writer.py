@@ -91,7 +91,7 @@ class SaveWriter:
 
             # Strategy C: Dataclasses -> Dict (for JSON)
             elif dataclasses.is_dataclass(value):
-                meta_data[key] = dataclasses.asdict(value)
+                meta_data[key] = dataclasses.asdict(value) # type: ignore
 
             # Strategy D: Primitives -> JSON
             else:

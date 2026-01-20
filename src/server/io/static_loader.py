@@ -102,7 +102,7 @@ class StaticAssetLoader:
                 separator="\t", 
                 ignore_errors=True, 
                 infer_schema_length=1000, 
-                dtypes={"hex": pl.Utf8}
+                schema_overrides={"hex": pl.String} # 'schema_overrides' is the modern arg
             )
             # Filter out internal columns immediately
             valid_cols = [c for c in df.columns if not c.startswith("_")]

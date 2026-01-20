@@ -14,6 +14,7 @@ class ISystem(Protocol):
         Unique identifier for the system (e.g., 'base.economy').
         Namespace convention: 'mod_id.system_name'
         """
+        ... 
 
     @property
     def dependencies(self) -> List[str]:
@@ -21,8 +22,10 @@ class ISystem(Protocol):
         List of system IDs that must execute BEFORE this system.
         Example: ['base.territory', 'base.time']
         """
+        ... 
 
     def update(self, state: GameState, delta_time: float) -> None:
         """
         Performs the logic for a single tick.
         """
+        ...

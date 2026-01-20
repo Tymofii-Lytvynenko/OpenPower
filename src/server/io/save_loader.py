@@ -63,10 +63,10 @@ class SaveStateLoader:
                 data_dict = meta.get(key, {})
                 # Recursive safety: check if data is actually a dict
                 if isinstance(data_dict, dict):
-                    constructor_args[key] = target_type(**data_dict)
+                    constructor_args[key] = target_type(**data_dict) # type: ignore
                 else:
                     # Fallback for empty/corrupt data
-                    constructor_args[key] = target_type()
+                    constructor_args[key] = target_type() # type: ignore
 
             # Strategy D: Primitives (int, float, list, etc.)
             else:

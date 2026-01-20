@@ -73,7 +73,7 @@ class DataLoader:
             # Strategy C: Nested Dataclasses (e.g., state.time)
             elif dataclasses.is_dataclass(target_type):
                 data_dict = meta_data.get(key, {})
-                constructor_args[key] = target_type(**data_dict)
+                constructor_args[key] = target_type(**data_dict) # type: ignore
 
             # Strategy D: Primitives (globals, tick, etc.)
             else:
@@ -122,7 +122,13 @@ class DataLoader:
     def _read_clean_tsv(self, path: Path) -> pl.DataFrame:
         """Reads TSV, forcing 'hex' to string, and ignoring '_' columns."""
         try:
-            df = pl.read_csv(path, separator="\t", ignore_errors=True, infer_schema_length=1000, dtypes={"hex": pl.Utf8})
+            df = pl.read_csv(
+                path, 
+                separator="\t", 
+                ignore_errors=True, 
+                infer_schema_length=1000, 
+                schema_overrides={"hex": pl.String} # 'schema_overrides' is the modern arg
+            )
             valid_cols = [c for c in df.columns if not c.startswith("_")]
             return df.select(valid_cols)
         except Exception as e:
