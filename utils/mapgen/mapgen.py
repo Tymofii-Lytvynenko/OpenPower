@@ -175,7 +175,7 @@ def main():
 
     # 3. Physics Calculation
     print("Calculating real surface area...")
-    gdf_metric = gdf.to_crs({'proj': 'cea'})
+    gdf_metric = gdf.to_crs({'proj': 'cea'}) # type: ignore
     gdf['area_km2'] = (gdf_metric.geometry.area / 1e6).astype(int)
 
     # 4. ID Assignment
@@ -281,7 +281,7 @@ def main():
     height = CFG['map']['height']
     bounds = CFG['map']['bounds']
     
-    transform = from_bounds(*bounds, width, height)
+    transform = from_bounds(*bounds, width, height) # type: ignore
     
     tsv_rows = []
     tsv_header = [
@@ -338,7 +338,7 @@ def main():
     # 8. Rescue Logic (ORIGINAL SPIRAL SEARCH)
     print("Rescuing small regions...")
     present_ids = np.unique(raster_ids)
-    missing_ids = np.setdiff1d(gdf['temp_id'].values, present_ids)
+    missing_ids = np.setdiff1d(gdf['temp_id'].values, present_ids) # type: ignore
     
     if len(missing_ids) > 0:
         print(f"  -> Attempting to rescue {len(missing_ids)} regions...")
@@ -364,7 +364,7 @@ def main():
                 if not (0 <= try_x < width and 0 <= try_y < height):
                     continue
                 
-                current_pixel_val = raster_ids[try_y, try_x]
+                current_pixel_val = raster_ids[try_y, try_x] # type: ignore
                 
                 if current_pixel_val == CFG['map']['background_id']:
                     best_candidate = (try_x, try_y)
@@ -376,7 +376,7 @@ def main():
             
             if best_candidate:
                 final_x, final_y = best_candidate
-                raster_ids[final_y, final_x] = m_id
+                raster_ids[final_y, final_x] = m_id # type: ignore
                 placed_count += 1
             else:
                 print(f"CRITICAL: No space found for ID {m_id} near {c_x},{c_y}")

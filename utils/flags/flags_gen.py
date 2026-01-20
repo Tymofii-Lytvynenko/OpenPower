@@ -39,8 +39,8 @@ class FlagProcessor:
 
         success_count = 0
         for country in self.countries:
-            iso2 = country.alpha_2.lower()
-            iso3 = country.alpha_3.upper()
+            iso2 = country.alpha_2.lower() # type: ignore (false positive)
+            iso3 = country.alpha_3.upper() # type: ignore (false positive)
             
             if self.download_and_resize(iso2, iso3):
                 print(f"[OK] {iso3}")
