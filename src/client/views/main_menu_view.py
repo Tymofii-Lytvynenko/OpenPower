@@ -1,47 +1,54 @@
+# --- File: views/main_menu_view.py ---
 import arcade
 import sys
+from typing import TYPE_CHECKING
+
+# Base Class
+from src.client.views.base_view import BaseImGuiView
+
+# UI Components
 from src.client.services.imgui_service import ImGuiService
 from src.client.ui.composer import UIComposer
 from src.client.ui.theme import GAMETHEME
-from src.shared.config import GameConfig
-from src.server.session import GameSession
 
-# Views
-from src.client.views.editor_view import EditorView
-from src.client.views.new_game_view import NewGameView 
-from src.client.views.loading_view import LoadingView
+# Type Checking (No runtime imports = No Cycles)
+if TYPE_CHECKING:
+    from src.shared.config import GameConfig
+    from src.server.session import GameSession
 
-# Tasks
-from src.client.tasks.editor_loading_task import EditorLoadingTask, EditorContext
-
-class MainMenuView(arcade.View):
+class MainMenuView(BaseImGuiView):
     """
     The entry point of the game visual stack.
+    Refactored to use NavigationService for decoupled transitions.
     """
 
-    def __init__(self, session: GameSession, config: GameConfig):
+    def __init__(self, session: "GameSession", config: "GameConfig"):
         super().__init__()
         self.session = session
         self.config = config
         
-        # Services
-        self.imgui = ImGuiService(self.window)
+        # We only need to init the UI Composer. 
+        # ImGuiService is handled by BaseImGuiView.
         self.ui = UIComposer(GAMETHEME)
 
     def on_show_view(self):
         print("[MainMenuView] Entered Main Menu")
         self.window.background_color = GAMETHEME.col_black
-
-    def on_resize(self, width: int, height: int):
-        self.imgui.resize(width, height)
+        
+        # Ensure ImGui is set up (from BaseImGuiView)
+        if not self.imgui:
+            self.setup_imgui()
 
     def on_draw(self):
         self.clear()
         
-        self.imgui.new_frame()
-        self.ui.setup_frame()
-        self._render_menu_window()
-        self.imgui.render()
+        # BaseImGuiView doesn't automatically call new_frame/render 
+        # to allow flexibility, so we do it here.
+        if self.imgui:
+            self.imgui.new_frame()
+            self.ui.setup_frame()
+            self._render_menu_window()
+            self.imgui.render()
 
     def _render_menu_window(self):
         screen_w, screen_h = self.window.get_size()
@@ -50,23 +57,24 @@ class MainMenuView(arcade.View):
             
             self.ui.draw_title("OPENPOWER")
             
-            # -- Menu Buttons --
+            # -- Menu Buttons (Delegated to NavigationService) --
+            
             if self.ui.draw_menu_button("SINGLEPLAYER"):
-                # Transition to New Game selection screen
-                next_view = NewGameView(self.session, self.config)
-                self.window.show_view(next_view)
+                # Clean transition: No imports needed here
+                self.nav.show_new_game_screen(self.session, self.config)
             
             if self.ui.draw_menu_button("LOAD GAME"):
-                from src.client.views.load_game_view import LoadGameView
-                self.window.show_view(LoadGameView(self.config))
+                self.nav.show_load_game_screen(self.config)
+            
             # ------------------
             
             if self.ui.draw_menu_button("MAP EDITOR"):
-                self._launch_editor()
+                self.nav.show_editor_loading(self.session, self.config)
             
             if self.ui.draw_menu_button("SETTINGS"):
                 print("Settings clicked (Not Implemented)")
             
+            # Spacing
             from imgui_bundle import imgui
             imgui.dummy((0, 50)) 
             
@@ -75,33 +83,3 @@ class MainMenuView(arcade.View):
                 sys.exit()
 
             self.ui.end_panel()
-
-    def _launch_editor(self):
-        """
-        Initiates the loading sequence for the editor.
-        """
-        # 1. Create the Task
-        task = EditorLoadingTask(self.session, self.config)
-        
-        # 2. Define success callback
-        def on_editor_loaded(context: EditorContext):
-            # Pass the loaded context to the view
-            return EditorView(context, self.config)
-            
-        # 3. Show Loading Screen
-        loader = LoadingView(task, on_success=on_editor_loaded)
-        self.window.show_view(loader)
-
-    # --- Input Delegation ---
-    
-    def on_mouse_press(self, x, y, button, modifiers):
-        self.imgui.on_mouse_press(x, y, button, modifiers)
-
-    def on_mouse_release(self, x, y, button, modifiers):
-        self.imgui.on_mouse_release(x, y, button, modifiers)
-
-    def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
-        self.imgui.on_mouse_drag(x, y, dx, dy, buttons, modifiers)
-
-    def on_mouse_motion(self, x, y, dx, dy):
-        self.imgui.on_mouse_motion(x, y, dx, dy)

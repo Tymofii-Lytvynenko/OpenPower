@@ -51,12 +51,16 @@ class LoadingView(arcade.View):
                 if self.on_failure:
                     self.on_failure(self.error)
                 else:
-                    # Default error handling: Crash to console
                     raise self.error
             else:
-                # Success: Delegate to the callback to create the next view
+                # Success Logic
+                # We call the callback. 
+                # If the callback uses self.nav.show_... it will switch the view.
+                # If it returns a View object, we switch to it manually.
                 next_view = self.on_success(self.result)
-                self.window.show_view(next_view)
+                
+                if next_view:
+                    self.window.show_view(next_view)
 
     def on_resize(self, width: int, height: int):
         self.imgui.resize(width, height)

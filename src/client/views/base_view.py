@@ -1,17 +1,24 @@
 import arcade
-from typing import Optional
+from typing import Optional, Any
 from src.client.services.imgui_service import ImGuiService
 
 class BaseImGuiView(arcade.View):
     """
-    CRITICAL INFRASTRUCTURE:
-    1. Manages the lifecycle of the ImGui Service.
-    2. Routes inputs: ImGui gets first dibs. If ImGui ignores it, pass to 'game' methods.
+    Base view that manages ImGui lifecycle.
     """
     def __init__(self):
         super().__init__()
-        # Defer initialization to allow subclasses to prep data first
         self.imgui: Optional[ImGuiService] = None
+
+    @property
+    def nav(self) -> Any:
+        """
+        Quick access to the NavigationService attached to the window.
+        Typed as 'Any' to preventing circular imports.
+        """
+        if hasattr(self.window, 'nav'):
+            return self.window.nav # type: ignore
+        raise AttributeError("NavigationService not found on Window.")
 
     def setup_imgui(self):
         """Must be called by subclass after window is ready."""

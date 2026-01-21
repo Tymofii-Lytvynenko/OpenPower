@@ -1,8 +1,12 @@
 import arcade
+from typing import Optional, TYPE_CHECKING
+
 from src.shared.config import GameConfig
-from src.client.views.loading_view import LoadingView
-from src.client.views.main_menu_view import MainMenuView
+from src.client.services.navigation_service import NavigationService
 from src.client.tasks.startup_task import StartupTask
+
+if TYPE_CHECKING:
+    from src.server.session import GameSession
 
 class MainWindow(arcade.Window):
     
@@ -12,58 +16,58 @@ class MainWindow(arcade.Window):
         self.center_window()
         self.set_minimum_size(800, 600)
         
-        # Session starts as None; populated by LoadingView later
-        self.session = None 
+        # 1. Initialize Navigation Service
+        # This is the "Router" that handles all view switching
+        self.nav = NavigationService(self)
+        
+        # Session starts as None; populated by StartupTask later
+        self.session: Optional["GameSession"] = None 
 
     def setup(self):
+        """
+        Called by main.py to kick off the application lifecycle.
+        """
         print("[Window] Booting...")
         
-        # 1. Create the Task Object (The 'Disc')
-        # This object implements the logic to load the server
+        # 1. Create the Task (The 'Disc')
         task = StartupTask(self.game_config)
         
-        # 2. Define the callback (What happens when the Task finishes)
-        def on_boot_complete(result_session):
+        # 2. Define the callback (The 'next step')
+        def on_boot_complete(result_session: "GameSession"):
             print("[Window] Engine Ready.")
             self.session = result_session
-            # Switch to Main Menu with the ready session
-            return MainMenuView(self.session, self.game_config)
+            
+            # USE ROUTER: Switch to Main Menu
+            # The window doesn't need to know what 'MainMenuView' is.
+            self.nav.show_main_menu(self.session, self.game_config)
+            
+            # The callback must return a View for the LoadingView to switch to,
+            # but since we switched explicitly above, we can return None 
+            # or refactor NavigationService.show_loading to not auto-switch if we handle it.
+            # Ideally, NavigationService handles the switch.
+            return None 
 
-        # 3. Create the View (The 'Player')
-        # We pass the Task object, not a raw function
-        loader = LoadingView(task, on_success=on_boot_complete)
+        # 3. USE ROUTER: Start the Loading Screen
+        # We modify show_loading slightly in service to handle the callback logic,
+        # or we just let the loading view drive.
+        # For this implementation, we simply pass the data to the service.
+        self.nav.show_loading(task, on_success=on_boot_complete)
         
-        self.show_view(loader)
-        
-    # Change type hints from float to int to match Arcade's native types
     def on_resize(self, width: int, height: int):
         """
         Handles window resizing events.
-        
-        Modification for Composition:
-            We override this to ensure the active View (and its ImGui service)
-            receives the resize event *synchronously*. 
-            
-            Without this explicit call, the OpenGL viewport might update before 
-            ImGui's internal state, leading to temporary rendering artifacts 
-            or 'black zones' during window maximization.
         """
-        # 1. Call standard Arcade resize (handles projection matrices)
-        # Pylance is happy because we are now passing ints
         super().on_resize(width, height)
         
-        # 2. FORCE Viewport update (Safety measure against ImGui interfering)
-        # Sometimes ImGui leaves the viewport in a weird state.
-        # Pylance is happy because viewport expects a tuple of ints
+        # Force Viewport update (Safety measure against ImGui interfering)
         self.ctx.viewport = (0, 0, width, height)
-        self.ctx.scissor = None # Ensure full screen is writable
+        self.ctx.scissor = None 
         
-        # 3. Propagate to View/ImGuiService
+        # Propagate to View/ImGuiService
         if self.current_view and hasattr(self.current_view, "on_resize"):
             self.current_view.on_resize(width, height)
 
     def on_update(self, delta_time: float):
         """Global game tick."""
-        # Only tick the engine if loading is complete and session is ready.
         if self.session:
             self.session.tick(delta_time)

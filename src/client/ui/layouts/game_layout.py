@@ -72,7 +72,7 @@ class GameLayout(BaseLayout):
                 
                 # Special Case: Economy Panel needs 'player_tag'
                 # In a larger system, we might pass a context object to all panels.
-                if panel_id == "ECO":
+                if panel_id in ["ECO", "DEM"]:
                     panel_instance.render(self.composer, state, self.player_tag)
                 else:
                     panel_instance.render(self.composer, state)
