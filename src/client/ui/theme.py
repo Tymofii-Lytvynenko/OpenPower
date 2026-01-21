@@ -24,6 +24,7 @@ class UITheme:
     col_politics: tuple = (1.00, 0.85, 0.25, 1.00)
     col_military: tuple = (1.00, 0.35, 0.35, 1.00)
     col_economy: tuple  = (0.30, 0.95, 0.60, 1.00)
+    col_demographics: tuple = (0.7, 0.4, 0.9, 1.0)
 
     # Status Colors
     col_positive: tuple = (0.30, 0.95, 0.60, 1.00)

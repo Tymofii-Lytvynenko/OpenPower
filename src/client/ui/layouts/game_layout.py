@@ -11,6 +11,7 @@ from src.client.controllers.viewport_controller import SelectionMode
 from src.client.ui.panels.politics_panel import PoliticsPanel
 from src.client.ui.panels.military_panel import MilitaryPanel
 from src.client.ui.panels.economy_panel import EconomyPanel
+from src.client.ui.panels.demographics_panel import DemographicsPanel
 from src.shared.actions import ActionSetGameSpeed, ActionSetPaused
 
 class GameLayout(BaseLayout):
@@ -49,6 +50,12 @@ class GameLayout(BaseLayout):
                 "visible": True, 
                 "icon": "ECO", 
                 "color": GAMETHEME.col_economy
+            },
+            "DEM": {
+                "instance": DemographicsPanel(), 
+                "visible": True, 
+                "icon": "DEM", 
+                "color": GAMETHEME.col_demographics
             },
         }
 
