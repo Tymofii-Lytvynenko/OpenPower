@@ -16,10 +16,10 @@
         "reportGeneralTypeIssues": "error", // Catch type mismatches (e.g., passing string to int)
         "reportOptionalMemberAccess": "warning", // Warn when accessing attributes on a value that might be None
         // 2. Imports & Cleanliness
-        "reportUnusedImport": "error", // Highlights unused imports as errors
+        // "reportUnusedImport": "warning", // Highlights unused imports as errors
         "reportMissingImports": "error", // Red flag if a module is not installed or not found
         "reportDuplicateImport": "error", // Error if you import the same thing twice
-        "reportUnusedVariable": "warning", // Fade out variables that are defined but never used
+        // "reportUnusedVariable": "warning", // Fade out variables that are defined but never used
         // 3. Project Structure & Quality
         "reportImportCycles": "warning", // Warns about circular dependencies
         "reportUnusedClass": "warning", // Warns if a class is defined but never used
