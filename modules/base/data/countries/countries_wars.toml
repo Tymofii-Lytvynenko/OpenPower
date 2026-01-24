@@ -1,0 +1,31 @@
+[[wars]]
+side_a = ["COD", "AGO", "NAM", "ZWE", "TCD"]
+side_b = ["RWA", "UGA", "BDI"]
+
+[[wars]]
+side_a = ["ISR"]
+side_b = ["PSE"]
+
+[[wars]]
+side_a = ["IND"]
+side_b = ["PAK"]
+
+[[wars]]
+side_a = ["USA", "GBR"]
+side_b = ["IRQ"]
+
+[[wars]]
+side_a = ["SLE", "NGA", "GBR", "GIN"]
+side_b = ["LBR"]
+
+[[wars]]
+side_a = ["ERI"]
+side_b = ["ETH"]
+
+[[wars]]
+side_a = ["GIN"]
+side_b = ["LBR"]
+
+[[wars]]
+side_a = ["SUD"]
+side_b = ["UGA"]
