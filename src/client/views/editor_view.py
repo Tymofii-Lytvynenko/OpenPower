@@ -93,7 +93,7 @@ class EditorView(BaseImGuiView):
         
         # 3. Generate UI
         self.window.use()
-        self.layout.render(self.selected_region_id, self.imgui.io.framerate)
+        self.layout.render(self.imgui.io.framerate)
         
         # 4. Render UI
         self.imgui.render()

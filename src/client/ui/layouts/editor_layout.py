@@ -31,7 +31,7 @@ class EditorLayout(BaseLayout):
         """Called by EditorView to know what to draw."""
         return self.layer_options[self.current_layer_label]
 
-    def render(self, selected_region_id: Optional[int], fps: float):
+    def render(self, fps: float):
         """Main UI Render Pass."""
         # 1. Setup Theme
         self.composer.setup_frame()
@@ -41,7 +41,7 @@ class EditorLayout(BaseLayout):
         self._render_info_overlay(fps)
 
         # 1. Process Global Input (Right-Click Menu)
-        self._render_context_menu(selected_region_id)
+        self._render_context_menu()
         
     def _render_menu_bar(self):
         if imgui.begin_main_menu_bar():

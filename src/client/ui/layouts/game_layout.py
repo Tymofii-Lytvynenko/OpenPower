@@ -14,6 +14,7 @@ from src.client.ui.panels.military_panel import MilitaryPanel
 from src.client.ui.panels.economy_panel import EconomyPanel
 from src.client.ui.panels.demographics_panel import DemographicsPanel
 from src.shared.actions import ActionSetGameSpeed, ActionSetPaused
+from src.client.ui.panels.data_insp_panel import DataInspectorPanel
 
 class GameLayout(BaseLayout):
     """
@@ -38,6 +39,8 @@ class GameLayout(BaseLayout):
         self.register_panel("ECO", EconomyPanel(), icon="ECO", color=GAMETHEME.col_economy)
         self.register_panel("DEM", DemographicsPanel(), icon="DEM", color=GAMETHEME.col_demographics)
 
+        #self.register_panel("DATA_INSPECTOR", DataInspectorPanel(), visible=False)
+        
     def render(self, selected_region_id: Optional[int], hovered_region_id: Optional[int], fps: float):
         """
         Main render loop. 
@@ -48,7 +51,7 @@ class GameLayout(BaseLayout):
         state = self.net.get_state()
 
         # Context menu now relies on hovered_region_id for right-click targeting.
-        self._render_context_menu(hovered_region_id)
+        self._render_context_menu()
 
         # Main panel rendering uses the persistent selected_region_id.
         self._render_panels(
@@ -69,7 +72,7 @@ class GameLayout(BaseLayout):
         """
         screen_h = imgui.get_main_viewport().size.y
         # Cond_.always ensures it stays fixed even if you resize the window
-        imgui.set_next_window_pos((10, screen_h - 155), imgui.Cond_.always)
+        imgui.set_next_window_pos((10, screen_h - 80), imgui.Cond_.always)
         
         flags = (imgui.WindowFlags_.no_decoration | 
                  imgui.WindowFlags_.no_move | 
@@ -89,12 +92,7 @@ class GameLayout(BaseLayout):
                 imgui.same_line()
             
             imgui.dummy((0, 8))
-            imgui.separator()
-            
-            # Regional Inspector toggle (with a generic icon)
-            insp_visible = self.panels["INSPECTOR"]["visible"]
-            if self.composer.draw_icon_toggle("INSP", GAMETHEME.col_info, insp_visible):
-                self.panels["INSPECTOR"]["visible"] = not insp_visible
+            #imgui.separator()
 
         imgui.end()
 
