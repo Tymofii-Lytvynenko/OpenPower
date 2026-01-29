@@ -1,6 +1,9 @@
 import arcade
+import ctypes  # <--- REQUIRED for ImGui Texture IDs
 from imgui_bundle import imgui
+from numpy import size
 from src.client.ui.theme import UITheme
+from src.client.services.imgui_service import ImGuiService
 
 class UIComposer:
     def __init__(self, theme: UITheme):
@@ -143,3 +146,35 @@ class UIComposer:
         """Returns True if the user clicked the item."""
         clicked, _ = imgui.menu_item(label, shortcut, False, True)
         return clicked
+    
+    def draw_image(self, texture: arcade.Texture, width: float, height: float):
+        """
+        Draws an Arcade Texture in ImGui. 
+        Handles GL ID extraction and ImVec2 type casting automatically.
+        Includes robust error handling to prevent stack crashes.
+        """
+        if not texture:
+            # Render a placeholder rectangle if texture is missing
+            self.dummy((width, height))
+            return
+
+        try:
+            # 1. Get ID via Service (Returns int)
+            tex_id = ImGuiService.get_texture_id(texture)
+            
+            # 2. Draw with Correct Binding
+            # imgui_bundle requires specific types for texture IDs (often void*).
+            # Passing a raw int will fail overload resolution in newer bindings.
+            # We use ctypes.c_void_p to create a compatible pointer object.
+            imgui.image(ctypes.c_void_p(tex_id), imgui.ImVec2(width, height)) # type: ignore
+
+        except Exception as e:
+            # SAFETY NET:
+            # If drawing fails (e.g., bad cast, invalid GL context), we catch it here.
+            # This prevents the Exception from bubbling up to GameLayout, which would
+            # skip imgui.end_group() and cause the whole app to crash with "Missing EndGroup".
+            print(f"[UIComposer] draw_image error: {e}")
+            self.dummy((width, height))
+       
+    def dummy(self, size: tuple[float, float]):
+        imgui.dummy(imgui.ImVec2(size[0], size[1]))

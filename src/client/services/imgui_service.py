@@ -256,3 +256,16 @@ class ImGuiService:
             arcade.key.Y: imgui.Key.y,
             arcade.key.Z: imgui.Key.z,
         }
+        
+    @staticmethod
+    def get_texture_id(texture: arcade.Texture) -> int:
+        """
+        Safely extracts the OpenGL ID from an Arcade Texture.
+        Compatible with Arcade 3.0 (.glo.glo_id) and Legacy (.gl_id).
+        """
+        # Arcade 3.0+
+        if hasattr(texture, "glo"):
+            return int(texture.glo.glo_id) # type: ignore
+        
+        # Fallback for Arcade 2.6
+        return int(getattr(texture, "gl_id", 0)) # type: ignore
