@@ -126,16 +126,13 @@ class GameLayout(BaseLayout):
                 btn_size = (70, 25)
                 
                 if imgui.button("SAVE", btn_size):
-                    self.net.request_save()
+                    print("Save functionality not implemented yet.")
+                    pass
                 
                 imgui.same_line()
                 if imgui.button("LOAD", btn_size):
-                    # Check if self.net.session exists! 
-                    # If NetworkClient doesn't expose .session, this lines crashes.
-                    if hasattr(self.net, 'session'):
-                        nav.show_load_game_screen(self.net.session.config)
-                    else:
-                        print("Error: self.net.session is missing!")
+                    print("Load functionality not implemented yet.")
+                    pass
 
                 imgui.same_line()
                 if imgui.button("MENU", btn_size):
