@@ -4,10 +4,19 @@ from src.client.services.network_client_service import NetworkClient
 
 class SystemBar:
     def render(self, composer: UIComposer, net: NetworkClient, nav_service):
-        vp_w = imgui.get_main_viewport().size.x
+        viewport = imgui.get_main_viewport()
         
-        # Position: Top-Right
-        imgui.set_next_window_pos((vp_w - 260, 10))
+        # Padding from edges
+        pad_x, pad_y = 10.0, 10.0
+
+        # Anchor: TOP-RIGHT
+        # We set pivot to (1, 0) -> (Right, Top)
+        # Then position at (ScreenW - Pad, Pad)
+        imgui.set_next_window_pos(
+            imgui.ImVec2(viewport.size.x - pad_x, pad_y), 
+            imgui.Cond_.always, 
+            imgui.ImVec2(1.0, 0.0) 
+        )
         
         flags = (imgui.WindowFlags_.no_decoration | 
                  imgui.WindowFlags_.no_move | 
@@ -16,7 +25,11 @@ class SystemBar:
 
         if imgui.begin("##System_Bar", True, flags):
             try:
-                btn_size = (70, 25)
+                # Calculate button size relative to font size for DPI support
+                font_size = imgui.get_font_size()
+                btn_w = font_size * 4.5
+                btn_h = font_size * 1.6
+                btn_size = (btn_w, btn_h)
                 
                 # SAVE
                 if imgui.button("SAVE", btn_size):
