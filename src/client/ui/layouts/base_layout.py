@@ -44,6 +44,26 @@ class BaseLayout:
         # Замість прямого виклику open_popup, ми просимо зробити це на наступному кадрі
         self._queued_popup_open = True 
 
+    def _render_fps_counter(self, fps: float):
+        """
+        Draws a plain FPS counter in the top-left corner.
+        No panel, no background, just raw text.
+        """
+        # Position at top-left with a small 10px padding
+        imgui.set_next_window_pos((10, 10))
+        
+        # Flags to make the window completely invisible/non-interactive
+        flags = (imgui.WindowFlags_.no_decoration | 
+                 imgui.WindowFlags_.no_inputs | 
+                 imgui.WindowFlags_.no_move | 
+                 imgui.WindowFlags_.no_background |
+                 imgui.WindowFlags_.always_auto_resize)
+                 
+        if imgui.begin("##FPS_Overlay", True, flags):
+            # Render as pure white text
+            imgui.text_colored((1.0, 1.0, 1.0, 1.0), f"{fps:.0f}")
+        imgui.end()
+
     def _render_panels(self, state: Any, **extra_ctx):
         for panel_id, data in self.panels.items():
             if not data["visible"]:

@@ -36,12 +36,14 @@ class EditorLayout(BaseLayout):
         # 1. Setup Theme
         self.composer.setup_frame()
         
-        # 2. Render Static Elements
-        self._render_menu_bar()
-        self._render_info_overlay(fps)
-
-        # 1. Process Global Input (Right-Click Menu)
+        # Plain white FPS in corner
+        self._render_fps_counter(fps)
+        
+        # Right-click menu still works for map layers
         self._render_context_menu()
+        
+        # Floating debug info (already handles its own position)
+        self._render_info_overlay(fps)
         
     def _render_menu_bar(self):
         if imgui.begin_main_menu_bar():

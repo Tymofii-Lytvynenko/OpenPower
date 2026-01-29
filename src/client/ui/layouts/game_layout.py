@@ -39,7 +39,7 @@ class GameLayout(BaseLayout):
         self.register_panel("ECO", EconomyPanel(), icon="ECO", color=GAMETHEME.col_economy)
         self.register_panel("DEM", DemographicsPanel(), icon="DEM", color=GAMETHEME.col_demographics)
         
-    def render(self, selected_region_id: Optional[int], hovered_region_id: Optional[int], fps: float):
+    def render(self, selected_region_id: Optional[int], fps: float, nav_service):
         """
         Main render loop. 
         Takes both selected_region_id (left click) and hovered_region_id (under mouse)
@@ -59,7 +59,7 @@ class GameLayout(BaseLayout):
             on_focus_request=self._on_focus_region
         )
 
-        self._render_top_bar(state, fps)
+        self._render_system_bar(state)
         self._render_toggle_bar()
         self._render_time_controls(state)
 
@@ -108,41 +108,27 @@ class GameLayout(BaseLayout):
         
         imgui.pop_style_color(2)
 
-    def _render_top_bar(self, state, fps: float):
-        """Renders the top menu bar with Player Tag, Treasury, and FPS."""
-        if imgui.begin_main_menu_bar():
-            # Player Identity
-            imgui.text_colored(GAMETHEME.col_active_accent, f"[{self.player_tag}]")
-            
-            # Treasury (Read from State)
-            balance = 0
-            try:
-                if "countries" in state.tables:
-                    df = state.tables["countries"]
-                    res = df.filter(pl.col("id") == self.player_tag).select("money_reserves")
-                    if not res.is_empty():
-                        balance = res.item(0, 0)
-            except Exception:
-                pass
+    def _render_system_bar(self, nav):
+        """Top-Right corner buttons."""
+        vp_w = imgui.get_main_viewport().size.x
+        imgui.set_next_window_pos((vp_w - 260, 10))
+        flags = (imgui.WindowFlags_.no_decoration | 
+                 imgui.WindowFlags_.no_move | 
+                 imgui.WindowFlags_.always_auto_resize |
+                 imgui.WindowFlags_.no_background)
 
-            imgui.separator()
-            imgui.text(f"Treasury: ${balance:,.0f}".replace(",", " "))
-            imgui.separator()
-            
-            # Map Mode Switcher
-            if imgui.begin_menu("Map Mode"):
-                if imgui.menu_item("Political", "", self.map_mode == "political")[0]:
-                    self.map_mode = "political"
-                if imgui.menu_item("Terrain", "", self.map_mode == "terrain")[0]:
-                    self.map_mode = "terrain"
-                imgui.end_menu()
-
-            # FPS Counter (Far Right)
-            main_vp_w = imgui.get_main_viewport().size.x
-            imgui.set_cursor_pos_x(main_vp_w - 85)
-            imgui.text_disabled(f"{fps:.0f} FPS")
-
-            imgui.end_main_menu_bar()
+        if imgui.begin("##System_Bar", True, flags):
+            # Using theme buttons
+            btn_size = (70, 25)
+            if imgui.button("SAVE", btn_size):
+                self.net.request_save()
+            imgui.same_line()
+            if imgui.button("LOAD", btn_size):
+                nav.show_load_game_screen(self.net.session.config)
+            imgui.same_line()
+            if imgui.button("MENU", btn_size):
+                nav.show_main_menu(self.net.session, self.net.session.config)
+        imgui.end()
 
     def _render_time_controls(self, state):
         """Renders the Play/Pause and Speed controls at the bottom center."""

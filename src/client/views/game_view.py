@@ -75,29 +75,41 @@ class GameView(BaseImGuiView):
         self.selected_region_id = region_id
 
     def on_draw(self):
+        """
+        Main render pass for the gameplay view.
+        Coordinates the Arcade world rendering with the ImGui HUD.
+        """
+        # 1. Clear the screen with the theme's background color
         self.clear()
         
-        # 1. Start ImGui frame (must be first)
+        # 2. Start the ImGui frame (Must be called before any UI logic)
         self.imgui.new_frame()
         
-        # 2. Draw Game World (Arcade Layer)
+        # 3. Draw Game World (Arcade/OpenGL Layer)
+        # We use the world camera to handle pan and zoom for the map
         self.world_cam.use()
-        mode = "political" if self.layout.map_mode == "political" else "terrain"
-        self.renderer.draw(mode=mode)
         
-        # 3. Draw UI (ImGui Layer)
+        # Determine current render mode from layout state
+        render_mode = "political" if self.layout.map_mode == "political" else "terrain"
+        self.renderer.draw(mode=render_mode)
+        
+        # 4. Draw UI (ImGui Overlay Layer)
+        # Switch back to the window's coordinate system for the UI
         self.window.use()
         
-        # Calculate hover state for tooltip/highlight purposes (visual only).
-        # We DO NOT use this for the Context Menu logic anymore to prevent drift issues.
-        hovered_id = self.viewport_ctrl.get_region_at(self.window._mouse_x, self.window._mouse_y)
-
-        self.layout.render(
-            self.selected_region_id, 
-            hovered_id, 
-            self.imgui.io.framerate
-        )
+        # Execute Layout rendering.
+        # Arguments: (selected_id, hovered_id, delta_time/fps, navigation_service)
+        try:
+            self.layout.render(
+                self.selected_region_id, 
+                self.imgui.io.framerate,
+                self.nav 
+            )
+        except Exception as e:
+            # Basic fail-safe to prevent the whole app from crashing if a UI panel fails
+            print(f"[GameView] UI Rendering Error: {e}")
         
+        # 5. Finalize and push the ImGui draw data to the GPU
         self.imgui.render()
 
     # --- INPUT HANDLING ---
