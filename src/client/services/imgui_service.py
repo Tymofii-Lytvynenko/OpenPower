@@ -41,7 +41,8 @@ class ImGuiService:
                 self.io, 
                 font_path, 
                 size_pixels=base_font_size * pixel_ratio, 
-                load_cjk=False
+                load_cjk=False,
+                load_icons=True
             )
 
             # 2. Scale Down: Use the new Style API to scale the UI back to logical size
