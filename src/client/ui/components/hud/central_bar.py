@@ -1,5 +1,4 @@
 import arcade
-import ctypes 
 from typing import Optional
 from imgui_bundle import imgui, icons_fontawesome_6
 
@@ -10,18 +9,22 @@ from src.client.renderers.flag_renderer import FlagRenderer
 from src.shared.actions import ActionSetGameSpeed, ActionSetPaused
 
 class CentralBar:
+    """
+    HUD component displayed at the bottom of the screen.
+    Handles country info, time controls, and quick actions.
+    """
     def __init__(self):
         self.show_speed_controls = True 
         self.news_ticker_text = "Global News: Simulation initialized and running."
+        
+        # Renderer instance
         self.flag_renderer = FlagRenderer()
         self.active_player_tag = "" 
 
+        # Layout configuration
         self.height = 100.0                
-        self.top_section_h_pct = 0.65      
-        self.content_scale_factor = 0.80   
-        
-        # Limit debug spam
-        self._image_error_printed = False
+        self.top_section_h_pct = 0.65       
+        self.content_scale_factor = 0.80    
 
     def render(self, composer: UIComposer, state, net: NetworkClient, player_tag: str) -> str:
         self.active_player_tag = player_tag
@@ -52,6 +55,7 @@ class CentralBar:
                 top_h = h * self.top_section_h_pct
                 ticker_h = h - top_h
 
+                # Draw backgrounds
                 draw_list.add_rect_filled(p, (p.x + w, p.y + top_h), imgui.get_color_u32(GAMETHEME.col_panel_bg), GAMETHEME.rounding, imgui.ImDrawFlags_.round_corners_top)
                 draw_list.add_rect_filled((p.x, p.y + top_h), (p.x + w, p.y + h), imgui.get_color_u32(GAMETHEME.col_overlay_bg), GAMETHEME.rounding, imgui.ImDrawFlags_.round_corners_bottom)
                 draw_list.add_rect(p, (p.x + w, p.y + h), imgui.get_color_u32(GAMETHEME.border), GAMETHEME.rounding, 0, 1.5)
@@ -62,13 +66,16 @@ class CentralBar:
                 left_section_w = 170.0  
                 right_section_w = 250.0 
 
+                # 1. Left Section: Country Flag & Info
                 imgui.set_cursor_pos((padding_x, content_y))
                 self._render_country_info(composer, inner_item_h)
 
+                # 2. Right Section: Time Controls
                 right_start_x = w - right_section_w - padding_x
                 imgui.set_cursor_pos((right_start_x, content_y))
                 self._render_time_controls(state, net, right_section_w, inner_item_h)
 
+                # 3. Center Section: Quick Actions
                 btn_count = 3
                 btn_spacing = 10.0
                 center_grp_w = (inner_item_h * btn_count) + (btn_spacing * (btn_count - 1))
@@ -79,11 +86,13 @@ class CentralBar:
                 imgui.set_cursor_pos((center_x, content_y))
                 self._render_quick_actions(inner_item_h, btn_spacing)
 
+                # 4. Bottom Section: News Ticker
                 text_height = imgui.get_text_line_height()
                 ticker_text_y = top_h + (ticker_h - text_height) / 2
                 imgui.set_cursor_pos((padding_x, ticker_text_y))
                 self._render_ticker()
 
+                # 5. Popups
                 self._render_country_selector_popup(state)
 
             except Exception as e:
@@ -99,7 +108,7 @@ class CentralBar:
     def _render_time_controls(self, state, net, width, height):
         imgui.begin_group()
         try:
-            if imgui.button("TIME", (50, height)):
+            if imgui.button(icons_fontawesome_6.ICON_FA_HOURGLASS_HALF, (50, height)):
                 self.show_speed_controls = not self.show_speed_controls
             imgui.same_line()
             
@@ -157,69 +166,18 @@ class CentralBar:
         imgui.same_line()
         imgui.text_colored(GAMETHEME.col_text_bright, time_part)
 
-    def _safe_image(self, gl_id: int, w: float, h: float):
-        """
-        Attempts to render an image using the required ImGui type casts.
-        """
-        size = imgui.ImVec2(w, h)
-        
-        # ATTEMPT 1: Strict Binding Cast (Likely Fix)
-        # The error said it wants 'ImTextureRef', so let's try to find and use it.
-        # This wrapper handles the void* conversion for us.
-        try:
-            # Check if class exists in the module
-            if hasattr(imgui, "ImTextureRef"):
-                # Warning: Some bindings use constructor ImTextureRef(id), 
-                # others might need a cast helper. We try constructor first.
-                tex_ref = imgui.ImTextureRef(gl_id) 
-                imgui.image(tex_ref, size)
-                return
-        except Exception:
-            pass
-
-        # ATTEMPT 2: Fallback to ImTextureID (Standard ImGui name)
-        try:
-            if hasattr(imgui, "ImTextureID"):
-                tex_id = imgui.ImTextureID(gl_id)
-                imgui.image(tex_id, size)
-                return
-        except Exception:
-            pass
-
-        # ATTEMPT 3: Standard Int (Failed before, but kept as backup)
-        try:
-            imgui.image(gl_id, size)
-            return
-        except TypeError:
-            pass
-            
-        # ATTEMPT 4: Void Pointer (Failed before, but kept)
-        try:
-            ptr = ctypes.c_void_p(gl_id)
-            imgui.image(ptr, size)
-            return
-        except TypeError:
-            pass
-
-        # If we reach here, report strict error
-        if not self._image_error_printed:
-            print(f"[CentralBar] FAILED all cast attempts for ID {gl_id}.")
-            self._image_error_printed = True
-            
-        imgui.text_colored(GAMETHEME.col_warning, f"IMG_ERR({gl_id})")
-
     def _render_country_info(self, composer: UIComposer, height):
+        """
+        Renders the flag and basic status labels.
+        Delegates the actual rendering logic to FlagRenderer.
+        """
         imgui.begin_group()
         try:
             flag_h = height
             flag_w = flag_h * 1.5
             
-            flag_tex = self.flag_renderer.get_texture(self.active_player_tag)
-            
-            if flag_tex and flag_tex.gl_id > 0:
-                self._safe_image(flag_tex.gl_id, flag_w, flag_h)
-            else:
-                composer.dummy((flag_w, flag_h))
+            # Simplified: No longer need to manually check GL IDs here
+            self.flag_renderer.draw_flag(self.active_player_tag, flag_w, flag_h)
 
             imgui.same_line()
 
@@ -244,14 +202,14 @@ class CentralBar:
     def _render_quick_actions(self, height, spacing):
         btn_sz = (height, height)
         imgui.push_style_var(imgui.StyleVar_.item_spacing, (spacing, 0))
-        if imgui.button(f"{icons_fontawesome_6.ICON_FA_DESKTOP}", btn_sz): pass
-        if imgui.is_item_hovered(): imgui.set_tooltip("Overview")
+        if imgui.button(f"{icons_fontawesome_6.ICON_FA_BRAIN}", btn_sz): pass
+        if imgui.is_item_hovered(): imgui.set_tooltip("AI")
         imgui.same_line()
         if imgui.button(f"{icons_fontawesome_6.ICON_FA_CHART_LINE}", btn_sz): pass
         if imgui.is_item_hovered(): imgui.set_tooltip("Statistics")
         imgui.same_line()
-        if imgui.button(f"{icons_fontawesome_6.ICON_FA_MESSAGE}", btn_sz): pass
-        if imgui.is_item_hovered(): imgui.set_tooltip("Diplomacy")
+        if imgui.button(f"{icons_fontawesome_6.ICON_FA_ENVELOPE}", btn_sz): pass
+        if imgui.is_item_hovered(): imgui.set_tooltip("Messages")
         imgui.pop_style_var()
 
     def _render_ticker(self):
