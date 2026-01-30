@@ -1,13 +1,17 @@
 {
-    "copy4ai.excludePatterns": [
-        "**/node_modules/**",
-        "**/__pycache__/**",
-        "**/.venv/**",
-        "**/venv/**",
-        "**/.git/**",
-        "**/.tsv/**",
-        "**/.toml/**"
-    ],
+    "copy4ai.exclude": {
+        "paths": [
+            ".vscode/**",
+            ".__pycache__/**"
+        ],
+        "patterns": [
+            "node_modules",
+            "*.log",
+            "*.tsv",
+            "*.toml"
+        ],
+        "useGitignore": true
+    },
     "isGitignoreExtActive": true,
     // --- General Python Analysis Settings ---
     // "workspace" ensures Pylance scans all files in the project, not just open ones
