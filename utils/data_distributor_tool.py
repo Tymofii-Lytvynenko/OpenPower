@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import csv
 import os
-import math
+import traceback
 
 """
 OpenPower Data Distribution Utility
@@ -25,407 +25,308 @@ It supports four distribution modes:
 """
 
 # ==========================================
-# 1. Data & Logic Layer (Model)
+# 1. Logic & Strategy
 # ==========================================
 
-class TSVManager:
-    """
-    Handles reading and writing TSV files using standard csv library.
-    Focuses on the 'how' of file I/O.
-    """
-    def read_tsv(self, filepath):
-        """Reads a TSV file and returns a list of dictionaries."""
-        if not filepath or not os.path.exists(filepath):
-            return []
+class DistributionStrategy:
+    def calculate_weights(self, region_data, total_pop, total_area, country_hdi, count):
+        raise NotImplementedError
+
+class EvenStrategy(DistributionStrategy):
+    def calculate_weights(self, region_data, total_pop, total_area, country_hdi, count):
+        return 1.0 / count if count > 0 else 0
+
+class PopulationStrategy(DistributionStrategy):
+    def calculate_weights(self, region_data, total_pop, total_area, country_hdi, count):
+        return region_data['pop'] / total_pop if total_pop > 0 else (1.0 / count)
+
+class AreaStrategy(DistributionStrategy):
+    def calculate_weights(self, region_data, total_pop, total_area, country_hdi, count):
+        return region_data['area'] / total_area if total_area > 0 else (1.0 / count)
+
+class HybridStrategy(DistributionStrategy):
+    def calculate_weights(self, region_data, total_pop, total_area, country_hdi, count):
+        w_pop = (region_data['pop'] / total_pop) if total_pop > 0 else (1.0 / count)
+        w_area = (region_data['area'] / total_area) if total_area > 0 else (1.0 / count)
+        hdi_normalized = max(0.1, min(1.0, country_hdi / 100.0))
+        pop_bias = 1.0 - (hdi_normalized * 0.5) 
+        return (w_pop * pop_bias) + (w_area * (1.0 - pop_bias))
+
+class SafeTSV:
+    @staticmethod
+    def read(path):
+        if not path or not os.path.exists(path): return []
+        with open(path, 'r', encoding='utf-8-sig', newline='') as f:
+            reader = csv.reader(f, delimiter='\t')
+            try: headers = next(reader)
+            except: return []
+            headers = [h.strip() for h in headers]
+            data = []
+            for row in reader:
+                if len(row) > 0:
+                    # Pad row if short
+                    while len(row) < len(headers): row.append('')
+                    data.append(dict(zip(headers, row)))
+            return data
+
+class WorldRegistry:
+    def __init__(self):
+        self.countries = {}
+        self.all_regions = []
+
+    def build(self, reg_path, pop_path, dem_path):
+        self.countries.clear(); self.all_regions.clear()
         
-        with open(filepath, mode='r', encoding='utf-8', newline='') as f:
-            reader = csv.DictReader(f, delimiter='\t')
-            return list(reader)
+        # HDI
+        hdi_map = {}
+        for row in SafeTSV.read(dem_path):
+            if 'id' in row: hdi_map[row['id']] = float(row.get('human_dev', 50))
 
-    def write_tsv(self, filepath, fieldnames, data):
-        """Writes a list of dictionaries to a TSV file."""
-        with open(filepath, mode='w', encoding='utf-8', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t')
-            writer.writeheader()
-            writer.writerows(data)
+        # Pop
+        pop_map = {}
+        for row in SafeTSV.read(pop_path):
+            if 'hex' in row:
+                pop_map[row['hex']] = sum([float(row.get(k,0) or 0) for k in ['pop_14','pop_15_64','pop_65']])
 
-    def get_columns(self, filepath):
-        """Returns the list of column names from a TSV file."""
-        if not filepath or not os.path.exists(filepath):
-            return []
-        
-        with open(filepath, mode='r', encoding='utf-8', newline='') as f:
-            # Read only the first line to get headers
-            line = f.readline()
-            if not line:
-                return []
-            return line.strip().split('\t')
+        # Regions
+        reg_data = SafeTSV.read(reg_path)
+        if not reg_data: raise ValueError("Regions file empty/invalid")
+        if 'hex' not in reg_data[0]: raise KeyError("Missing 'hex' column in regions.tsv")
 
-
-class WorldDataManager:
-    """
-    Manages the relationships between Countries and Regions (Pop, Area, Owner).
-    Serves as the 'Database' for the operation.
-    """
-    def __init__(self, tsv_manager):
-        self.tsv = tsv_manager
-        # Mapping: country_id -> list of region objects (dict)
-        self.country_to_regions = {}
-        # Mapping: region_hex -> region data (area, pop, owner)
-        self.region_registry = {}
-
-    def load_world_data(self, regions_path, pop_path):
-        """
-        Parses regions.tsv and regions_pop.tsv to build the world state.
-        
-        Why: We need to join data from two files (geo and pop) to perform 
-        proportional math.
-        """
-        self.country_to_regions.clear()
-        self.region_registry.clear()
-
-        # 1. Load Geo Data (Area, Owner, Hex)
-        raw_regions = self.tsv.read_tsv(regions_path)
-        for row in raw_regions:
-            r_hex = row.get('hex')
-            owner = row.get('owner')
-            try:
-                area = float(row.get('area_km2', 0))
-            except ValueError:
-                area = 0.0
-
-            if r_hex and owner:
-                data = {
-                    'hex': r_hex,
-                    'owner': owner,
-                    'area': area,
-                    'pop': 0.0 # Will be filled next
-                }
-                self.region_registry[r_hex] = data
-                
-                if owner not in self.country_to_regions:
-                    self.country_to_regions[owner] = []
-                self.country_to_regions[owner].append(data)
-
-        # 2. Load Pop Data (Populations)
-        raw_pop = self.tsv.read_tsv(pop_path)
-        for row in raw_pop:
-            r_hex = row.get('hex')
-            if r_hex in self.region_registry:
-                # Summing all age groups for total population
-                try:
-                    p14 = float(row.get('pop_14', 0))
-                    p15 = float(row.get('pop_15_64', 0))
-                    p65 = float(row.get('pop_65', 0))
-                    self.region_registry[r_hex]['pop'] = p14 + p15 + p65
-                except ValueError:
-                    continue
-
-
-class DistributionLogic:
-    """
-    Pure logic class for calculating distributions.
-    Adheres to the single responsibility principle.
-    """
-    
-    MODES = {
-        "Even": "even",
-        "Population (Per Capita)": "pop",
-        "Area (Per km²)": "area",
-        "Hybrid (Pop & Area)": "hybrid"
-    }
-
-    def calculate_distribution(self, total_value, regions_data, mode):
-        """
-        Distributes a total_value across a list of regions based on the mode.
-        
-        Args:
-            total_value (float): The value to distribute.
-            regions_data (list): List of dicts {'hex', 'pop', 'area'}.
-            mode (str): Key from MODES.
-            
-        Returns:
-            dict: { region_hex: calculated_value }
-        """
-        results = {}
-        count = len(regions_data)
-        if count == 0:
-            return results
-
-        # Strategy 1: Even
-        if mode == "even":
-            val_per_region = total_value / count
-            for r in regions_data:
-                results[r['hex']] = val_per_region
-            return results
-
-        # Strategy 2, 3, 4: Proportional
-        # We need total weights first
-        total_pop = sum(r['pop'] for r in regions_data)
-        total_area = sum(r['area'] for r in regions_data)
-
-        for r in regions_data:
-            weight = 0.0
-            
-            if mode == "pop":
-                if total_pop > 0:
-                    weight = r['pop'] / total_pop
-                else:
-                    weight = 1.0 / count # Fallback to even
-            
-            elif mode == "area":
-                if total_area > 0:
-                    weight = r['area'] / total_area
-                else:
-                    weight = 1.0 / count
-
-            elif mode == "hybrid":
-                # Average of the two proportions
-                w_pop = (r['pop'] / total_pop) if total_pop > 0 else (1.0/count)
-                w_area = (r['area'] / total_area) if total_area > 0 else (1.0/count)
-                weight = (w_pop + w_area) / 2.0
-
-            results[r['hex']] = total_value * weight
-
-        return results
-
+        for row in reg_data:
+            r_hex = row['hex']
+            owner = row.get('owner', 'Unknown')
+            self.all_regions.append(r_hex)
+            if owner not in self.countries:
+                self.countries[owner] = {'hdi': hdi_map.get(owner, 50.0), 'regions': []}
+            self.countries[owner]['regions'].append({
+                'hex': r_hex,
+                'area': float(row.get('area_km2', 1) or 1),
+                'pop': pop_map.get(r_hex, 0)
+            })
 
 # ==========================================
-# 2. UI Layer (View/Controller)
+# 2. UI Components
 # ==========================================
 
-class FileSelector(tk.Frame):
-    """Reusable component for selecting a file."""
-    def __init__(self, parent, label_text, file_type="tsv", command=None):
+class ColumnConfigRow(tk.Frame):
+    def __init__(self, parent, col_name, strategies):
         super().__init__(parent)
+        tk.Label(self, text=col_name, width=20, anchor='w', font=('Consolas', 10)).pack(side='left')
+        self.var_mode = tk.StringVar(value="Hybrid")
+        ttk.Combobox(self, textvariable=self.var_mode, values=list(strategies.keys()), state="readonly", width=15).pack(side='left', padx=5)
         self.pack(fill='x', pady=2)
-        
-        lbl = tk.Label(self, text=label_text, width=20, anchor='w')
-        lbl.pack(side='left')
-        
-        self.entry = tk.Entry(self)
-        self.entry.pack(side='left', fill='x', expand=True, padx=5)
-        
-        btn = tk.Button(self, text="Browse", command=self._browse)
-        btn.pack(side='left')
-
-        self.custom_callback = command
-        self.file_type = file_type
-
-    def _browse(self):
-        filename = filedialog.askopenfilename(filetypes=[("TSV Files", "*.tsv")])
-        if filename:
-            self.entry.delete(0, tk.END)
-            self.entry.insert(0, filename)
-            if self.custom_callback:
-                self.custom_callback(filename)
-
-    def get(self):
-        return self.entry.get()
-
 
 class MainWindow:
-    """
-    Main Application Window.
-    Binds the Logic (DataManager) to the User Interactions.
-    """
     def __init__(self, root):
         self.root = root
-        self.root.title("OpenPower Data Distributor Tool")
-        self.root.geometry("700x600")
-
-        # Logic Composition
-        self.tsv_manager = TSVManager()
-        self.world_manager = WorldDataManager(self.tsv_manager)
-        self.logic = DistributionLogic()
-
-        self.source_columns = []
+        self.root.title("OpenPower Distributor v3.1")
+        self.root.geometry("800x750")
         
+        self.registry = WorldRegistry()
+        self.strategies = {
+            "Even": EvenStrategy(),
+            "Population": PopulationStrategy(),
+            "Area": AreaStrategy(),
+            "Hybrid (Smart)": HybridStrategy()
+        }
+        self.configs = {}
         self._setup_ui()
 
     def _setup_ui(self):
-        # --- Section 1: Base Data ---
-        lf_base = tk.LabelFrame(self.root, text="1. Load World Data (Base Modules)")
-        lf_base.pack(fill='x', padx=10, pady=5)
+        # 1. Base Data
+        lf1 = tk.LabelFrame(self.root, text="1. Base Data Setup", font=('Arial', 10, 'bold'))
+        lf1.pack(fill='x', padx=10, pady=5)
+        self.ent_reg = self._path_row(lf1, "Regions:")
+        self.ent_pop = self._path_row(lf1, "Pop Data:")
+        self.ent_dem = self._path_row(lf1, "Demographics:")
+        tk.Button(lf1, text="Initialize World Data", bg="#dddddd", command=self.load_world).pack(pady=5)
+
+        # 2. Source/Target
+        lf2 = tk.LabelFrame(self.root, text="2. File Selection", font=('Arial', 10, 'bold'))
+        lf2.pack(fill='x', padx=10, pady=5)
         
-        self.fs_regions = FileSelector(lf_base, "regions.tsv:")
-        self.fs_pop = FileSelector(lf_base, "regions_pop.tsv:")
+        # Source Row with explicit Load Button
+        f_src = tk.Frame(lf2)
+        f_src.pack(fill='x', pady=2)
+        tk.Label(f_src, text="Source (Country):", width=15, anchor='w').pack(side='left')
+        self.ent_src = tk.Entry(f_src)
+        self.ent_src.pack(side='left', fill='x', expand=True, padx=5)
+        tk.Button(f_src, text="...", width=3, command=lambda: self._browse(self.ent_src)).pack(side='left')
+        # THIS IS THE NEW BUTTON
+        tk.Button(f_src, text="LOAD COLUMNS", bg="#3498db", fg="white", command=self.load_columns).pack(side='left', padx=5)
+
+        self.ent_tgt = self._path_row(lf2, "Target (Region):")
+
+        # 3. Config Area
+        tk.Label(self.root, text="3. Distribution Configuration", font=('Arial', 10, 'bold')).pack(pady=(10,0))
         
-        btn_load_world = tk.Button(lf_base, text="Load World Data", command=self.load_world_data)
-        btn_load_world.pack(pady=5)
-
-        # --- Section 2: Source & Target ---
-        lf_files = tk.LabelFrame(self.root, text="2. Select Data Files")
-        lf_files.pack(fill='x', padx=10, pady=5)
-
-        self.fs_source = FileSelector(lf_files, "Source (Country):", command=self.update_source_columns)
-        self.fs_target = FileSelector(lf_files, "Target (Regions):")
-
-        # --- Section 3: Configuration ---
-        lf_config = tk.LabelFrame(self.root, text="3. Distribution Configuration")
-        lf_config.pack(fill='x', padx=10, pady=5)
-
-        # Column Selector
-        frame_col = tk.Frame(lf_config)
-        frame_col.pack(fill='x', pady=2)
-        tk.Label(frame_col, text="Column to Distribute:", width=20, anchor='w').pack(side='left')
-        self.combo_col = ttk.Combobox(frame_col, state="readonly")
-        self.combo_col.pack(side='left', fill='x', expand=True)
-
-        # Mode Selector
-        frame_mode = tk.Frame(lf_config)
-        frame_mode.pack(fill='x', pady=5)
-        tk.Label(frame_mode, text="Distribution Mode:", width=20, anchor='w').pack(side='left')
+        # Scrollable Canvas
+        container = tk.Frame(self.root, bd=1, relief="sunken")
+        container.pack(fill='both', expand=True, padx=10, pady=5)
         
-        self.var_mode = tk.StringVar(value="even")
-        for text, val in self.logic.MODES.items():
-            rb = tk.Radiobutton(frame_mode, text=text, variable=self.var_mode, value=val)
-            rb.pack(side='left')
+        self.canvas = tk.Canvas(container)
+        sb = tk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+        self.scroll_frame = tk.Frame(self.canvas)
 
-        # --- Section 4: Action ---
-        btn_run = tk.Button(self.root, text="🚀 RUN DISTRIBUTION", command=self.run_process, bg="#dddddd", height=2)
-        btn_run.pack(fill='x', padx=10, pady=10)
+        self.scroll_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.canvas.create_window((0, 0), window=self.scroll_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=sb.set)
 
-        # --- Log ---
-        self.log_text = tk.Text(self.root, height=10, state='disabled')
-        self.log_text.pack(fill='both', expand=True, padx=10, pady=(0, 10))
-        
-        self.log("Welcome to the OpenPower Data Tool.")
-        self.log("Please select regions.tsv and regions_pop.tsv first.")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
 
-    def log(self, message):
-        self.log_text.config(state='normal')
-        self.log_text.insert(tk.END, f"> {message}\n")
-        self.log_text.see(tk.END)
-        self.log_text.config(state='disabled')
+        # 4. Action
+        tk.Button(self.root, text="🚀 EXECUTE DISTRIBUTION", bg="#27ae60", fg="white", font=('Arial', 12, 'bold'), height=2, command=self.run).pack(fill='x', padx=10, pady=10)
 
-    def load_world_data(self):
-        """Loads the base mapping files."""
-        r_path = self.fs_regions.get()
-        p_path = self.fs_pop.get()
-        
-        if not r_path or not p_path:
-            messagebox.showerror("Error", "Please select both regions.tsv and regions_pop.tsv")
-            return
+        # Log
+        self.log_widget = tk.Text(self.root, height=8, bg="#2c3e50", fg="#ecf0f1", state='disabled')
+        self.log_widget.pack(fill='x', padx=10, pady=(0, 10))
 
+    def _path_row(self, parent, label):
+        f = tk.Frame(parent)
+        f.pack(fill='x', pady=2)
+        tk.Label(f, text=label, width=15, anchor='w').pack(side='left')
+        e = tk.Entry(f)
+        e.pack(side='left', fill='x', expand=True, padx=5)
+        tk.Button(f, text="...", width=3, command=lambda: self._browse(e)).pack(side='left')
+        return e
+
+    def _browse(self, entry):
+        p = filedialog.askopenfilename(filetypes=[("TSV", "*.tsv")])
+        if p:
+            entry.delete(0, tk.END)
+            entry.insert(0, p)
+
+    def log(self, m):
+        self.log_widget.config(state='normal')
+        self.log_widget.insert(tk.END, f"> {m}\n")
+        self.log_widget.see(tk.END)
+        self.log_widget.config(state='disabled')
+
+    def load_world(self):
         try:
-            self.world_manager.load_world_data(r_path, p_path)
-            count = len(self.world_manager.country_to_regions)
-            self.log(f"Successfully loaded world data. Found {count} countries.")
+            self.registry.build(self.ent_reg.get(), self.ent_pop.get(), self.ent_dem.get())
+            self.log(f"World Loaded: {len(self.registry.countries)} countries, {len(self.registry.all_regions)} regions.")
         except Exception as e:
-            self.log(f"Error loading world data: {e}")
+            messagebox.showerror("Init Error", str(e))
+            self.log(f"Error: {e}")
 
-    def update_source_columns(self, filepath):
-        """Callback when source file changes to populate dropdown."""
-        try:
-            cols = self.tsv_manager.get_columns(filepath)
-            self.combo_col['values'] = cols
-            if cols:
-                self.combo_col.current(1) # Default to 2nd column usually (1st is ID)
-                self.log(f"Loaded columns from source: {cols}")
-        except Exception as e:
-            self.log(f"Error reading source columns: {e}")
-
-    def run_process(self):
-        """Main execution flow."""
-        # 1. Validation
-        if not self.world_manager.country_to_regions:
-            messagebox.showerror("Error", "World data not loaded. Please complete Step 1.")
+    def load_columns(self):
+        """
+        Reads source file and lists ALL potential columns.
+        removed strict numeric checking to prevent skipping valid columns.
+        """
+        p = self.ent_src.get()
+        if not p or not os.path.exists(p):
+            messagebox.showerror("Error", "Please select a valid Source file first.")
             return
 
-        src_path = self.fs_source.get()
-        tgt_path = self.fs_target.get()
-        col_name = self.combo_col.get()
-        mode = self.var_mode.get()
-
-        if not src_path or not tgt_path or not col_name:
-            messagebox.showerror("Error", "Please select Source, Target, and Column.")
-            return
+        # Clear old UI
+        for w in self.scroll_frame.winfo_children(): w.destroy()
+        self.configs.clear()
 
         try:
-            # 2. Read Source Country Data
-            country_data = self.tsv_manager.read_tsv(src_path)
-            
-            # 3. Read (or Init) Target Region Data
-            # Note: If target exists, we read it to preserve other columns. 
-            # If not, we create basic structure.
-            target_rows = []
-            target_fieldnames = []
-            
-            if os.path.exists(tgt_path):
-                target_rows = self.tsv_manager.read_tsv(tgt_path)
-                target_fieldnames = self.tsv_manager.get_columns(tgt_path)
-            
-            # If the column doesn't exist in target, add it
-            if col_name not in target_fieldnames:
-                target_fieldnames.append(col_name)
-            
-            # Ensure 'hex' is in fieldnames if creating new file
-            if 'hex' not in target_fieldnames:
-                target_fieldnames.insert(0, 'hex')
-
-            # Create a lookup for existing target rows to update them efficiently
-            # Mapping: hex -> row_dict
-            target_map = {row['hex']: row for row in target_rows if 'hex' in row}
-
-            processed_count = 0
-
-            # 4. Processing Loop
-            for c_row in country_data:
-                c_id = c_row.get('id') # Assuming 'id' is standard country key
-                if not c_id: continue
-
-                # Get value to distribute
+            # Read just the header
+            with open(p, 'r', encoding='utf-8-sig') as f:
+                reader = csv.reader(f, delimiter='\t')
                 try:
-                    val_str = c_row.get(col_name)
-                    # Handle empty strings or None
-                    if val_str in [None, '']:
-                        total_val = 0.0
-                    else:
-                        total_val = float(val_str)
-                except ValueError:
-                    self.log(f"Skipping country {c_id}: value '{c_row.get(col_name)}' is not a number.")
-                    continue
+                    headers = next(reader)
+                except StopIteration:
+                    self.log("Source file is empty.")
+                    return
 
-                # Get regions for this country
-                regions = self.world_manager.country_to_regions.get(c_id, [])
-                if not regions:
-                    continue
-
-                # Calculate
-                distribution = self.logic.calculate_distribution(total_val, regions, mode)
-
-                # Update Target Map
-                for r_hex, new_val in distribution.items():
-                    if r_hex not in target_map:
-                        # Create new row if it didn't exist in target file
-                        target_map[r_hex] = {'hex': r_hex}
-                    
-                    # Store as integer if it was an integer input, else float
-                    # Here we stick to formatting as string for TSV
-                    target_map[r_hex][col_name] = f"{new_val:.4f}"
-                
-                processed_count += 1
-
-            # 5. Write Result
-            final_rows = list(target_map.values())
-            self.tsv_manager.write_tsv(tgt_path, target_fieldnames, final_rows)
+            # Clean headers
+            cols = [h.strip() for h in headers if h.strip()]
             
-            self.log(f"Done! Distributed '{col_name}' from {processed_count} countries to regions.")
-            self.log(f"Saved to: {tgt_path}")
-            messagebox.showinfo("Success", "Distribution Complete!")
+            # Blocklist: Columns that definitely shouldn't be distributed
+            ignored = ['id', 'un_member', 'is_playable', 'name', 'hex', 'owner', 'iso_region', 'type']
+            
+            # Allow everything else
+            valid_cols = [c for c in cols if c.lower() not in ignored]
+
+            self.log(f"Raw Headers Found: {cols}")
+            
+            if not valid_cols:
+                self.log("No valid columns found. Check your TSV headers.")
+                tk.Label(self.scroll_frame, text="No columns found (check log).", fg="red").pack()
+                return
+
+            self.log(f"Configurable Columns: {valid_cols}")
+            
+            for c in valid_cols:
+                self.configs[c] = ColumnConfigRow(self.scroll_frame, c, self.strategies)
+            
+            # Update UI Layout
+            self.scroll_frame.update_idletasks()
+            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
         except Exception as e:
-            self.log(f"Critical Error: {e}")
-            import traceback
+            self.log(f"Error reading source: {e}")
             traceback.print_exc()
+            
+    def run(self):
+        if not self.registry.countries:
+            messagebox.showerror("Error", "Please click 'Initialize World Data' first.")
+            return
+        if not self.configs:
+            messagebox.showerror("Error", "Please click 'LOAD COLUMNS' first.")
+            return
 
+        try:
+            # Load Data
+            src_rows = SafeTSV.read(self.ent_src.get())
+            
+            # Prep Target
+            tgt_path = self.ent_tgt.get()
+            target_data = {}
+            
+            # Merge existing
+            for r in SafeTSV.read(tgt_path):
+                if 'hex' in r: target_data[r['hex']] = r
+            
+            # Ensure all regions present
+            for h in self.registry.all_regions:
+                if h not in target_data: target_data[h] = {'hex': h}
 
-# ==========================================
-# 3. Entry Point
-# ==========================================
+            # Distribute
+            for col, config in self.configs.items():
+                strat = self.strategies[config.var_mode.get()]
+                self.log(f"Processing '{col}' via {config.var_mode.get()}...")
+
+                for c_row in src_rows:
+                    c_id = c_row.get('id')
+                    if c_id not in self.registry.countries: continue
+                    
+                    try: val = float(c_row.get(col, 0) or 0)
+                    except: val = 0.0
+
+                    c_info = self.registry.countries[c_id]
+                    regs = c_info['regions']
+                    t_pop = sum(r['pop'] for r in regs)
+                    t_area = sum(r['area'] for r in regs)
+
+                    for r in regs:
+                        w = strat.calculate_weights(r, t_pop, t_area, c_info['hdi'], len(regs))
+                        target_data[r['hex']][col] = f"{val * w:.4f}"
+
+            # Save
+            all_keys = set().union(*(d.keys() for d in target_data.values()))
+            fieldnames = ['hex'] + sorted([k for k in all_keys if k != 'hex'])
+            
+            with open(tgt_path, 'w', encoding='utf-8', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t')
+                writer.writeheader()
+                writer.writerows(target_data.values())
+
+            self.log("✅ Distribution Complete!")
+            messagebox.showinfo("Success", f"Updated {tgt_path}")
+
+        except Exception as e:
+            self.log(f"Run Error: {e}")
+            traceback.print_exc()
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = MainWindow(root)
+    MainWindow(root)
     root.mainloop()
