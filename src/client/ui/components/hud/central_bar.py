@@ -42,7 +42,7 @@ class CentralBar:
         screen_w = viewport.size.x
         screen_h = viewport.size.y
         
-        bar_width = max(650.0, min(screen_w * 0.40, 800.0))
+        bar_width = max(700.0, min(screen_w * 0.40, 800.0))
         pos_x = (screen_w - bar_width) / 2
         pos_y = screen_h - self.height - 15 
 
