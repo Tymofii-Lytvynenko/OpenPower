@@ -9,7 +9,8 @@ class DemographicsPanel(BasePanel):
         super().__init__("DEMOGRAPHICS", x=10, y=350, w=240, h=480)
 
     def _render_content(self, composer: UIComposer, state, **kwargs):
-        player_tag = kwargs.get("player_tag", "")
+        target_tag = kwargs.get("target_tag", "")
+        is_own = kwargs.get("is_own_country", False)
 
         # --- 1. Aggregation Logic ---
         total_pop = 0
@@ -20,12 +21,13 @@ class DemographicsPanel(BasePanel):
         if "regions" in state.tables:
             try:
                 df = state.tables["regions"]
-                player_regions = df.filter(pl.col("owner") == player_tag)
+                # Filter by active target (could be foreign)
+                target_regions = df.filter(pl.col("owner") == target_tag)
                 
-                if not player_regions.is_empty():
-                    pop_14 = player_regions.select(pl.col("pop_14")).sum().item()
-                    pop_15_64 = player_regions.select(pl.col("pop_15_64")).sum().item()
-                    pop_65 = player_regions.select(pl.col("pop_65")).sum().item()
+                if not target_regions.is_empty():
+                    pop_14 = target_regions.select(pl.col("pop_14")).sum().item()
+                    pop_15_64 = target_regions.select(pl.col("pop_15_64")).sum().item()
+                    pop_65 = target_regions.select(pl.col("pop_65")).sum().item()
                     total_pop = pop_14 + pop_15_64 + pop_65
             except Exception as e:
                 print(f"[Demographics] Error: {e}")
@@ -62,7 +64,7 @@ class DemographicsPanel(BasePanel):
         if "countries_dem" in state.tables:
             try:
                 dem_df = state.tables["countries_dem"]
-                row = dem_df.filter(pl.col("id") == player_tag)
+                row = dem_df.filter(pl.col("id") == target_tag)
                 if not row.is_empty():
                     human_dev_index = float(row["human_dev"][0])
             except: pass
@@ -72,7 +74,8 @@ class DemographicsPanel(BasePanel):
         imgui.dummy((0, 15))
         
         # Action Buttons
-        if imgui.button("MIGRATION POLICY", (-1, 30)):
-            pass
-        if imgui.button("SOCIAL PROGRAMS", (-1, 30)):
-            pass
+        if is_own:
+            if imgui.button("MIGRATION POLICY", (-1, 30)): pass
+            if imgui.button("SOCIAL PROGRAMS", (-1, 30)): pass
+        else:
+            imgui.text_disabled("Internal Policies Restricted")

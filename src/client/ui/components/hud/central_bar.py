@@ -17,17 +17,26 @@ class CentralBar:
         self.show_speed_controls = True 
         self.news_ticker_text = "Global News: Simulation initialized and running."
         
-        # Renderer instance
         self.flag_renderer = FlagRenderer()
-        self.active_player_tag = "" 
+        self.active_tag = "" 
+        self.is_own = True
+        
+        # Used to pass the popup selection back to the layout
+        self._switch_request: Optional[str] = None
 
         # Layout configuration
         self.height = 100.0                
         self.top_section_h_pct = 0.65       
         self.content_scale_factor = 0.80    
 
-    def render(self, composer: UIComposer, state, net: NetworkClient, player_tag: str) -> str:
-        self.active_player_tag = player_tag
+    def render(self, composer: UIComposer, state, net: NetworkClient, target_tag: str, is_own_country: bool) -> Optional[str]:
+        """
+        Renders the bar.
+        Returns: A string (Country Tag) if the user selected a new country from the popup, else None.
+        """
+        self.active_tag = target_tag
+        self.is_own = is_own_country
+        self._switch_request = None # Reset request
         
         viewport = imgui.get_main_viewport()
         screen_w = viewport.size.x
@@ -63,7 +72,7 @@ class CentralBar:
                 padding_x = 12.0
                 inner_item_h = top_h * self.content_scale_factor
                 content_y = (top_h - inner_item_h) / 2
-                left_section_w = 170.0  
+                left_section_w = 200.0  
                 right_section_w = 250.0 
 
                 # 1. Left Section: Country Flag & Info
@@ -103,7 +112,7 @@ class CentralBar:
             imgui.end()
             
         imgui.pop_style_var() 
-        return self.active_player_tag
+        return self._switch_request
 
     def _render_time_controls(self, state, net, width, height):
         imgui.begin_group()
@@ -167,17 +176,12 @@ class CentralBar:
         imgui.text_colored(GAMETHEME.col_text_bright, time_part)
 
     def _render_country_info(self, composer: UIComposer, height):
-        """
-        Renders the flag and basic status labels.
-        Delegates the actual rendering logic to FlagRenderer.
-        """
         imgui.begin_group()
         try:
             flag_h = height
             flag_w = flag_h * 1.5
             
-            # Simplified: No longer need to manually check GL IDs here
-            self.flag_renderer.draw_flag(self.active_player_tag, flag_w, flag_h)
+            self.flag_renderer.draw_flag(self.active_tag, flag_w, flag_h)
 
             imgui.same_line()
 
@@ -186,13 +190,20 @@ class CentralBar:
                 gap = 2.0
                 row_h = (height - gap) / 2
                 
-                if imgui.button(f" {self.active_player_tag} ", (90, row_h)):
+                # Top Row: Country Tag (Click to open switcher)
+                if imgui.button(f" {self.active_tag} ", (90, row_h)):
                     imgui.open_popup("CountrySelectorPopup")
                 
+                # Bottom Row: Status Indicator
                 imgui.push_style_var(imgui.StyleVar_.item_spacing, (4, 0))
-                self._draw_status_label("ALLIED", GAMETHEME.col_positive, row_h, width=50)
+                
+                if self.is_own:
+                    self._draw_status_label("COMMAND", GAMETHEME.col_positive, row_h, width=70)
+                else:
+                    self._draw_status_label("VIEWING", GAMETHEME.col_warning, row_h, width=70)
+
                 imgui.same_line()
-                self._draw_status_label("INFO", GAMETHEME.col_info, row_h, width=36)
+                self._draw_status_label("INFO", GAMETHEME.col_info, row_h, width=16)
                 imgui.pop_style_var()
             finally:
                 imgui.end_group()
@@ -200,6 +211,10 @@ class CentralBar:
             imgui.end_group()
 
     def _render_quick_actions(self, height, spacing):
+        # We disable quick actions if looking at another country
+        if not self.is_own:
+            imgui.begin_disabled()
+
         btn_sz = (height, height)
         imgui.push_style_var(imgui.StyleVar_.item_spacing, (spacing, 0))
         if imgui.button(f"{icons_fontawesome_6.ICON_FA_BRAIN}", btn_sz): pass
@@ -212,6 +227,9 @@ class CentralBar:
         if imgui.is_item_hovered(): imgui.set_tooltip("Messages")
         imgui.pop_style_var()
 
+        if not self.is_own:
+            imgui.end_disabled()
+
     def _render_ticker(self):
         imgui.align_text_to_frame_padding()
         imgui.text_colored(GAMETHEME.col_text_disabled, icons_fontawesome_6.ICON_FA_NEWSPAPER)
@@ -219,19 +237,36 @@ class CentralBar:
         imgui.text_colored(GAMETHEME.col_text_bright, self.news_ticker_text)
 
     def _render_country_selector_popup(self, state):
+        """Restored Popup: Lists all countries in the game state."""
         if imgui.begin_popup("CountrySelectorPopup"):
-            imgui.text_disabled("Switch Viewpoint")
+            imgui.text_disabled("Switch Viewpoint (Debug)")
             imgui.separator()
+            
             if "countries" in state.tables:
                 df = state.tables["countries"]
-                if imgui.begin_child("CountryList", (200, 300)):
-                    for row in df.head(50).iter_rows(named=True):
+                # Sort alphabetically for better UX
+                try:
+                    df = df.sort("id")
+                except: pass
+                
+                # Use a child window to make it scrollable
+                if imgui.begin_child("CountryList", (250, 300), True):
+                    for row in df.iter_rows(named=True):
                         tag = row['id']
                         name = row.get('name', tag)
-                        if imgui.selectable(f"{tag} - {name}", False)[0]:
-                            self.active_player_tag = tag
+                        label = f"{tag} - {name}"
+                        
+                        # Highlight current tag
+                        is_selected = (tag == self.active_tag)
+                        
+                        if imgui.selectable(label, is_selected)[0]:
+                            self._switch_request = tag
                             imgui.close_current_popup()
+                            
                     imgui.end_child()
+            else:
+                imgui.text_colored(GAMETHEME.col_error, "No country data loaded.")
+                
             imgui.end_popup()
 
     def _draw_status_label(self, label, color, height, width=40):

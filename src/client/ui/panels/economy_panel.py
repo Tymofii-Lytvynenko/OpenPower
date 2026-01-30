@@ -6,22 +6,21 @@ from src.client.ui.theme import GAMETHEME
 
 class EconomyPanel(BasePanel):
     def __init__(self):
-        # We set a default X position (e.g., 1600) for the first launch.
-        # ImGui will save the user's preferred position in the .ini file after that.
         super().__init__("ECONOMY", x=1600, y=100, w=260, h=450)
 
     def _render_content(self, composer: UIComposer, state, **kwargs):
-        player_tag = kwargs.get("player_tag", "")
+        target_tag = kwargs.get("target_tag", "")
+        is_own = kwargs.get("is_own_country", False)
 
         # --- 1. Fetch Economy Data ---
-        reserves = -25000000000 # Fallback
+        reserves = -25000000000 
         gdp_per_capita = 0
-        tax_rate = 0.2 # Default if missing
+        tax_rate = 0.2 
         
         if "countries" in state.tables:
             try:
                 df = state.tables["countries"]
-                row = df.filter(pl.col("id") == player_tag)
+                row = df.filter(pl.col("id") == target_tag)
                 if not row.is_empty():
                     reserves = int(row["money_reserves"][0])
                     gdp_per_capita = int(row["gdp_per_capita"][0])
@@ -29,25 +28,22 @@ class EconomyPanel(BasePanel):
             except Exception:
                 pass
 
-        # --- 2. Calculate Total GDP (Pop * Per Capita) ---
+        # --- 2. Calculate Total GDP ---
         total_pop = 0
         if "regions" in state.tables:
             try:
                 df_pop = state.tables["regions"]
-                # Sum population of all regions owned by player
-                player_regions = df_pop.filter(pl.col("owner") == player_tag)
-                if not player_regions.is_empty():
-                    p14 = player_regions.select(pl.col("pop_14")).sum().item()
-                    p1564 = player_regions.select(pl.col("pop_15_64")).sum().item()
-                    p65 = player_regions.select(pl.col("pop_65")).sum().item()
+                # Sum population of all regions owned by target
+                target_regions = df_pop.filter(pl.col("owner") == target_tag)
+                if not target_regions.is_empty():
+                    p14 = target_regions.select(pl.col("pop_14")).sum().item()
+                    p1564 = target_regions.select(pl.col("pop_15_64")).sum().item()
+                    p65 = target_regions.select(pl.col("pop_65")).sum().item()
                     total_pop = p14 + p1564 + p65
             except Exception:
                 pass
 
         total_gdp = total_pop * gdp_per_capita
-        
-        # --- 3. Calculate Income ---
-        # "Income must be tax rate of GDP"
         calculated_income = total_gdp * tax_rate
 
         # --- 4. Render UI ---
@@ -58,8 +54,13 @@ class EconomyPanel(BasePanel):
         imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.popup_bg)
         imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.col_active_accent)
         
-        # Placeholder slider for "State vs Free Market"
+        # Disable interaction if foreign country
+        if not is_own: imgui.begin_disabled()
+        
         imgui.slider_float("##eco_model", 0.2, 0.0, 1.0, "")
+        
+        if not is_own: imgui.end_disabled()
+
         imgui.pop_style_color(2)
         
         imgui.text_disabled("State-Controlled")
@@ -71,7 +72,6 @@ class EconomyPanel(BasePanel):
         # GDP Section
         composer.draw_section_header(f"GDP: ${total_gdp:,.0f}")
         
-        # Meter visual: Assume $1 Trillion is "max" for the bar logic, just for visualization
         gdp_health = min((total_gdp / 1000000000000) * 100, 100.0)
         composer.draw_meter("", gdp_health, GAMETHEME.col_positive) 
         
@@ -83,17 +83,22 @@ class EconomyPanel(BasePanel):
         
         composer.draw_currency_row("INCOME", calculated_income)
         
-        # Expenses remain a placeholder for now
-        expenses = 0
+        expenses = 0 # Placeholder
         composer.draw_currency_row("EXPENSES", expenses)
         
         balance = calculated_income - expenses
         col_bal = GAMETHEME.col_negative if balance < 0 else GAMETHEME.col_positive
         composer.draw_currency_row("BALANCE", balance, col_bal)
         
-        # Real Reserves from DB
-        col_res = GAMETHEME.col_negative if reserves < 0 else GAMETHEME.col_positive
-        composer.draw_currency_row("AVAILABLE", reserves, col_res)
+        # Maybe hide exact reserves if not own country?
+        if is_own:
+            col_res = GAMETHEME.col_negative if reserves < 0 else GAMETHEME.col_positive
+            composer.draw_currency_row("AVAILABLE", reserves, col_res)
+        else:
+            imgui.text("AVAILABLE")
+            imgui.same_line()
+            composer.right_align(80)
+            imgui.text_disabled("Unknown")
         
         imgui.dummy((0, 8))
 
@@ -104,4 +109,7 @@ class EconomyPanel(BasePanel):
         imgui.dummy((0, 15))
         
         # Footer
-        imgui.button("TRADE", (-1, 35))
+        if is_own:
+            if imgui.button("TRADE", (-1, 35)): pass
+        else:
+            if imgui.button("PROPOSE TRADE", (-1, 35)): pass
