@@ -3,7 +3,7 @@
         "paths": [
             ".vscode/**",
             "__pycache__/**",
-            "modules/assets/flags/**",
+            "modules/base/assets/flags/**",
         ],
         "patterns": [
             "node_modules",
