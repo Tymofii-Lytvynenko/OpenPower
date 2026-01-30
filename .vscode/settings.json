@@ -2,7 +2,8 @@
     "copy4ai.exclude": {
         "paths": [
             ".vscode/**",
-            ".__pycache__/**"
+            "__pycache__/**",
+            "modules/assets/flags/**",
         ],
         "patterns": [
             "node_modules",
