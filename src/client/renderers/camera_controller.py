@@ -8,7 +8,7 @@ class CameraController:
     def __init__(
         self,
         distance: float = 2.6,
-        min_distance: float = 1.4,
+        min_distance: float = 1.1,
         max_distance: float = 6.0,
         fov_deg: float = 60.0,
         near: float = 0.1,
@@ -27,7 +27,7 @@ class CameraController:
         # Rotation state
         self.yaw = np.radians(-120.0)
         self.pitch = np.radians(-10.0)
-        self.max_pitch = float(np.radians(45.0))
+        self.max_pitch = float(np.radians(89.0))
         self.base_flip = np.pi
         
         # Auto-spin
@@ -58,7 +58,7 @@ class CameraController:
         self.pitch = float(np.clip(self.pitch, -self.max_pitch, self.max_pitch))
         
         # Model matrix: base flip + user rotations (yaw-pitch order to prevent roll)
-        self._u_model = self._rot_x(self.base_flip) @ self._rot_y(self.yaw) @ self._rot_x(self.pitch)
+        self._u_model = self._rot_x(self.pitch) @ self._rot_y(self.yaw) @ self._rot_x(self.base_flip)
         
         # View matrix: orbit camera
         eye = np.array([0.0, 0.0, self.distance], dtype=np.float32)
@@ -117,8 +117,8 @@ class CameraController:
             return False
         
         sensitivity = 0.005
-        self.yaw -= dx * sensitivity
-        self.pitch += dy * sensitivity
+        self.yaw += dx * sensitivity
+        self.pitch -= dy * sensitivity
         
         self._last_mouse_x = x
         self._last_mouse_y = y
@@ -126,7 +126,7 @@ class CameraController:
     
     def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int) -> bool:
         """Handle mouse scroll for zoom."""
-        zoom_speed = 0.25
+        zoom_speed = 0.1
         self.distance -= float(scroll_y) * zoom_speed
         self.distance = float(np.clip(self.distance, self.min_distance, self.max_distance))
         return True

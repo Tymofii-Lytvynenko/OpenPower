@@ -66,8 +66,8 @@ class TextureManager:
             data=encoded_data.tobytes(),
             filter=(self.ctx.NEAREST, self.ctx.NEAREST),
         )
-        self.map_texture.wrap_x = self.ctx.REPEAT
-        self.map_texture.wrap_y = self.ctx.CLAMP_TO_EDGE
+        self.map_texture.wrap_x = self.ctx.REPEAT # type: ignore
+        self.map_texture.wrap_y = self.ctx.CLAMP_TO_EDGE # type: ignore
     
     def load_terrain_texture(self, terrain_path: Path) -> None:
         """Load the terrain texture from file."""
@@ -81,8 +81,8 @@ class TextureManager:
             data=rgba,
             filter=(self.ctx.LINEAR, self.ctx.LINEAR),
         )
-        self.terrain_texture.wrap_x = self.ctx.REPEAT
-        self.terrain_texture.wrap_y = self.ctx.CLAMP_TO_EDGE
+        self.terrain_texture.wrap_x = self.ctx.REPEAT # type: ignore
+        self.terrain_texture.wrap_y = self.ctx.CLAMP_TO_EDGE # type: ignore
     
     def init_lookup_texture(self) -> None:
         """Initialize the lookup texture for color overlays."""
@@ -91,7 +91,7 @@ class TextureManager:
             components=4,
             filter=(self.ctx.NEAREST, self.ctx.NEAREST),
         )
-        self.lookup_texture.write(self.lut_data.tobytes())
+        self.lookup_texture.write(self.lut_data.tobytes()) # type: ignore
     
     def update_overlay(self, color_map: Dict[int, Tuple[int, int, int]]) -> None:
         """Update the overlay colors and rebuild LUT."""

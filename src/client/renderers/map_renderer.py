@@ -115,7 +115,7 @@ class MapRenderer(BaseRenderer):
     def reload_shader(self):
         """Reload the shader - useful for development/testing."""
         if hasattr(self.program, 'release'):
-            self.program.release()
+            self.program.release() # type: ignore
         self._init_glsl_globe()
 
     # -------------------------------------------------------------------------
