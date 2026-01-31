@@ -13,28 +13,31 @@ from src.client.map_modes.base_map_mode import BaseMapMode
 from src.client.map_modes.political_mode import PoliticalMapMode
 from src.client.map_modes.gradient_mode import GradientMapMode
 
+
 class SelectionMode(Enum):
     REGION = auto()
     COUNTRY = auto()
+
 
 class ViewportController:
     """
     The Brains of the Map.
     Handles Input -> Camera, Input -> Selection, and State -> Map Modes.
     """
-    def __init__(self, 
-                 cam_ctrl: CameraController, 
+
+    def __init__(self,
+                 cam_ctrl: CameraController,
                  world_camera: arcade.Camera2D,
                  map_renderer: MapRenderer,
                  net_client: NetworkClient,
                  on_selection_change: Callable[[Optional[int]], None]):
-        
+
         self.cam = cam_ctrl
         self.world_cam = world_camera
         self.renderer = map_renderer
         self.net = net_client
         self.on_selection_change = on_selection_change
-        
+
         self._is_panning = False
         self.selection_mode = SelectionMode.COUNTRY
 
@@ -42,28 +45,28 @@ class ViewportController:
         # We instantiate strategies here. The 'political' mode is default.
         self.map_modes: Dict[str, BaseMapMode] = {
             "political": PoliticalMapMode(),
-            
+
             # FIXED CONFIGURATION
             "gdp_per_capita": GradientMapMode(
-                mode_name="GDP (Per Capita)", 
-                column_name="gdp_per_capita", 
-                fallback_to_country=True,
-                use_percentile=True, 
-                steps=10 
-            ),
-            "gvt_stability": GradientMapMode(
-                mode_name="Government Stability", 
-                column_name="gvt_stability", 
-                fallback_to_country=True,
-                use_percentile=True, 
-                steps=10           
-            ),
-            "money_reserves": GradientMapMode(
-                mode_name="Money Reserves", 
-                column_name="money_reserves", 
+                mode_name="GDP (Per Capita)",
+                column_name="gdp_per_capita",
                 fallback_to_country=True,
                 use_percentile=True,
-                steps=10             
+                steps=10
+            ),
+            "gvt_stability": GradientMapMode(
+                mode_name="Government Stability",
+                column_name="gvt_stability",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10
+            ),
+            "money_reserves": GradientMapMode(
+                mode_name="Money Reserves",
+                column_name="money_reserves",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10
             ),
         }
         self.current_mode_key = "political"
@@ -82,7 +85,7 @@ class ViewportController:
             self.refresh_map_layer()
 
     # --- VISUALIZATION HELPERS ---
-    
+
     def refresh_map_layer(self):
         """
         Fetches state, asks the active MapMode Strategy to calculate colors,
@@ -90,10 +93,10 @@ class ViewportController:
         """
         state = self.net.get_state()
         active_mode = self.map_modes[self.current_mode_key]
-        
+
         # 1. Execute Strategy (Pure Data Transformation)
         color_map = active_mode.calculate_colors(state)
-        
+
         # 2. Update Renderer (Pure Visualization)
         self.renderer.update_overlay(color_map)
 
@@ -107,18 +110,18 @@ class ViewportController:
 
         df = state.tables["regions"]
         row = df.filter(pl.col("id") == region_id)
-        
+
         if not row.is_empty():
             cx = row["center_x"][0]
             cy = row["center_y"][0]
-            
+
             # Convert to World Space
             wx, wy = image_to_world(cx, cy, self.renderer.height)
-            
+
             # Execute Jump
             self.cam.jump_to(wx, wy)
             self.cam.sync_with_arcade(self.world_cam)
-            
+
             # Force selection
             self.select_region_by_id(region_id)
 
@@ -126,24 +129,18 @@ class ViewportController:
     def on_mouse_press(self, x: float, y: float, button: int):
         if button == arcade.MOUSE_BUTTON_LEFT:
             self._handle_click_selection(x, y)
-        elif button in (arcade.MOUSE_BUTTON_RIGHT, arcade.MOUSE_BUTTON_MIDDLE):
-            self._is_panning = True
 
     def on_mouse_release(self, x: float, y: float, button: int):
-        if button in (arcade.MOUSE_BUTTON_RIGHT, arcade.MOUSE_BUTTON_MIDDLE):
-            self._is_panning = False
+        pass
 
     def on_mouse_drag(self, x: float, y: float, dx: float, dy: float, buttons: int):
-        is_panning_btn = (buttons & arcade.MOUSE_BUTTON_RIGHT) or (buttons & arcade.MOUSE_BUTTON_MIDDLE)
-        
-        if self._is_panning or is_panning_btn:
-            self.cam.pan(dx, dy)
-            self.cam.sync_with_arcade(self.world_cam)
-            self._is_panning = True
+        # Globe rotation is handled by MapRenderer (LMB drag).
+        # Keep RMB/MMB panning disabled in globe mode for now.
+        pass
 
     def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int):
-        self.cam.zoom_scroll(scroll_y)
-        self.cam.sync_with_arcade(self.world_cam)
+        # Globe zoom
+        self.renderer.on_mouse_scroll(x, y, scroll_x, scroll_y)
 
     # --- SELECTION LOGIC ---
     def select_region_by_id(self, region_id: int):
@@ -154,8 +151,8 @@ class ViewportController:
         self._apply_selection_logic(region_id)
 
     def _handle_click_selection(self, screen_x: float, screen_y: float):
-        world_pos = self.world_cam.unproject((screen_x, screen_y))
-        region_id = self.renderer.get_region_id_at_world_pos(world_pos.x, world_pos.y)
+        # Globe: pick directly in screen space (raycast)
+        region_id = self.renderer.get_region_id_at_screen_pos(screen_x, screen_y)
         self.select_region_by_id(region_id)
 
     def _apply_selection_logic(self, region_id: int):
@@ -178,8 +175,7 @@ class ViewportController:
 
     def get_region_at(self, screen_x: float, screen_y: float) -> Optional[int]:
         try:
-            world_pos = self.world_cam.unproject((screen_x, screen_y))
-            region_id = self.renderer.get_region_id_at_world_pos(world_pos.x, world_pos.y)
+            region_id = self.renderer.get_region_id_at_screen_pos(screen_x, screen_y)
             return region_id if region_id > 0 else None
         except Exception:
             return None

@@ -3,12 +3,15 @@ from pathlib import Path
 # Absolute path to the directory containing this file
 ROOT = Path(__file__).parent
 
+
 class ShaderRegistry:
     """Centralized paths for all GLSL source files."""
-    
+
     # Paths relative to the client folder
     POLITICAL_V = ROOT / "renderers" / "shaders" / "political_map.vert"
     POLITICAL_F = ROOT / "renderers" / "shaders" / "political_map.frag"
+    GLOBE_V = ROOT / "renderers" / "shaders" / "globe.vert"
+    GLOBE_F = ROOT / "renderers" / "shaders" / "globe.frag"
 
     @classmethod
     def load_bundle(cls, vert_path: Path, frag_path: Path) -> dict:

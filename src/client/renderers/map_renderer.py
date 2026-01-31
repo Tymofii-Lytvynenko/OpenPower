@@ -1,282 +1,275 @@
 import arcade
 import arcade.gl
 import numpy as np
-from array import array
-from typing import Optional, List, Dict, Tuple, Union, Set
+from typing import Optional, List, Dict, Tuple, Set
 from pathlib import Path
-from pyglet import gl
 
-# Internal imports
 from src.core.map_data import RegionMapData
 from src.core.map_indexer import MapIndexer
 from src.client.shader_registry import ShaderRegistry
+from src.client.renderers.sphere_mesh import SphereMesh
+from src.client.renderers.base_renderer import BaseRenderer
+from src.client.renderers.camera_controller import CameraController
+from src.client.renderers.texture_manager import TextureManager
+from src.client.renderers.picking_utils import PickingUtils
 
-class MapRenderer:
+
+class MapRenderer(BaseRenderer):
     """
-    Handles the high-performance rendering of the game map.
-    
-    Refactored for Generic Map Modes:
-    This class no longer knows about 'politics' or 'GDP'. It simply accepts 
-    a dictionary of {RegionID: RGB} and visualizes it via the Lookup Table (LUT).
+    Interactive globe renderer with LUT overlay + picking.
+
+    Controls:
+      - LMB drag: rotate globe
+      - Mouse wheel: zoom in/out
     """
 
-    def __init__(self, 
-                 map_data: RegionMapData, 
-                 map_img_path: Path, 
-                 terrain_img_path: Path):
+    def __init__(
+        self,
+        map_data: RegionMapData,
+        map_img_path: Path,
+        terrain_img_path: Path,
+    ):
+        super().__init__()
         
-        self.window = arcade.get_window()
-        self.ctx = self.window.ctx
         self.map_data = map_data
         self.width = map_data.width
         self.height = map_data.height
-        
-        # --- MAPPINGS ---
-        self.real_to_dense: Dict[int, int] = {}
-        self.dense_to_real: Union[List[int], np.ndarray] = []
 
+        # --- COMPONENTS ---
+        self.camera = CameraController()
+        self.texture_manager = TextureManager(self.ctx)
+        
         # --- CACHING COMPONENT ---
         self.indexer = MapIndexer(map_img_path.parent / ".cache")
 
         # --- SELECTION STATE ---
         self.single_select_dense_id: int = -1
-        self.multi_select_dense_ids: Set[int] = set()
-        self.prev_multi_select_dense_ids: Set[int] = set()
 
-        # --- VISUALIZATION STATE ---
-        # Cache the current color map so we can update selection highlights 
-        # without needing the full GameState or re-calculating everything.
-        # Format: {RealID: (R, G, B)}
-        self._active_color_map: Dict[int, Tuple[int, int, int]] = {}
-        
-        # Default fallback color (Dark Grey for unmapped regions)
-        self._default_color = (40, 40, 40)
+        # --- GLOBE STATE ---
+        self.globe_radius: float = 1.0
 
-        # --- TEXTURE CONFIGURATION ---
-        self.lut_dim = 4096
-        self.lut_data = np.full((self.lut_dim * self.lut_dim, 4), 0, dtype=np.uint8)
+        # --- GL RESOURCES ---
+        self.program: Optional[arcade.gl.Program] = None
+        self.sphere: Optional[SphereMesh] = None
 
-        self.terrain_sprite: Optional[arcade.Sprite] = None
-        self.terrain_list: Optional[arcade.SpriteList] = None
-        
-        self._init_resources(terrain_img_path, map_img_path) 
-        self._init_glsl()
+        self._init_resources(terrain_img_path, map_img_path)
+        self._init_glsl_globe()
 
-    def get_center(self) -> Tuple[float, float]:
-        return self.width / 2.0, self.height / 2.0
-    
+    # -------------------------------------------------------------------------
+    # Resource init
+    # -------------------------------------------------------------------------
+
+
     def _init_resources(self, terrain_path: Path, map_path: Path):
-        # 1. Setup Terrain Layer
-        self.terrain_list = arcade.SpriteList()
-
-        if terrain_path.exists():
-            self.terrain_sprite = arcade.Sprite(terrain_path)
-            self.terrain_sprite.width = self.width
-            self.terrain_sprite.height = self.height
-            self.terrain_sprite.center_x = self.width / 2
-            self.terrain_sprite.center_y = self.height / 2
-            self.terrain_list.append(self.terrain_sprite)
-        else:
-            print(f"CRITICAL ERROR: Terrain path not found: {terrain_path}")
-            self.terrain_sprite = None
-
-        # 2. Re-Index Map
-        print(f"[MapRenderer] Loading region indices...")
-        unique_ids, dense_map = self.indexer.get_indices(
-            source_path=map_path,
-            map_data_array=self.map_data.packed_map
+        """Initialize all textures and resources."""
+        # Load map texture
+        self.texture_manager.load_map_texture(
+            map_path, 
+            self.map_data.packed_map, 
+            self.width, 
+            self.height,
+            self.indexer
         )
         
-        self.dense_to_real = unique_ids
-        self.real_to_dense = {real_id: i for i, real_id in enumerate(unique_ids)}
+        # Load terrain texture
+        self.texture_manager.load_terrain_texture(terrain_path)
         
-        print(f"[MapRenderer] Indexed {len(unique_ids)} unique regions.")
+        # Initialize lookup texture
+        self.texture_manager.init_lookup_texture()
 
-        # 3. Create Map Data Texture (Dense ID Map)
-        dense_map = dense_map.reshape((self.height, self.width)).astype(np.uint32)
-        r = ((dense_map >> 16) & 0xFF).astype(np.uint8)
-        g = ((dense_map >> 8) & 0xFF).astype(np.uint8)
-        b = (dense_map & 0xFF).astype(np.uint8)
-        
-        encoded_data = np.dstack((r, g, b))
-        encoded_data = np.flipud(encoded_data)
+    # -------------------------------------------------------------------------
+    # Shader / geometry init
+    # -------------------------------------------------------------------------
 
-        gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1)
+    def _set_uniform_if_present(self, name: str, value):
+        """Safely set uniform if it exists in the shader."""
+        super()._set_uniform_if_present(self.program, name, value)
 
-        self.map_texture = self.ctx.texture(
-            (self.width, self.height),
-            components=3,
-            data=encoded_data.tobytes(),
-            filter=(self.ctx.NEAREST, self.ctx.NEAREST)
-        )
-        
-        # 4. Create Lookup Texture (LUT)
-        self.lookup_texture = self.ctx.texture(
-            (self.lut_dim, self.lut_dim),
-            components=4,
-            filter=(self.ctx.NEAREST, self.ctx.NEAREST)
-        )
-        self.lookup_texture.write(self.lut_data.tobytes())
-
-    def _init_glsl(self):
-        buffer_data = array('f', [
-            0.0, 0.0, 0.0, 0.0,
-             self.width, 0.0, 1.0, 0.0,
-            0.0,  self.height, 0.0, 1.0,
-             self.width,  self.height, 1.0, 1.0,
-        ])
-        
-        self.quad_buffer = self.ctx.buffer(data=buffer_data)
-        self.quad_geometry = self.ctx.geometry(
-            [arcade.gl.BufferDescription(self.quad_buffer, '2f 2f', ['in_vert', 'in_uv'])],
-            mode=self.ctx.TRIANGLE_STRIP
-        )
-
-        shader_source = ShaderRegistry.load_bundle(ShaderRegistry.POLITICAL_V, ShaderRegistry.POLITICAL_F)
+    def _init_glsl_globe(self):
+        """Initialize the globe shader and geometry."""
+        shader_source = ShaderRegistry.load_bundle(ShaderRegistry.GLOBE_V, ShaderRegistry.GLOBE_F)
         self.program = self.ctx.program(
             vertex_shader=shader_source["vertex_shader"],
-            fragment_shader=shader_source["fragment_shader"]
+            fragment_shader=shader_source["fragment_shader"],
         )
+
+        # Set texture uniforms
+        self._set_uniform_if_present("u_map_texture", 0)
+        self._set_uniform_if_present("u_lookup_texture", 1)
+        self._set_uniform_if_present("u_terrain_texture", 2)
+
+        # Set LUT uniforms
+        self.texture_manager.set_uniforms(self.program)
         
-        self.program['u_map_texture'] = 0
-        self.program['u_lookup_texture'] = 1
-        self.program['u_texture_size'] = (float(self.width), float(self.height))
-        self.program['u_lut_dim'] = float(self.lut_dim)
-        self.program['u_selected_id'] = -1
+        # Set other uniforms
+        self._set_uniform_if_present("u_selected_id", -1)
+        self._set_uniform_if_present("u_overlay_mode", 1)
+        self._set_uniform_if_present("u_opacity", 0.90)
+        self._set_uniform_if_present("u_light_dir", (0.4, 0.3, 1.0))
+        self._set_uniform_if_present("u_ambient", 0.35)
+
+        # Create sphere geometry
+        self.sphere = SphereMesh(self.ctx, radius=self.globe_radius, seg_u=256, seg_v=128)
+        self.sphere.build_geometry(self.ctx, self.program)
+
+    def reload_shader(self):
+        """Reload the shader - useful for development/testing."""
+        if hasattr(self.program, 'release'):
+            self.program.release()
+        self._init_glsl_globe()
+
+    # -------------------------------------------------------------------------
+    # LUT / overlay updates
+    # -------------------------------------------------------------------------
 
     def update_overlay(self, color_map: Dict[int, Tuple[int, int, int]]):
-        """
-        Updates the map overlay with new colors.
-        
-        Args:
-            color_map: Dictionary mapping Real Region IDs to (R, G, B) tuples.
-                       Regions not in the map will use the default dark grey.
-        """
-        self._active_color_map = color_map
-        self._rebuild_lut_array()
-        self.lookup_texture.write(self.lut_data.tobytes())
+        """Update overlay colors using texture manager."""
+        self.texture_manager.update_overlay(color_map)
 
-    def _rebuild_lut_array(self):
-        """
-        Regenerates the numpy array for the Lookup Table based on _active_color_map.
-        """
-        # Reset to 0 (Transparent)
-        self.lut_data.fill(0) 
-
-        # We iterate over the *Real* IDs provided in the color map
-        for real_id, color in self._active_color_map.items():
-            # Translate Real ID -> Dense ID for texture coordinates
-            if real_id in self.real_to_dense:
-                dense_id = self.real_to_dense[real_id]
-                
-                if dense_id < len(self.lut_data):
-                    # ID 0 is usually background/ocean; ignore unless specified
-                    if dense_id == 0: continue 
-
-                    # Alpha Logic: 
-                    # Highlighting is done via Alpha channel manipulation in the LUT.
-                    # 255 = Fully Opaque (Selected)
-                    # 200 = Slight Transparency (Unselected, lets terrain texture show through)
-                    alpha = 255 if dense_id in self.multi_select_dense_ids else 200
-                    
-                    self.lut_data[dense_id] = [color[0], color[1], color[2], alpha]
-
-    def _update_selection_texture(self):
-        """
-        Optimized partial update for the LUT when only selection changes.
-        """
-        # 1. Revert old selection to standard opacity
-        for idx in self.prev_multi_select_dense_ids:
-            if idx < len(self.lut_data) and idx != 0: 
-                if self.lut_data[idx, 3] > 0:
-                    self.lut_data[idx, 3] = 200
-
-        # 2. Set new selection to full opacity
-        for idx in self.multi_select_dense_ids:
-            if idx < len(self.lut_data) and idx != 0: 
-                if self.lut_data[idx, 3] > 0:
-                    self.lut_data[idx, 3] = 255
-
-        self.prev_multi_select_dense_ids = self.multi_select_dense_ids.copy()
-        self.lookup_texture.write(self.lut_data.tobytes())
+    # -------------------------------------------------------------------------
+    # Selection API
+    # -------------------------------------------------------------------------
 
     def set_highlight(self, real_region_ids: List[int]):
-        """
-        Updates the visual highlight state for specific regions.
-        """
+        """Set highlighted regions using texture manager."""
         if not real_region_ids:
             self.clear_highlight()
             return
 
-        valid_dense_ids = []
+        valid_dense_ids: List[int] = []
         for rid in real_region_ids:
-            if rid in self.real_to_dense:
-                valid_dense_ids.append(self.real_to_dense[rid])
+            if rid in self.texture_manager.real_to_dense:
+                valid_dense_ids.append(self.texture_manager.real_to_dense[rid])
 
         if not valid_dense_ids:
             return
 
-        # Case 1: Single Selection (Use Shader Uniform)
         if len(valid_dense_ids) == 1:
             self.single_select_dense_id = valid_dense_ids[0]
-            if self.multi_select_dense_ids:
-                self.multi_select_dense_ids = set()
-                self._update_selection_texture()
-        
-        # Case 2: Multi-selection (Use LUT modification)
+            self.texture_manager.update_selection(set())
         else:
             self.single_select_dense_id = -1
             new_set = set(valid_dense_ids)
-            if new_set != self.multi_select_dense_ids:
-                self.multi_select_dense_ids = new_set
-                self._update_selection_texture()
+            self.texture_manager.update_selection(new_set)
 
     def clear_highlight(self):
+        """Clear all highlights."""
         self.single_select_dense_id = -1
-        if self.multi_select_dense_ids:
-            self.multi_select_dense_ids = set()
-            self._update_selection_texture()
+        self.texture_manager.update_selection(set())
 
-    def draw(self, mode: str = "terrain"):
-        """
-        Args:
-            mode: 'terrain' (default) or 'overlay' (any colored map mode).
-        """
-        # 1. Draw Terrain Base
-        if self.terrain_list:
-            self.terrain_list.draw()
+    # -------------------------------------------------------------------------
+    # Input handlers (call these from your View)
+    # -------------------------------------------------------------------------
 
-        # Optimization: Early exit if just terrain and no selection
-        if mode == "terrain" and self.single_select_dense_id == -1 and not self.multi_select_dense_ids:
+    def on_mouse_press(self, x: float, y: float, button: int, modifiers: int) -> bool:
+        """Handle mouse press using camera controller."""
+        return self.camera.on_mouse_press(x, y, button, modifiers)
+
+    def on_mouse_release(self, x: float, y: float, button: int, modifiers: int) -> bool:
+        """Handle mouse release using camera controller."""
+        return self.camera.on_mouse_release(x, y, button, modifiers)
+
+    def on_mouse_drag(self, x: float, y: float, dx: float, dy: float, buttons: int, modifiers: int) -> bool:
+        """Handle mouse drag using camera controller."""
+        return self.camera.on_mouse_drag(x, y, dx, dy, buttons, modifiers)
+
+    def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int) -> bool:
+        """Handle mouse scroll using camera controller."""
+        return self.camera.on_mouse_scroll(x, y, scroll_x, scroll_y)
+
+    # -------------------------------------------------------------------------
+    # Rendering
+    # -------------------------------------------------------------------------
+
+    def draw(self, mode: str = "overlay"):
+        """Render the globe."""
+        if self.program is None or self.sphere is None or self.sphere.geo is None:
             return
-
-        # 2. GL State Setup
-        self.ctx.enable(self.ctx.BLEND)
-        self.ctx.blend_func = self.ctx.BLEND_DEFAULT
         
-        self.map_texture.use(0)
-        self.lookup_texture.use(1)
+        # Update camera matrices
+        w, h = self.window.get_size()
+        self.camera.update_matrices(w, h)
         
-        self.program['u_view'] = self.window.ctx.view_matrix
-        self.program['u_projection'] = self.window.ctx.projection_matrix
-        self.program['u_selected_id'] = int(self.single_select_dense_id)
+        # Enable rendering state
+        self._enable_rendering_state()
         
-        # --- FIX STARTS HERE ---
-        # Allow both "overlay" (generic) and "political" (legacy/specific) to trigger the coloring shader
+        # Bind textures
+        self.texture_manager.bind_textures(self.program)
+        
+        # Set matrix uniforms
+        model, view, proj = self.camera.get_matrices()
+        self.program["u_model"] = model
+        self.program["u_view"] = view
+        self.program["u_projection"] = proj
+        
+        # Set selection uniform
+        self.program["u_selected_id"] = int(self.single_select_dense_id)
+        
+        # Set camera position for atmospheric effects
+        camera_pos = self.camera.get_position()
+        self._set_uniform_if_present("u_camera_pos", camera_pos)
+        
+        # Set rendering mode
         if mode in ("overlay", "political"):
-            self.program['u_overlay_mode'] = 1
-            self.program['u_opacity'] = 0.9
+            self._set_uniform_if_present("u_overlay_mode", 1)
+            self._set_uniform_if_present("u_opacity", 0.90)
         else:
-            # Selection only (Terrain mode)
-            self.program['u_overlay_mode'] = 0
-            self.program['u_opacity'] = 1.0 
-        # --- FIX ENDS HERE ---
+            self._set_uniform_if_present("u_overlay_mode", 0)
+            self._set_uniform_if_present("u_opacity", 1.00)
+        
+        # Render sphere
+        self.sphere.geo.render(self.program)
+        
+        # Disable rendering state
+        self._disable_rendering_state()
 
-        # 4. Draw Quad
-        self.quad_geometry.render(self.program)
+    # -------------------------------------------------------------------------
+    # Picking
+    # -------------------------------------------------------------------------
 
-    def get_region_id_at_world_pos(self, world_x: float, world_y: float) -> int:
-        img_y = int(self.height - world_y)
-        if not (0 <= world_x < self.width and 0 <= img_y < self.height):
+    def get_region_id_at_screen_pos(self, sx: float, sy: float) -> int:
+        """Get region ID at screen position using picking utilities."""
+        w, h = self.window.get_size()
+        if w <= 0 or h <= 0:
             return 0
-        return self.map_data.get_region_id(int(world_x), img_y)
+
+        # Update camera matrices if needed
+        self.camera.update_matrices(w, h)
+        
+        # Get cached matrices
+        vp_matrix, model_matrix = self.camera.get_cached_matrices()
+        if vp_matrix is None or model_matrix is None:
+            return 0
+
+        # Try both coordinate systems - Arcade bottom-left and potential UI top-left
+        for test_sy in [sy, h - sy]:
+            ray_o, ray_d = PickingUtils.screen_to_ray(sx, test_sy, w, h, vp_matrix)
+            if ray_o is None or ray_d is None:
+                continue
+
+            # Intersect ray with sphere
+            t = PickingUtils.ray_sphere_intersect(ray_o, ray_d, self.globe_radius)
+            if t is None:
+                continue
+
+            hit = ray_o + ray_d * t
+
+            # Convert hit to UV coordinates
+            uv_result = PickingUtils.world_to_uv_coords(hit, model_matrix)
+            if uv_result is None:
+                continue
+            
+            u, v = uv_result
+
+            # Convert UV to pixel coordinates
+            px, py = PickingUtils.uv_to_pixel_coords(u, v, self.width, self.height)
+
+            region_id = self.map_data.get_region_id(px, py)
+            if region_id > 0:
+                return region_id
+        
+        return 0
+
+    # Backwards-compatible alias
+    def get_region_id_at_world_pos(self, world_x: float, world_y: float) -> int:
+        return self.get_region_id_at_screen_pos(world_x, world_y)

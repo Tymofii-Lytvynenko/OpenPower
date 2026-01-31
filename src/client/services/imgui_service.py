@@ -22,6 +22,7 @@ class ImGuiService:
 
     def __init__(self, window: arcade.Window, font_path: Optional[Path] = None):
         self.window = window
+        self.window.switch_to()
         
         # Create a dedicated ImGui context
         self._context = imgui.create_context()

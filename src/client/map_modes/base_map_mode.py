@@ -7,7 +7,7 @@ class BaseMapMode(ABC):
     Strategy interface for coloring the map.
     Returns a mapping of Region ID -> RGB Color.
     """
-    
+
     @property
     @abstractmethod
     def name(self) -> str:
