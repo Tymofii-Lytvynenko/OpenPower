@@ -208,6 +208,14 @@ class MapRenderer(BaseRenderer):
         # Set camera position for atmospheric effects
         camera_pos = self.camera.get_position()
         self._set_uniform_if_present("u_camera_pos", camera_pos)
+
+        # Keep lighting stable relative to the view (headlight).
+        # u_light_dir is expected in world space; using the camera direction avoids
+        # the globe going dark when the user orbits the camera.
+        lx, ly, lz = camera_pos
+        mag = (lx * lx + ly * ly + lz * lz) ** 0.5
+        if mag > 1e-8:
+            self._set_uniform_if_present("u_light_dir", (lx / mag, ly / mag, lz / mag))
         
         # Set rendering mode
         if mode in ("overlay", "political"):

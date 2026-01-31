@@ -27,7 +27,7 @@ class CameraController:
         # Rotation state
         self.yaw = np.radians(-120.0)
         self.pitch = np.radians(-10.0)
-        self.max_pitch = float(np.radians(45.0))
+        self.max_pitch = float(np.radians(80.0))
         self.base_flip = np.pi
         
         # Auto-spin
@@ -57,11 +57,14 @@ class CameraController:
         # Clamp pitch to avoid flipping at poles
         self.pitch = float(np.clip(self.pitch, -self.max_pitch, self.max_pitch))
         
-        # Model matrix: base flip + user rotations (yaw-pitch order to prevent roll)
-        self._u_model = self._rot_x(self.base_flip) @ self._rot_y(self.yaw) @ self._rot_x(self.pitch)
+        # Model matrix: only static base orientation for the globe mesh/UV alignment.
+        # User interaction is applied via the VIEW (orbit camera) to keep roll locked
+        # and avoid awkward gimbal behavior from chaining model rotations.
+        self._u_model = self._rot_x(self.base_flip)
         
-        # View matrix: orbit camera
-        eye = np.array([0.0, 0.0, self.distance], dtype=np.float32)
+        # View matrix: orbit camera around the globe using yaw/pitch.
+        # Roll is locked by always using world-up (0, 1, 0) and by clamping pitch.
+        eye = np.array(self.get_position(), dtype=np.float32)
         up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
         self._u_view = self._look_at(eye, self.target, up)
         
@@ -118,7 +121,7 @@ class CameraController:
         
         sensitivity = 0.005
         self.yaw -= dx * sensitivity
-        self.pitch += dy * sensitivity
+        self.pitch -= dy * sensitivity
         
         self._last_mouse_x = x
         self._last_mouse_y = y
