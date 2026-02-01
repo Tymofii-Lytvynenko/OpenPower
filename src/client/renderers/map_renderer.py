@@ -61,22 +61,31 @@ class MapRenderer(BaseRenderer):
         super()._set_uniform_if_present(self.program, name, value)
 
     def _init_glsl_globe(self):
+        """Initialize the globe shader and geometry."""
         shader_source = ShaderRegistry.load_bundle(ShaderRegistry.GLOBE_V, ShaderRegistry.GLOBE_F)
         self.program = self.ctx.program(
             vertex_shader=shader_source["vertex_shader"],
             fragment_shader=shader_source["fragment_shader"],
         )
+
+        # Set texture uniforms
         self._set_uniform_if_present("u_map_texture", 0)
         self._set_uniform_if_present("u_lookup_texture", 1)
         self._set_uniform_if_present("u_terrain_texture", 2)
+
         self.texture_manager.set_uniforms(self.program)
         
+        # Set default uniforms
         self._set_uniform_if_present("u_selected_id", -1)
         self._set_uniform_if_present("u_overlay_mode", 1)
         self._set_uniform_if_present("u_opacity", 0.90)
         self._set_uniform_if_present("u_light_dir", (0.4, 0.3, 1.0))
         self._set_uniform_if_present("u_ambient", 0.35)
+        
+        # --- CRITICAL: Send Texture Size for Border Detection ---
+        self._set_uniform_if_present("u_texture_size", (float(self.width), float(self.height)))
 
+        # Create sphere geometry
         self.sphere = SphereMesh(self.ctx, radius=self.globe_radius, seg_u=256, seg_v=128)
         self.sphere.build_geometry(self.ctx, self.program)
 
