@@ -11,7 +11,7 @@ from src.client.renderers.sphere_mesh import SphereMesh
 from src.client.renderers.base_renderer import BaseRenderer
 from src.client.controllers.camera_controller import CameraController
 from src.client.renderers.texture_manager import TextureManager
-from src.client.renderers.picking_utils import PickingUtils
+from src.client.utils.picking_utils import PickingUtils
 
 
 class MapRenderer(BaseRenderer):
