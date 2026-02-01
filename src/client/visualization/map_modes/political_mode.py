@@ -1,6 +1,6 @@
 from typing import Dict, Tuple
 from src.server.state import GameState
-from src.client.map_modes.base_map_mode import BaseMapMode
+from src.client.visualization.map_modes.base_map_mode import BaseMapMode
 from src.client.utils.color_generator import generate_political_colors
 
 class PoliticalMapMode(BaseMapMode):

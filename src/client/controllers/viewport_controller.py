@@ -8,9 +8,9 @@ from src.client.renderers.map_renderer import MapRenderer
 from src.client.services.network_client_service import NetworkClient
 
 # Strategy Imports
-from src.client.map_modes.base_map_mode import BaseMapMode
-from src.client.map_modes.political_mode import PoliticalMapMode
-from src.client.map_modes.gradient_mode import GradientMapMode
+from src.client.visualization.map_modes.base_map_mode import BaseMapMode
+from src.client.visualization.map_modes.political_mode import PoliticalMapMode
+from src.client.visualization.map_modes.gradient_mode import GradientMapMode
 
 
 class SelectionMode(Enum):
