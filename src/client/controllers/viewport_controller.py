@@ -6,7 +6,6 @@ from enum import Enum, auto
 from src.client.controllers.camera_controller import CameraController
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.services.network_client_service import NetworkClient
-from src.client.utils.coords_util import image_to_world
 
 # Strategy Imports
 from src.client.map_modes.base_map_mode import BaseMapMode
@@ -38,15 +37,11 @@ class ViewportController:
         self.net = net_client
         self.on_selection_change = on_selection_change
 
-        self._is_panning = False
         self.selection_mode = SelectionMode.COUNTRY
 
         # --- MAP MODES (Composition) ---
-        # We instantiate strategies here. The 'political' mode is default.
         self.map_modes: Dict[str, BaseMapMode] = {
             "political": PoliticalMapMode(),
-
-            # FIXED CONFIGURATION
             "gdp_per_capita": GradientMapMode(
                 mode_name="GDP (Per Capita)",
                 column_name="gdp_per_capita",
@@ -77,9 +72,6 @@ class ViewportController:
         self.on_selection_change(None)
 
     def set_map_mode(self, mode_key: str):
-        """
-        Public API to switch the active visualization strategy.
-        """
         if mode_key in self.map_modes:
             self.current_mode_key = mode_key
             self.refresh_map_layer()
@@ -87,31 +79,21 @@ class ViewportController:
     # --- VISUALIZATION HELPERS ---
 
     def refresh_map_layer(self):
-        """
-        Fetches state, asks the active MapMode Strategy to calculate colors,
-        and pushes BOTH data and visual configuration to the generic GPU renderer.
-        """
         state = self.net.get_state()
         active_mode = self.map_modes[self.current_mode_key]
-
-        # 1. Execute Strategy (Pure Data Transformation)
         color_map = active_mode.calculate_colors(state)
 
-        # 2. Configure Renderer Visuals (Opacity, Enabled/Disabled)
-        # This allows new MapModes to define their own look without changing Renderer code
         self.renderer.set_overlay_style(
             enabled=active_mode.overlay_enabled,
             opacity=active_mode.opacity
         )
-
-        # 3. Update Renderer Data (Pure Visualization)
         self.renderer.update_overlay(color_map)
 
-    # Legacy alias for compatibility with older Views, routed to new logic
     def refresh_political_layer(self):
         self.set_map_mode("political")
 
     def focus_on_region(self, region_id: int):
+        """Finds a region and rotates the globe to face it."""
         state = self.net.get_state()
         if "regions" not in state.tables: return
 
@@ -122,17 +104,18 @@ class ViewportController:
             cx = row["center_x"][0]
             cy = row["center_y"][0]
 
-            # Convert to World Space
-            wx, wy = image_to_world(cx, cy, self.renderer.height)
-
-            # Execute Jump
-            self.cam.jump_to(wx, wy)
-            self.cam.sync_with_arcade(self.world_cam)
-
+            # Use the new 3D method
+            self.cam.look_at_pixel_coords(
+                cx, cy, 
+                self.renderer.width, 
+                self.renderer.height
+            )
+            
             # Force selection
             self.select_region_by_id(region_id)
 
     # --- INPUT HANDLING ---
+    
     def on_mouse_press(self, x: float, y: float, button: int):
         if button == arcade.MOUSE_BUTTON_LEFT:
             self._handle_click_selection(x, y)
@@ -141,13 +124,13 @@ class ViewportController:
         pass
 
     def on_mouse_drag(self, x: float, y: float, dx: float, dy: float, buttons: int):
-        # Globe rotation is handled by MapRenderer (LMB drag).
-        # Keep RMB/MMB panning disabled in globe mode for now.
-        pass
+        # Handle 3D rotation via the controller
+        if buttons & arcade.MOUSE_BUTTON_LEFT:
+            self.cam.drag(dx, dy)
 
     def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int):
-        # Globe zoom
-        self.renderer.on_mouse_scroll(x, y, scroll_x, scroll_y)
+        # Handle 3D zoom via the controller
+        self.cam.zoom_scroll(scroll_y)
 
     # --- SELECTION LOGIC ---
     def select_region_by_id(self, region_id: int):
@@ -158,7 +141,6 @@ class ViewportController:
         self._apply_selection_logic(region_id)
 
     def _handle_click_selection(self, screen_x: float, screen_y: float):
-        # Globe: pick directly in screen space (raycast)
         region_id = self.renderer.get_region_id_at_screen_pos(screen_x, screen_y)
         self.select_region_by_id(region_id)
 
