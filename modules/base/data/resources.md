@@ -32,9 +32,9 @@ Chemicals (kg)
 Pharmaceuticals (TEU float)
 
 FINISHED GOODS 
-Appliances (Units)
-Vehicles (Units)
-Machinery (Units)
+Appliances (Units ??? not sure)
+Vehicles (Units ??? not sure)
+Machinery (Units ??? not sure)
 Commodities (TEU float)
 Luxury commodities (TEU float)
 
