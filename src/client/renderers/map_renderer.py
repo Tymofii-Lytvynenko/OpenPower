@@ -17,10 +17,8 @@ from src.client.renderers.picking_utils import PickingUtils
 class MapRenderer(BaseRenderer):
     """
     Interactive globe renderer with LUT overlay + picking.
-
-    Controls:
-      - LMB drag: rotate globe
-      - Mouse wheel: zoom in/out
+    
+    Now strictly presentation-agnostic. Use set_overlay_style() to control visuals.
     """
 
     def __init__(
@@ -45,6 +43,11 @@ class MapRenderer(BaseRenderer):
         # --- SELECTION STATE ---
         self.single_select_dense_id: int = -1
 
+        # --- VISUAL STATE ---
+        # Defaults
+        self._overlay_enabled: bool = True
+        self._overlay_opacity: float = 0.90
+
         # --- GLOBE STATE ---
         self.globe_radius: float = 1.0
 
@@ -58,7 +61,6 @@ class MapRenderer(BaseRenderer):
     # -------------------------------------------------------------------------
     # Resource init
     # -------------------------------------------------------------------------
-
 
     def _init_resources(self, terrain_path: Path, map_path: Path):
         """Initialize all textures and resources."""
@@ -117,6 +119,18 @@ class MapRenderer(BaseRenderer):
         if hasattr(self.program, 'release'):
             self.program.release() # type: ignore
         self._init_glsl_globe()
+
+    # -------------------------------------------------------------------------
+    # Configuration API (New)
+    # -------------------------------------------------------------------------
+
+    def set_overlay_style(self, enabled: bool, opacity: float):
+        """
+        Configure the visual style of the map overlay.
+        Allows the Controller to drive the visual state based on the Active Map Mode.
+        """
+        self._overlay_enabled = enabled
+        self._overlay_opacity = opacity
 
     # -------------------------------------------------------------------------
     # LUT / overlay updates
@@ -181,8 +195,8 @@ class MapRenderer(BaseRenderer):
     # Rendering
     # -------------------------------------------------------------------------
 
-    def draw(self, mode: str = "overlay"):
-        """Render the globe."""
+    def draw(self):
+        """Render the globe using current internal configuration."""
         if self.program is None or self.sphere is None or self.sphere.geo is None:
             return
         
@@ -209,13 +223,11 @@ class MapRenderer(BaseRenderer):
         camera_pos = self.camera.get_position()
         self._set_uniform_if_present("u_camera_pos", camera_pos)
         
-        # Set rendering mode
-        if mode in ("overlay", "political"):
-            self._set_uniform_if_present("u_overlay_mode", 1)
-            self._set_uniform_if_present("u_opacity", 0.90)
-        else:
-            self._set_uniform_if_present("u_overlay_mode", 0)
-            self._set_uniform_if_present("u_opacity", 1.00)
+        # --- APPLY CONFIGURATION STATE ---
+        # This decouples the renderer from specific mode names like "political"
+        mode_int = 1 if self._overlay_enabled else 0
+        self._set_uniform_if_present("u_overlay_mode", mode_int)
+        self._set_uniform_if_present("u_opacity", self._overlay_opacity)
         
         # Render sphere
         self.sphere.geo.render(self.program)

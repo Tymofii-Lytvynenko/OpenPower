@@ -102,8 +102,14 @@ class GameView(BaseImGuiView):
         # 3. Draw Game World (Arcade/OpenGL Layer)
         # We use the world camera to handle pan and zoom for the map
         self.window.use()
-        render_mode = "political" if self.layout.map_mode == "political" else "terrain"
-        self.renderer.draw(mode=render_mode)
+        
+        # Configure the renderer based on Layout State
+        # If "political", enable overlay. If "terrain", disable it.
+        is_political = (self.layout.map_mode == "political")
+        self.renderer.set_overlay_style(enabled=is_political, opacity=0.90)
+        
+        # Draw
+        self.renderer.draw()
 
         # 4. Draw UI (ImGui Overlay Layer)
         # Switch back to the window's coordinate system for the UI

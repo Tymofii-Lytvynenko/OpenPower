@@ -75,7 +75,8 @@ class EditorView(BaseImGuiView):
         # Generate consistent colors
         color_map = generate_political_colors(unique_owners)
         
-        self.renderer.update_political_layer(region_map, color_map)
+        # Note: Editor uses direct renderer access for now, pending full Controller refactor
+        self.renderer.update_overlay(color_map)
 
     def on_selection_changed(self, region_id: int | None):
         """Callback from ViewportController."""
@@ -89,7 +90,14 @@ class EditorView(BaseImGuiView):
         
         # 2. Draw World
         self.world_cam.use()
-        self.renderer.draw(mode=self.layout.get_current_render_mode())
+        
+        # Update Renderer State based on UI Layout
+        current_mode = self.layout.get_current_render_mode()
+        is_overlay_enabled = (current_mode != "terrain")
+        self.renderer.set_overlay_style(enabled=is_overlay_enabled, opacity=0.90)
+        
+        # Draw
+        self.renderer.draw()
         
         # 3. Generate UI
         self.window.use()

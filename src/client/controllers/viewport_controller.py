@@ -89,7 +89,7 @@ class ViewportController:
     def refresh_map_layer(self):
         """
         Fetches state, asks the active MapMode Strategy to calculate colors,
-        and pushes the result to the generic GPU renderer.
+        and pushes BOTH data and visual configuration to the generic GPU renderer.
         """
         state = self.net.get_state()
         active_mode = self.map_modes[self.current_mode_key]
@@ -97,7 +97,14 @@ class ViewportController:
         # 1. Execute Strategy (Pure Data Transformation)
         color_map = active_mode.calculate_colors(state)
 
-        # 2. Update Renderer (Pure Visualization)
+        # 2. Configure Renderer Visuals (Opacity, Enabled/Disabled)
+        # This allows new MapModes to define their own look without changing Renderer code
+        self.renderer.set_overlay_style(
+            enabled=active_mode.overlay_enabled,
+            opacity=active_mode.opacity
+        )
+
+        # 3. Update Renderer Data (Pure Visualization)
         self.renderer.update_overlay(color_map)
 
     # Legacy alias for compatibility with older Views, routed to new logic
