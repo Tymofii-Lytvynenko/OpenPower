@@ -1,125 +1,158 @@
-#version 330
+#version 330 core
 
-uniform sampler2D u_terrain_texture;
-uniform sampler2D u_map_texture;
-uniform sampler2D u_lookup_texture;
-
-uniform float u_lut_dim;
-uniform vec2  u_texture_size; // Needed for border calculation
-uniform int   u_selected_id;
-uniform int   u_overlay_mode;
-uniform float u_opacity;
-
-uniform vec3  u_light_dir;
-uniform float u_ambient;
-uniform vec3  u_camera_pos;
-
+// ==========================================
+// INPUTS & UNIFORMS
+// ==========================================
 in vec2 v_uv;
 in vec3 v_nrm_ws;
 in vec3 v_world_pos;
 
 out vec4 out_color;
 
-// Helper: Convert encoded color (RGB) back to Integer ID
+// Textures
+uniform sampler2D u_terrain_texture; // Base albedo
+uniform sampler2D u_map_texture;     // ID map (RGB encoded IDs)
+uniform sampler2D u_lookup_texture;  // Data/Political colors (LUT)
+
+// Configuration
+uniform float u_lut_dim;       // Dimension of the LUT (e.g., 256.0)
+uniform vec2  u_texture_size;  // Size of map texture (for pixel step calc)
+uniform int   u_selected_id;   // Currently selected ID (-1 if none)
+uniform int   u_overlay_mode;  // 0=Terrain Only, 1=Political Overlay
+uniform float u_opacity;       // Overlay opacity
+
+// Environment
+uniform vec3  u_light_dir;
+uniform float u_ambient;
+uniform vec3  u_camera_pos;
+
+// ==========================================
+// UTILITY FUNCTIONS
+// ==========================================
+
+// Decodes a 24-bit RGB color into a unique integer ID.
+// Why: Standard float-to-int casting can be lossy; adding 0.5 ensures stable rounding.
 int decode_id(vec3 rgb) {
     ivec3 c = ivec3(rgb * 255.0 + 0.5);
     return (c.r << 16) | (c.g << 8) | c.b;
 }
 
-// Helper: Fetch color from Lookup Texture (LUT)
-vec4 lut_lookup(int dense_id) {
+// Fetches data from the Lookup Texture based on the dense ID.
+// Why: Maps a linear ID to 2D UV coordinates for the LUT.
+vec4 get_overlay_data(int dense_id) {
     int x = dense_id % int(u_lut_dim);
     int y = dense_id / int(u_lut_dim);
-    // Sample center of the pixel
+    // Offset by 0.5 to sample the exact center of the texel to avoid bleeding
     vec2 uv = (vec2(x, y) + vec2(0.5)) / vec2(u_lut_dim, u_lut_dim);
     return texture(u_lookup_texture, uv);
 }
 
+// standard Blinn-Phong/Lambertian hybrid lighting
+vec3 apply_lighting(vec3 albedo, vec3 normal, vec3 light_dir, float ambient) {
+    float ndotl = max(dot(normal, normalize(light_dir)), 0.0);
+    float light_intensity = ambient + (1.0 - ambient) * ndotl;
+    return albedo * light_intensity;
+}
+
+// Adds depth fog and rim lighting.
+// Why: Pure flat maps look artificial in 3D; this grounds the map in the scene.
+vec3 apply_atmosphere(vec3 color, vec3 normal, vec3 world_pos, vec3 cam_pos) {
+    vec3 view_dir = normalize(cam_pos - world_pos);
+
+    // Rim Light (Fresnel) - Highlights glancing angles
+    float fresnel = pow(1.0 - max(dot(normal, view_dir), 0.0), 2.0);
+    vec3 atmosphere_color = vec3(0.4, 0.6, 1.0);
+    color = mix(color, atmosphere_color, fresnel * 0.15);
+
+    // Depth Fog - Fades distant geometry
+    float depth_fog = pow(max(dot(normal, -view_dir), 0.0), 1.5) * 0.05;
+    vec3 fog_color = vec3(0.7, 0.8, 0.9);
+    color = mix(color, fog_color, depth_fog);
+
+    return color;
+}
+
+// Checks if the current pixel is at the edge of a region.
+// Optimization: This function performs 2 extra texture lookups. 
+// It should ONLY be called if absolutely necessary (i.e., not on ocean pixels).
+bool is_border_pixel(vec2 uv, int center_id) {
+    vec2 step = 1.0 / u_texture_size;
+
+    // Sample Right and Up neighbors
+    int id_r = decode_id(texture(u_map_texture, uv + vec2(step.x, 0.0)).rgb);
+    int id_u = decode_id(texture(u_map_texture, uv + vec2(0.0, step.y)).rgb);
+
+    return (center_id != id_r || center_id != id_u);
+}
+
+// ==========================================
+// MAIN PIPELINE
+// ==========================================
+
 void main() {
+    // 1. Setup & Coordinates
     vec2 uv = vec2(fract(v_uv.x), clamp(v_uv.y, 0.0, 1.0));
-
-    // --- Lighting ---
     vec3 n = normalize(v_nrm_ws);
-    float ndotl = max(dot(n, normalize(u_light_dir)), 0.0);
-    float light = u_ambient + (1.0 - u_ambient) * ndotl;
 
-    // --- Base Terrain ---
+    // 2. Base Terrain Pass
+    // We always calculate this first as the foundation of the image.
     vec4 terrain = texture(u_terrain_texture, uv);
-    vec3 base = terrain.rgb * light;
+    vec3 final_rgb = apply_lighting(terrain.rgb, n, u_light_dir, u_ambient);
 
-    // --- Map Data Lookup ---
+    // 3. Data Fetch (The Optimization Hub)
+    // We sample the map data ONCE here. The results are reused for overlay AND selection.
     vec3 map_rgb = texture(u_map_texture, uv).rgb;
     int dense_id = decode_id(map_rgb);
-    vec4 overlay = lut_lookup(dense_id);
-
-    float opacity = u_opacity;
-    int mode = u_overlay_mode;
-
-    // Start with base rendering
-    vec4 final_color;
-
-    // --- BORDER DETECTION ---
-    // We check the pixel to the right and above. If the ID is different, we are on an edge.
-    bool is_border = false;
     
-    // Optimization: Only check borders if we are in overlay mode and not in the ocean (id 0)
-    if (mode == 1 && dense_id > 0) {
-        vec2 step = 1.0 / u_texture_size;
+    // Fetch overlay data (Color in RGB, Multi-select flag in Alpha)
+    vec4 overlay_data = get_overlay_data(dense_id);
+
+    // 4. Political Overlay Pass
+    // Only process if mode is active AND the overlay has data (alpha > 0)
+    if (u_overlay_mode == 1 && overlay_data.a > 0.0) {
+        vec3 overlay_color = overlay_data.rgb;
+
+        // BORDER OPTIMIZATION: 
+        // Only check borders if this is NOT the ocean (id 0).
+        // Checking borders on the ocean is wasted GPU cycles (70% of the map).
+        if (dense_id > 0) {
+            if (is_border_pixel(uv, dense_id)) {
+                // Darken borders for visual separation
+                overlay_color *= 0.6; 
+            }
+        }
+
+        // Apply lighting to the overlay paint so it respects the terrain shape
+        vec3 lit_overlay = apply_lighting(overlay_color, n, u_light_dir, u_ambient);
         
-        // Sample neighbor pixels
-        int id_r = decode_id(texture(u_map_texture, uv + vec2(step.x, 0.0)).rgb);
-        int id_u = decode_id(texture(u_map_texture, uv + vec2(0.0, step.y)).rgb);
-
-        if (dense_id != id_r || dense_id != id_u) {
-            is_border = true;
-        }
+        // Blend overlay onto terrain based on global opacity and texture alpha
+        final_rgb = mix(final_rgb, lit_overlay, overlay_data.a * u_opacity);
     }
 
-    // --- COLOR BLENDING ---
-    if (mode == 1 && overlay.a > 0.0) {
-        // Political/Data Mode
-        float a = overlay.a * opacity;
-        vec3 overlay_rgb = overlay.rgb;
+    // 5. Post-Process Effects (Atmosphere)
+    final_rgb = apply_atmosphere(final_rgb, n, v_world_pos, u_camera_pos);
 
-        // Darken the color at the border for separation
-        // This is strictly for visualization, not selection style.
-        if (is_border) {
-            overlay_rgb *= 0.6; 
-        }
-
-        vec3 mixed = mix(base, overlay_rgb * light, a);
-        final_color = vec4(mixed, 1.0);
-    } else {
-        // Terrain Mode
-        final_color = vec4(base, 1.0);
+    // 6. Selection Logic
+    // Combined Check: Is it the single selected ID? OR is it part of a multi-select group?
+    // We reuse 'overlay_data.a' here to avoid a second texture lookup.
+    bool is_selected = (u_selected_id >= 0 && dense_id == u_selected_id);
+    if (!is_selected) {
+        // Assuming Alpha > 0.95 indicates a multi-selected region in the LUT
+        is_selected = (overlay_data.a > 0.95); 
     }
 
-    // --- ATMOSPHERIC EFFECTS (Visual Polish) ---
-    vec3 view_dir = normalize(u_camera_pos - v_world_pos);
-    float fresnel = pow(1.0 - max(dot(v_nrm_ws, view_dir), 0.0), 2.0);
-
-    vec3 atmosphere_color = vec3(0.4, 0.6, 1.0);
-    float atmosphere_strength = fresnel * 0.15;
-    final_color.rgb = mix(final_color.rgb, atmosphere_color, atmosphere_strength);
-
-    float depth_fog = pow(max(dot(v_nrm_ws, -view_dir), 0.0), 1.5) * 0.05;
-    vec3 fog_color = vec3(0.7, 0.8, 0.9);
-    final_color.rgb = mix(final_color.rgb, fog_color, depth_fog);
-
-    // --- SELECTION HIGHLIGHT (New Style Preserved) ---
-    // Single selection via ID or Multi-selection via LUT Alpha
-    float single_sel = (u_selected_id >= 0 && dense_id == u_selected_id) ? 1.0 : 0.0;
-    float multi_sel  = (overlay.a > 0.95) ? 1.0 : 0.0;
-    float sel = max(single_sel, multi_sel);
-
-    if (sel > 0.0) {
-        // "New Style": Brightness Boost + White Tint
-        vec3 highlight_color = vec3(1.0);
-        float highlight_strength = 0.55;
-
-        final_color.rgb = mix(final_color.rgb, highlight_color, highlight_strength);
-        final_color.rgb = min(final_color.rgb * 1.15, vec3(1.0));
+    if (is_selected) {
+        // "New Style" Highlight
+        // 1. Tint towards white (desaturate and brighten)
+        final_rgb = mix(final_rgb, vec3(1.0), 0.55);
+        // 2. Boost exposure
+        final_rgb *= 1.15;
+        
+        // SAFETY CLAMP:
+        // Ensure we don't exceed 1.0, which can cause artifacts on non-HDR monitors.
+        // If you are using an HDR pipeline, remove this min().
+        final_rgb = min(final_rgb, vec3(1.0));
     }
 
-    out_color = final_color;
+    out_color = vec4(final_rgb, 1.0);
 }
