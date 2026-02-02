@@ -10,67 +10,110 @@ class EconomyPanel:
         target_tag = kwargs.get("target_tag", "")
         is_own = kwargs.get("is_own_country", False)
 
+        # Uses WindowManager context instead of Inheritance
         with WindowManager.window("ECONOMY", x=1600, y=100, w=260, h=450) as is_open:
             if not is_open: return False
-
             self._render_content(state, target_tag, is_own)
             return True
 
     def _render_content(self, state, target_tag, is_own):
-        # 1. Fetch Data
-        reserves = 0
+        # --- 1. Fetch Economy Data ---
+        reserves = -25000000000 
         gdp_per_capita = 0
-        tax_rate = 0.2
+        tax_rate = 0.2 
         
         if "countries" in state.tables:
             try:
-                row = state.tables["countries"].filter(pl.col("id") == target_tag)
+                df = state.tables["countries"]
+                row = df.filter(pl.col("id") == target_tag)
                 if not row.is_empty():
                     reserves = int(row["money_reserves"][0])
                     gdp_per_capita = int(row["gdp_per_capita"][0])
                     tax_rate = float(row["global_tax_rate"][0])
-            except: pass
+            except Exception:
+                pass
 
-        # Approx Total GDP calculation
-        total_pop = 1_000_000 # Fallback
+        # --- 2. Calculate Total GDP ---
+        total_pop = 0
         if "regions" in state.tables:
             try:
-                target_regions = state.tables["regions"].filter(pl.col("owner") == target_tag)
+                df_pop = state.tables["regions"]
+                # Sum population of all regions owned by target
+                target_regions = df_pop.filter(pl.col("owner") == target_tag)
                 if not target_regions.is_empty():
-                     total_pop = target_regions.select(pl.col("pop_14") + pl.col("pop_15_64") + pl.col("pop_65")).sum().item()
-            except: pass
+                    p14 = target_regions.select(pl.col("pop_14")).sum().item()
+                    p1564 = target_regions.select(pl.col("pop_15_64")).sum().item()
+                    p65 = target_regions.select(pl.col("pop_65")).sum().item()
+                    total_pop = p14 + p1564 + p65
+            except Exception:
+                pass
 
         total_gdp = total_pop * gdp_per_capita
-        income = total_gdp * tax_rate
-        expenses = 0 
+        calculated_income = total_gdp * tax_rate
+
+        # --- 4. Render UI ---
         
-        # 2. Render UI
-        Prims.header("ECONOMIC MODEL", show_bg=False)
+        # Economic Model Section
+        Prims.header("ECONOMIC MODEL")
+        
+        imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.colors.bg_popup)
+        imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.colors.accent)
+        
+        # Disable interaction if foreign country
         if not is_own: imgui.begin_disabled()
-        imgui.slider_float("##tax", tax_rate, 0.0, 1.0, "Tax: %.2f")
-        if not is_own: imgui.end_disabled()
         
-        imgui.dummy((0, 10))
+        imgui.slider_float("##eco_model", 0.2, 0.0, 1.0, "")
+        
+        if not is_own: imgui.end_disabled()
 
+        imgui.pop_style_color(2)
+        
+        imgui.text_disabled("State-Controlled")
+        imgui.same_line()
+        # Custom alignment using primitives logic
+        Prims.right_align_text("Free Market", GAMETHEME.colors.text_dim)
+        imgui.dummy((0, 5))
+
+        # GDP Section
         Prims.header(f"GDP: ${total_gdp:,.0f}")
-        gdp_health = min((total_gdp / 1e12) * 100, 100.0)
-        Prims.meter("GDP Health", gdp_health, GAMETHEME.colors.positive)
-        Prims.currency_row("Per Capita", gdp_per_capita)
+        
+        gdp_health = min((total_gdp / 1000000000000) * 100, 100.0)
+        Prims.meter("", gdp_health, GAMETHEME.colors.positive) 
+        
+        imgui.text_disabled(f"Per Capita: ${gdp_per_capita:,}")
+        imgui.dummy((0, 5))
 
-        imgui.dummy((0, 10))
-
+        # Budget Section
         Prims.header("BUDGET")
-        Prims.currency_row("INCOME", income)
+        
+        Prims.currency_row("INCOME", calculated_income)
+        
+        expenses = 0 # Placeholder
         Prims.currency_row("EXPENSES", expenses)
         
-        balance = income - expenses
-        col_bal = GAMETHEME.colors.positive if balance >= 0 else GAMETHEME.colors.negative
+        balance = calculated_income - expenses
+        col_bal = GAMETHEME.colors.negative if balance < 0 else GAMETHEME.colors.positive
         Prims.currency_row("BALANCE", balance, col_bal)
-
-        if is_own:
-            col_res = GAMETHEME.colors.positive if reserves >= 0 else GAMETHEME.colors.negative
-            Prims.currency_row("RESERVES", reserves, col_res)
         
-        imgui.dummy((0, 20))
+        # Maybe hide exact reserves if not own country?
         if is_own:
-            imgui.button("TRADE AGREEMENTS", (-1, 35))
+            col_res = GAMETHEME.colors.negative if reserves < 0 else GAMETHEME.colors.positive
+            Prims.currency_row("AVAILABLE", reserves, col_res)
+        else:
+            imgui.text("AVAILABLE")
+            imgui.same_line()
+            Prims.right_align_text("Unknown", GAMETHEME.colors.text_dim)
+        
+        imgui.dummy((0, 8))
+
+        # Resources Section
+        Prims.header("RESOURCES")
+        Prims.meter("", 66.0, GAMETHEME.colors.positive)
+        
+        imgui.dummy((0, 15))
+        
+        # Footer
+        if is_own:
+            if imgui.button("TRADE", (-1, 35)): pass
+        else:
+            if imgui.button("PROPOSE TRADE", (-1, 35)): pass
