@@ -69,7 +69,7 @@ class BaseLayout:
             if not data["visible"]:
                 continue
             panel_instance = data["instance"]
-            still_open = panel_instance.render(self.composer, state, **extra_ctx)
+            still_open = panel_instance.render(state, **extra_ctx)
             if still_open is False:
                 data["visible"] = False
 
