@@ -27,6 +27,11 @@ class MainMenuView(BaseImGuiView):
             # BIGGER GLOBE: Set default distance closer (was 4.5, now 2.3)
             self.cam_ctrl = CameraController(distance=2.3)
             
+            self.cam_ctrl.look_at_pixel_coords(
+                12000, 2400,
+                16000, 8000 # TODO: Replace with dynamic map size
+            )
+            
             map_path = config.get_asset_path("map/regions.png")
             terrain_path = config.get_asset_path("map/terrain.png")
 
