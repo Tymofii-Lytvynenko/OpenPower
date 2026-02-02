@@ -1,17 +1,11 @@
 from imgui_bundle import imgui
-from src.client.ui.composer import UIComposer
-from src.client.services.network_client_service import NetworkClient
 
 class SystemBar:
-    def render(self, composer: UIComposer, net: NetworkClient, nav_service):
+    def render(self, net_client, nav_service):
         viewport = imgui.get_main_viewport()
-        
-        # Padding from edges
         pad_x, pad_y = 10.0, 10.0
 
-        # Anchor: TOP-RIGHT
-        # We set pivot to (1, 0) -> (Right, Top)
-        # Then position at (ScreenW - Pad, Pad)
+        # Anchor Top-Right
         imgui.set_next_window_pos(
             imgui.ImVec2(viewport.size.x - pad_x, pad_y), 
             imgui.Cond_.always, 
@@ -24,34 +18,22 @@ class SystemBar:
                  imgui.WindowFlags_.no_background)
 
         if imgui.begin("##System_Bar", True, flags):
-            try:
-                # Calculate button size relative to font size for DPI support
-                font_size = imgui.get_font_size()
-                btn_w = font_size * 4.5
-                btn_h = font_size * 1.6
-                btn_size = (btn_w, btn_h)
-                
-                # SAVE
-                if imgui.button("SAVE", btn_size):
-                    net.request_save()
-                
-                imgui.same_line()
-                
-                # LOAD
-                if imgui.button("LOAD", btn_size):
-                    if hasattr(net, 'session'):
-                        nav_service.show_load_game_screen(net.session.config)
-                
-                imgui.same_line()
-                
-                # MENU
-                if imgui.button("MENU", btn_size):
-                    if hasattr(net, 'session'):
-                        nav_service.show_main_menu(net.session.config)
+            font_size = imgui.get_font_size()
+            btn_size = (font_size * 4.5, font_size * 1.6)
+            
+            if imgui.button("SAVE", btn_size):
+                net_client.request_save()
+            
+            imgui.same_line()
+            
+            if imgui.button("LOAD", btn_size):
+                if hasattr(net_client, 'session'):
+                    nav_service.show_load_game_screen(net_client.session.config)
+            
+            imgui.same_line()
+            
+            if imgui.button("MENU", btn_size):
+                if hasattr(net_client, 'session'):
+                    nav_service.show_main_menu(net_client.session, net_client.session.config)
 
-            except Exception as e:
-                print(f"[SystemBar] Error: {e}")
-            finally:
-                imgui.end()
-        else:
             imgui.end()

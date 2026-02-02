@@ -4,7 +4,7 @@ from src.client.ui.panels.data_insp_panel import DataInspectorPanel
 from src.client.services.network_client_service import NetworkClient
 from src.client.ui.panels.region_inspector import RegionInspectorPanel
 from src.client.ui.composer import UIComposer
-from src.client.ui.theme import GAMETHEME
+from src.client.ui.core.theme import GAMETHEME
 from imgui_bundle import imgui
 
 class BaseLayout:

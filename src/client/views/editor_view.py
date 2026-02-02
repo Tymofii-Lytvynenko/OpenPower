@@ -1,7 +1,7 @@
 import arcade
 from src.shared.config import GameConfig
 from src.client.services.imgui_service import ImGuiService
-from src.client.ui.theme import GAMETHEME
+from src.client.ui.core.theme import GAMETHEME
 from src.client.views.base_view import BaseImGuiView
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.ui.layouts.editor_layout import EditorLayout

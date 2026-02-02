@@ -1,115 +1,76 @@
 import polars as pl
 from imgui_bundle import imgui
-from src.client.ui.panels.base_panel import BasePanel
-from src.client.ui.composer import UIComposer
-from src.client.ui.theme import GAMETHEME
 
-class EconomyPanel(BasePanel):
-    def __init__(self):
-        super().__init__("ECONOMY", x=1600, y=100, w=260, h=450)
+from src.client.ui.core.theme import GAMETHEME
+from src.client.ui.core.primitives import UIPrimitives as Prims
+from src.client.ui.core.containers import WindowManager
 
-    def _render_content(self, composer: UIComposer, state, **kwargs):
+class EconomyPanel:
+    def render(self, state, **kwargs) -> bool:
         target_tag = kwargs.get("target_tag", "")
         is_own = kwargs.get("is_own_country", False)
 
-        # --- 1. Fetch Economy Data ---
-        reserves = -25000000000 
+        with WindowManager.window("ECONOMY", x=1600, y=100, w=260, h=450) as is_open:
+            if not is_open: return False
+
+            self._render_content(state, target_tag, is_own)
+            return True
+
+    def _render_content(self, state, target_tag, is_own):
+        # 1. Fetch Data
+        reserves = 0
         gdp_per_capita = 0
-        tax_rate = 0.2 
+        tax_rate = 0.2
         
         if "countries" in state.tables:
             try:
-                df = state.tables["countries"]
-                row = df.filter(pl.col("id") == target_tag)
+                row = state.tables["countries"].filter(pl.col("id") == target_tag)
                 if not row.is_empty():
                     reserves = int(row["money_reserves"][0])
                     gdp_per_capita = int(row["gdp_per_capita"][0])
                     tax_rate = float(row["global_tax_rate"][0])
-            except Exception:
-                pass
+            except: pass
 
-        # --- 2. Calculate Total GDP ---
-        total_pop = 0
+        # Approx Total GDP calculation
+        total_pop = 1_000_000 # Fallback
         if "regions" in state.tables:
             try:
-                df_pop = state.tables["regions"]
-                # Sum population of all regions owned by target
-                target_regions = df_pop.filter(pl.col("owner") == target_tag)
+                target_regions = state.tables["regions"].filter(pl.col("owner") == target_tag)
                 if not target_regions.is_empty():
-                    p14 = target_regions.select(pl.col("pop_14")).sum().item()
-                    p1564 = target_regions.select(pl.col("pop_15_64")).sum().item()
-                    p65 = target_regions.select(pl.col("pop_65")).sum().item()
-                    total_pop = p14 + p1564 + p65
-            except Exception:
-                pass
+                     total_pop = target_regions.select(pl.col("pop_14") + pl.col("pop_15_64") + pl.col("pop_65")).sum().item()
+            except: pass
 
         total_gdp = total_pop * gdp_per_capita
-        calculated_income = total_gdp * tax_rate
-
-        # --- 4. Render UI ---
+        income = total_gdp * tax_rate
+        expenses = 0 
         
-        # Economic Model Section
-        composer.draw_section_header("ECONOMIC MODEL", show_more_btn=False)
-        
-        imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.colors.bg_input)
-        imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.colors.accent)
-        
-        # Disable interaction if foreign country
+        # 2. Render UI
+        Prims.header("ECONOMIC MODEL", show_bg=False)
         if not is_own: imgui.begin_disabled()
-        
-        imgui.slider_float("##eco_model", 0.2, 0.0, 1.0, "")
-        
+        imgui.slider_float("##tax", tax_rate, 0.0, 1.0, "Tax: %.2f")
         if not is_own: imgui.end_disabled()
+        
+        imgui.dummy((0, 10))
 
-        imgui.pop_style_color(2)
-        
-        imgui.text_disabled("State-Controlled")
-        imgui.same_line()
-        imgui.set_cursor_pos_x(imgui.get_content_region_avail().x - 70)
-        imgui.text_disabled("Free Market")
-        imgui.dummy((0, 5))
+        Prims.header(f"GDP: ${total_gdp:,.0f}")
+        gdp_health = min((total_gdp / 1e12) * 100, 100.0)
+        Prims.meter("GDP Health", gdp_health, GAMETHEME.colors.positive)
+        Prims.currency_row("Per Capita", gdp_per_capita)
 
-        # GDP Section
-        composer.draw_section_header(f"GDP: ${total_gdp:,.0f}")
-        
-        gdp_health = min((total_gdp / 1000000000000) * 100, 100.0)
-        composer.draw_meter("", gdp_health, GAMETHEME.colors.positive) 
-        
-        imgui.text_disabled(f"Per Capita: ${gdp_per_capita:,}")
-        imgui.dummy((0, 5))
+        imgui.dummy((0, 10))
 
-        # Budget Section
-        composer.draw_section_header("BUDGET")
+        Prims.header("BUDGET")
+        Prims.currency_row("INCOME", income)
+        Prims.currency_row("EXPENSES", expenses)
         
-        composer.draw_currency_row("INCOME", calculated_income)
-        
-        expenses = 0 # Placeholder
-        composer.draw_currency_row("EXPENSES", expenses)
-        
-        balance = calculated_income - expenses
-        col_bal = GAMETHEME.colors.negative if balance < 0 else GAMETHEME.colors.positive
-        composer.draw_currency_row("BALANCE", balance, col_bal)
-        
-        # Maybe hide exact reserves if not own country?
+        balance = income - expenses
+        col_bal = GAMETHEME.colors.positive if balance >= 0 else GAMETHEME.colors.negative
+        Prims.currency_row("BALANCE", balance, col_bal)
+
         if is_own:
-            col_res = GAMETHEME.colors.negative if reserves < 0 else GAMETHEME.colors.positive
-            composer.draw_currency_row("AVAILABLE", reserves, col_res)
-        else:
-            imgui.text("AVAILABLE")
-            imgui.same_line()
-            composer.right_align(80)
-            imgui.text_disabled("Unknown")
+            col_res = GAMETHEME.colors.positive if reserves >= 0 else GAMETHEME.colors.negative
+            Prims.currency_row("RESERVES", reserves, col_res)
         
-        imgui.dummy((0, 8))
-
-        # Resources Section
-        composer.draw_section_header("RESOURCES")
-        composer.draw_meter("", 66.0, GAMETHEME.colors.positive)
-        
-        imgui.dummy((0, 15))
-        
-        # Footer
+        imgui.dummy((0, 20))
         if is_own:
-            if imgui.button("TRADE", (-1, 35)): pass
-        else:
-            if imgui.button("PROPOSE TRADE", (-1, 35)): pass
+            imgui.button("TRADE AGREEMENTS", (-1, 35))

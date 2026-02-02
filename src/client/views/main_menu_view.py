@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from src.client.views.base_view import BaseImGuiView
 from src.client.services.imgui_service import ImGuiService
 from src.client.ui.composer import UIComposer
-from src.client.ui.theme import GAMETHEME
+from src.client.ui.core.theme import GAMETHEME
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.controllers.camera_controller import CameraController
 

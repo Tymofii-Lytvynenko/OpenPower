@@ -5,7 +5,7 @@ import orjson
 from src.client.views.base_view import BaseImGuiView
 
 from src.client.ui.composer import UIComposer
-from src.client.ui.theme import GAMETHEME
+from src.client.ui.core.theme import GAMETHEME
 from src.shared.config import GameConfig
 from src.server.io.save_writer import SaveWriter
 from src.server.io.data_load_manager import DataLoader

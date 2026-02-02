@@ -8,7 +8,7 @@ from src.client.renderers.map_renderer import MapRenderer
 from src.client.ui.layouts.game_layout import GameLayout
 from src.client.controllers.camera_controller import CameraController
 from src.client.controllers.viewport_controller import ViewportController
-from src.client.ui.theme import GAMETHEME
+from src.client.ui.core.theme import GAMETHEME
 
 
 class GameView(BaseImGuiView):
