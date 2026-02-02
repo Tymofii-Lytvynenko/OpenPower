@@ -86,8 +86,8 @@ class UITheme:
         # 3. Inputs & Buttons (Unified Logic)
         # Idle: Dark Grey | Hover: Accent Blue | Active: Bright Blue
         set_c(imgui.Col_.frame_bg,        c.bg_input)
-        set_c(imgui.Col_.frame_bg_hovered, with_alpha(c.bg_input, 0.8)) # Slightly lighter
-        set_c(imgui.Col_.frame_bg_active,  c.interaction_active)
+        set_c(imgui.Col_.frame_bg_hovered, with_alpha(c.bg_input, 0.8))
+        set_c(imgui.Col_.frame_bg_active,  with_alpha(c.interaction_active, 0.5))
 
         set_c(imgui.Col_.button,          c.bg_input)
         set_c(imgui.Col_.button_hovered,  c.accent)
