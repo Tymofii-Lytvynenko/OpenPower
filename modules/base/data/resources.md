@@ -6,10 +6,11 @@ FOOD/AGRICULTURE
 Cereals (kg)
 Vegetables & fruits (kg)
 Meat (kg)
+Seafood (kg)
 Dairy (kg)
 Tobacco (kg)
 Drugs (kg)
-Drinkable Water (m3)
+Water (m3)
 
 ENERGY 
 Electricity (kWh)
@@ -33,8 +34,9 @@ Pharmaceuticals (TEU float)
 
 FINISHED GOODS 
 Appliances (Units ??? not sure)
-Vehicles (Units ??? not sure)
-Machinery (Units ??? not sure)
+Vehicles (Horsepower ??? not sure)
+Machinery (KWh ??? not sure)
+Hardware (TFLOPS ???)
 Commodities (TEU float)
 Luxury commodities (TEU float)
 
