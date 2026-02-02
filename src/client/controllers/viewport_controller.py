@@ -72,17 +72,37 @@ class ViewportController:
         self.on_selection_change(None)
 
     def set_map_mode(self, mode_key: str):
+        """
+        Switches the visual map mode.
+        Handles 'terrain' as a special case to disable overlays.
+        """
+        # 1. Special Case: Terrain Mode (No Overlay)
+        if mode_key == "terrain":
+            self.renderer.set_overlay_style(enabled=False, opacity=0.0)
+            self.current_mode_key = "terrain"
+            return
+
+        # 2. Standard Data Modes
         if mode_key in self.map_modes:
             self.current_mode_key = mode_key
+            # Ensure overlay is visible if we are switching from terrain
+            self.renderer.set_overlay_style(enabled=True, opacity=0.90)
             self.refresh_map_layer()
 
     # --- VISUALIZATION HELPERS ---
 
     def refresh_map_layer(self):
         state = self.net.get_state()
+        
+        # Safety check if we are in 'terrain' mode or invalid key
+        if self.current_mode_key not in self.map_modes:
+            return
+
         active_mode = self.map_modes[self.current_mode_key]
         color_map = active_mode.calculate_colors(state)
 
+        # We rely on set_map_mode to have set the enabled/opacity state correctly,
+        # but we re-assert it here just in case.
         self.renderer.set_overlay_style(
             enabled=active_mode.overlay_enabled,
             opacity=active_mode.opacity
