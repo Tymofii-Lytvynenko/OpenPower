@@ -8,7 +8,7 @@ from src.client.services.imgui_service import ImGuiService
 
 if TYPE_CHECKING:
     from src.server.session import GameSession
-
+    from src.client.renderers.map_renderer import MapRenderer
 
 class MainWindow(arcade.Window):
 
@@ -19,68 +19,42 @@ class MainWindow(arcade.Window):
         self.center_window()
         self.set_minimum_size(800, 600)
 
-        # 1. Initialize ImGui Service ONCE (Singleton)
-        # We try to resolve the font path here immediately
+        # 1. Initialize ImGui
         font_path = config.get_asset_path("fonts/main_font.ttf")
         if not font_path or not font_path.exists():
-            print(f"[Window] Font not found at {font_path}, using default.")
             font_path = None
-
         self.imgui = ImGuiService(self, font_path=font_path)
 
-        # 2. Initialize Navigation Service
-        # This is the "Router" that handles all view switching
+        # 2. Services & State
         self.nav = NavigationService(self)
-
-        # Session starts as None; populated by StartupTask later
         self.session: Optional["GameSession"] = None
+        
+        # 3. SHARED RENDERER (The Fix for Freezing)
+        # We load this once, and all Views use it.
+        self.shared_renderer: Optional["MapRenderer"] = None
 
     def setup(self):
-        """
-        Called by main.py to kick off the application lifecycle.
-        """
         print("[Window] Booting...")
-
-        # 1. Create the Task (The 'Disc')
         task = StartupTask(self.game_config)
 
-        # 2. Define the callback (The 'next step')
         def on_boot_complete(result_session: "GameSession"):
             print("[Window] Engine Ready.")
             self.session = result_session
-
-            # USE ROUTER: Switch to Main Menu
-            # The window doesn't need to know what 'MainMenuView' is.
+            
+            # Note: We initialize the renderer lazily in the Main Menu 
+            # to ensure the OpenGL context is fully ready.
             self.nav.show_main_menu(self.session, self.game_config)
-
-            # The callback must return a View for the LoadingView to switch to,
-            # but since we switched explicitly above, we can return None
-            # or refactor NavigationService.show_loading to not auto-switch if we handle it.
-            # Ideally, NavigationService handles the switch.
             return None
 
-            # 3. USE ROUTER: Start the Loading Screen
-
-        # We modify show_loading slightly in service to handle the callback logic,
-        # or we just let the loading view drive.
-        # For this implementation, we simply pass the data to the service.
         self.nav.show_loading(task, on_success=on_boot_complete)
 
     def on_resize(self, width: int, height: int):
-        """
-        Handles window resizing events.
-        """
         super().on_resize(width, height)
-
-        # Force Viewport update (Safety measure against ImGui interfering)
         self.ctx.viewport = (0, 0, width, height)
         self.ctx.scissor = None
-
-        # Propagate to View/ImGuiService
         if self.current_view and hasattr(self.current_view, "on_resize"):
             self.current_view.on_resize(width, height)
 
     def on_update(self, delta_time: float):
-        """Global game tick."""
         if self.session:
             self.session.tick(delta_time)
