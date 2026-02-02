@@ -44,7 +44,7 @@ class UIColors:
     # We use these for button clicks instead of blue to keep it clean.
     hover_neutral: tuple = (0.25, 0.27, 0.30, 0.80)
     pressed_neutral: tuple = (0.12, 0.14, 0.16, 1.00) 
-    interaction_active: tuple = (0.26, 0.59, 0.85, 1.00) # Fallback alias for accent
+    interaction_active: tuple = (0.26, 0.59, 0.85, 0.5) # Fallback alias for accent
 
     # --- 7. Special Overrides ---
     drag_drop: tuple     = (0.90, 0.90, 0.00, 0.50) 
@@ -56,7 +56,7 @@ class UITheme:
     Applies the UIColors to the ImGui Style engine.
     """
     colors: UIColors = field(default_factory=UIColors)
-    rounding: float = 6.0
+    rounding: float = 0.0
 
     def apply(self):
         style = imgui.get_style()
@@ -69,7 +69,7 @@ class UITheme:
         style.window_padding    = (14, 14)
         style.frame_padding     = (8, 5)
         style.item_spacing      = (10, 8)
-        style.window_rounding   = self.rounding + 2.0
+        style.window_rounding   = self.rounding
         style.frame_rounding    = self.rounding
         style.popup_rounding    = self.rounding
         style.grab_rounding     = self.rounding

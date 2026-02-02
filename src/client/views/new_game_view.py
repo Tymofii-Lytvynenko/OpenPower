@@ -69,11 +69,15 @@ class NewGameView(BaseImGuiView):
             unique_owners = df["owner"].unique().to_list()
             tag_palette = generate_political_colors(unique_owners)
             
+            # Convert theme dim color to 0-255 INT tuple for fallback
+            fallback_c = tuple(int(c * 255) for c in GAMETHEME.colors.text_dim[:3])
+
             region_color_map = {}
             for row in df.select(["id", "owner"]).iter_rows(named=True):
                 rid = row["id"]
                 owner = row["owner"]
-                color = tag_palette.get(owner, (50, 50, 50))
+                # Use the generated palette or the theme fallback
+                color = tag_palette.get(owner, fallback_c)
                 region_color_map[rid] = color
             
             self.renderer.update_overlay(region_color_map)
@@ -90,7 +94,7 @@ class NewGameView(BaseImGuiView):
             return pl.DataFrame()
 
     def on_show_view(self):
-        self.window.background_color = (10, 10, 10, 255)
+        pass
 
     def on_draw(self):
         self.clear()
@@ -112,12 +116,15 @@ class NewGameView(BaseImGuiView):
     def _render_ui(self):
         screen_w, screen_h = self.window.get_size()
         
-        if self.ui.begin_centered_panel("New Game", screen_w, screen_h, w=600, h=500):
+        # Increase height to 650 to fit content without clipping
+        if self.ui.begin_centered_panel("New Game", screen_w, screen_h, w=600, h=600):
             self.ui.draw_title("SELECT NATION")
             
             from imgui_bundle import imgui
             
-            imgui.begin_child("CountryList", (250, 350), True)
+            # Left Column: Country List
+            # Height 400 allows enough space for list while leaving room for bottom buttons
+            imgui.begin_child("CountryList", (250, 400), True)
             if not self.playable_countries.is_empty():
                 for row in self.playable_countries.iter_rows(named=True):
                     c_id = row['id']
@@ -138,27 +145,34 @@ class NewGameView(BaseImGuiView):
             
             imgui.same_line()
             
+            # Right Column: Details
             imgui.begin_group()
-            imgui.dummy((300, 0))
+            imgui.dummy((300, 0)) # Spacing
             if self.selected_country_id:
                 imgui.text_colored(GAMETHEME.colors.accent, f"Selected: {self.selected_country_id}")
                 imgui.separator()
+                imgui.dummy((0, 10))
                 imgui.text_wrapped("Standard Campaign.")
                 imgui.text_wrapped("Difficulty: Normal")
+                imgui.text_wrapped("Ironman: On")
             else:
-                imgui.text_disabled("Select a nation.")
+                imgui.text_disabled("Select a nation from the list.")
             imgui.end_group()
             
-            imgui.dummy((0, 20))
+            # Bottom Controls Area
+            imgui.dummy((0, 30)) # Vertical Spacer
             imgui.separator()
-            imgui.dummy((0, 10))
+            imgui.dummy((0, 10)) # Vertical Spacer
             
+            # Back Button
             if imgui.button("BACK", (100, 40)):
                 self.renderer.clear_highlight()
                 self.renderer.set_overlay_style(enabled=False, opacity=0.0)
                 self.nav.show_main_menu(self.session, self.config)
             
             imgui.same_line()
+            
+            # Right Align "Start" Button
             avail_w = imgui.get_content_region_avail().x
             imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + avail_w - 150)
             
@@ -206,9 +220,6 @@ class NewGameView(BaseImGuiView):
     def _start_game(self):
         if not self.selected_country_id: return
         
-        # Don't clear highlight, user might like seeing their choice glow during load
-        # self.renderer.clear_highlight() 
-
         from src.client.tasks.new_game_task import NewGameTask, NewGameContext
 
         def on_task_complete(ctx: NewGameContext):
