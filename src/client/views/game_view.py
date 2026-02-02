@@ -17,25 +17,34 @@ class GameView(BaseImGuiView):
         self.config = config
         self.net = NetworkClient(session)
 
-        # 1. Initialize Camera System (Single Source of Truth)
-        # We start with default values, initial_pos logic is moved to ViewportController if needed
-        self.cam_ctrl = CameraController()
-        
-        # 2. Initialize Renderer (Inject Camera)
-        map_path = config.get_asset_path("map/regions.png")
-        terrain_path = config.get_asset_path("map/terrain.png")
+        # 1. Initialize Camera & Renderer
+        # We reuse the shared renderer from the Window to keep the state (position/zoom) intact.
+        if self.window.shared_renderer:
+            self.renderer = self.window.shared_renderer
+            self.cam_ctrl = self.renderer.camera
+            
+            # CRITICAL: We DO NOT reset distance or pitch here. 
+            # We let it persist from the previous screen (Loading/NewGameView).
+            
+            # Ensure political overlay is ON for gameplay
+            self.renderer.set_overlay_style(enabled=True, opacity=0.90)
+        else:
+            # Fallback if accessed directly without main menu (Debug scenarios)
+            self.cam_ctrl = CameraController()
+            map_path = config.get_asset_path("map/regions.png")
+            terrain_path = config.get_asset_path("map/terrain.png")
+            
+            self.renderer = MapRenderer(
+                camera=self.cam_ctrl,
+                map_data=session.map_data,
+                map_img_path=map_path,
+                terrain_img_path=terrain_path
+            )
 
-        self.renderer = MapRenderer(
-            camera=self.cam_ctrl,
-            map_data=session.map_data,
-            map_img_path=map_path,
-            terrain_img_path=terrain_path
-        )
-
-        # Legacy 2D camera for UI compatibility if needed, but not used for Map anymore
+        # Legacy 2D camera (kept for safety, though unused by 3D globe)
         self.world_cam = arcade.Camera2D()
 
-        # 3. Initialize Logic Controller
+        # 2. Initialize Logic Controller
         self.viewport_ctrl = ViewportController(
             cam_ctrl=self.cam_ctrl,
             world_camera=self.world_cam,
@@ -44,31 +53,55 @@ class GameView(BaseImGuiView):
             on_selection_change=self.on_selection_changed
         )
 
-        # 4. Initialize UI Layout
+        # 3. Initialize UI Layout
         self.layout = GameLayout(self.net, player_tag, self.viewport_ctrl)
 
         self.selected_region_id = None
         self._drag_start_pos = None
 
+        # 4. Handle Initial Focusing
+        # If initial_pos is passed (e.g. centroid of selected country), make sure we look at it.
+        # Since 'look_at_pixel_coords' only changes rotation (yaw/pitch) and preserves distance,
+        # the zoom level will stay consistent with what the user set in the menu.
+        if initial_pos:
+            # Convert World Coords (Bottom-Left Origin) -> Pixel Coords (Top-Left Origin)
+            world_x, world_y = initial_pos
+            map_h = session.map_data.height
+            px = world_x
+            py = map_h - world_y 
+            
+            self.cam_ctrl.look_at_pixel_coords(
+                px, py, 
+                self.renderer.width, 
+                self.renderer.height
+            )
+
     def on_show_view(self):
-        self.window.background_color = GAMETHEME.col_black
+        self.window.background_color = (10, 10, 10, 255)
         self.viewport_ctrl.refresh_map_layer()
 
     def on_selection_changed(self, region_id: int | None):
         self.selected_region_id = region_id
 
     def on_draw(self):
+        # 1. Clear Screen
         self.clear()
+        
+        # 2. ImGui Start
         self.imgui.new_frame()
+        # Note: Layout setup happens inside layout.render()
 
-        # Draw 3D World
-        self.window.use()
-        is_political = (self.layout.map_mode == "political")
-        self.renderer.set_overlay_style(enabled=is_political, opacity=0.90)
+        # 3. Render 3D World
+        # CRITICAL FIX: Reset OpenGL Context before drawing 3D
+        ctx = self.window.ctx
+        ctx.scissor = None
+        ctx.viewport = (0, 0, self.window.width, self.window.height)
+        ctx.enable_only((ctx.DEPTH_TEST, ctx.BLEND))
+
         self.renderer.draw()
 
-        # Draw UI
-        self.window.use()
+        # 4. Render UI
+        self.window.use() # Switch back for UI
         try:
             self.layout.render(
                 self.selected_region_id,
@@ -93,7 +126,7 @@ class GameView(BaseImGuiView):
                     self.layout.show_context_menu(target_region_id)
 
     def on_game_mouse_release(self, x, y, button, modifiers):
-        # For left clicks, handle selection if it wasn't a drag
+        # Handle "Click" vs "Drag"
         if button == arcade.MOUSE_BUTTON_LEFT and self._drag_start_pos:
             drag_threshold = 5.0
             dx = x - self._drag_start_pos[0]
@@ -101,17 +134,15 @@ class GameView(BaseImGuiView):
             drag_distance = (dx * dx + dy * dy) ** 0.5
 
             if drag_distance < drag_threshold:
-                # It was a Click
+                # It was a click
                 self.viewport_ctrl.on_mouse_press(self._drag_start_pos[0], self._drag_start_pos[1], button)
             
             self._drag_start_pos = None
 
     def on_game_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
-        # Forward drag to controller (which handles rotation)
         self.viewport_ctrl.on_mouse_drag(x, y, dx, dy, buttons)
 
     def on_game_mouse_scroll(self, x, y, scroll_x, scroll_y):
-        # Forward scroll to controller (which handles zoom)
         self.viewport_ctrl.on_mouse_scroll(x, y, scroll_x, scroll_y)
 
     def on_game_resize(self, width, height):

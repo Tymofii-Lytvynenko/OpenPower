@@ -26,11 +26,11 @@ class LoadingView(arcade.View):
         self.result = None
         self.error = None
 
-        # --- NEW: Sentinel to allow one render frame before switching ---
         self._finalizing_frame_rendered = False 
 
     def on_show_view(self):
-        self.window.background_color = GAMETHEME.col_black
+        # We use a transparent/dark bg so it looks nice if the renderer is missing
+        self.window.background_color = (10, 10, 10, 255)
         self.thread.start()
 
     def _worker(self):
@@ -45,33 +45,44 @@ class LoadingView(arcade.View):
         # If thread is done...
         if self.is_finished:
             if self.error:
-                # Handle error immediately
                 if self.on_failure: self.on_failure(self.error)
                 else: raise self.error
             else:
-                # --- THE FIX: DELAY SWITCHING BY 1 FRAME ---
+                # Delay switching by 1 frame to allow "100%" text to render
                 if not self._finalizing_frame_rendered:
-                    # Update text to show we are now in the blocking phase
                     self.task.status_text = "Finalizing Graphics..."
                     self.task.progress = 1.0
                     self._finalizing_frame_rendered = True
-                    return # RETURN HERE! Let on_draw() run one last time!
+                    return 
 
-                # NOW we do the heavy main-thread switching
+                # Switch Views
                 next_view = self.on_success(self.result)
-                
                 if next_view:
                     self.window.show_view(next_view)
 
-    # ... (rest of class: on_resize, on_draw remain the same) ...
     def on_resize(self, width: int, height: int):
         self.imgui.resize(width, height)
 
     def on_draw(self):
         self.clear()
+        
+        # 1. Start ImGui
         self.imgui.new_frame()
         self.ui.setup_frame()
 
+        # 2. Render Background Globe (If available)
+        # This keeps the visualization consistent during transition
+        if hasattr(self.window, "shared_renderer") and self.window.shared_renderer:
+            # CRITICAL: Reset OpenGL state
+            ctx = self.window.ctx
+            ctx.scissor = None
+            ctx.viewport = (0, 0, self.window.width, self.window.height)
+            ctx.enable_only((ctx.DEPTH_TEST, ctx.BLEND))
+            
+            # Draw the globe (reuses existing camera position)
+            self.window.shared_renderer.draw()
+
+        # 3. Render Loading UI
         screen_w, screen_h = self.window.get_size()
         
         if self.ui.begin_centered_panel("Loader", screen_w, screen_h, w=400, h=150):
