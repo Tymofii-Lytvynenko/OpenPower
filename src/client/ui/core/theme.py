@@ -12,8 +12,8 @@ class UIColors:
     Combines Modern Glass UI (Neutrals) with Game Semantics (Vibrant).
     """
     # --- 1. Base Text ---
-    text_main: tuple     = (0.90, 0.90, 0.93, 1.00) # Soft White
-    text_dim: tuple      = (0.50, 0.55, 0.60, 1.00) # Muted Grey
+    text_main: tuple     = (1.00, 1.00, 1.00, 1.00) # Soft White
+    text_dim: tuple      = (0.60, 0.60, 0.60, 1.00) # Muted Grey
 
     # --- 2. Backgrounds (Glass/Modern) ---
     # Dark charcoal, high alpha for readability, but still semi-transparent

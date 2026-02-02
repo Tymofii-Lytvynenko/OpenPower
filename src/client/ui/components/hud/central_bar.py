@@ -300,7 +300,7 @@ class CentralBar:
         
         imgui.set_cursor_pos((btn_x, btn_y))
         
-        imgui.push_style_color(imgui.Col_.button, (0,0,0,0)) # Transparent
+        imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.bg_child)
         if imgui.button(icons_fontawesome_6.ICON_FA_NEWSPAPER, (btn_w, btn_h)):
             pass # Open history
         imgui.pop_style_color()
