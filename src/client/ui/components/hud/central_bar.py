@@ -3,7 +3,7 @@ import polars as pl
 from typing import Optional
 from imgui_bundle import imgui, icons_fontawesome_6
 
-from src.client.ui.composer import UIComposer
+from src.client.ui.core.composer import UIComposer
 from src.client.ui.core.theme import GAMETHEME
 from src.client.renderers.flag_renderer import FlagRenderer
 from src.shared.actions import ActionSetGameSpeed, ActionSetPaused

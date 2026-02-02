@@ -4,7 +4,7 @@ from typing import Optional
 from imgui_bundle import imgui
 from imgui_bundle.python_backends.opengl_backend_programmable import ProgrammablePipelineRenderer as OpenGL3Backend
 
-from src.client.ui.font_loader import FontLoader
+from src.client.ui.core.font_loader import FontLoader
 
 class ImGuiService:
     """

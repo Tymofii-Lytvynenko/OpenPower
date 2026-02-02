@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Optional
 
 from src.client.views.base_view import BaseImGuiView
 from src.client.services.network_client_service import NetworkClient
-from src.client.ui.composer import UIComposer
+from src.client.ui.core.composer import UIComposer
 from src.client.ui.core.theme import GAMETHEME
 from src.shared.config import GameConfig
 from src.client.utils.coords_util import calculate_centroid
