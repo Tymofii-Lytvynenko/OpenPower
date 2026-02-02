@@ -62,11 +62,11 @@ class MilitaryPanel(BasePanel):
             imgui.set_cursor_pos_x(imgui.get_content_region_avail().x - 90)
             imgui.button("RESEARCH##strat", (90, 0))
         else:
-            imgui.text_colored(GAMETHEME.col_text_disabled, "Classified Intel")
+            imgui.text_colored(GAMETHEME.colors.text_dim, "Classified Intel")
         
         # 4. Missile Defense
         composer.draw_section_header("MISSILE DEFENSE", show_more_btn=False)
-        imgui.text_colored(GAMETHEME.col_negative, "N/A")
+        imgui.text_colored(GAMETHEME.colors.negative, "N/A")
         
         if is_own:
             imgui.same_line()

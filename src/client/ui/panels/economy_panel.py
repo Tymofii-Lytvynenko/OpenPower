@@ -51,8 +51,8 @@ class EconomyPanel(BasePanel):
         # Economic Model Section
         composer.draw_section_header("ECONOMIC MODEL", show_more_btn=False)
         
-        imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.popup_bg)
-        imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.col_active_accent)
+        imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.colors.bg_input)
+        imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.colors.accent)
         
         # Disable interaction if foreign country
         if not is_own: imgui.begin_disabled()
@@ -73,7 +73,7 @@ class EconomyPanel(BasePanel):
         composer.draw_section_header(f"GDP: ${total_gdp:,.0f}")
         
         gdp_health = min((total_gdp / 1000000000000) * 100, 100.0)
-        composer.draw_meter("", gdp_health, GAMETHEME.col_positive) 
+        composer.draw_meter("", gdp_health, GAMETHEME.colors.positive) 
         
         imgui.text_disabled(f"Per Capita: ${gdp_per_capita:,}")
         imgui.dummy((0, 5))
@@ -87,12 +87,12 @@ class EconomyPanel(BasePanel):
         composer.draw_currency_row("EXPENSES", expenses)
         
         balance = calculated_income - expenses
-        col_bal = GAMETHEME.col_negative if balance < 0 else GAMETHEME.col_positive
+        col_bal = GAMETHEME.colors.negative if balance < 0 else GAMETHEME.colors.positive
         composer.draw_currency_row("BALANCE", balance, col_bal)
         
         # Maybe hide exact reserves if not own country?
         if is_own:
-            col_res = GAMETHEME.col_negative if reserves < 0 else GAMETHEME.col_positive
+            col_res = GAMETHEME.colors.negative if reserves < 0 else GAMETHEME.colors.positive
             composer.draw_currency_row("AVAILABLE", reserves, col_res)
         else:
             imgui.text("AVAILABLE")
@@ -104,7 +104,7 @@ class EconomyPanel(BasePanel):
 
         # Resources Section
         composer.draw_section_header("RESOURCES")
-        composer.draw_meter("", 66.0, GAMETHEME.col_positive)
+        composer.draw_meter("", 66.0, GAMETHEME.colors.positive)
         
         imgui.dummy((0, 15))
         

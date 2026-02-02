@@ -46,7 +46,7 @@ class DemographicsPanel(BasePanel):
         imgui.same_line()
         # Right align the number
         imgui.set_cursor_pos_x(imgui.get_content_region_avail().x + 20 - imgui.calc_text_size(f"{total_pop:,}").x)
-        imgui.text_colored(GAMETHEME.col_active_accent, f"{total_pop:,}")
+        imgui.text_colored(GAMETHEME.colors.accent, f"{total_pop:,}")
         
         imgui.dummy((0, 5))
 
@@ -69,7 +69,7 @@ class DemographicsPanel(BasePanel):
                     human_dev_index = float(row["human_dev"][0])
             except: pass
 
-        composer.draw_meter("HDI Score", human_dev_index, GAMETHEME.col_info)
+        composer.draw_meter("HDI Score", human_dev_index, GAMETHEME.colors.info)
         
         imgui.dummy((0, 15))
         

@@ -85,10 +85,10 @@ class EditorLayout(BaseLayout):
                  imgui.WindowFlags_.no_focus_on_appearing)
                  
         # Use theme for semi-transparent overlay background
-        imgui.push_style_color(imgui.Col_.window_bg, GAMETHEME.col_overlay_bg)
+        imgui.push_style_color(imgui.Col_.window_bg, GAMETHEME.colors.overlay_bg)
         
         if imgui.begin("Overlay", flags=flags):
-            imgui.text_colored(GAMETHEME.col_positive, f"FPS: {fps:.0f}")
+            imgui.text_colored(GAMETHEME.colors.positive, f"FPS: {fps:.0f}")
             imgui.text(f"Layer: {self.current_layer_label}")
             imgui.separator()
             imgui.text_disabled("Right Click: Pan Map")

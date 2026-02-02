@@ -28,11 +28,11 @@ class RegionInspectorPanel(BasePanel):
             row_df = regions.filter(pl.col("id") == region_id)
             
             if row_df.is_empty():
-                imgui.text_colored(GAMETHEME.col_error, "Region not found in database.")
+                imgui.text_colored(GAMETHEME.colors.error, "Region not found in database.")
                 return
 
             row = row_df.row(0, named=True)
-            imgui.text_colored(GAMETHEME.col_active_accent, f"NAME: {row.get('name', '???')}")
+            imgui.text_colored(GAMETHEME.colors.accent, f"NAME: {row.get('name', '???')}")
             
             if on_focus_request and imgui.button("CENTER CAMERA"):
                 on_focus_request(region_id) # The ViewportController handles the logic

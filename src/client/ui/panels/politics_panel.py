@@ -35,8 +35,8 @@ class PoliticsPanel(BasePanel):
 
         # Ideology Slider
         composer.draw_section_header("IDEOLOGY", show_more_btn=False)
-        imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.col_active_accent)
-        imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.popup_bg)
+        imgui.push_style_color(imgui.Col_.slider_grab, GAMETHEME.colors.accent)
+        imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.colors.bg_input)
         
         if not is_own: imgui.begin_disabled()
         imgui.slider_float("##ideology", 0.5, 0.0, 1.0, "")
@@ -61,15 +61,15 @@ class PoliticsPanel(BasePanel):
 
         # Metrics
         composer.draw_section_header("APPROVAL", show_more_btn=False)
-        col = GAMETHEME.col_positive if approval > 40 else GAMETHEME.col_negative
+        col = GAMETHEME.colors.positive if approval > 40 else GAMETHEME.colors.negative
         composer.draw_meter("", approval, col) 
 
         composer.draw_section_header("STABILITY", show_more_btn=False)
-        col = GAMETHEME.col_positive if stability > 50 else GAMETHEME.col_warning
+        col = GAMETHEME.colors.positive if stability > 50 else GAMETHEME.colors.warning
         composer.draw_meter("", stability, col) 
 
         composer.draw_section_header("CORRUPTION", show_more_btn=False)
-        col = GAMETHEME.col_negative if corruption > 30 else GAMETHEME.col_positive
+        col = GAMETHEME.colors.negative if corruption > 30 else GAMETHEME.colors.positive
         composer.draw_meter("", corruption, col) 
         
         imgui.dummy((0, 10))

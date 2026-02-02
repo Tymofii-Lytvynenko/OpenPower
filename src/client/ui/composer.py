@@ -16,7 +16,7 @@ class UIComposer:
 
     def setup_frame(self):
         """Applies global theme styles for the current frame."""
-        self.theme.apply_global_styles()
+        self.theme.apply()
 
     # =========================================================
     # 1. WINDOW / PANEL MANAGEMENT
@@ -143,7 +143,7 @@ class UIComposer:
         draw_list.add_rect_filled(
             p, 
             (p.x + width, p.y + height), 
-            imgui.get_color_u32(self.theme.header_bg),
+            imgui.get_color_u32(self.theme.colors.bg_input),
             4.0 # Rounding
         )
         
@@ -153,7 +153,7 @@ class UIComposer:
         
         # Padding Left
         imgui.set_cursor_screen_pos((p.x + 8, text_y))
-        imgui.text_colored(self.theme.text_main, label)
+        imgui.text_colored(self.theme.colors.text_main, label)
         
         # Reset Cursor for next item
         imgui.set_cursor_screen_pos((p.x, p.y + height + 5))
@@ -177,7 +177,7 @@ class UIComposer:
         # Background (Track)
         draw_list.add_rect_filled(
             p, (p.x + w, p.y + h), 
-            imgui.get_color_u32(self.theme.frame_bg),
+            imgui.get_color_u32(self.theme.colors.bg_input),
             h / 2
         )
         
@@ -207,7 +207,7 @@ class UIComposer:
         # Right align the value
         self.right_align(imgui.calc_text_size(val_str).x)
         
-        col = color_val if color_val else self.theme.text_main
+        col = color_val if color_val else self.theme.colors.text_main
         imgui.text_colored(col, val_str)
 
     def draw_progress_bar(self, fraction: float, text: str = "", width: float = -1, height: float = 20):
@@ -222,20 +222,20 @@ class UIComposer:
         # Background
         draw_list.add_rect_filled(
             p, (p.x + w, p.y + height), 
-            imgui.get_color_u32(self.theme.window_bg)
+            imgui.get_color_u32(self.theme.colors.bg_window)
         )
         
         # Fill
         fill_w = w * max(0.0, min(fraction, 1.0))
         draw_list.add_rect_filled(
             p, (p.x + fill_w, p.y + height), 
-            imgui.get_color_u32(self.theme.col_active_accent)
+            imgui.get_color_u32(self.theme.colors.accent)
         )
         
         # Border
         draw_list.add_rect(
             p, (p.x + w, p.y + height), 
-            imgui.get_color_u32(self.theme.border)
+            imgui.get_color_u32(self.theme.colors.accent)
         )
         
         # Centered Text
@@ -258,7 +258,7 @@ class UIComposer:
         """
         # 1. Custom Button Style
         # Use Active color for background if selected, else Normal
-        bg_col = self.theme.button_active if is_active else self.theme.button_normal
+        bg_col = self.theme.colors.interaction_active if is_active else self.theme.colors.bg_input
         imgui.push_style_color(imgui.Col_.button, bg_col)
         imgui.push_style_var(imgui.StyleVar_.frame_rounding, 8.0) # Softer corners for icons
         
@@ -274,7 +274,7 @@ class UIComposer:
         draw_list = imgui.get_window_draw_list()
         
         # Indicator color: The specific category color (e.g. Red for Mil, Green for Eco)
-        ind_col_tuple = (*color[:3], 1.0) if is_active else self.theme.text_dim
+        ind_col_tuple = (*color[:3], 1.0) if is_active else self.theme.colors.text_dim
         ind_col = imgui.get_color_u32(ind_col_tuple)
         
         # Draw a small bar at the bottom

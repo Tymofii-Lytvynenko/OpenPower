@@ -40,10 +40,10 @@ class GameLayout(BaseLayout):
         self._cached_target_tag: str = player_tag
 
         # --- Panel Registry ---
-        self.register_panel("POL", PoliticsPanel(), icon=f"{icons_fontawesome_6.ICON_FA_BUILDING_COLUMNS}", color=GAMETHEME.col_politics, visible=False)
-        self.register_panel("MIL", MilitaryPanel(), icon=f"{icons_fontawesome_6.ICON_FA_PERSON_MILITARY_RIFLE}", color=GAMETHEME.col_military, visible=False)
-        self.register_panel("ECO", EconomyPanel(), icon=f"{icons_fontawesome_6.ICON_FA_SACK_DOLLAR}", color=GAMETHEME.col_economy, visible=False)
-        self.register_panel("DEM", DemographicsPanel(), icon=f"{icons_fontawesome_6.ICON_FA_PEOPLE_GROUP}", color=GAMETHEME.col_demographics, visible=False)
+        self.register_panel("POL", PoliticsPanel(), icon=f"{icons_fontawesome_6.ICON_FA_BUILDING_COLUMNS}", color=GAMETHEME.colors.politics, visible=False)
+        self.register_panel("MIL", MilitaryPanel(), icon=f"{icons_fontawesome_6.ICON_FA_PERSON_MILITARY_RIFLE}", color=GAMETHEME.colors.military, visible=False)
+        self.register_panel("ECO", EconomyPanel(), icon=f"{icons_fontawesome_6.ICON_FA_SACK_DOLLAR}", color=GAMETHEME.colors.economy, visible=False)
+        self.register_panel("DEM", DemographicsPanel(), icon=f"{icons_fontawesome_6.ICON_FA_PEOPLE_GROUP}", color=GAMETHEME.colors.demographics, visible=False)
         
         self.register_panel("DATA_INSPECTOR", DataInspectorPanel(), visible=False)
 

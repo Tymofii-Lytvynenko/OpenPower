@@ -83,15 +83,15 @@ class DataInspectorPanel(BasePanel):
                 imgui.set_next_item_width(150)
                 _, self.row_limit = imgui.slider_int("Row Limit", self.row_limit, 10, 1000)
                 imgui.same_line()
-                imgui.text_colored(GAMETHEME.col_info, f"Shape: {data.shape}")
+                imgui.text_colored(GAMETHEME.colors.info, f"Shape: {data.shape}")
             
             elif dataclasses.is_dataclass(data):
                 imgui.same_line()
-                imgui.text_colored(GAMETHEME.col_politics, "Type: Dataclass")
+                imgui.text_colored(GAMETHEME.colors.politics, "Type: Dataclass")
 
             elif isinstance(data, dict):
                 imgui.same_line()
-                imgui.text_colored(GAMETHEME.col_politics, f"Type: Dict ({len(data)} keys)")
+                imgui.text_colored(GAMETHEME.colors.politics, f"Type: Dict ({len(data)} keys)")
 
         imgui.separator()
 
@@ -156,7 +156,7 @@ class DataInspectorPanel(BasePanel):
                 
                 # Column 1: Name
                 imgui.table_next_column()
-                imgui.text_colored(GAMETHEME.col_active_accent, field.name)
+                imgui.text_colored(GAMETHEME.colors.accent, field.name)
                 
                 # Column 2: Value
                 imgui.table_next_column()
@@ -176,7 +176,7 @@ class DataInspectorPanel(BasePanel):
             for k, v in data.items():
                 imgui.table_next_row()
                 imgui.table_next_column()
-                imgui.text_colored(GAMETHEME.col_active_accent, str(k))
+                imgui.text_colored(GAMETHEME.colors.accent, str(k))
                 imgui.table_next_column()
                 self._draw_value(v)
             
@@ -191,9 +191,9 @@ class DataInspectorPanel(BasePanel):
         val_str = str(val)
         
         if isinstance(val, (int, float)):
-            imgui.text_colored(GAMETHEME.col_active_accent, val_str)
+            imgui.text_colored(GAMETHEME.colors.accent, val_str)
         elif isinstance(val, bool):
-            col = GAMETHEME.col_positive if val else GAMETHEME.col_negative
+            col = GAMETHEME.colors.positive if val else GAMETHEME.colors.negative
             imgui.text_colored(col, val_str)
         elif val is None:
             imgui.text_disabled("None")

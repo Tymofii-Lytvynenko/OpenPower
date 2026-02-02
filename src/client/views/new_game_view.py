@@ -141,7 +141,7 @@ class NewGameView(BaseImGuiView):
             imgui.begin_group()
             imgui.dummy((300, 0))
             if self.selected_country_id:
-                imgui.text_colored(GAMETHEME.col_active_accent, f"Selected: {self.selected_country_id}")
+                imgui.text_colored(GAMETHEME.colors.accent, f"Selected: {self.selected_country_id}")
                 imgui.separator()
                 imgui.text_wrapped("Standard Campaign.")
                 imgui.text_wrapped("Difficulty: Normal")

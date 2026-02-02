@@ -65,9 +65,9 @@ class CentralBar:
                 ticker_h = h - top_h
 
                 # Draw backgrounds
-                draw_list.add_rect_filled(p, (p.x + w, p.y + top_h), imgui.get_color_u32(GAMETHEME.col_panel_bg), GAMETHEME.rounding, imgui.ImDrawFlags_.round_corners_top)
-                draw_list.add_rect_filled((p.x, p.y + top_h), (p.x + w, p.y + h), imgui.get_color_u32(GAMETHEME.col_overlay_bg), GAMETHEME.rounding, imgui.ImDrawFlags_.round_corners_bottom)
-                draw_list.add_rect(p, (p.x + w, p.y + h), imgui.get_color_u32(GAMETHEME.border), GAMETHEME.rounding, 0, 1.5)
+                draw_list.add_rect_filled(p, (p.x + w, p.y + top_h), imgui.get_color_u32(GAMETHEME.colors.bg_window), GAMETHEME.rounding, imgui.ImDrawFlags_.round_corners_top)
+                draw_list.add_rect_filled((p.x, p.y + top_h), (p.x + w, p.y + h), imgui.get_color_u32(GAMETHEME.colors.bg_window), GAMETHEME.rounding, imgui.ImDrawFlags_.round_corners_bottom)
+                draw_list.add_rect(p, (p.x + w, p.y + h), imgui.get_color_u32(GAMETHEME.colors.accent), GAMETHEME.rounding, 0, 1.5)
 
                 padding_x = 12.0
                 inner_item_h = top_h * self.content_scale_factor
@@ -123,8 +123,8 @@ class CentralBar:
             screen_w = width - 50 - imgui.get_style().item_spacing.x
             p = imgui.get_cursor_screen_pos()
             draw_list = imgui.get_window_draw_list()
-            draw_list.add_rect_filled(p, (p.x + screen_w, p.y + height), imgui.get_color_u32(GAMETHEME.col_black))
-            draw_list.add_rect(p, (p.x + screen_w, p.y + height), imgui.get_color_u32(GAMETHEME.border))
+            draw_list.add_rect_filled(p, (p.x + screen_w, p.y + height), imgui.get_color_u32(0xFF222222))
+            draw_list.add_rect(p, (p.x + screen_w, p.y + height), imgui.get_color_u32(GAMETHEME.colors.accent))
             
             imgui.begin_child("TimeScreen", (screen_w, height), False, imgui.WindowFlags_.no_background)
             
@@ -147,8 +147,8 @@ class CentralBar:
         imgui.push_style_var(imgui.StyleVar_.frame_padding, (0, 0))
         
         if is_paused: 
-            imgui.push_style_color(imgui.Col_.button, GAMETHEME.col_warning)
-            imgui.push_style_color(imgui.Col_.text, GAMETHEME.col_black)
+            imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.warning)
+            imgui.push_style_color(imgui.Col_.text, GAMETHEME.colors.text_dim)
         
         if imgui.button("||", btn_s):
             net.send_action(ActionSetPaused("local", not is_paused))
@@ -159,8 +159,8 @@ class CentralBar:
         for i in range(1, 6):
             is_active = (current_speed == i and not is_paused)
             if is_active: 
-                imgui.push_style_color(imgui.Col_.button, GAMETHEME.col_positive)
-                imgui.push_style_color(imgui.Col_.text, GAMETHEME.col_black)
+                imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.positive)
+                imgui.push_style_color(imgui.Col_.text, GAMETHEME.colors.text_dim)
             if imgui.button(str(i), btn_s):
                 net.send_action(ActionSetPaused("local", False))
                 net.send_action(ActionSetGameSpeed("local", i))
@@ -187,9 +187,9 @@ class CentralBar:
         imgui.set_cursor_pos((pos_x, pos_y))
         
         # Draw with color logic
-        imgui.text_colored(GAMETHEME.col_positive, date_part)
+        imgui.text_colored(GAMETHEME.colors.positive, date_part)
         imgui.same_line()
-        imgui.text_colored(GAMETHEME.col_text_bright, time_part)
+        imgui.text_colored(GAMETHEME.colors.text_main, time_part)
 
     def _render_country_info(self, composer: UIComposer, height):
         imgui.begin_group()
@@ -214,12 +214,12 @@ class CentralBar:
                 imgui.push_style_var(imgui.StyleVar_.item_spacing, (4, 0))
                 
                 if self.is_own:
-                    self._draw_status_label("COMMAND", GAMETHEME.col_positive, row_h, width=70)
+                    self._draw_status_label("COMMAND", GAMETHEME.colors.positive, row_h, width=70)
                 else:
-                    self._draw_status_label("VIEWING", GAMETHEME.col_warning, row_h, width=70)
+                    self._draw_status_label("VIEWING", GAMETHEME.colors.warning, row_h, width=70)
 
                 imgui.same_line()
-                self._draw_status_label("INFO", GAMETHEME.col_info, row_h, width=16)
+                self._draw_status_label("INFO", GAMETHEME.colors.info, row_h, width=16)
                 imgui.pop_style_var()
             finally:
                 imgui.end_group()
@@ -261,7 +261,7 @@ class CentralBar:
         
         # Draw Text
         imgui.set_cursor_pos((padding_x, current_y + text_y))
-        imgui.text_colored(GAMETHEME.col_text_bright, self.news_ticker_text)
+        imgui.text_colored(GAMETHEME.colors.text_main, self.news_ticker_text)
         
         # 2. Draw "News Button" on the far right
         btn_h = section_h - 6.0 # Small padding top/bottom
@@ -309,12 +309,12 @@ class CentralBar:
                         
                 imgui.end_child()
             else:
-                imgui.text_colored(GAMETHEME.col_error, "No country data loaded.")
+                imgui.text_colored(GAMETHEME.colors.error, "No country data loaded.")
                 
             imgui.end_popup()
 
     def _draw_status_label(self, label, color, height, width=40):
         imgui.push_style_color(imgui.Col_.button, color)
-        imgui.push_style_color(imgui.Col_.text, GAMETHEME.col_black)
+        imgui.push_style_color(imgui.Col_.text, GAMETHEME.colors.text_dim)
         imgui.button(label, (width, height))
         imgui.pop_style_color(2)
