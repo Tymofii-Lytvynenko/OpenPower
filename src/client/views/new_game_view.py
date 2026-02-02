@@ -152,9 +152,9 @@ class NewGameView(BaseImGuiView):
                 imgui.text_colored(GAMETHEME.colors.accent, f"Selected: {self.selected_country_id}")
                 imgui.separator()
                 imgui.dummy((0, 10))
-                imgui.text_wrapped("Standard Campaign.")
-                imgui.text_wrapped("Difficulty: Normal")
-                imgui.text_wrapped("Ironman: On")
+                imgui.text_wrapped("Country Details:")
+                imgui.text_wrapped("")
+                imgui.text_wrapped("")
             else:
                 imgui.text_disabled("Select a nation from the list.")
             imgui.end_group()
