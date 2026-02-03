@@ -259,12 +259,12 @@ class CentralBar:
         
         # 1. AI Button
         if imgui.button(f"{icons_fontawesome_6.ICON_FA_BRAIN}", btn_sz): pass
-        if imgui.is_item_hovered(): imgui.set_tooltip("AI Settings")
+        if imgui.is_item_hovered(): imgui.set_tooltip("AI")
         imgui.same_line()
         
         # 2. Statistics
         if imgui.button(f"{icons_fontawesome_6.ICON_FA_CHART_LINE}", btn_sz): pass
-        if imgui.is_item_hovered(): imgui.set_tooltip("Global Ledger")
+        if imgui.is_item_hovered(): imgui.set_tooltip("Statistics")
         imgui.same_line()
         
         # 3. Messages
