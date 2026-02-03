@@ -15,7 +15,7 @@ Water (m3)
 ENERGY 
 Electricity (kWh)
 Solid Fuel (kg)
-Liquid Fuel (barrel)
+Liquid Fuel (kg)
 Gas (m3)
 Radioactive Materials (kg)
 
@@ -23,32 +23,45 @@ RAW MATERIALS
 Wood & paper (kg)
 Minerals (kg)
 Iron & steel (kg)
-Precious stones (gram)
+Non-Ferrous Metals (kg)
+Precious stones (g)
 Rare earth elements (kg)
 
 INDUSTRIAL MATERIALS 
 Fabrics (kg)
-Plastics (kg)
+Polymers & Rubber (kg)
 Chemicals (kg)
-Pharmaceuticals (TEU float)
+Pharma (kg)
 
-FINISHED GOODS 
-Appliances (Units ??? not sure)
-Vehicles (Horsepower ??? not sure)
-Machinery (KWh ??? not sure)
-Hardware (TFLOPS ???)
-Commodities (TEU float)
-Luxury commodities (TEU float)
+HEAVY INDUSTRY 
+Machinery (kg)
+Vehicles (kg)
+Electronics (kg)
+
+CONSUMER GOODS 
+Pharma (kg) 
+Textiles & Clothing (kg) 
+Household Goods (kg)
 
 SERVICES 
+Travel & Tourism (Mh)
+Transport & Logistics (Mh)
+Engineering & Technical (Mh)
 Construction (Mh)
 Engineering (Mh)
-Health & care (Mh)
-Retail (Mh)
-Legal services (Mh)
-Market & advertising (Mh)
-Information technologies (Mh)
-Science (Mh)
+Health & Care (Mh)
+Education & Science (Mh)
+Retail & Hospitality (Mh)
+IT & Banking (Mh)
 
 MILITARY 
-Military Supplies (TEU float)
+Military Supplies (kg)
+
+We take real statistics on global exports of the resource (in dollars)
+We take real statistics on global exports of the resource (in units of measurement)
+We look at how much the country exported (in dollars)
+We divide the price in dollars by the price per unit
+
+Sources:
+https://unstats.un.org/unsd/classifications/Econ/Download/In%20Text/EBOPS2010_english.pdf
+https://www.tariffnumber.com/
