@@ -12,12 +12,11 @@ from src.client.renderers.base_renderer import BaseRenderer
 from src.client.controllers.camera_controller import CameraController
 from src.client.renderers.texture_manager import TextureManager
 from src.client.utils.picking_utils import PickingUtils
-
+from src.client.services.cache_service import CacheService
 
 class MapRenderer(BaseRenderer):
     """
-    Interactive globe renderer with LUT overlay + picking.
-    Centralized caching ensures assets folder remains clean.
+    Interactive globe renderer.
     """
 
     def __init__(
@@ -34,18 +33,15 @@ class MapRenderer(BaseRenderer):
         self.width = map_data.width
         self.height = map_data.height
 
-        # --- CENTRALIZED CACHE LOGIC ---
-        # Find project root (OpenPower/) by going up 3 levels from src/client/renderers/
-        # Since MapRenderer is in the same folder as TextureManager, the logic is identical.
-        self.project_root = Path(__file__).resolve().parents[3] # TODO: remove hardcoding later
-        self.cache_dir = self.project_root / ".cache"
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        # --- CACHE SERVICE INIT ---
+        # Robust root finding: Go up until we find "modules" or "main.py"
+        root = Path(__file__).resolve().parents[3] # Or pass this in from main.py via config
+        self.cache_service = CacheService(root)
 
         # --- COMPONENTS ---
-        self.texture_manager = TextureManager(self.ctx)
-        
-        # Point the indexer specifically to the root cache, NOT map_img_path.parent
-        self.indexer = MapIndexer(self.cache_dir)
+        # Pass service to components using Dependency Injection (Composition)
+        self.texture_manager = TextureManager(self.ctx, self.cache_service)
+        self.indexer = MapIndexer(self.cache_service)
 
         # --- STATE ---
         self.single_select_dense_id: int = -1
@@ -61,9 +57,6 @@ class MapRenderer(BaseRenderer):
         self._init_glsl_globe()
 
     def _init_resources(self, terrain_path: Path, map_path: Path):
-        """Load textures and initialize the indexing system."""
-        # TextureManager already knows to look in project_root/.cache
-        # But we pass the indexer which is now also pointed at the root cache.
         self.texture_manager.load_map_texture(
             map_path, 
             self.map_data.packed_map, 
@@ -74,9 +67,8 @@ class MapRenderer(BaseRenderer):
         self.texture_manager.load_terrain_texture(terrain_path)
         self.texture_manager.init_lookup_texture()
 
-    def _set_uniform_if_present(self, name: str, value: Any):
-        super()._set_uniform_if_present(self.program, name, value)
-
+    # ... (Rest of the file remains exactly the same: _init_glsl_globe, draw, etc.)
+    # ...
     def _init_glsl_globe(self):
         """Initialize the globe shader and geometry."""
         shader_source = ShaderRegistry.load_bundle(ShaderRegistry.GLOBE_V, ShaderRegistry.GLOBE_F)
@@ -85,26 +77,24 @@ class MapRenderer(BaseRenderer):
             fragment_shader=shader_source["fragment_shader"],
         )
 
-        # Set texture uniforms to matching units
         self._set_uniform_if_present("u_map_texture", 0)
         self._set_uniform_if_present("u_lookup_texture", 1)
         self._set_uniform_if_present("u_terrain_texture", 2)
 
         self.texture_manager.set_uniforms(self.program)
         
-        # Set default uniforms
         self._set_uniform_if_present("u_selected_id", -1)
         self._set_uniform_if_present("u_overlay_mode", 1)
         self._set_uniform_if_present("u_opacity", 0.90)
         self._set_uniform_if_present("u_light_dir", (0.4, 0.3, 1.0))
         self._set_uniform_if_present("u_ambient", 0.35)
-        
-        # Send Texture Size for Border Detection in Shader
         self._set_uniform_if_present("u_texture_size", (float(self.width), float(self.height)))
 
-        # Create sphere geometry
         self.sphere = SphereMesh(self.ctx, radius=self.globe_radius, seg_u=256, seg_v=128)
         self.sphere.build_geometry(self.ctx, self.program)
+
+    def _set_uniform_if_present(self, name: str, value: Any):
+        super()._set_uniform_if_present(self.program, name, value)
 
     def set_overlay_style(self, enabled: bool, opacity: float):
         self._overlay_enabled = enabled
@@ -138,14 +128,12 @@ class MapRenderer(BaseRenderer):
         if self.program is None or self.sphere is None or self.sphere.geo is None:
             return
         
-        # Update Camera Matrices
         w, h = self.window.get_size()
         self.camera.update_matrices(w, h)
         
         self._enable_rendering_state()
         self.texture_manager.bind_textures(self.program)
         
-        # Get Matrices from Camera
         model, view, proj = self.camera.get_matrices()
         self.program["u_model"] = model
         self.program["u_view"] = view
@@ -173,7 +161,6 @@ class MapRenderer(BaseRenderer):
         if vp_matrix is None or model_matrix is None:
             return 0
 
-        # Raycast against Sphere
         ray_o, ray_d = PickingUtils.screen_to_ray(sx, sy, w, h, vp_matrix)
         if ray_o is None or ray_d is None: return 0
 
