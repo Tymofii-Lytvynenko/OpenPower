@@ -13,6 +13,7 @@ from src.client.controllers.camera_controller import CameraController
 from src.client.renderers.texture_manager import TextureManager
 from src.client.utils.picking_utils import PickingUtils
 from src.client.services.cache_service import CacheService
+from src.core.paths import ProjectPaths
 
 class MapRenderer(BaseRenderer):
     """
@@ -34,9 +35,8 @@ class MapRenderer(BaseRenderer):
         self.height = map_data.height
 
         # --- CACHE SERVICE INIT ---
-        # Robust root finding: Go up until we find "modules" or "main.py"
-        root = Path(__file__).resolve().parents[3] # Or pass this in from main.py via config
-        self.cache_service = CacheService(root)
+        self.cache_service = CacheService(ProjectPaths.root())
+        self.texture_manager = TextureManager(self.ctx, self.cache_service)
 
         # --- COMPONENTS ---
         # Pass service to components using Dependency Injection (Composition)

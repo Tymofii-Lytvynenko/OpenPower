@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, Optional, Any
 from PIL import Image
 from imgui_bundle import imgui
+from src.core.paths import ProjectPaths
 
 class FlagTexture:
     """
@@ -42,8 +43,10 @@ class FlagRenderer:
                 self.project_root = parent
                 break
         
-        self.flags_dir = self.project_root / "modules" / "base" / "assets" / "flags"
+        self.flags_dir = ProjectPaths.assets("base") / "flags"
+        
         self._cache: Dict[str, Optional[FlagTexture]] = {}
+        
         self._fallback_tag = "XXX"
         self._error_printed = False # To prevent console spam on rendering failures
         self._initialized = True

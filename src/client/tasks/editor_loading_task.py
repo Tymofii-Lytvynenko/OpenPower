@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from src.server.session import GameSession
 from src.shared.config import GameConfig
-
+from src.core.paths import ProjectPaths
 # UPDATED: Import Core Data class instead of Shared Atlas
 from src.core.map_data import RegionMapData
 from src.client.services.network_client_service import NetworkClient

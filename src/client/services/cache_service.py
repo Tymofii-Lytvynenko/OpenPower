@@ -5,6 +5,7 @@ import shutil
 import numpy as np
 from pathlib import Path
 from typing import Optional, Any, Dict
+from src.core.paths import ProjectPaths
 
 class CacheService:
     """
@@ -12,8 +13,8 @@ class CacheService:
     Handles path resolution, hashing, validation, and threaded I/O.
     """
     def __init__(self, project_root: Path):
-        self.project_root = project_root
-        self.cache_dir = self.project_root / ".cache"
+        self.project_root = project_root or ProjectPaths.root()
+        self.cache_dir = ProjectPaths.cache()
         self._ensure_cache_dir()
 
     def _ensure_cache_dir(self):
@@ -38,7 +39,7 @@ class CacheService:
 
     def get_asset_path(self, module: str, *parts: str) -> Path:
         """Helper to resolve paths to raw assets (e.g. modules/base/assets/...)."""
-        return self.project_root / "modules" / module / "assets" / Path(*parts)
+        return ProjectPaths.assets(module).joinpath(*parts)
 
     # --- Validation ---
 
