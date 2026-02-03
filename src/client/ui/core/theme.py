@@ -17,9 +17,9 @@ class UIColors:
 
     # --- 2. Backgrounds (Glass/Modern) ---
     # Dark charcoal, high alpha for readability, but still semi-transparent
-    bg_window: tuple     = (0.08, 0.09, 0.10, 0.80) 
+    bg_window: tuple     = (0.08, 0.09, 0.10, 0.85) 
     bg_child: tuple      = (0.00, 0.00, 0.00, 0.00) # Transparent (letting window bg show)
-    bg_popup: tuple      = (0.05, 0.05, 0.05, 0.80)
+    bg_popup: tuple      = (0.05, 0.05, 0.05, 0.85)
     bg_input: tuple      = (0.16, 0.18, 0.21, 0.60) # Dark neutral for inputs
 
     # --- 3. Main Accent (Used sparingly) ---
