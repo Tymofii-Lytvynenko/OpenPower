@@ -1,7 +1,7 @@
 import arcade
 import arcade.gl
 import numpy as np
-from typing import Optional, List, Dict, Tuple, Set
+from typing import Optional, List, Dict, Tuple, Set, Any
 from pathlib import Path
 
 from src.core.map_data import RegionMapData
@@ -17,11 +17,12 @@ from src.client.utils.picking_utils import PickingUtils
 class MapRenderer(BaseRenderer):
     """
     Interactive globe renderer with LUT overlay + picking.
+    Centralized caching ensures assets folder remains clean.
     """
 
     def __init__(
         self,
-        camera: CameraController,  # <--- INJECTED DEPENDENCY
+        camera: CameraController,
         map_data: RegionMapData,
         map_img_path: Path,
         terrain_img_path: Path,
@@ -33,9 +34,18 @@ class MapRenderer(BaseRenderer):
         self.width = map_data.width
         self.height = map_data.height
 
+        # --- CENTRALIZED CACHE LOGIC ---
+        # Find project root (OpenPower/) by going up 3 levels from src/client/renderers/
+        # Since MapRenderer is in the same folder as TextureManager, the logic is identical.
+        self.project_root = Path(__file__).resolve().parents[3]
+        self.cache_dir = self.project_root / ".cache"
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
         # --- COMPONENTS ---
         self.texture_manager = TextureManager(self.ctx)
-        self.indexer = MapIndexer(map_img_path.parent / ".cache")
+        
+        # Point the indexer specifically to the root cache, NOT map_img_path.parent
+        self.indexer = MapIndexer(self.cache_dir)
 
         # --- STATE ---
         self.single_select_dense_id: int = -1
@@ -51,13 +61,20 @@ class MapRenderer(BaseRenderer):
         self._init_glsl_globe()
 
     def _init_resources(self, terrain_path: Path, map_path: Path):
+        """Load textures and initialize the indexing system."""
+        # TextureManager already knows to look in project_root/.cache
+        # But we pass the indexer which is now also pointed at the root cache.
         self.texture_manager.load_map_texture(
-            map_path, self.map_data.packed_map, self.width, self.height, self.indexer
+            map_path, 
+            self.map_data.packed_map, 
+            self.width, 
+            self.height, 
+            self.indexer
         )
         self.texture_manager.load_terrain_texture(terrain_path)
         self.texture_manager.init_lookup_texture()
 
-    def _set_uniform_if_present(self, name: str, value):
+    def _set_uniform_if_present(self, name: str, value: Any):
         super()._set_uniform_if_present(self.program, name, value)
 
     def _init_glsl_globe(self):
@@ -68,7 +85,7 @@ class MapRenderer(BaseRenderer):
             fragment_shader=shader_source["fragment_shader"],
         )
 
-        # Set texture uniforms
+        # Set texture uniforms to matching units
         self._set_uniform_if_present("u_map_texture", 0)
         self._set_uniform_if_present("u_lookup_texture", 1)
         self._set_uniform_if_present("u_terrain_texture", 2)
@@ -82,7 +99,7 @@ class MapRenderer(BaseRenderer):
         self._set_uniform_if_present("u_light_dir", (0.4, 0.3, 1.0))
         self._set_uniform_if_present("u_ambient", 0.35)
         
-        # --- CRITICAL: Send Texture Size for Border Detection ---
+        # Send Texture Size for Border Detection in Shader
         self._set_uniform_if_present("u_texture_size", (float(self.width), float(self.height)))
 
         # Create sphere geometry
@@ -121,14 +138,14 @@ class MapRenderer(BaseRenderer):
         if self.program is None or self.sphere is None or self.sphere.geo is None:
             return
         
-        # 1. Update Camera
+        # Update Camera Matrices
         w, h = self.window.get_size()
         self.camera.update_matrices(w, h)
         
         self._enable_rendering_state()
         self.texture_manager.bind_textures(self.program)
         
-        # 2. Get Matrices from Camera
+        # Get Matrices from Camera
         model, view, proj = self.camera.get_matrices()
         self.program["u_model"] = model
         self.program["u_view"] = view
@@ -150,7 +167,6 @@ class MapRenderer(BaseRenderer):
         w, h = self.window.get_size()
         if w <= 0 or h <= 0: return 0
 
-        # Ensure camera is fresh
         self.camera.update_matrices(w, h)
         vp_matrix, model_matrix = self.camera.get_cached_matrices()
         
@@ -158,8 +174,6 @@ class MapRenderer(BaseRenderer):
             return 0
 
         # Raycast against Sphere
-        # Arcade Y is up, but sometimes UI coords vary. Try both just in case.
-        # But generally sx, sy from Arcade events are correct.
         ray_o, ray_d = PickingUtils.screen_to_ray(sx, sy, w, h, vp_matrix)
         if ray_o is None or ray_d is None: return 0
 
