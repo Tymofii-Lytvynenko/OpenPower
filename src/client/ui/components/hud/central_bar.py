@@ -203,45 +203,67 @@ class CentralBar:
             imgui.end_group()
 
     def _draw_speed_controls(self, state, net, total_height: float):
-        """Renders Pause and Speed 1-5 buttons centered vertically."""
-        btn_h = 24
-        # Vertical centering
-        imgui.set_cursor_pos_y((total_height - btn_h) / 2)
-        imgui.set_cursor_pos_x(10) # Padding left
+        """Renders Pause and Speed 1-5 buttons centered both vertically and horizontally."""
+        # 1. Configuration for the button group
+        btn_h = 26
+        btn_w = 26
+        spacing = 4.0
+        btn_count = 6  # Pause button + 5 speed levels
+        
+        # Calculate total width of the button group for horizontal centering
+        total_group_width = (btn_w * btn_count) + (spacing * (btn_count - 1))
+        
+        # Get the width of the current child area (the LCD screen)
+        avail_w = imgui.get_content_region_avail().x
+        
+        # 2. Positioning math
+        start_x = (avail_w - total_group_width) / 2
+        start_y = (total_height - btn_h) / 2
+        
+        # Set the cursor within the child window's local coordinates
+        imgui.set_cursor_pos((start_x, start_y))
 
-        current_speed = getattr(state.time, "speed", 1)
-        is_paused = getattr(state.time, "paused", False)
-        btn_s = (24, btn_h) 
+        # 3. Data Extraction (Fixed naming: speed_level and is_paused)
+        current_speed = getattr(state.time, "speed_level", 1) 
+        is_paused = getattr(state.time, "is_paused", False)
+        btn_size = (btn_w, btn_h) 
         
-        imgui.push_style_var(imgui.StyleVar_.item_spacing, (4, 0))
+        imgui.push_style_var(imgui.StyleVar_.item_spacing, (spacing, 0))
         imgui.push_style_var(imgui.StyleVar_.frame_padding, (0, 0))
-        
-        # Pause Button
+        imgui.push_style_var(imgui.StyleVar_.frame_rounding, 4.0)
+
+        # 4. Render Pause Button
         if is_paused: 
-            imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.warning)
-            imgui.push_style_color(imgui.Col_.text, GAMETHEME.colors.text_main)
+            imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.interaction_active)
+            imgui.push_style_color(imgui.Col_.button_hovered, GAMETHEME.colors.interaction_active)
         
-        if imgui.button("||", btn_s):
+        if imgui.button("||", btn_size):
             net.send_action(ActionSetPaused("local", not is_paused))
         
-        if is_paused: imgui.pop_style_color(2)
+        if is_paused: 
+            imgui.pop_style_color(2)
+        
         imgui.same_line()
 
-        # Speed Buttons 1-5
+        # 5. Render Speed Buttons 1-5
         for i in range(1, 6):
             is_active = (current_speed == i and not is_paused)
+            
             if is_active: 
                 imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.interaction_active)
-                imgui.push_style_color(imgui.Col_.text, GAMETHEME.colors.bg_window)
+                imgui.push_style_color(imgui.Col_.button_hovered, GAMETHEME.colors.interaction_active)
             
-            if imgui.button(str(i), btn_s):
+            if imgui.button(str(i), btn_size):
                 net.send_action(ActionSetPaused("local", False))
                 net.send_action(ActionSetGameSpeed("local", i))
             
-            if is_active: imgui.pop_style_color(2)
-            if i < 5: imgui.same_line()
+            if is_active: 
+                imgui.pop_style_color(2)
             
-        imgui.pop_style_var(2)
+            if i < 5: 
+                imgui.same_line()
+            
+        imgui.pop_style_var(3)
 
     def _draw_date_display(self, state, avail_w, avail_h):
         """Renders the text date."""
@@ -281,17 +303,17 @@ class CentralBar:
         
         # 1. AI Button
         if imgui.button(f"{icons_fontawesome_6.ICON_FA_BRAIN}", btn_sz): pass
-        if imgui.is_item_hovered(): imgui.set_tooltip("AI Director")
+        if imgui.is_item_hovered(): imgui.set_tooltip("AI Assistance")
         imgui.same_line()
         
         # 2. Statistics
         if imgui.button(f"{icons_fontawesome_6.ICON_FA_CHART_LINE}", btn_sz): pass
-        if imgui.is_item_hovered(): imgui.set_tooltip("Global Statistics")
+        if imgui.is_item_hovered(): imgui.set_tooltip("Statistics")
         imgui.same_line()
         
         # 3. Messages
         if imgui.button(f"{icons_fontawesome_6.ICON_FA_ENVELOPE}", btn_sz): pass
-        if imgui.is_item_hovered(): imgui.set_tooltip("Diplomatic Messages")
+        if imgui.is_item_hovered(): imgui.set_tooltip("Messages")
         
         imgui.pop_style_var()
 
@@ -323,7 +345,7 @@ class CentralBar:
             pass 
         imgui.pop_style_color()
         
-        if imgui.is_item_hovered(): imgui.set_tooltip("News History")
+        if imgui.is_item_hovered(): imgui.set_tooltip("News log")
 
     def _render_debug_selector(self, state):
         """Renders the Country Selector Popup for debug/view switching."""
@@ -364,7 +386,7 @@ class CentralBar:
     def _draw_status_label(self, label: str, color: tuple, height: float, width: float = 40):
         """Helper to draw a colored status badge."""
         imgui.push_style_color(imgui.Col_.button, color)
-        imgui.push_style_color(imgui.Col_.text, GAMETHEME.colors.bg_window)
+        imgui.push_style_color(imgui.Col_.text, GAMETHEME.colors.text_main)
         imgui.push_style_var(imgui.StyleVar_.frame_rounding, 4.0)
         imgui.button(label, (width, height))
         imgui.pop_style_var()

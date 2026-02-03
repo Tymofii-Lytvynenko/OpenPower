@@ -112,7 +112,7 @@ class FontLoader:
             icon_cfg = imgui.ImFontConfig()
             icon_cfg.merge_mode = True 
             icon_cfg.pixel_snap_h = True
-            icon_cfg.glyph_offset = imgui.ImVec2(0, 0)
+            icon_cfg.glyph_offset = imgui.ImVec2(0, 2)
             
             # 2. Define Ranges
             icon_ranges = [icons_fontawesome_6.ICON_MIN_FA, icons_fontawesome_6.ICON_MAX_FA, 0]

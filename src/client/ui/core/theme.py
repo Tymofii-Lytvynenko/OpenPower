@@ -43,7 +43,7 @@ class UIColors:
     # --- 6. Interaction States (Neutral logic) ---
     # We use these for button clicks instead of blue to keep it clean.
     hover_neutral: tuple = (0.25, 0.27, 0.30, 0.80)
-    pressed_neutral: tuple = (0.12, 0.14, 0.16, 1.00) 
+    pressed_neutral: tuple = (0.26, 0.59, 0.85, 0.5) # (0.12, 0.14, 0.16, 1.00) 
     interaction_active: tuple = (0.26, 0.59, 0.85, 0.5) # Fallback alias for accent
 
     # --- 7. Special Overrides ---
