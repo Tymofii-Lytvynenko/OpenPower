@@ -37,7 +37,7 @@ class MapRenderer(BaseRenderer):
         # --- CENTRALIZED CACHE LOGIC ---
         # Find project root (OpenPower/) by going up 3 levels from src/client/renderers/
         # Since MapRenderer is in the same folder as TextureManager, the logic is identical.
-        self.project_root = Path(__file__).resolve().parents[3]
+        self.project_root = Path(__file__).resolve().parents[3] # TODO: remove hardcoding later
         self.cache_dir = self.project_root / ".cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 

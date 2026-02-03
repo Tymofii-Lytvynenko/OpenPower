@@ -23,7 +23,7 @@ class TextureManager:
         # --- Cache Configuration ---
         # Determines project root based on this file's location
         self.script_dir = Path(__file__).parent.resolve()
-        self.project_root = self.script_dir.parents[2] 
+        self.project_root = self.script_dir.parents[2] # TODO: remove hardcoding later
         self.cache_dir = self.project_root / ".cache"
         
         # Ensure cache directory exists immediately
