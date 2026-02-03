@@ -32,7 +32,19 @@ class MainMenuView(BaseImGuiView):
                 16000, 8000 # TODO: Replace with dynamic map size
             )
             
-            map_path = config.get_asset_path("map/regions.png")
+            map_path = None
+            
+            # 1. Search in data directories (mods first)
+            for data_dir in config.get_data_dirs():
+                candidate = data_dir / "regions" / "regions.png"
+                if candidate.exists():
+                    map_path = candidate
+                    break
+            
+            # 2. Hard fallback to base module if not found
+            if map_path is None:
+                map_path = config.project_root / "modules" / "base" / "data" / "regions" / "regions.png"
+                
             terrain_path = config.get_asset_path("map/terrain.png")
 
             self.window.shared_renderer = MapRenderer(

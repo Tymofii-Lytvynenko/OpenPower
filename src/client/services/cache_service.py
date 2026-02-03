@@ -56,11 +56,24 @@ class CacheService:
     def is_cache_valid(self, source_path: Path, cache_path: Path) -> bool:
         """Fast check based on file modification timestamps."""
         if not cache_path.exists():
+            print(f"[CacheService] MISS: Cache file not found: {cache_path.name}")
             return False
+            
         try:
-            # Check if cache is strictly newer than source
-            return cache_path.stat().st_mtime > source_path.stat().st_mtime
-        except OSError:
+            src_mtime = source_path.stat().st_mtime
+            cache_mtime = cache_path.stat().st_mtime
+            
+            # Debug prints to solve the mystery
+            if cache_mtime <= src_mtime:
+                print(f"[CacheService] STALE: {cache_path.name}")
+                print(f"    - Source: {src_mtime} | Cache: {cache_mtime}")
+                print(f"    - Diff: {cache_mtime - src_mtime}s")
+                return False
+                
+            return True
+            
+        except OSError as e:
+            print(f"[CacheService] ERROR: accessing file stats: {e}")
             return False
 
     # --- I/O Operations ---
