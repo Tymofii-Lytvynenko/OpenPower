@@ -43,7 +43,7 @@ class CentralBar:
         screen_h = viewport.size.y
         
         # Responsive Width
-        bar_width = max(700.0, min(screen_w * 0.45, 900.0))
+        bar_width = max(700.0, min(screen_w * 0.45, 800.0))
         pos_x = (screen_w - bar_width) / 2
         pos_y = screen_h - self.height - 15 
 
@@ -75,7 +75,7 @@ class CentralBar:
                 # Bottom part (Ticker - darker)
                 draw_list.add_rect_filled(
                     (p.x, p.y + top_h), (p.x + w, p.y + h), 
-                    imgui.get_color_u32(GAMETHEME.colors.bg_child), 
+                    imgui.get_color_u32(GAMETHEME.colors.bg_popup), 
                     GAMETHEME.rounding, imgui.ImDrawFlags_.round_corners_bottom
                 )
                 # Border outline
@@ -289,7 +289,7 @@ class CentralBar:
         
         # Draw Text
         imgui.set_cursor_pos((padding_x, current_y + text_y))
-        imgui.text_colored(GAMETHEME.colors.text_dim, self.news_ticker_text)
+        imgui.text_colored(GAMETHEME.colors.text_main, self.news_ticker_text)
         
         # 2. Draw "News Button" on the far right
         btn_h = section_h - 4.0 
