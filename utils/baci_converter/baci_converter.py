@@ -75,50 +75,66 @@ class BaciLoader:
 
 
 class BaciTransformer:
-    """Applies economic logic, categorization, and gap-healing."""
-    def __init__(self, config: PipelineConfig):
+    """Applies economic logic, categorization, and gap-healing using hierarchical imputation."""
+    def __init__(self, config: 'PipelineConfig'):
         self.cfg = config
 
     def transform(self, lf: pl.LazyFrame) -> pl.LazyFrame:
-        logger.info("Applying HS2 categorization and economic transformations...")
+        logger.info("Applying hierarchical categorization and economic transformations...")
         
-        # 1. HS6 to HS2 categorization
-        # Pad with 0s to ensure 6 digits (e.g., '10111' -> '010111'), then slice first 2
+        # Extract hierarchical HS codes. 
+        # This allows us to group data at different levels of granularity (Product -> Sub-group -> Chapter)
+        # to calculate increasingly broad price proxies when specific data is missing.
         lf = lf.with_columns(
-            pl.col(self.cfg.col_product)
-            .cast(pl.Utf8)
-            .str.zfill(6)
-            .str.slice(0, 2)
-            .alias("resource_id")
+            pl.col(self.cfg.col_product).cast(pl.Utf8).str.zfill(6).alias("hs6_code")
+        ).with_columns(
+            pl.col("hs6_code").str.slice(0, 4).alias("hs4_code"),
+            pl.col("hs6_code").str.slice(0, 2).alias("resource_id")
         )
 
-        # 2. Economic Gap Healing (Impute missing quantities)
-        # Some BACI records have value (v) but missing quantity (q).
-        # We calculate the global weighted average price for the HS2 category to estimate the missing mass.
-        lf = lf.with_columns([
-            (pl.col(self.cfg.col_value).sum().over("resource_id") * 1000 / 
-             pl.col(self.cfg.col_quantity).sum().over("resource_id")
-            ).alias("global_avg_price_per_ton")
-        ])
-        
+        # Calculate unit value (price per ton) at multiple aggregation levels.
+        # BACI values are in thousands of USD, so we multiply by 1000 to get the raw USD value.
+        # Reference for Unit Value methodologies in trade data: 
+        # https://unstats.un.org/unsd/trade/data/imputation.asp
+        def calculate_unit_price(level: str) -> pl.Expr:
+            return (
+                (pl.col(self.cfg.col_value).sum().over(level) * 1000) / 
+                pl.col(self.cfg.col_quantity).sum().over(level)
+            )
+
         lf = lf.with_columns(
+            calculate_unit_price("hs6_code").alias("price_hs6"),
+            calculate_unit_price("hs4_code").alias("price_hs4"),
+            calculate_unit_price("resource_id").alias("price_hs2"),
+            # The ultimate fallback if the entire dataset lacks volume data for a category
+            ((pl.col(self.cfg.col_value).sum() * 1000) / pl.col(self.cfg.col_quantity).sum()).alias("price_global")
+        )
+
+        # Impute missing quantities.
+        # We coalesce prices from most granular to least granular. If a highly specific HS6 price exists, 
+        # it is used; otherwise, the engine falls back to the broader HS4 price, and so on.
+        lf = lf.with_columns(
+            pl.coalesce("price_hs6", "price_hs4", "price_hs2", "price_global").alias("best_estimated_price")
+        ).with_columns(
             pl.coalesce(
                 pl.col(self.cfg.col_quantity),
-                (pl.col(self.cfg.col_value) * 1000) / pl.col("global_avg_price_per_ton")
+                (pl.col(self.cfg.col_value) * 1000) / pl.col("best_estimated_price")
             ).alias("healed_quantity")
         )
 
-        # 3. Noise Reduction
+        # Filter out negligible dust data that could bloat the game engine's trade network
         lf = lf.filter(pl.col("healed_quantity") >= self.cfg.min_quantity_tons)
 
-        # 4. Aggregation by Exporter, Importer, and Resource
         logger.info("Aggregating bilateral trade flows...")
         lf_agg = lf.group_by(["exporter_id", "importer_id", "resource_id"]).agg([
             pl.col(self.cfg.col_value).sum().alias("total_v"),
             pl.col("healed_quantity").sum().alias("annual_volume_tons")
         ])
 
-        # 5. Calculate final Unit Price and apply Self-Healing rule (drop <= 0)
+        # Final pass to calculate the unified price for the simulated economy.
+        # Excludes strict zeroes to prevent division by zero in downstream engine modules.
+        # TODO: Engine currently drops zero-volume flows. Evaluate if we need to keep them as 
+        # dormant connection edges in the network graph for future dynamic routing.
         lf_agg = lf_agg.filter(
             pl.col("annual_volume_tons").is_not_null() & (pl.col("annual_volume_tons") > 0)
         ).with_columns(
