@@ -21,7 +21,8 @@ QUALITY_SENSITIVE_GOODS = [
     "machinery_and_instruments", 
     "arms_and_ammunition", 
     "pharmaceuticals",
-    "luxury_commodities"
+    "luxury_commodities",
+    "services"
 ]
 
 GAME_MAPPING = {
@@ -58,7 +59,7 @@ GAME_MAPPING = {
     "arms_and_ammunition": ["93"]
 }
 
-# Base per capita consumption (in tons/year) for a baseline country.
+# Base per capita consumption (in tons/year or man-hours/year) for a baseline country.
 # Adjusting these values directly impacts global supply/demand balance in the engine.
 CONSUMPTION_MATRIX = {
     "cereals": {"base_req": 0.15, "elasticity": 0.1},
@@ -72,13 +73,14 @@ CONSUMPTION_MATRIX = {
     "appliances": {"base_req": 0.01, "elasticity": 1.5},
     "vehicles": {"base_req": 0.005, "elasticity": 2.0},
     "arms_and_ammunition": {"base_req": 0.001, "elasticity": 0.5},
-    # Missing resources will fallback to a hardcoded baseline in ConsumptionModel.
+    "services": {"base_req": 1000.0, "elasticity": 1.8}, # Measured in man-hours
 }
 
 @dataclass
 class EconomyConfig:
-    """Unified configuration for both trade conversion and production estimation."""
+    """Unified configuration for trade conversion, services, and production estimation."""
     baci_input_path: Path
+    itpd_input_path: Path
     country_map_path: Path
     valid_countries_path: Path
     pop_data_path: Path
@@ -88,6 +90,7 @@ class EconomyConfig:
     
     target_year: int = 2001
     min_quantity_tons: float = 1.0
+    working_hours_per_year: float = 2000.0
     
     # Outlier clipping
     enable_percentile_clipping: bool = False
@@ -97,6 +100,46 @@ class EconomyConfig:
     
     # Consumption model baseline
     baseline_gdp_pc: float = 10000.0
+
+
+# ==============================================================================
+# DATA LOADERS & STATE ACCESS
+# ==============================================================================
+
+class GameStateLoader:
+    """Aggregates demographic and economic data from the game's base module."""
+    def __init__(self, config: EconomyConfig):
+        self.cfg = config
+
+    def load_population(self) -> pl.LazyFrame:
+        lf = pl.scan_csv(self.cfg.pop_data_path, separator='\t')
+        return lf.group_by("_owner").agg(
+            (pl.col("pop_14") + pl.col("pop_15_64") + pl.col("pop_65")).sum().alias("total_population")
+        ).rename({"_owner": "country_id"})
+
+    def load_economy(self) -> pl.LazyFrame:
+        return pl.scan_csv(self.cfg.eco_data_path, separator='\t').select(["id", "gdp_per_capita"]).rename({"id": "country_id"})
+
+
+class GameDataValidator:
+    """Ensures external datasets conform to the active internal map schema."""
+    def __init__(self, config: EconomyConfig):
+        self.cfg = config
+
+    def validate(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+        if not self.cfg.valid_countries_path.exists():
+            raise FileNotFoundError(f"Missing essential state file: {self.cfg.valid_countries_path}")
+            
+        valid_countries = pl.scan_csv(self.cfg.valid_countries_path, separator='\t').select(pl.col("id").alias("valid_id"))
+
+        lf = lf.filter(pl.col("game_resource_id") != "unclassified")
+
+        # Inner joins enforce strict filtering of unplayable/non-existent nodes.
+        return lf.join(
+            valid_countries, left_on="exporter_id", right_on="valid_id", how="inner"
+        ).join(
+            valid_countries, left_on="importer_id", right_on="valid_id", how="inner"
+        )
 
 
 # ==============================================================================
@@ -132,7 +175,7 @@ class EconomyMapper:
 
 
 class BaciLoader:
-    """Handles raw data ingestion and UN-to-ISO country code mapping."""
+    """Handles raw physical goods data ingestion and UN-to-ISO country code mapping."""
     def __init__(self, config: EconomyConfig):
         self.cfg = config
 
@@ -152,7 +195,7 @@ class BaciLoader:
 
 
 class BaciTransformer:
-    """Applies economic logic, categorization, and gap-healing."""
+    """Applies economic logic, categorization, and gap-healing for physical goods."""
     def __init__(self, config: EconomyConfig, mapper: EconomyMapper):
         self.cfg = config
         self.mapper = mapper
@@ -199,6 +242,62 @@ class BaciTransformer:
         return lf_agg
 
 
+class ItpdServicesLoader:
+    """
+    Extracts intangible trade flows from the ITPD-E dataset.
+    Reference: https://www.usitc.gov/data/gravity/itpde.htm
+    """
+    def __init__(self, config: EconomyConfig):
+        self.cfg = config
+
+    def load_data(self) -> pl.LazyFrame:
+        lf = pl.scan_csv(self.cfg.itpd_input_path)
+
+        return lf.filter(
+            (pl.col("year") == self.cfg.target_year) & 
+            (pl.col("broad_sector") == "Services") &
+            (pl.col("exporter_iso3") != pl.col("importer_iso3"))
+        ).rename({
+            "exporter_iso3": "exporter_id",
+            "importer_iso3": "importer_id"
+        })
+
+
+class ServicesManHourConverter:
+    """Translates monetary service value into labor time (man-hours)."""
+    def __init__(self, config: EconomyConfig, state_loader: GameStateLoader):
+        self.cfg = config
+        self.state_loader = state_loader
+
+    def convert(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+        eco_lf = self.state_loader.load_economy()
+
+        # Join with exporter's economy data to determine their average wage
+        lf = lf.join(eco_lf, left_on="exporter_id", right_on="country_id", how="left")
+
+        # Fallback prevents division by zero for states missing GDP data
+        lf = lf.with_columns(
+            pl.col("gdp_per_capita").fill_null(self.cfg.baseline_gdp_pc)
+        )
+
+        # ITPD-E trade is usually reported in millions USD. Multiply by 1e6.
+        lf = lf.with_columns(
+            (pl.col("gdp_per_capita") / self.cfg.working_hours_per_year).alias("hourly_wage")
+        ).with_columns(
+            ((pl.col("trade") * 1_000_000) / pl.col("hourly_wage")).alias("annual_volume_tons"),
+            pl.col("hourly_wage").alias("unit_price_usd"),
+            pl.lit("services").alias("game_resource_id")
+        )
+
+        # Explaining unidiomatic code: We keep 'annual_volume_tons' as the column name 
+        # even for man-hours to satisfy the strict schema of the unified trade parquet file 
+        # expected by the game engine's data loaders.
+        return lf.select([
+            "exporter_id", "importer_id", "game_resource_id", 
+            "annual_volume_tons", "unit_price_usd"
+        ])
+
+
 class OutlierProcessor:
     """Sanitizes unit prices to handle customs reporting errors."""
     def __init__(self, config: EconomyConfig):
@@ -225,44 +324,45 @@ class OutlierProcessor:
         return lf
 
 
-class GameDataValidator:
-    """Ensures external datasets conform to the active internal map schema."""
-    def __init__(self, config: EconomyConfig):
-        self.cfg = config
-
-    def validate(self, lf: pl.LazyFrame) -> pl.LazyFrame:
-        if not self.cfg.valid_countries_path.exists():
-            raise FileNotFoundError(f"Missing essential state file: {self.cfg.valid_countries_path}")
-            
-        valid_countries = pl.scan_csv(self.cfg.valid_countries_path, separator='\t').select(pl.col("id").alias("valid_id"))
-
-        lf = lf.filter(pl.col("game_resource_id") != "unclassified")
-
-        # Inner joins enforce strict filtering of unplayable/non-existent nodes.
-        return lf.join(
-            valid_countries, left_on="exporter_id", right_on="valid_id", how="inner"
-        ).join(
-            valid_countries, left_on="importer_id", right_on="valid_id", how="inner"
-        )
-
-
 class TradeConverterPipeline:
-    def __init__(self, config: EconomyConfig, mapper: EconomyMapper, validator: GameDataValidator, out_processor: OutlierProcessor):
+    def __init__(
+        self, 
+        config: EconomyConfig, 
+        mapper: EconomyMapper, 
+        validator: GameDataValidator, 
+        out_processor: OutlierProcessor,
+        state_loader: GameStateLoader
+    ):
         self.config = config
-        self.loader = BaciLoader(config)
-        self.transformer = BaciTransformer(config, mapper)
-        self.out_processor = out_processor
         self.validator = validator
+        
+        # Dependencies for BACI (Goods)
+        self.baci_loader = BaciLoader(config)
+        self.baci_transformer = BaciTransformer(config, mapper)
+        self.out_processor = out_processor
+        
+        # Dependencies for ITPD-E (Services)
+        self.itpd_loader = ItpdServicesLoader(config)
+        self.services_converter = ServicesManHourConverter(config, state_loader)
 
     def run(self):
         logger.info("--- Starting International Trade Pipeline ---")
-        lf = self.loader.load_data()
-        lf = self.transformer.transform(lf)
-        lf = self.out_processor.process(lf)
-        lf = self.validator.validate(lf) 
+        
+        # 1. Process Physical Goods (BACI)
+        goods_lf = self.baci_loader.load_data()
+        goods_lf = self.baci_transformer.transform(goods_lf)
+        goods_lf = self.out_processor.process(goods_lf)
+        
+        # 2. Process Services (ITPD-E)
+        services_lf = self.itpd_loader.load_data()
+        services_lf = self.services_converter.convert(services_lf)
+        
+        # 3. Combine and Validate
+        combined_lf = pl.concat([goods_lf, services_lf])
+        combined_lf = self.validator.validate(combined_lf) 
         
         target_schema = ["exporter_id", "importer_id", "game_resource_id", "annual_volume_tons", "unit_price_usd"]
-        lf.select(target_schema).sink_parquet(self.config.trade_output_path)
+        combined_lf.select(target_schema).sink_parquet(self.config.trade_output_path)
         logger.info(f"Trade network saved to {self.config.trade_output_path}")
 
 
@@ -272,7 +372,7 @@ class TradeConverterPipeline:
 
 class QualityEstimator:
     """
-    Calculates a Quality Index (1-100) for complex manufactured goods.
+    Calculates a Quality Index (1-100) for complex manufactured goods and services.
     Combines global market price competitiveness with the country's tech level (proxy: GDP per capita).
     """
     def __init__(self, baseline_gdp_pc: float = 10000.0, price_weight: float = 0.4, tech_weight: float = 0.6):
@@ -281,7 +381,7 @@ class QualityEstimator:
         self.w_tech = tech_weight
 
     def calculate(self, trade_lf: pl.LazyFrame, eco_lf: pl.LazyFrame, production_lf: pl.LazyFrame) -> pl.LazyFrame:
-        logger.info("Calculating Quality Index for manufactured goods...")
+        logger.info("Calculating Quality Index for manufactured goods and services...")
 
         global_prices = trade_lf.group_by("game_resource_id").agg(
             pl.col("unit_price_usd").median().alias("global_median_price")
@@ -330,21 +430,6 @@ class QualityEstimator:
         ])
 
 
-class GameStateLoader:
-    """Aggregates demographic and economic data from the game's base module."""
-    def __init__(self, config: EconomyConfig):
-        self.cfg = config
-
-    def load_population(self) -> pl.LazyFrame:
-        lf = pl.scan_csv(self.cfg.pop_data_path, separator='\t')
-        return lf.group_by("_owner").agg(
-            (pl.col("pop_14") + pl.col("pop_15_64") + pl.col("pop_65")).sum().alias("total_population")
-        ).rename({"_owner": "country_id"})
-
-    def load_economy(self) -> pl.LazyFrame:
-        return pl.scan_csv(self.cfg.eco_data_path, separator='\t').select(["id", "gdp_per_capita"]).rename({"id": "country_id"})
-
-
 class TradeAggregator:
     """Extracts aggregate import/export volumes from the previously generated trade network."""
     def __init__(self, config: EconomyConfig):
@@ -374,7 +459,7 @@ class ConsumptionModel:
         # Fallback values for any unmapped resources to avoid breaking the join
         default_base, default_elasticity = 0.01, 0.5
         
-        all_resources = list(GAME_MAPPING.keys())
+        all_resources = list(GAME_MAPPING.keys()) + ["services"]
         bases = [self.rules.get(res, {}).get("base_req", default_base) for res in all_resources]
         elasticities = [self.rules.get(res, {}).get("elasticity", default_elasticity) for res in all_resources]
         
@@ -408,9 +493,9 @@ class ProductionCalculator:
 
 
 class InternalProductionPipeline:
-    def __init__(self, config: EconomyConfig, quality_estimator: QualityEstimator):
+    def __init__(self, config: EconomyConfig, quality_estimator: QualityEstimator, state_loader: GameStateLoader):
         self.config = config
-        self.state_loader = GameStateLoader(config)
+        self.state_loader = state_loader
         self.trade_aggregator = TradeAggregator(config)
         self.consumption_model = ConsumptionModel(config, CONSUMPTION_MATRIX)
         self.calculator = ProductionCalculator()
@@ -444,19 +529,22 @@ class InternalProductionPipeline:
 # ==============================================================================
 
 class WorldEconomyGenerator:
-    """Master orchestrator combining both data pipelines in sequence."""
+    """Master orchestrator combining data pipelines in sequence."""
     def __init__(self, config: EconomyConfig):
         self.config = config
+        
+        # Core shared dependency
+        state_loader = GameStateLoader(config)
         
         # Dependency Injection for Phase 1
         mapper = EconomyMapper(GAME_MAPPING)
         validator = GameDataValidator(config)
         out_processor = OutlierProcessor(config)
-        self.trade_pipeline = TradeConverterPipeline(config, mapper, validator, out_processor)
+        self.trade_pipeline = TradeConverterPipeline(config, mapper, validator, out_processor, state_loader)
         
         # Dependency Injection for Phase 2
         quality_estimator = QualityEstimator(config.baseline_gdp_pc)
-        self.production_pipeline = InternalProductionPipeline(config, quality_estimator)
+        self.production_pipeline = InternalProductionPipeline(config, quality_estimator, state_loader)
 
     def generate(self):
         try:
@@ -475,6 +563,7 @@ if __name__ == "__main__":
     
     config = EconomyConfig(
         baci_input_path=Path("BACI_HS92_Y2001_V202401.csv"),
+        itpd_input_path=Path("ITPD_E_R03.csv"),
         country_map_path=Path("country_codes.csv"),
         valid_countries_path=base_data / "countries" / "countries.tsv",
         pop_data_path=base_data / "regions" / "regions_pop.tsv",
@@ -487,6 +576,8 @@ if __name__ == "__main__":
 
     if not config.baci_input_path.exists():
         logger.warning(f"BACI input not found at: {config.baci_input_path}. Please place the dataset.")
+    elif not config.itpd_input_path.exists():
+        logger.warning(f"ITPD-E input not found at: {config.itpd_input_path}. Please place the dataset.")
     else:
         generator = WorldEconomyGenerator(config)
         generator.generate()
