@@ -11,6 +11,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("BaciConverter")
 
+# Target categories where quality actually matters. 
+# Raw materials like 'minerals' or 'cereals' are excluded and will default to a quality of 1.
+QUALITY_SENSITIVE_GOODS = [
+    "appliances", 
+    "vehicles", 
+    "machinery_and_instruments", 
+    "arms_and_ammunition", 
+    "pharmaceuticals",
+    "luxury_commodities"
+]
+
 # OpenPower specific mapping defining the game's economic sectors.
 # Kept separate from the pipeline logic for easy balance tweaking.
 GAME_MAPPING = {
@@ -76,6 +87,78 @@ class PipelineConfig:
     map_code_col: str = "country_code"
     map_iso_col: str = "iso_3"
 
+class QualityEstimator:
+    """
+    Calculates a Quality Index (1-100) for complex manufactured goods.
+    Combines global market price competitiveness with the country's tech level (proxy: GDP per capita).
+    """
+    def __init__(self, baseline_gdp_pc: float = 10000.0, price_weight: float = 0.4, tech_weight: float = 0.6):
+        self.baseline_gdp = baseline_gdp_pc
+        self.w_price = price_weight
+        self.w_tech = tech_weight
+
+    def calculate(self, trade_lf: pl.LazyFrame, eco_lf: pl.LazyFrame, production_lf: pl.LazyFrame) -> pl.LazyFrame:
+        logger.info("Calculating Quality Index for manufactured goods...")
+
+        # 1. Calculate the global median price for each resource to establish a baseline
+        global_prices = trade_lf.group_by("game_resource_id").agg(
+            pl.col("unit_price_usd").median().alias("global_median_price")
+        )
+
+        # 2. Extract local export prices. 
+        # We assume export price reflects the quality of domestic production.
+        local_prices = trade_lf.group_by(["exporter_id", "game_resource_id"]).agg(
+            pl.col("unit_price_usd").median().alias("local_price")
+        ).rename({"exporter_id": "country_id"})
+
+        # 3. Join economic data to get the technological proxy (GDP per capita)
+        # Using inner join because a country must exist in the economy DB to produce goods
+        eval_lf = production_lf.join(
+            local_prices, on=["country_id", "game_resource_id"], how="left"
+        ).join(
+            eco_lf, on="country_id", how="left"
+        ).join(
+            global_prices, on="game_resource_id", how="left"
+        )
+
+        # 4. Handle cases where a country produces goods internally but doesn't export them.
+        # If local_price is null, we fallback to the global median so they don't get a 0 for price.
+        eval_lf = eval_lf.with_columns(
+            pl.col("local_price").fill_null(pl.col("global_median_price"))
+        )
+
+        # 5. Apply the Quality Formula
+        # We clip the ratios to prevent extreme outliers from skewing the final 1-100 mapping.
+        eval_lf = eval_lf.with_columns(
+            (pl.col("local_price") / pl.col("global_median_price")).clip(0.5, 3.0).alias("price_ratio"),
+            (pl.col("gdp_per_capita") / self.baseline_gdp).clip(0.1, 5.0).alias("tech_ratio")
+        ).with_columns(
+            ((pl.col("price_ratio") ** self.w_price) * (pl.col("tech_ratio") ** self.w_tech)).alias("raw_quality")
+        )
+
+        # 6. Normalize to a 1-100 scale and apply ONLY to target goods.
+        # Other goods get a default quality of 1.
+        # TODO: Consider passing the normalization bounds (e.g., max theoretical raw_quality) 
+        # as config parameters to allow easier tuning later.
+        max_theoretical_quality = (3.0 ** self.w_price) * (5.0 ** self.w_tech)
+        
+        eval_lf = eval_lf.with_columns(
+            pl.when(pl.col("game_resource_id").is_in(QUALITY_SENSITIVE_GOODS))
+            .then(
+                ((pl.col("raw_quality") / max_theoretical_quality) * 100).round(0).clip(1.0, 100.0)
+            )
+            .otherwise(1.0)
+            .cast(pl.Int32)
+            .alias("quality_index")
+        )
+
+        # Return the final production dataframe with the new quality metric attached
+        return eval_lf.select([
+            "country_id", 
+            "game_resource_id", 
+            "domestic_production_tons", 
+            "quality_index"
+        ])
 
 class EconomyMapper:
     """
