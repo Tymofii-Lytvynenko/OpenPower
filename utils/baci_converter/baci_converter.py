@@ -102,78 +102,6 @@ class EconomyConfig:
 # ==============================================================================
 # PHASE 1: INTERNATIONAL TRADE PIPELINE
 # ==============================================================================
-class QualityEstimator:
-    """
-    Calculates a Quality Index (1-100) for complex manufactured goods.
-    Combines global market price competitiveness with the country's tech level (proxy: GDP per capita).
-    """
-    def __init__(self, baseline_gdp_pc: float = 10000.0, price_weight: float = 0.4, tech_weight: float = 0.6):
-        self.baseline_gdp = baseline_gdp_pc
-        self.w_price = price_weight
-        self.w_tech = tech_weight
-
-    def calculate(self, trade_lf: pl.LazyFrame, eco_lf: pl.LazyFrame, production_lf: pl.LazyFrame) -> pl.LazyFrame:
-        logger.info("Calculating Quality Index for manufactured goods...")
-
-        # 1. Calculate the global median price for each resource to establish a baseline
-        global_prices = trade_lf.group_by("game_resource_id").agg(
-            pl.col("unit_price_usd").median().alias("global_median_price")
-        )
-
-        # 2. Extract local export prices. 
-        # We assume export price reflects the quality of domestic production.
-        local_prices = trade_lf.group_by(["exporter_id", "game_resource_id"]).agg(
-            pl.col("unit_price_usd").median().alias("local_price")
-        ).rename({"exporter_id": "country_id"})
-
-        # 3. Join economic data to get the technological proxy (GDP per capita)
-        # Using inner join because a country must exist in the economy DB to produce goods
-        eval_lf = production_lf.join(
-            local_prices, on=["country_id", "game_resource_id"], how="left"
-        ).join(
-            eco_lf, on="country_id", how="left"
-        ).join(
-            global_prices, on="game_resource_id", how="left"
-        )
-
-        # 4. Handle cases where a country produces goods internally but doesn't export them.
-        # If local_price is null, we fallback to the global median so they don't get a 0 for price.
-        eval_lf = eval_lf.with_columns(
-            pl.col("local_price").fill_null(pl.col("global_median_price"))
-        )
-
-        # 5. Apply the Quality Formula
-        # We clip the ratios to prevent extreme outliers from skewing the final 1-100 mapping.
-        eval_lf = eval_lf.with_columns(
-            (pl.col("local_price") / pl.col("global_median_price")).clip(0.5, 3.0).alias("price_ratio"),
-            (pl.col("gdp_per_capita") / self.baseline_gdp).clip(0.1, 5.0).alias("tech_ratio")
-        ).with_columns(
-            ((pl.col("price_ratio") ** self.w_price) * (pl.col("tech_ratio") ** self.w_tech)).alias("raw_quality")
-        )
-
-        # 6. Normalize to a 1-100 scale and apply ONLY to target goods.
-        # Other goods get a default quality of 1.
-        # TODO: Consider passing the normalization bounds (e.g., max theoretical raw_quality) 
-        # as config parameters to allow easier tuning later.
-        max_theoretical_quality = (3.0 ** self.w_price) * (5.0 ** self.w_tech)
-        
-        eval_lf = eval_lf.with_columns(
-            pl.when(pl.col("game_resource_id").is_in(QUALITY_SENSITIVE_GOODS))
-            .then(
-                ((pl.col("raw_quality") / max_theoretical_quality) * 100).round(0).clip(1.0, 100.0)
-            )
-            .otherwise(1.0)
-            .cast(pl.Int32)
-            .alias("quality_index")
-        )
-
-        # Return the final production dataframe with the new quality metric attached
-        return eval_lf.select([
-            "country_id", 
-            "game_resource_id", 
-            "domestic_production_tons", 
-            "quality_index"
-        ])
 
 class EconomyMapper:
     """Translates HS product codes into game resource categories."""
@@ -197,7 +125,7 @@ class EconomyMapper:
         lf = lf.join(self.lf_map_4d, on="hs4_code", how="left")
         lf = lf.join(self.lf_map_2d, on="hs2_code", how="left")
         
-        # See: https://docs.pola.rs/user-guide/expressions/null/#coalesce
+        # Reference: https://docs.pola.rs/user-guide/expressions/null/#coalesce
         return lf.with_columns(
             pl.coalesce("res_4d", "res_2d").fill_null("unclassified").alias("game_resource_id")
         ).drop(["res_4d", "res_2d"])
@@ -342,6 +270,66 @@ class TradeConverterPipeline:
 # PHASE 2: INTERNAL PRODUCTION PIPELINE
 # ==============================================================================
 
+class QualityEstimator:
+    """
+    Calculates a Quality Index (1-100) for complex manufactured goods.
+    Combines global market price competitiveness with the country's tech level (proxy: GDP per capita).
+    """
+    def __init__(self, baseline_gdp_pc: float = 10000.0, price_weight: float = 0.4, tech_weight: float = 0.6):
+        self.baseline_gdp = baseline_gdp_pc
+        self.w_price = price_weight
+        self.w_tech = tech_weight
+
+    def calculate(self, trade_lf: pl.LazyFrame, eco_lf: pl.LazyFrame, production_lf: pl.LazyFrame) -> pl.LazyFrame:
+        logger.info("Calculating Quality Index for manufactured goods...")
+
+        global_prices = trade_lf.group_by("game_resource_id").agg(
+            pl.col("unit_price_usd").median().alias("global_median_price")
+        )
+
+        local_prices = trade_lf.group_by(["exporter_id", "game_resource_id"]).agg(
+            pl.col("unit_price_usd").median().alias("local_price")
+        ).rename({"exporter_id": "country_id"})
+
+        eval_lf = production_lf.join(
+            local_prices, on=["country_id", "game_resource_id"], how="left"
+        ).join(
+            eco_lf, on="country_id", how="left"
+        ).join(
+            global_prices, on="game_resource_id", how="left"
+        )
+
+        eval_lf = eval_lf.with_columns(
+            pl.col("local_price").fill_null(pl.col("global_median_price"))
+        )
+
+        eval_lf = eval_lf.with_columns(
+            (pl.col("local_price") / pl.col("global_median_price")).clip(0.5, 3.0).alias("price_ratio"),
+            (pl.col("gdp_per_capita") / self.baseline_gdp).clip(0.1, 5.0).alias("tech_ratio")
+        ).with_columns(
+            ((pl.col("price_ratio") ** self.w_price) * (pl.col("tech_ratio") ** self.w_tech)).alias("raw_quality")
+        )
+
+        max_theoretical_quality = (3.0 ** self.w_price) * (5.0 ** self.w_tech)
+        
+        eval_lf = eval_lf.with_columns(
+            pl.when(pl.col("game_resource_id").is_in(QUALITY_SENSITIVE_GOODS))
+            .then(
+                ((pl.col("raw_quality") / max_theoretical_quality) * 100).round(0).clip(1.0, 100.0)
+            )
+            .otherwise(1.0)
+            .cast(pl.Int32)
+            .alias("quality_index")
+        )
+
+        return eval_lf.select([
+            "country_id", 
+            "game_resource_id", 
+            "domestic_production_tons", 
+            "quality_index"
+        ])
+
+
 class GameStateLoader:
     """Aggregates demographic and economic data from the game's base module."""
     def __init__(self, config: EconomyConfig):
@@ -420,22 +408,32 @@ class ProductionCalculator:
 
 
 class InternalProductionPipeline:
-    def __init__(self, config: EconomyConfig):
+    def __init__(self, config: EconomyConfig, quality_estimator: QualityEstimator):
         self.config = config
         self.state_loader = GameStateLoader(config)
         self.trade_aggregator = TradeAggregator(config)
         self.consumption_model = ConsumptionModel(config, CONSUMPTION_MATRIX)
         self.calculator = ProductionCalculator()
+        self.quality_estimator = quality_estimator
 
     def run(self):
         logger.info("--- Starting Internal Production Estimation ---")
         
-        dem_eco_lf = self.state_loader.load_population().join(
-            self.state_loader.load_economy(), on="country_id", how="inner"
-        )
+        # Load core economic data needed by multiple steps
+        eco_lf = self.state_loader.load_economy()
+        pop_lf = self.state_loader.load_population()
+        dem_eco_lf = pop_lf.join(eco_lf, on="country_id", how="inner")
+        
         trade_lf = self.trade_aggregator.get_net_trade()
         consumption_lf = self.consumption_model.estimate_consumption(dem_eco_lf)
+        
+        # Step 1: Calculate raw quantity
         production_lf = self.calculator.calculate(consumption_lf, trade_lf)
+        
+        # Step 2: Inject quality metrics
+        # Re-loading trade network specifically for price data extraction
+        raw_trade_lf = pl.scan_parquet(self.config.trade_output_path)
+        production_lf = self.quality_estimator.calculate(raw_trade_lf, eco_lf, production_lf)
 
         production_lf.sink_parquet(self.config.production_output_path)
         logger.info(f"Domestic production saved to {self.config.production_output_path}")
@@ -457,7 +455,8 @@ class WorldEconomyGenerator:
         self.trade_pipeline = TradeConverterPipeline(config, mapper, validator, out_processor)
         
         # Dependency Injection for Phase 2
-        self.production_pipeline = InternalProductionPipeline(config)
+        quality_estimator = QualityEstimator(config.baseline_gdp_pc)
+        self.production_pipeline = InternalProductionPipeline(config, quality_estimator)
 
     def generate(self):
         try:
