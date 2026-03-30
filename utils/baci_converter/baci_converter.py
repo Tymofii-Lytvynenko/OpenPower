@@ -183,13 +183,13 @@ class BaciLoader:
         lf = pl.scan_csv(self.cfg.baci_input_path) if self.cfg.baci_input_path.suffix.lower() == '.csv' else pl.scan_parquet(self.cfg.baci_input_path)
         
         mapping_lf = pl.scan_csv(self.cfg.country_map_path).select([
-            pl.col("country_code").cast(pl.Int64), pl.col("iso_3")
+            pl.col("country_code").cast(pl.Int64), pl.col("country_iso3")
         ])
 
         lf = lf.filter(pl.col("t") == self.cfg.target_year)
 
-        lf = lf.join(mapping_lf, left_on="i", right_on="country_code", how="left").rename({"iso_3": "exporter_id"})
-        lf = lf.join(mapping_lf, left_on="j", right_on="country_code", how="left").rename({"iso_3": "importer_id"})
+        lf = lf.join(mapping_lf, left_on="i", right_on="country_code", how="left").rename({"country_iso3": "exporter_id"})
+        lf = lf.join(mapping_lf, left_on="j", right_on="country_code", how="left").rename({"country_iso3": "importer_id"})
         
         return lf.drop_nulls(subset=["exporter_id", "importer_id"])
 
@@ -358,7 +358,7 @@ class TradeConverterPipeline:
         services_lf = self.services_converter.convert(services_lf)
         
         # 3. Combine and Validate
-        combined_lf = pl.concat([goods_lf, services_lf])
+        combined_lf = pl.concat([goods_lf.drop("total_v"), services_lf])
         combined_lf = self.validator.validate(combined_lf) 
         
         target_schema = ["exporter_id", "importer_id", "game_resource_id", "annual_volume_tons", "unit_price_usd"]
@@ -562,9 +562,9 @@ if __name__ == "__main__":
     base_data = project_root / "modules" / "base" / "data"
     
     config = EconomyConfig(
-        baci_input_path=Path("BACI_HS92_Y2001_V202401.csv"),
-        itpd_input_path=Path("ITPD_E_R03.csv"),
-        country_map_path=Path("country_codes.csv"),
+        baci_input_path=Path("temp//BACI_HS96_Y2001_V202601.csv"),
+        itpd_input_path=Path("temp//ITPD_E_R03.csv"),
+        country_map_path=Path("temp//country_codes_V202601.csv"),
         valid_countries_path=base_data / "countries" / "countries.tsv",
         pop_data_path=base_data / "regions" / "regions_pop.tsv",
         eco_data_path=base_data / "countries" / "countries_eco.tsv",
