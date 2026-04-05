@@ -30,10 +30,10 @@ QUALITY_SENSITIVE_GOODS = [
     "it_and_telecom_services",
     "business_services",
     "recreational_services",
-    "social_services",
+    "health_services",
+    "education_services",
     "government_services",
     "industrial_services",
-    "royalties"
 ]
 
 GAME_MAPPING = {
@@ -76,11 +76,11 @@ SERVICES_MAPPING = {
     "tourism_services": ["Travel"],
     "construction_services": ["Construction"],
     "financial_services": ["Insurance and pension services", "Financial services"],
-    "royalties": ["Charges for use of intellectual property"],
     "it_and_telecom_services": ["Telecom, computer, information services"],
-    "business_services": ["Other business services", "Trade-related services"],
+    "business_services": ["Other business services", "Trade-related services", "Charges for use of intellectual property"],
     "recreational_services": ["Heritage and recreational services", "Other personal services"],
-    "social_services": ["Health services", "Education services"],
+    "health_services": ["Health services"],
+    "education_services": ["Education services"],
     "government_services": ["Government goods and services n.i.e."],
     "industrial_services": ["Manufacturing services on physical inputs", "Maintenance and repair services n.i.e."]
     # "Services not allocated" is intentionally omitted to fall back to "unclassified"
@@ -107,12 +107,11 @@ CONSUMPTION_MATRIX = {
     "construction_services": {"base_req": 100.0, "elasticity": 1.4},
     "financial_services": {"base_req": 40.0, "elasticity": 1.5},
     "it_and_telecom_services": {"base_req": 170.0, "elasticity": 1.5},
-    "business_services": {"base_req": 80.0, "elasticity": 1.3},
+    "business_services": {"base_req": 85.0, "elasticity": 1.3},
     "recreational_services": {"base_req": 30.0, "elasticity": 2.0},
     "social_services": {"base_req": 150.0, "elasticity": 0.8}, # Inelastic: people need health/education regardless of wealth
     "government_services": {"base_req": 200.0, "elasticity": 0.5},
     "industrial_services": {"base_req": 50.0, "elasticity": 1.1},
-    "royalties": {"base_req": 5.0, "elasticity": 2.0},
 }
 
 @dataclass
@@ -597,9 +596,9 @@ if __name__ == "__main__":
     base_data = project_root / "modules" / "base" / "data"
     
     config = EconomyConfig(
-        baci_input_path=Path("temp//BACI_HS96_Y2001_V202601.csv"),
-        itpd_input_path=Path("temp//ITPD_E_R03.csv"),
-        country_map_path=Path("temp//country_codes_V202601.csv"),
+        baci_input_path=Path(".temp//BACI_HS96_Y2001_V202601.csv"),
+        itpd_input_path=Path(".temp//ITPD_E_R03.csv"),
+        country_map_path=Path(".temp//country_codes_V202601.csv"),
         valid_countries_path=base_data / "countries" / "countries.tsv",
         pop_data_path=base_data / "regions" / "regions_pop.tsv",
         eco_data_path=base_data / "countries" / "countries_eco.tsv",
