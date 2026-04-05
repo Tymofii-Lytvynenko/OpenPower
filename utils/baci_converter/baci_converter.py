@@ -593,10 +593,30 @@ class WorldEconomyGenerator:
         quality_estimator = QualityEstimator(config.baseline_gdp_pc)
         self.production_pipeline = InternalProductionPipeline(config, quality_estimator, state_loader)
 
+    def log_isolated_countries(self):
+        """
+        Identifies and logs countries present in the game world but missing from the trade network.
+        """
+        prod_lf = pl.scan_parquet(self.config.production_output_path)
+        trade_lf = pl.scan_parquet(self.config.trade_output_path)
+        
+        all_countries = prod_lf.select("country_id").unique().collect()
+        
+        # Combine exporters and importers to get all unique trading participants
+        trade_exporters = trade_lf.select(pl.col("exporter_id").alias("country_id"))
+        trade_importers = trade_lf.select(pl.col("importer_id").alias("country_id"))
+        trading_countries = pl.concat([trade_exporters, trade_importers]).unique().collect()
+        
+        # Anti-join returns rows from the left frame that do not have a match in the right frame
+        isolated_countries = all_countries.join(trading_countries, on="country_id", how="anti")
+        
+        logger.info(f"Isolated countries (autarkies) missing from trade network: {isolated_countries['country_id'].to_list()}")
+
     def generate(self):
         try:
             self.trade_pipeline.run()
             self.production_pipeline.run()
+            self.log_isolated_countries()
             logger.info("Global economy generation completed successfully.")
         except Exception as e:
             logger.error(f"Generation failed: {str(e)}")
