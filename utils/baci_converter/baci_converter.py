@@ -22,7 +22,18 @@ QUALITY_SENSITIVE_GOODS = [
     "arms_and_ammunition", 
     "pharmaceuticals",
     "luxury_commodities",
-    "services"
+    # Service categories added to quality calculation
+    "transport_services",
+    "tourism_services",
+    "construction_services",
+    "financial_services",
+    "it_and_telecom_services",
+    "business_services",
+    "recreational_services",
+    "social_services",
+    "government_services",
+    "industrial_services",
+    "royalties"
 ]
 
 GAME_MAPPING = {
@@ -59,8 +70,24 @@ GAME_MAPPING = {
     "arms_and_ammunition": ["93"]
 }
 
-# Base per capita consumption (in tons/year or man-hours/year) for a baseline country.
-# Adjusting these values directly impacts global supply/demand balance in the engine.
+# ITPD-E industry sector descriptions mapped to OpenPower service resources
+SERVICES_MAPPING = {
+    "transport_services": ["Transport"],
+    "tourism_services": ["Travel"],
+    "construction_services": ["Construction"],
+    "financial_services": ["Insurance and pension services", "Financial services"],
+    "royalties": ["Charges for use of intellectual property"],
+    "it_and_telecom_services": ["Telecom, computer, information services"],
+    "business_services": ["Other business services", "Trade-related services"],
+    "recreational_services": ["Heritage and recreational services", "Other personal services"],
+    "social_services": ["Health services", "Education services"],
+    "government_services": ["Government goods and services n.i.e."],
+    "industrial_services": ["Manufacturing services on physical inputs", "Maintenance and repair services n.i.e."]
+    # "Services not allocated" is intentionally omitted to fall back to "unclassified"
+}
+
+# Base per capita consumption
+# Note: Physical goods are typically measured in tons/year. Services in man-hours/year.
 CONSUMPTION_MATRIX = {
     "cereals": {"base_req": 0.15, "elasticity": 0.1},
     "vegetables_and_fruits": {"base_req": 0.1, "elasticity": 0.2},
@@ -73,7 +100,19 @@ CONSUMPTION_MATRIX = {
     "appliances": {"base_req": 0.01, "elasticity": 1.5},
     "vehicles": {"base_req": 0.005, "elasticity": 2.0},
     "arms_and_ammunition": {"base_req": 0.001, "elasticity": 0.5},
-    "services": {"base_req": 1000.0, "elasticity": 1.8}, # Measured in man-hours
+    
+    # Service requirements (man-hours scaling)
+    "transport_services": {"base_req": 100.0, "elasticity": 1.2},
+    "tourism_services": {"base_req": 50.0, "elasticity": 2.5},
+    "construction_services": {"base_req": 100.0, "elasticity": 1.4},
+    "financial_services": {"base_req": 40.0, "elasticity": 1.5},
+    "it_and_telecom_services": {"base_req": 170.0, "elasticity": 1.5},
+    "business_services": {"base_req": 80.0, "elasticity": 1.3},
+    "recreational_services": {"base_req": 30.0, "elasticity": 2.0},
+    "social_services": {"base_req": 150.0, "elasticity": 0.8}, # Inelastic: people need health/education regardless of wealth
+    "government_services": {"base_req": 200.0, "elasticity": 0.5},
+    "industrial_services": {"base_req": 50.0, "elasticity": 1.1},
+    "royalties": {"base_req": 5.0, "elasticity": 2.0},
 }
 
 @dataclass
@@ -92,13 +131,11 @@ class EconomyConfig:
     min_quantity_tons: float = 1.0
     working_hours_per_year: float = 2000.0
     
-    # Outlier clipping
     enable_percentile_clipping: bool = False
     clip_lower_percentile: float = 0.05
     clip_upper_percentile: float = 0.95
     max_fallback_price: float = 5000000.0
     
-    # Consumption model baseline
     baseline_gdp_pc: float = 10000.0
 
 
@@ -134,7 +171,6 @@ class GameDataValidator:
 
         lf = lf.filter(pl.col("game_resource_id") != "unclassified")
 
-        # Inner joins enforce strict filtering of unplayable/non-existent nodes.
         return lf.join(
             valid_countries, left_on="exporter_id", right_on="valid_id", how="inner"
         ).join(
@@ -158,7 +194,7 @@ class EconomyMapper:
                     map_4d[code] = resource
                 else:
                     # Explaining unidiomatic code: We explicitly crash here instead of logging 
-                    # to enforce strict schema adherence during the initial parsing phase.
+                    # to enforce strict schema adherence during the initial config parsing.
                     raise ValueError(f"Invalid HS code length in mapping config: {code}")
         
         self.lf_map_2d = pl.DataFrame({"hs2_code": list(map_2d.keys()), "res_2d": list(map_2d.values())}).lazy()
@@ -168,10 +204,29 @@ class EconomyMapper:
         lf = lf.join(self.lf_map_4d, on="hs4_code", how="left")
         lf = lf.join(self.lf_map_2d, on="hs2_code", how="left")
         
-        # Reference: https://docs.pola.rs/user-guide/expressions/null/#coalesce
+        # Coalesce selects the first non-null value, prioritizing 4-digit precision.
         return lf.with_columns(
             pl.coalesce("res_4d", "res_2d").fill_null("unclassified").alias("game_resource_id")
         ).drop(["res_4d", "res_2d"])
+
+
+class ServiceMapper:
+    """Translates ITPD-E industry descriptions into game service categories."""
+    def __init__(self, mapping_dict: Dict[str, List[str]]):
+        flat_map = {}
+        for resource, sectors in mapping_dict.items():
+            for sector in sectors:
+                flat_map[sector] = resource
+                
+        self.lf_map = pl.DataFrame({
+            "industry_descr": list(flat_map.keys()), 
+            "game_resource_id": list(flat_map.values())
+        }).lazy()
+
+    def map_services(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+        return lf.join(self.lf_map, on="industry_descr", how="left").with_columns(
+            pl.col("game_resource_id").fill_null("unclassified")
+        )
 
 
 class BaciLoader:
@@ -211,7 +266,6 @@ class BaciTransformer:
         def calculate_unit_price(level: str) -> pl.Expr:
             return ((pl.col("v").sum().over(level) * 1000) / pl.col("q").sum().over(level))
 
-        # Imputation methodology: https://unstats.un.org/unsd/trade/data/imputation.asp
         lf = lf.with_columns(
             calculate_unit_price("hs6_code").alias("price_hs6"),
             calculate_unit_price("hs4_code").alias("price_hs4"),
@@ -230,23 +284,20 @@ class BaciTransformer:
 
         lf_agg = lf.group_by(["exporter_id", "importer_id", "game_resource_id"]).agg([
             pl.col("v").sum().alias("total_v"),
-            pl.col("healed_quantity").sum().alias("annual_volume_tons")
+            pl.col("healed_quantity").sum().alias("annual_volume")
         ])
 
         # TODO: Evaluate keeping 0-volume connections as dormant graph edges for dynamic routing.
         lf_agg = lf_agg.filter(
-            pl.col("annual_volume_tons").is_not_null() & (pl.col("annual_volume_tons") > 0)
+            pl.col("annual_volume").is_not_null() & (pl.col("annual_volume") > 0)
         ).with_columns(
-            ((pl.col("total_v") * 1000) / pl.col("annual_volume_tons")).alias("unit_price_usd")
+            ((pl.col("total_v") * 1000) / pl.col("annual_volume")).alias("unit_price_usd")
         )
         return lf_agg
 
 
 class ItpdServicesLoader:
-    """
-    Extracts intangible trade flows from the ITPD-E dataset.
-    Reference: https://www.usitc.gov/data/gravity/itpde.htm
-    """
+    """Extracts intangible trade flows from the ITPD-E dataset."""
     def __init__(self, config: EconomyConfig):
         self.cfg = config
 
@@ -260,41 +311,38 @@ class ItpdServicesLoader:
         ).rename({
             "exporter_iso3": "exporter_id",
             "importer_iso3": "importer_id"
-        })
+        }).select(["exporter_id", "importer_id", "industry_descr", "trade"])
 
 
 class ServicesManHourConverter:
-    """Translates monetary service value into labor time (man-hours)."""
-    def __init__(self, config: EconomyConfig, state_loader: GameStateLoader):
+    """Translates monetary service value into labor time (man-hours) and applies category mapping."""
+    def __init__(self, config: EconomyConfig, state_loader: GameStateLoader, mapper: ServiceMapper):
         self.cfg = config
         self.state_loader = state_loader
+        self.mapper = mapper
 
     def convert(self, lf: pl.LazyFrame) -> pl.LazyFrame:
         eco_lf = self.state_loader.load_economy()
 
-        # Join with exporter's economy data to determine their average wage
+        # Join with exporter's economy data to estimate their average wage
         lf = lf.join(eco_lf, left_on="exporter_id", right_on="country_id", how="left")
-
-        # Fallback prevents division by zero for states missing GDP data
         lf = lf.with_columns(
             pl.col("gdp_per_capita").fill_null(self.cfg.baseline_gdp_pc)
         )
 
-        # ITPD-E trade is usually reported in millions USD. Multiply by 1e6.
+        lf = self.mapper.map_services(lf)
+
+        # Calculate volume in man-hours rather than tons
         lf = lf.with_columns(
             (pl.col("gdp_per_capita") / self.cfg.working_hours_per_year).alias("hourly_wage")
         ).with_columns(
-            ((pl.col("trade") * 1_000_000) / pl.col("hourly_wage")).alias("annual_volume_tons"),
-            pl.col("hourly_wage").alias("unit_price_usd"),
-            pl.lit("services").alias("game_resource_id")
+            ((pl.col("trade") * 1_000_000) / pl.col("hourly_wage")).alias("annual_volume"),
+            pl.col("hourly_wage").alias("unit_price_usd")
         )
 
-        # Explaining unidiomatic code: We keep 'annual_volume_tons' as the column name 
-        # even for man-hours to satisfy the strict schema of the unified trade parquet file 
-        # expected by the game engine's data loaders.
         return lf.select([
             "exporter_id", "importer_id", "game_resource_id", 
-            "annual_volume_tons", "unit_price_usd"
+            "annual_volume", "unit_price_usd"
         ])
 
 
@@ -315,7 +363,6 @@ class OutlierProcessor:
                 .alias("unit_price_usd")
             )
         else:
-            # Hardcap prevents GUI rendering issues and integer overflow in the simulation engine.
             lf = lf.with_columns(
                 pl.when(pl.col("unit_price_usd") > self.cfg.max_fallback_price).then(self.cfg.max_fallback_price)
                 .otherwise(pl.col("unit_price_usd"))
@@ -329,6 +376,7 @@ class TradeConverterPipeline:
         self, 
         config: EconomyConfig, 
         mapper: EconomyMapper, 
+        service_mapper: ServiceMapper,
         validator: GameDataValidator, 
         out_processor: OutlierProcessor,
         state_loader: GameStateLoader
@@ -336,32 +384,27 @@ class TradeConverterPipeline:
         self.config = config
         self.validator = validator
         
-        # Dependencies for BACI (Goods)
         self.baci_loader = BaciLoader(config)
         self.baci_transformer = BaciTransformer(config, mapper)
         self.out_processor = out_processor
         
-        # Dependencies for ITPD-E (Services)
         self.itpd_loader = ItpdServicesLoader(config)
-        self.services_converter = ServicesManHourConverter(config, state_loader)
+        self.services_converter = ServicesManHourConverter(config, state_loader, service_mapper)
 
     def run(self):
         logger.info("--- Starting International Trade Pipeline ---")
         
-        # 1. Process Physical Goods (BACI)
         goods_lf = self.baci_loader.load_data()
         goods_lf = self.baci_transformer.transform(goods_lf)
         goods_lf = self.out_processor.process(goods_lf)
         
-        # 2. Process Services (ITPD-E)
         services_lf = self.itpd_loader.load_data()
         services_lf = self.services_converter.convert(services_lf)
         
-        # 3. Combine and Validate
         combined_lf = pl.concat([goods_lf.drop("total_v"), services_lf])
         combined_lf = self.validator.validate(combined_lf) 
         
-        target_schema = ["exporter_id", "importer_id", "game_resource_id", "annual_volume_tons", "unit_price_usd"]
+        target_schema = ["exporter_id", "importer_id", "game_resource_id", "annual_volume", "unit_price_usd"]
         combined_lf.select(target_schema).sink_parquet(self.config.trade_output_path)
         logger.info(f"Trade network saved to {self.config.trade_output_path}")
 
@@ -371,10 +414,7 @@ class TradeConverterPipeline:
 # ==============================================================================
 
 class QualityEstimator:
-    """
-    Calculates a Quality Index (1-100) for complex manufactured goods and services.
-    Combines global market price competitiveness with the country's tech level (proxy: GDP per capita).
-    """
+    """Calculates a Quality Index (1-100) for complex manufactured goods and services."""
     def __init__(self, baseline_gdp_pc: float = 10000.0, price_weight: float = 0.4, tech_weight: float = 0.6):
         self.baseline_gdp = baseline_gdp_pc
         self.w_price = price_weight
@@ -425,7 +465,7 @@ class QualityEstimator:
         return eval_lf.select([
             "country_id", 
             "game_resource_id", 
-            "domestic_production_tons", 
+            "domestic_production", 
             "quality_index"
         ])
 
@@ -439,11 +479,11 @@ class TradeAggregator:
         trade_lf = pl.scan_parquet(self.cfg.trade_output_path)
         
         exports = trade_lf.group_by(["exporter_id", "game_resource_id"]).agg(
-            pl.col("annual_volume_tons").sum().alias("total_export")
+            pl.col("annual_volume").sum().alias("total_export")
         ).rename({"exporter_id": "country_id"})
 
         imports = trade_lf.group_by(["importer_id", "game_resource_id"]).agg(
-            pl.col("annual_volume_tons").sum().alias("total_import")
+            pl.col("annual_volume").sum().alias("total_import")
         ).rename({"importer_id": "country_id"})
 
         return exports.join(imports, on=["country_id", "game_resource_id"], how="full", coalesce=True).fill_null(0.0)
@@ -456,10 +496,9 @@ class ConsumptionModel:
         self.rules = rules
 
     def _build_rules_df(self) -> pl.LazyFrame:
-        # Fallback values for any unmapped resources to avoid breaking the join
         default_base, default_elasticity = 0.01, 0.5
         
-        all_resources = list(GAME_MAPPING.keys()) + ["services"]
+        all_resources = list(GAME_MAPPING.keys()) + list(SERVICES_MAPPING.keys())
         bases = [self.rules.get(res, {}).get("base_req", default_base) for res in all_resources]
         elasticities = [self.rules.get(res, {}).get("elasticity", default_elasticity) for res in all_resources]
         
@@ -483,13 +522,12 @@ class ProductionCalculator:
     def calculate(self, consumption_lf: pl.LazyFrame, trade_lf: pl.LazyFrame) -> pl.LazyFrame:
         lf = consumption_lf.join(trade_lf, on=["country_id", "game_resource_id"], how="left").fill_null(0.0)
 
-        # Clamping at 0.0 because negative production implies an inventory depletion state 
-        # which is outside the current scope of static generation.
+        # Clamping at 0.0 prevents inventory depletion states which fall outside the scope of static generation.
         return lf.with_columns(
             (pl.col("estimated_consumption") + pl.col("total_export") - pl.col("total_import"))
             .clip(lower_bound=0.0)
-            .alias("domestic_production_tons")
-        ).select(["country_id", "game_resource_id", "domestic_production_tons"])
+            .alias("domestic_production")
+        ).select(["country_id", "game_resource_id", "domestic_production"])
 
 
 class InternalProductionPipeline:
@@ -504,7 +542,6 @@ class InternalProductionPipeline:
     def run(self):
         logger.info("--- Starting Internal Production Estimation ---")
         
-        # Load core economic data needed by multiple steps
         eco_lf = self.state_loader.load_economy()
         pop_lf = self.state_loader.load_population()
         dem_eco_lf = pop_lf.join(eco_lf, on="country_id", how="inner")
@@ -512,11 +549,8 @@ class InternalProductionPipeline:
         trade_lf = self.trade_aggregator.get_net_trade()
         consumption_lf = self.consumption_model.estimate_consumption(dem_eco_lf)
         
-        # Step 1: Calculate raw quantity
         production_lf = self.calculator.calculate(consumption_lf, trade_lf)
         
-        # Step 2: Inject quality metrics
-        # Re-loading trade network specifically for price data extraction
         raw_trade_lf = pl.scan_parquet(self.config.trade_output_path)
         production_lf = self.quality_estimator.calculate(raw_trade_lf, eco_lf, production_lf)
 
@@ -533,23 +567,24 @@ class WorldEconomyGenerator:
     def __init__(self, config: EconomyConfig):
         self.config = config
         
-        # Core shared dependency
         state_loader = GameStateLoader(config)
         
-        # Dependency Injection for Phase 1
+        # Inject dependencies
         mapper = EconomyMapper(GAME_MAPPING)
+        service_mapper = ServiceMapper(SERVICES_MAPPING)
         validator = GameDataValidator(config)
         out_processor = OutlierProcessor(config)
-        self.trade_pipeline = TradeConverterPipeline(config, mapper, validator, out_processor, state_loader)
         
-        # Dependency Injection for Phase 2
+        self.trade_pipeline = TradeConverterPipeline(
+            config, mapper, service_mapper, validator, out_processor, state_loader
+        )
+        
         quality_estimator = QualityEstimator(config.baseline_gdp_pc)
         self.production_pipeline = InternalProductionPipeline(config, quality_estimator, state_loader)
 
     def generate(self):
         try:
             self.trade_pipeline.run()
-            # Production pipeline must run *after* trade, as it relies on the generated trade network
             self.production_pipeline.run()
             logger.info("Global economy generation completed successfully.")
         except Exception as e:
