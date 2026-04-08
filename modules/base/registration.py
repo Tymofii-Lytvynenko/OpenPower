@@ -8,6 +8,8 @@ from modules.base.systems.population_system import PopulationSystem
 from modules.base.systems.military_system import MilitarySystem
 from modules.base.systems.territory_system import TerritorySystem
 from modules.base.systems.ai_system import AISystem
+from modules.base.systems.trade_system import TradeSystem
+from modules.base.systems.economy_system import EconomySystem
 
 def register() -> List[ISystem]:
     """
@@ -20,5 +22,7 @@ def register() -> List[ISystem]:
         PopulationSystem(),
         MilitarySystem(),
         TerritorySystem(),
-        AISystem()
+        AISystem(),
+        TradeSystem(),
+        EconomySystem()
     ]

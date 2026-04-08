@@ -116,6 +116,14 @@ class DataLoader:
         # --- 2. COUNTRIES ---
         countries_df = self._load_countries()
         state.update_table("countries", countries_df if not countries_df.is_empty() else pl.DataFrame())
+
+        # --- 3. WORLD DATA (Parquets) ---
+        for data_dir in self.config.get_data_dirs():
+            world_dir = data_dir / "world"
+            if world_dir.exists():
+                for p_file in world_dir.glob("*.parquet"):
+                    print(f"[DataLoader] Loading world table: {p_file.stem}")
+                    state.update_table(p_file.stem, pl.read_parquet(p_file))
              
         return state
 
