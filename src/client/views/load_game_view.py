@@ -26,7 +26,7 @@ class LoadGameView(BaseImGuiView):
         self.selected_save_name = None
 
     def on_show_view(self):
-        self.window.background_color = GAMETHEME.colors.black
+        self.window.background_color = arcade.color.BLACK
         if not self.imgui:
             self.setup_imgui()
 

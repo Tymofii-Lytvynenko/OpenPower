@@ -43,7 +43,7 @@ class EditorView(BaseImGuiView):
         self.selected_region_id = None
 
     def on_show_view(self):
-        self.window.background_color = GAMETHEME.colors.black
+        self.window.background_color = arcade.color.BLACK
         self._refresh_political_data()
 
     def _refresh_political_data(self):

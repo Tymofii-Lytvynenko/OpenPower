@@ -30,38 +30,72 @@ class ResourcesPanel:
                  imgui.TableFlags_.resizable)
         
         if imgui.begin_table("ResourcesTable", 5, flags):
-            imgui.table_setup_scroll_freeze(0, 1)
-            imgui.table_setup_column("RESOURCE", imgui.TableColumnFlags_.width_stretch)
-            imgui.table_setup_column("PRODUCTION", imgui.TableColumnFlags_.width_fixed, 120)
-            imgui.table_setup_column("CONSUMPTION", imgui.TableColumnFlags_.width_fixed, 120)
-            imgui.table_setup_column("TRADE", imgui.TableColumnFlags_.width_fixed, 120)
-            imgui.table_setup_column("BALANCE", imgui.TableColumnFlags_.width_fixed, 100)
-            imgui.table_headers_row()
-            
-            # Example hardcoded structure similar to screenshot
-            self._draw_category_row("Raw Materials", 514320, 555322, -225002, -17151)
-            self._draw_category_row("Industrial Materials", 490755, 906706, -361757, -54194)
-            self._draw_category_row("Finished Goods", 581313, 829946, -242442, -6190)
-            
-            # The one that is expanded in screenshot
-            imgui.table_next_row()
-            imgui.table_next_column()
-            tree_open = imgui.tree_node_ex("Services", imgui.TreeNodeFlags_.default_open)
-            # The values for the category overall
-            imgui.table_next_column(); Prims.right_align_text("$ 7 740 430 M")
-            imgui.table_next_column(); Prims.right_align_text("$ 5 851 134 M")
-            imgui.table_next_column(); Prims.right_align_text("$ 1 889 295 M")
-            imgui.table_next_column(); Prims.right_align_text("$ 0 M", GAMETHEME.colors.positive)
-            
-            if tree_open:
-                self._draw_leaf_row("Construction", 1992605, 1462854, 529750, 0, selected=True)
-                self._draw_leaf_row("Engineering", 747045, 615261, 131783, 0)
-                self._draw_leaf_row("Health and care", 3088165, 2467611, 620553, 0)
-                self._draw_leaf_row("Retail", 757045, 393235, 363809, 0)
-                self._draw_leaf_row("Legal services", 797045, 610755, 186289, 0)
-                self._draw_leaf_row("Market and advertising", 358525, 301416, 57109, 0)
-                imgui.tree_pop()
-                
+            try:
+                imgui.table_setup_scroll_freeze(0, 1)
+                imgui.table_setup_column("RESOURCE", imgui.TableColumnFlags_.width_stretch)
+                imgui.table_setup_column("PRODUCTION", imgui.TableColumnFlags_.width_fixed, 120)
+                imgui.table_setup_column("CONSUMPTION", imgui.TableColumnFlags_.width_fixed, 120)
+                imgui.table_setup_column("TRADE", imgui.TableColumnFlags_.width_fixed, 120)
+                imgui.table_setup_column("BALANCE", imgui.TableColumnFlags_.width_fixed, 100)
+                imgui.table_headers_row()
+                if "resource_ledger" in state.tables:
+                    ledger = state.tables["resource_ledger"]
+                    if target_tag:
+                        ledger = ledger.filter(pl.col("country_id") == target_tag)
+                    
+                    if not ledger.is_empty():
+                        # Group by category, sort deterministically to prevent random shifting
+                        categories = ledger.select("category").unique().to_series().to_list()
+                        categories.sort()
+                        for cat in categories:
+                            cat_df = ledger.filter(pl.col("category") == cat)
+                            
+                            cat_prod_usd = cat_df.select(pl.col("production_usd")).sum().item()
+                            cat_cons_usd = cat_df.select(pl.col("consumption_usd")).sum().item()
+                            cat_trade_usd = cat_df.select(pl.col("trade_usd")).sum().item()
+                            cat_bal_usd = cat_df.select(pl.col("balance_usd")).sum().item()
+                            
+                            imgui.table_next_row()
+                            imgui.table_next_column()
+                            safe_cat = str(cat) if cat is not None else "Unclassified"
+                            tree_open = imgui.tree_node_ex(safe_cat, imgui.TreeNodeFlags_.default_open if safe_cat == "Services" else 0)
+                            
+                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_prod_usd))
+                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_cons_usd))
+                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_trade_usd))
+                            
+                            color = GAMETHEME.colors.negative if (cat_bal_usd is not None and cat_bal_usd < 0) else GAMETHEME.colors.positive
+                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_bal_usd), color)
+                            
+                            if tree_open:
+                                res_df = cat_df.group_by(["game_resource_id", "unit_str"]).agg(
+                                    pl.col("production_vol").sum(), pl.col("production_usd").sum(),
+                                    pl.col("consumption_vol").sum(), pl.col("consumption_usd").sum(),
+                                    pl.col("trade_vol").sum(), pl.col("trade_usd").sum(),
+                                    pl.col("balance_vol").sum(), pl.col("balance_usd").sum()
+                                ).sort("game_resource_id")
+                                
+                                for row in res_df.iter_rows(named=True):
+                                    g_id = row.get("game_resource_id")
+                                    res_name = str(g_id).replace("_", " ").title() if g_id else "Unknown"
+                                    self._draw_leaf_row(
+                                        res_name,
+                                        row["production_vol"], row["production_usd"],
+                                        row["consumption_vol"], row["consumption_usd"],
+                                        row["trade_vol"], row["trade_usd"],
+                                        row["balance_vol"], row["balance_usd"],
+                                        str(row.get("unit_str", ""))
+                                    )
+                                imgui.tree_pop()
+                else:
+                    imgui.table_next_row()
+                    imgui.table_next_column()
+                    imgui.text_disabled("No resource data available. Unpause the game to calculate.")
+            except Exception as e:
+                import traceback
+                print("Exception in ResourcesPanel:")
+                traceback.print_exc()
+
             imgui.end_table()
         imgui.end_child()
         imgui.pop_style_color()
@@ -94,24 +128,21 @@ class ResourcesPanel:
             
             imgui.end_table()
 
-    def _draw_category_row(self, name, prod, cons, trade, bal):
-        imgui.table_next_row()
-        imgui.table_next_column()
-        # It's a closed node
-        expanded = imgui.tree_node_ex(name, 0)
-        imgui.table_next_column()
-        Prims.right_align_text(f"$ {prod:,} M".replace(",", " "))
-        imgui.table_next_column()
-        Prims.right_align_text(f"$ {cons:,} M".replace(",", " "))
-        imgui.table_next_column()
-        Prims.right_align_text(f"$ {trade:,} M".replace(",", " "))
-        imgui.table_next_column()
-        color = GAMETHEME.colors.negative if bal < 0 else GAMETHEME.colors.positive
-        Prims.right_align_text(f"$ {bal:,} M".replace(",", " "), color)
-        if expanded:
-            imgui.tree_pop()
+    def _fmt_money(self, val) -> str:
+        if val is None: return "$ 0 M"
+        return f"$ {val/1_000_000:,.0f} M".replace(",", " ")
 
-    def _draw_leaf_row(self, name, prod, cons, trade, bal, selected=False):
+    def _fmt_vol(self, val, unit) -> str:
+        if val is None: return f"0 {unit}"
+        if unit == "man hours": # typically huge
+            return f"{val/1_000_000:,.1f}M Mh".replace(",", " ")
+        if val > 1_000_000:
+            return f"{val/1_000_000:,.1f}M {unit}".replace(",", " ")
+        elif val > 1_000:
+            return f"{val/1_000:,.1f}k {unit}".replace(",", " ")
+        return f"{val:,.0f} {unit}".replace(",", " ")
+
+    def _draw_leaf_row(self, name, p_vol, p_usd, c_vol, c_usd, t_vol, t_usd, b_vol, b_usd, unit, selected=False):
         imgui.table_next_row()
         imgui.table_next_column()
         
@@ -123,15 +154,26 @@ class ResourcesPanel:
         else:
             imgui.text(name)
             
+        # Draw physical volume on the first line, money on the second or just combine them
+        # We can draw two texts right-aligned sequentially using a trick or just one string
+        
         imgui.table_next_column()
-        Prims.right_align_text(f"$ {prod:,} M".replace(",", " "))
+        Prims.right_align_text(self._fmt_vol(p_vol, unit))
+        Prims.right_align_text(self._fmt_money(p_usd), GAMETHEME.colors.text_dim)
+        
         imgui.table_next_column()
-        Prims.right_align_text(f"$ {cons:,} M".replace(",", " "))
+        Prims.right_align_text(self._fmt_vol(c_vol, unit))
+        Prims.right_align_text(self._fmt_money(c_usd), GAMETHEME.colors.text_dim)
+        
         imgui.table_next_column()
-        Prims.right_align_text(f"$ {trade:,} M".replace(",", " "))
+        Prims.right_align_text(self._fmt_vol(t_vol, unit))
+        Prims.right_align_text(self._fmt_money(t_usd), GAMETHEME.colors.text_dim)
+        
         imgui.table_next_column()
-        color = GAMETHEME.colors.negative if bal < 0 else GAMETHEME.colors.positive
-        Prims.right_align_text(f"$ {bal:,} M".replace(",", " "), color)
+        color = GAMETHEME.colors.negative if (b_vol and b_vol < 0) else GAMETHEME.colors.positive
+        Prims.right_align_text(self._fmt_vol(b_vol, unit), color)
+        color_usd = GAMETHEME.colors.negative if (b_usd and b_usd < 0) else GAMETHEME.colors.positive
+        Prims.right_align_text(self._fmt_money(b_usd), color_usd)
 
     def _render_controls(self):
         # Global Tax mod, Management, Status, Sector Tax, % GDP, Market Share
