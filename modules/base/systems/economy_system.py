@@ -18,8 +18,9 @@ class EconomySystem(ISystem):
         return ["base.time", "base.trade"] # Run after trade to have final money state
 
     def update(self, state: GameState, delta_time: float) -> None:
+        rebuild_ledger = False
         if "resource_ledger" not in state.tables and "domestic_production" in state.tables and "trade_network" in state.tables:
-            self._build_resource_ledger(state)
+            rebuild_ledger = True
 
         real_sec_events = [e for e in state.events if isinstance(e, EventRealSecond)]
         
@@ -29,25 +30,30 @@ class EconomySystem(ISystem):
                 
             fraction_of_year = event.game_seconds_passed / (365.25 * 24 * 3600)
             self._process_economy(state, fraction_of_year)
+            # Rebuild ledger periodically when simulation advances 
+            if "domestic_production" in state.tables and "trade_network" in state.tables:
+                rebuild_ledger = True
+                
+        if rebuild_ledger:
+            self._build_resource_ledger(state)
 
     def _build_resource_ledger(self, state: GameState):
         """
-        Builds a statically aggregated resource ledger for UI presentation.
-        Re-run this if production or trade volumes ever become dynamic.
+        Builds a dynamically aggregated resource ledger linking Demographics, Production, and Trade.
         """
         prod_table = state.get_table("domestic_production")
         trade_table = state.get_table("trade_network")
+        regions = state.get_table("regions")
 
+        # 1. Prices
         prices = trade_table.group_by("game_resource_id").agg(
             pl.col("unit_price_usd").median().alias("avg_price")
         )
 
-        prod_val = prod_table.join(prices, on="game_resource_id", how="left").fill_null(1.0)
+        # 2. Production
+        prod_val = prod_table.rename({"domestic_production": "production_vol"})
         
-        prod_val = prod_val.with_columns(
-            (pl.col("domestic_production") * pl.col("avg_price")).alias("production_usd")
-        ).rename({"domestic_production": "production_vol"})
-        
+        # 3. Trade
         exports = trade_table.group_by(["exporter_id", "game_resource_id"]).agg(
             pl.col("annual_volume").sum().alias("export_vol"),
             (pl.col("annual_volume") * pl.col("unit_price_usd")).sum().alias("export_usd")
@@ -64,17 +70,50 @@ class EconomySystem(ISystem):
             (pl.col("export_usd") - pl.col("import_usd")).alias("trade_usd")
         )
         
+        # 4. Master Ledger
         ledger = prod_val.join(net_trade, on=["country_id", "game_resource_id"], how="full", coalesce=True).fill_null(0.0)
+        ledger = ledger.join(prices, on="game_resource_id", how="left").with_columns(pl.col("avg_price").fill_null(1.0))
+        ledger = ledger.with_columns((pl.col("production_vol") * pl.col("avg_price")).alias("production_usd"))
+
+        # 5. Dynamic Consumption based on Population
+        if "pop_14" in regions.columns:
+            country_pop = regions.group_by("owner").agg(
+                (pl.col("pop_14") + pl.col("pop_15_64") + pl.col("pop_65")).sum().alias("total_pop")
+            ).rename({"owner": "country_id"})
+        else:
+            country_pop = regions.group_by("owner").agg(pl.count().alias("total_pop")).rename({"owner": "country_id"})
+            
+        ledger = ledger.join(country_pop, on="country_id", how="left").fill_null(0.0)
         
-        ledger = ledger.with_columns(
-            (pl.col("production_vol") - pl.col("trade_vol")).clip(lower_bound=0.0).alias("consumption_vol"),
-            (pl.col("production_usd") - pl.col("trade_usd")).clip(lower_bound=0.0).alias("consumption_usd")
+        rates_data = [
+            {"game_resource_id": "cereals", "per_capita": 0.4},
+            {"game_resource_id": "vegetables_and_fruits", "per_capita": 0.25},
+            {"game_resource_id": "meat_and_fish", "per_capita": 0.15},
+            {"game_resource_id": "electricity", "per_capita": 5.0},
+            {"game_resource_id": "fossil_fuels", "per_capita": 2.5},
+            {"game_resource_id": "pharmaceuticals", "per_capita": 0.05},
+        ]
+        consumption_rates = pl.DataFrame(rates_data, schema={"game_resource_id": pl.String, "per_capita": pl.Float64})
+        
+        ledger = ledger.join(consumption_rates, on="game_resource_id", how="left").with_columns(
+            pl.col("per_capita").fill_null(0.05)
         )
         
+        # Calculate real dynamic consumption 
+        ledger = ledger.with_columns(
+            (pl.col("total_pop") * pl.col("per_capita")).alias("consumption_vol")
+        )
+        ledger = ledger.with_columns(
+            (pl.col("consumption_vol") * pl.col("avg_price")).alias("consumption_usd")
+        )
+        
+        # 6. Real Balances
         ledger = ledger.with_columns(
             (pl.col("production_vol") - pl.col("consumption_vol") - pl.col("trade_vol")).alias("balance_vol"),
             (pl.col("production_usd") - pl.col("consumption_usd") - pl.col("trade_usd")).alias("balance_usd")
         )
+        
+        ledger = ledger.drop(["total_pop", "per_capita", "avg_price"])
         
         from src.shared.economy_meta import RESOURCE_MAPPING
         cat_df = pl.DataFrame([
@@ -120,14 +159,16 @@ class EconomySystem(ISystem):
             pl.col("generated_value").sum().alias("production_income")
         ).rename({"country_id": "id"})
 
-        # 4. Update money reserves (Production income + taxes etc)
-        # For now, let's just add production income minus a base consumption cost (simulated)
+        # Update money reserves (Production income + taxes etc)
         updated_countries = countries.join(country_income, on="id", how="left").fill_null(0)
-        
-        # Simple Logic: countries gain money relative to production, but spend it elsewhere 
-        # (Simplified: Gain 100% of generated value as reserves/GDP-like growth)
         updated_countries = updated_countries.with_columns(
             (pl.col("money_reserves") + pl.col("production_income")).alias("money_reserves")
         )
 
         state.update_table("countries", updated_countries.drop("production_income"))
+
+        # 5. Dynamically Grow Domestic Production (Industrial Growth)
+        prod_table = prod_table.with_columns(
+            (pl.col("domestic_production") * (1.0 + (0.025 * fraction))).alias("domestic_production")
+        )
+        state.update_table("domestic_production", prod_table)

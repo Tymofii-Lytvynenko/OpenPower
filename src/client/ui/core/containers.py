@@ -18,7 +18,7 @@ class WindowManager:
         imgui.set_next_window_pos((x, y), imgui.Cond_.first_use_ever)
         imgui.set_next_window_size((w, h), imgui.Cond_.first_use_ever)
         
-        final_flags = flags | imgui.WindowFlags_.no_collapse
+        final_flags = flags | imgui.WindowFlags_.no_collapse | imgui.WindowFlags_.always_auto_resize
 
         expanded, opened = imgui.begin(title, closable, final_flags)
         
@@ -52,6 +52,7 @@ class WindowManager:
         
         flags = (imgui.WindowFlags_.no_title_bar | 
                  imgui.WindowFlags_.no_resize | 
+                 imgui.WindowFlags_.always_auto_resize | 
                  imgui.WindowFlags_.no_move)
         
         if imgui.begin(name, None, flags):

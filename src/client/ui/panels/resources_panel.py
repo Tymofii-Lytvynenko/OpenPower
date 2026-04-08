@@ -19,8 +19,8 @@ class ResourcesPanel:
         # "RESOURCE | PRODUCTION | CONSUMPTION | TRADE | BALANCE"
         # We'll use a tree node for groupings, e.g. "Services", "Finished Goods"
         
-        # Let's mock the data from domestic_production and trade if available
-        # or just a stubbed table since we don't have consumption/balance strictly tracked right now.
+        # Abbreviation user preference
+        abbreviate = state.globals.get("abbreviate_numbers", False)
 
         imgui.push_style_color(imgui.Col_.child_bg, (0.05, 0.05, 0.05, 1.0))
         imgui.begin_child("table_view", (0, 300), child_flags=imgui.ChildFlags_.borders)
@@ -50,30 +50,25 @@ class ResourcesPanel:
                         for cat in categories:
                             cat_df = ledger.filter(pl.col("category") == cat)
                             
-                            cat_prod_usd = cat_df.select(pl.col("production_usd")).sum().item()
-                            cat_cons_usd = cat_df.select(pl.col("consumption_usd")).sum().item()
-                            cat_trade_usd = cat_df.select(pl.col("trade_usd")).sum().item()
-                            cat_bal_usd = cat_df.select(pl.col("balance_usd")).sum().item()
+                            cat_prod_usd = cat_df["production_usd"].sum()
+                            cat_cons_usd = cat_df["consumption_usd"].sum()
+                            cat_trade_usd = cat_df["trade_usd"].sum()
+                            cat_bal_usd = cat_df["balance_usd"].sum()
                             
                             imgui.table_next_row()
                             imgui.table_next_column()
                             safe_cat = str(cat) if cat is not None else "Unclassified"
                             tree_open = imgui.tree_node_ex(safe_cat, imgui.TreeNodeFlags_.default_open if safe_cat == "Services" else 0)
                             
-                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_prod_usd))
-                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_cons_usd))
-                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_trade_usd))
+                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_prod_usd, abbreviate))
+                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_cons_usd, abbreviate))
+                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_trade_usd, abbreviate))
                             
                             color = GAMETHEME.colors.negative if (cat_bal_usd is not None and cat_bal_usd < 0) else GAMETHEME.colors.positive
-                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_bal_usd), color)
+                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_bal_usd, abbreviate), color)
                             
                             if tree_open:
-                                res_df = cat_df.group_by(["game_resource_id", "unit_str"]).agg(
-                                    pl.col("production_vol").sum(), pl.col("production_usd").sum(),
-                                    pl.col("consumption_vol").sum(), pl.col("consumption_usd").sum(),
-                                    pl.col("trade_vol").sum(), pl.col("trade_usd").sum(),
-                                    pl.col("balance_vol").sum(), pl.col("balance_usd").sum()
-                                ).sort("game_resource_id")
+                                res_df = cat_df.sort("game_resource_id")
                                 
                                 for row in res_df.iter_rows(named=True):
                                     g_id = row.get("game_resource_id")
@@ -84,7 +79,8 @@ class ResourcesPanel:
                                         row["consumption_vol"], row["consumption_usd"],
                                         row["trade_vol"], row["trade_usd"],
                                         row["balance_vol"], row["balance_usd"],
-                                        str(row.get("unit_str", ""))
+                                        str(row.get("unit_str", "")),
+                                        abbreviate
                                     )
                                 imgui.tree_pop()
                 else:
@@ -128,12 +124,20 @@ class ResourcesPanel:
             
             imgui.end_table()
 
-    def _fmt_money(self, val) -> str:
-        if val is None: return "$ 0 M"
-        return f"$ {val/1_000_000:,.0f} M".replace(",", " ")
+    def _fmt_money(self, val, abbreviate=False) -> str:
+        if val is None: return "$ 0 M" if abbreviate else "$ 0"
+        
+        if abbreviate:
+            return f"$ {val/1_000_000:,.0f} M".replace(",", " ")
+        else:
+            return f"$ {val:,.0f}".replace(",", " ")
 
-    def _fmt_vol(self, val, unit) -> str:
+    def _fmt_vol(self, val, unit, abbreviate=False) -> str:
         if val is None: return f"0 {unit}"
+        
+        if not abbreviate:
+            return f"{val:,.0f} {unit}".replace(",", " ")
+            
         if unit == "man hours": # typically huge
             return f"{val/1_000_000:,.1f}M Mh".replace(",", " ")
         if val > 1_000_000:
@@ -142,7 +146,7 @@ class ResourcesPanel:
             return f"{val/1_000:,.1f}k {unit}".replace(",", " ")
         return f"{val:,.0f} {unit}".replace(",", " ")
 
-    def _draw_leaf_row(self, name, p_vol, p_usd, c_vol, c_usd, t_vol, t_usd, b_vol, b_usd, unit, selected=False):
+    def _draw_leaf_row(self, name, p_vol, p_usd, c_vol, c_usd, t_vol, t_usd, b_vol, b_usd, unit, abbreviate=False, selected=False):
         imgui.table_next_row()
         imgui.table_next_column()
         
@@ -158,22 +162,22 @@ class ResourcesPanel:
         # We can draw two texts right-aligned sequentially using a trick or just one string
         
         imgui.table_next_column()
-        Prims.right_align_text(self._fmt_vol(p_vol, unit))
-        Prims.right_align_text(self._fmt_money(p_usd), GAMETHEME.colors.text_dim)
+        Prims.right_align_text(self._fmt_vol(p_vol, unit, abbreviate))
+        Prims.right_align_text(self._fmt_money(p_usd, abbreviate), GAMETHEME.colors.text_dim)
         
         imgui.table_next_column()
-        Prims.right_align_text(self._fmt_vol(c_vol, unit))
-        Prims.right_align_text(self._fmt_money(c_usd), GAMETHEME.colors.text_dim)
+        Prims.right_align_text(self._fmt_vol(c_vol, unit, abbreviate))
+        Prims.right_align_text(self._fmt_money(c_usd, abbreviate), GAMETHEME.colors.text_dim)
         
         imgui.table_next_column()
-        Prims.right_align_text(self._fmt_vol(t_vol, unit))
-        Prims.right_align_text(self._fmt_money(t_usd), GAMETHEME.colors.text_dim)
+        Prims.right_align_text(self._fmt_vol(t_vol, unit, abbreviate))
+        Prims.right_align_text(self._fmt_money(t_usd, abbreviate), GAMETHEME.colors.text_dim)
         
         imgui.table_next_column()
         color = GAMETHEME.colors.negative if (b_vol and b_vol < 0) else GAMETHEME.colors.positive
-        Prims.right_align_text(self._fmt_vol(b_vol, unit), color)
+        Prims.right_align_text(self._fmt_vol(b_vol, unit, abbreviate), color)
         color_usd = GAMETHEME.colors.negative if (b_usd and b_usd < 0) else GAMETHEME.colors.positive
-        Prims.right_align_text(self._fmt_money(b_usd), color_usd)
+        Prims.right_align_text(self._fmt_money(b_usd, abbreviate), color_usd)
 
     def _render_controls(self):
         # Global Tax mod, Management, Status, Sector Tax, % GDP, Market Share
