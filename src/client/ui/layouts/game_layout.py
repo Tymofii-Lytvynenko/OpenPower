@@ -20,6 +20,7 @@ from src.client.ui.panels.military_panel import MilitaryPanel
 from src.client.ui.panels.demographics_panel import DemographicsPanel
 from src.client.ui.panels.region_inspector import RegionInspectorPanel
 from src.client.ui.panels.data_insp_panel import DataInspectorPanel
+from src.client.ui.panels.resources_panel import ResourcesPanel
 
 class GameLayout:
     """
@@ -38,10 +39,18 @@ class GameLayout:
         # 2. Register Panels
         self.panel_manager.register("POL", PoliticsPanel(), icons_fontawesome_6.ICON_FA_BUILDING_COLUMNS, GAMETHEME.colors.politics)
         self.panel_manager.register("MIL", MilitaryPanel(), icons_fontawesome_6.ICON_FA_PERSON_MILITARY_RIFLE, GAMETHEME.colors.military)
-        self.panel_manager.register("ECO", EconomyPanel(), icons_fontawesome_6.ICON_FA_SACK_DOLLAR, GAMETHEME.colors.economy)
+        
+        # Economy Panel with callback to open Resources
+        self.panel_manager.register("ECO", EconomyPanel(
+            toggle_resources_cb=lambda: self.panel_manager.toggle("RESOURCES")
+        ), icons_fontawesome_6.ICON_FA_SACK_DOLLAR, GAMETHEME.colors.economy)
+        
         self.panel_manager.register("DEM", DemographicsPanel(), icons_fontawesome_6.ICON_FA_PEOPLE_GROUP, GAMETHEME.colors.demographics)
         self.panel_manager.register("INSPECTOR", RegionInspectorPanel())
         self.panel_manager.register("DATA_INSPECTOR", DataInspectorPanel())
+        
+        # Resources Panel (no icon = won't appear in toggle bar)
+        self.panel_manager.register("RESOURCES", ResourcesPanel())
 
         # 3. Compose HUD Components
         self.central_bar = CentralBar()

@@ -6,6 +6,9 @@ from src.client.ui.core.primitives import UIPrimitives as Prims
 from src.client.ui.core.containers import WindowManager
 
 class EconomyPanel:
+    def __init__(self, toggle_resources_cb=None):
+        self.toggle_resources_cb = toggle_resources_cb
+
     def render(self, state, **kwargs) -> bool:
         target_tag = kwargs.get("target_tag", "")
         is_own = kwargs.get("is_own_country", False)
@@ -27,9 +30,14 @@ class EconomyPanel:
                 df = state.tables["countries"]
                 row = df.filter(pl.col("id") == target_tag)
                 if not row.is_empty():
-                    reserves = int(row["money_reserves"][0])
-                    gdp_per_capita = int(row["gdp_per_capita"][0])
-                    tax_rate = float(row["global_tax_rate"][0])
+                    val = row["money_reserves"][0]
+                    reserves = float(val) if val is not None else 0.0
+                    
+                    val_gdp = row["gdp_per_capita"][0]
+                    gdp_per_capita = int(val_gdp) if val_gdp is not None else 0
+                    
+                    val_tax = row["global_tax_rate"][0]
+                    tax_rate = float(val_tax) if val_tax is not None else 0.2
             except Exception:
                 pass
 
@@ -41,10 +49,12 @@ class EconomyPanel:
                 # Sum population of all regions owned by target
                 target_regions = df_pop.filter(pl.col("owner") == target_tag)
                 if not target_regions.is_empty():
-                    p14 = target_regions.select(pl.col("pop_14")).sum().item()
-                    p1564 = target_regions.select(pl.col("pop_15_64")).sum().item()
-                    p65 = target_regions.select(pl.col("pop_65")).sum().item()
-                    total_pop = p14 + p1564 + p65
+                    pop_data = target_regions.select([
+                        pl.col("pop_14").fill_null(0).sum(),
+                        pl.col("pop_15_64").fill_null(0).sum(),
+                        pl.col("pop_65").fill_null(0).sum()
+                    ])
+                    total_pop = pop_data.sum_horizontal().item()
             except Exception:
                 pass
 
@@ -108,7 +118,9 @@ class EconomyPanel:
 
         # Resources Section
         Prims.header("RESOURCES")
-        Prims.meter("", 66.0, GAMETHEME.colors.positive)
+        if imgui.button("OPEN RESOURCES DIRECTORY", (-1, 30)):
+            if self.toggle_resources_cb:
+                self.toggle_resources_cb()
         
         imgui.dummy((0, 15))
         
