@@ -309,6 +309,8 @@ class ItpdServicesLoader:
             (pl.col("year") == self.cfg.target_year) & 
             (pl.col("broad_sector") == "Services") &
             (pl.col("exporter_iso3") != pl.col("importer_iso3"))
+        ).with_columns(
+            pl.col("industry_descr").str.replace(r"^\d+\s+", "")
         ).rename({
             "exporter_iso3": "exporter_id",
             "importer_iso3": "importer_id"
@@ -686,11 +688,29 @@ class WorldEconomyGenerator:
         
         logger.info(f"Isolated countries (autarkies) missing from trade network: {isolated_countries['country_id'].to_list()}")
 
+    def print_random_countries_data(self):
+        import random
+        prod_lf = pl.scan_parquet(self.config.production_output_path)
+        all_countries = prod_lf.select("country_id").unique().collect()["country_id"].to_list()
+        
+        if not all_countries:
+            return
+            
+        sample_countries = random.sample(all_countries, min(5, len(all_countries)))
+        prod_df = prod_lf.filter(pl.col("country_id").is_in(sample_countries)).collect()
+        
+        for country in sample_countries:
+            country_data = prod_df.filter(pl.col("country_id") == country)
+            logger.info(f"\n--- Production Data for {country} ---")
+            for row in country_data.iter_rows(named=True):
+                logger.info(f"  {row['game_resource_id']:<25}: {row['domestic_production']:>15,.2f} | QI: {row['quality_index']}")
+
     def generate(self):
         try:
             self.trade_pipeline.run()
             self.production_pipeline.run()
             self.log_isolated_countries()
+            self.print_random_countries_data()
             logger.info("Global economy generation completed successfully.")
         except Exception as e:
             logger.error(f"Generation failed: {str(e)}")
