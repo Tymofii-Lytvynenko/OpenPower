@@ -13,6 +13,8 @@ logger = logging.getLogger("EconomyGenerator")
 
 # --- MACROECONOMIC CONFIGURATION ---
 
+# Target categories where quality actually matters. 
+# Raw materials like 'minerals' or 'cereals' are excluded and will default to a quality of 1.
 QUALITY_SENSITIVE_GOODS = [
     "appliances", 
     "vehicles", 
@@ -20,6 +22,7 @@ QUALITY_SENSITIVE_GOODS = [
     "arms_and_ammunition", 
     "pharmaceuticals",
     "luxury_commodities",
+    # Service categories added to quality calculation
     "transport_services",
     "tourism_services",
     "construction_services",
@@ -67,6 +70,7 @@ GAME_MAPPING = {
     "arms_and_ammunition": ["93"]
 }
 
+# ITPD-E industry sector descriptions mapped to OpenPower service resources
 SERVICES_MAPPING = {
     "transport_services": ["Transport"],
     "tourism_services": ["Travel"],
@@ -79,44 +83,47 @@ SERVICES_MAPPING = {
     "education_services": ["Education services"],
     "government_services": ["Government goods and services n.i.e."],
     "industrial_services": ["Manufacturing services on physical inputs", "Maintenance and repair services n.i.e."]
+    # "Services not allocated" is intentionally omitted to fall back to "unclassified"
 }
 
-WIOD_MAPPING = {
-    "Agriculture, Hunting, Forestry and Fishing": ["cereals", "vegetables_and_fruits", "meat_and_fish", "dairy", "drugs_and_raw_plants"],
-    "Mining and Quarrying": ["fossil_fuels", "minerals", "precious_stones"],
-    "Food, Beverages and Tobacco": ["other_food_and_beverages", "tobacco"],
-    "Textiles and Textile Products": ["fabrics_and_leather"],
-    "Leather, Leather and Footwear": ["fabrics_and_leather"],
-    "Wood and Products of Wood and Cork": ["wood_and_paper"],
-    "Pulp, Paper, Paper , Printing and Publishing": ["wood_and_paper"],
-    "Coke, Refined Petroleum and Nuclear Fuel": ["fossil_fuels"],
-    "Chemicals and Chemical Products": ["chemicals", "pharmaceuticals"],
-    "Rubber and Plastics": ["plastics_and_rubber"],
-    "Other Non-Metallic Mineral": ["construction_materials"],
-    "Basic Metals and Fabricated Metal": ["iron_and_steel", "non_ferrous_metals", "arms_and_ammunition"],
-    "Machinery, Nec": ["machinery_and_instruments"],
-    "Electrical and Optical Equipment": ["appliances"],
-    "Transport Equipment": ["vehicles"],
-    "Manufacturing, Nec; Recycling": ["commodities", "luxury_commodities"],
-    "Electricity, Gas and Water Supply": ["electricity"],
-    "Construction": ["construction_services"],
-    "Sale, Maintenance and Repair of Motor Vehicles and Motorcycles; Retail Sale of Fuel": ["industrial_services"],
-    "Wholesale Trade and Commission Trade, Except of Motor Vehicles and Motorcycles": ["business_services"],
-    "Retail Trade, Except of Motor Vehicles and Motorcycles; Repair of Household Goods": ["business_services"],
-    "Hotels and Restaurants": ["tourism_services"],
-    "Inland Transport": ["transport_services"],
-    "Water Transport": ["transport_services"],
-    "Air Transport": ["transport_services"],
-    "Other Supporting and Auxiliary Transport Activities; Activities of Travel Agencies": ["transport_services"],
-    "Post and Telecommunications": ["it_and_telecom_services"],
-    "Financial Intermediation": ["financial_services"],
-    "Real Estate Activities": ["business_services"],
-    "Renting of M&Eq and Other Business Activities": ["business_services"],
-    "Public Admin and Defence; Compulsory Social Security": ["government_services"],
-    "Education": ["education_services"],
-    "Health and Social Work": ["health_services"],
-    "Other Community, Social and Personal Services": ["recreational_services"],
-    "Private Households with Employed Persons": ["recreational_services"]
+# Base per capita consumption
+# Note: Physical goods are typically measured in tons/year. 
+# Exception: 'electricity' (HS 2716) is implicitly measured in MWh due to UN Comtrade reporting standards.
+# Services are measured in man-hours/year.
+CONSUMPTION_MATRIX = {
+    "cereals": {"base_req": 0.15, "elasticity": 0.1},
+    "vegetables_and_fruits": {"base_req": 0.1, "elasticity": 0.2},
+    "meat_and_fish": {"base_req": 0.04, "elasticity": 0.6},
+    "dairy": {"base_req": 0.05, "elasticity": 0.4},
+    "electricity": {"base_req": 1.5, "elasticity": 1.2},
+    "fossil_fuels": {"base_req": 0.8, "elasticity": 1.0},
+    "wood_and_paper": {"base_req": 0.1, "elasticity": 0.8},
+    "iron_and_steel": {"base_req": 0.2, "elasticity": 1.1},
+    "appliances": {"base_req": 0.01, "elasticity": 1.5},
+    "vehicles": {"base_req": 0.005, "elasticity": 2.0},
+    "arms_and_ammunition": {"base_req": 0.001, "elasticity": 0.5},
+    
+    # Service requirements (man-hours scaling)
+    # The base_req defines the man-hours demanded per capita at the baseline GDP ($10k).
+    # Values are scaled down so that the total sum of man-hours demanded by an advanced 
+    # economy (after elasticity multipliers) does not exceed the physical limits of 
+    # the active labor force (approx. 700-1000 available service man-hours per capita).
+    "transport_services": {"base_req": 10.0, "elasticity": 1.2},
+    "tourism_services": {"base_req": 5.0, "elasticity": 2.5},
+    "construction_services": {"base_req": 8.0, "elasticity": 1.4},
+    "financial_services": {"base_req": 4.0, "elasticity": 1.5},
+    "it_and_telecom_services": {"base_req": 15.0, "elasticity": 1.5},
+    "business_services": {"base_req": 8.0, "elasticity": 1.3},
+    "recreational_services": {"base_req": 3.0, "elasticity": 2.0},
+    
+    # Explaining unidiomatic code: We split the generic 'social_services' into 
+    # health and education to strictly match the keys generated by SERVICES_MAPPING.
+    # Failing to match keys causes the ConsumptionModel to fallback to a 0.01 baseline.
+    "health_services": {"base_req": 7.0, "elasticity": 0.8},
+    "education_services": {"base_req": 8.0, "elasticity": 0.8}, 
+    
+    "government_services": {"base_req": 18.0, "elasticity": 0.5},
+    "industrial_services": {"base_req": 5.0, "elasticity": 1.1},
 }
 
 @dataclass
@@ -124,7 +131,6 @@ class EconomyConfig:
     """Unified configuration for trade conversion, services, and production estimation."""
     baci_input_path: Path
     itpd_input_path: Path
-    wiod_input_path: Path
     country_map_path: Path
     valid_countries_path: Path
     pop_data_path: Path
@@ -142,27 +148,6 @@ class EconomyConfig:
     max_fallback_price: float = 5000000.0
     
     baseline_gdp_pc: float = 10000.0
-
-
-RESOURCE_OUTPUT_WEIGHTS = {
-    "cereals": 0.40,
-    "vegetables_and_fruits": 0.30,
-    "meat_and_fish": 0.15,
-    "dairy": 0.10,
-    "drugs_and_raw_plants": 0.05,
-    "fossil_fuels": 0.80,
-    "minerals": 0.19,
-    "precious_stones": 0.01,
-    "other_food_and_beverages": 0.90,
-    "tobacco": 0.10,
-    "chemicals": 0.80,
-    "pharmaceuticals": 0.20,
-    "iron_and_steel": 0.80,
-    "non_ferrous_metals": 0.15,
-    "arms_and_ammunition": 0.05,
-    "commodities": 0.80,
-    "luxury_commodities": 0.20
-}
 
 
 # ==============================================================================
@@ -219,6 +204,8 @@ class EconomyMapper:
                 elif len(code) == 4:
                     map_4d[code] = resource
                 else:
+                    # Explaining unidiomatic code: We explicitly crash here instead of logging 
+                    # to enforce strict schema adherence during the initial config parsing.
                     raise ValueError(f"Invalid HS code length in mapping config: {code}")
         
         self.lf_map_2d = pl.DataFrame({"hs2_code": list(map_2d.keys()), "res_2d": list(map_2d.values())}).lazy()
@@ -228,6 +215,7 @@ class EconomyMapper:
         lf = lf.join(self.lf_map_4d, on="hs4_code", how="left")
         lf = lf.join(self.lf_map_2d, on="hs2_code", how="left")
         
+        # Coalesce selects the first non-null value, prioritizing 4-digit precision.
         return lf.with_columns(
             pl.coalesce("res_4d", "res_2d").fill_null("unclassified").alias("game_resource_id")
         ).drop(["res_4d", "res_2d"])
@@ -287,23 +275,17 @@ class BaciTransformer:
         )
 
         def calculate_unit_price(level: str) -> pl.Expr:
-            q_sum = pl.col("q").sum().over(level)
-            return pl.when(q_sum > 0).then((pl.col("v").sum().over(level) * 1000) / q_sum).otherwise(None)
-
-        q_sum_global = pl.col("q").sum()
+            return ((pl.col("v").sum().over(level) * 1000) / pl.col("q").sum().over(level))
 
         lf = lf.with_columns(
             calculate_unit_price("hs6_code").alias("price_hs6"),
             calculate_unit_price("hs4_code").alias("price_hs4"),
             calculate_unit_price("hs2_code").alias("price_hs2"),
-            pl.when(q_sum_global > 0).then((pl.col("v").sum() * 1000) / q_sum_global).otherwise(None).alias("price_global")
+            ((pl.col("v").sum() * 1000) / pl.col("q").sum()).alias("price_global")
         )
 
         lf = lf.with_columns(
-            pl.when(pl.col("hs4_code") == "2716")
-            .then(50.0)
-            .otherwise(pl.coalesce("price_hs6", "price_hs4", "price_hs2", "price_global"))
-            .alias("best_estimated_price")
+            pl.coalesce("price_hs6", "price_hs4", "price_hs2", "price_global").alias("best_estimated_price")
         ).with_columns(
             pl.coalesce(pl.col("q"), (pl.col("v") * 1000) / pl.col("best_estimated_price")).alias("healed_quantity")
         )
@@ -316,6 +298,7 @@ class BaciTransformer:
             pl.col("healed_quantity").sum().alias("annual_volume")
         ])
 
+        # TODO: Evaluate keeping 0-volume connections as dormant graph edges for dynamic routing.
         lf_agg = lf_agg.filter(
             pl.col("annual_volume").is_not_null() & (pl.col("annual_volume") > 0)
         ).with_columns(
@@ -336,8 +319,6 @@ class ItpdServicesLoader:
             (pl.col("year") == self.cfg.target_year) & 
             (pl.col("broad_sector") == "Services") &
             (pl.col("exporter_iso3") != pl.col("importer_iso3"))
-        ).with_columns(
-            pl.col("industry_descr").str.replace(r"^\d+\s+", "")
         ).rename({
             "exporter_iso3": "exporter_id",
             "importer_iso3": "importer_id"
@@ -354,6 +335,7 @@ class ServicesManHourConverter:
     def convert(self, lf: pl.LazyFrame) -> pl.LazyFrame:
         eco_lf = self.state_loader.load_economy()
 
+        # Join with exporter's economy data to estimate their average wage
         lf = lf.join(eco_lf, left_on="exporter_id", right_on="country_id", how="left")
         lf = lf.with_columns(
             pl.col("gdp_per_capita").fill_null(self.cfg.baseline_gdp_pc)
@@ -361,6 +343,7 @@ class ServicesManHourConverter:
 
         lf = self.mapper.map_services(lf)
 
+        # Calculate volume in man-hours rather than tons
         lf = lf.with_columns(
             (pl.col("gdp_per_capita") / self.cfg.working_hours_per_year).alias("hourly_wage")
         ).with_columns(
@@ -438,27 +421,8 @@ class TradeConverterPipeline:
 
 
 # ==============================================================================
-# PHASE 2: INTERNAL PRODUCTION PIPELINE (WIOD INTEGRATION)
+# PHASE 2: INTERNAL PRODUCTION PIPELINE
 # ==============================================================================
-
-class TradeAggregator:
-    """Extracts aggregate import/export volumes from the previously generated trade network."""
-    def __init__(self, config: EconomyConfig):
-        self.cfg = config
-
-    def get_net_trade(self) -> pl.LazyFrame:
-        trade_lf = pl.scan_parquet(self.cfg.trade_output_path)
-        
-        exports = trade_lf.group_by([pl.col("exporter_id").alias("country_id"), "game_resource_id"]).agg(
-            pl.col("annual_volume").sum().alias("total_export")
-        )
-
-        imports = trade_lf.group_by([pl.col("importer_id").alias("country_id"), "game_resource_id"]).agg(
-            pl.col("annual_volume").sum().alias("total_import")
-        )
-
-        return exports.join(imports, on=["country_id", "game_resource_id"], how="full", coalesce=True).fill_null(0.0)
-
 
 class QualityEstimator:
     """Calculates a Quality Index (1-100) for complex manufactured goods and services."""
@@ -517,167 +481,88 @@ class QualityEstimator:
         ])
 
 
-class WiodLoader:
-    """Handles parsing of the WIOD dataset."""
+class TradeAggregator:
+    """Extracts aggregate import/export volumes from the previously generated trade network."""
     def __init__(self, config: EconomyConfig):
         self.cfg = config
 
-    def _detect_separator(self, file_path: Path) -> str:
-        """Автоматично визначає роздільник, перевіряючи перший рядок файлу."""
-        with open(file_path, 'r', encoding='utf-8') as f:
-            first_line = f.readline()
-            if '\t' in first_line:
-                return '\t'
-            return ','
-
-    def load_data(self) -> pl.LazyFrame:
-        detected_sep = self._detect_separator(self.cfg.wiod_input_path)
+    def get_net_trade(self) -> pl.LazyFrame:
+        trade_lf = pl.scan_parquet(self.cfg.trade_output_path)
         
-        lf = pl.scan_csv(self.cfg.wiod_input_path, separator=detected_sep)
+        exports = trade_lf.group_by(["exporter_id", "game_resource_id"]).agg(
+            pl.col("annual_volume").sum().alias("total_export")
+        ).rename({"exporter_id": "country_id"})
 
-        lf = lf.with_columns(
-            pl.col("total_output")
-            .cast(pl.Utf8)
-            .str.replace_all(",", ".")
-            .str.replace_all("\xa0", "")
-            .str.replace_all(" ", "")
-            .str.strip_chars()
-            .cast(pl.Float64, strict=False)
-            .fill_null(0.0)
-        )
+        imports = trade_lf.group_by(["importer_id", "game_resource_id"]).agg(
+            pl.col("annual_volume").sum().alias("total_import")
+        ).rename({"importer_id": "country_id"})
+
+        return exports.join(imports, on=["country_id", "game_resource_id"], how="full", coalesce=True).fill_null(0.0)
+
+
+class ConsumptionModel:
+    """Estimates theoretical resource demand based on population size and GDP wealth scaling."""
+    def __init__(self, config: EconomyConfig, rules: dict):
+        self.cfg = config
+        self.rules = rules
+
+    def _build_rules_df(self) -> pl.LazyFrame:
+        default_base, default_elasticity = 0.01, 0.5
         
-        return lf
-
-class WiodProductionEstimator:
-    """Distributes WIOD monetary output into physical volumes and interpolates missing countries."""
-    def __init__(self, mapping_dict: Dict[str, List[str]]):
-        self.mapping_dict = mapping_dict
-        records = []
-        for wiod_cat, res_list in mapping_dict.items():
-            for res in res_list:
-                records.append({"category": wiod_cat, "game_resource_id": res})
-        self.mapping_lf = pl.DataFrame(records).lazy()
-
-    def estimate(self, wiod_lf: pl.LazyFrame, trade_lf: pl.LazyFrame, dem_eco_lf: pl.LazyFrame) -> pl.LazyFrame:
-        resource_values = trade_lf.group_by("game_resource_id").agg(
-            pl.col("unit_price_usd").median().alias("global_median_price")
-        )
-
-        weight_df = pl.DataFrame({
-            "game_resource_id": list(RESOURCE_OUTPUT_WEIGHTS.keys()),
-            "static_weight": list(RESOURCE_OUTPUT_WEIGHTS.values())
+        all_resources = list(GAME_MAPPING.keys()) + list(SERVICES_MAPPING.keys())
+        bases = [self.rules.get(res, {}).get("base_req", default_base) for res in all_resources]
+        elasticities = [self.rules.get(res, {}).get("elasticity", default_elasticity) for res in all_resources]
+        
+        return pl.DataFrame({
+            "game_resource_id": all_resources, "base_req": bases, "elasticity": elasticities
         }).lazy()
 
-        mapping_shares = self.mapping_lf.join(weight_df, on="game_resource_id", how="left").with_columns(
-            pl.col("static_weight").fill_null(1.0)
+    def estimate_consumption(self, dem_eco_lf: pl.LazyFrame) -> pl.LazyFrame:
+        rules_lf = self._build_rules_df()
+        lf = dem_eco_lf.join(rules_lf, how="cross")
+        
+        return lf.with_columns(
+            (pl.col("gdp_per_capita") / self.cfg.baseline_gdp_pc).clip(0.1, 5.0).alias("wealth_ratio")
         ).with_columns(
-            (pl.col("static_weight") / pl.col("static_weight").sum().over("category")).alias("share_in_category")
-        )
+            (pl.col("total_population") * pl.col("base_req") * (1.0 + (pl.col("wealth_ratio") - 1.0) * pl.col("elasticity"))).alias("estimated_consumption")
+        ).select(["country_id", "game_resource_id", "estimated_consumption"])
 
-        wiod_mapped = wiod_lf.join(mapping_shares, on="category", how="inner").join(resource_values, on="game_resource_id", how="left")
-        
-        wiod_mapped = wiod_mapped.with_columns(
-            ((pl.col("total_output") * 1_000_000 * pl.col("share_in_category")) / pl.col("global_median_price"))
+
+class ProductionCalculator:
+    """Solves the macroeconomic identity P = max(0, C + E - I) to find domestic production."""
+    def calculate(self, consumption_lf: pl.LazyFrame, trade_lf: pl.LazyFrame) -> pl.LazyFrame:
+        lf = consumption_lf.join(trade_lf, on=["country_id", "game_resource_id"], how="left").fill_null(0.0)
+
+        # Clamping at 0.0 prevents inventory depletion states which fall outside the scope of static generation.
+        return lf.with_columns(
+            (pl.col("estimated_consumption") + pl.col("total_export") - pl.col("total_import"))
+            .clip(lower_bound=0.0)
             .alias("domestic_production")
-        )
-
-        wiod_countries = wiod_mapped.filter(~pl.col("iso3").is_in(["RoW", "TOT"])).select(pl.col("iso3").unique())
-        
-        dem_eco_lf = dem_eco_lf.with_columns(
-            (pl.col("gdp_per_capita") * pl.col("total_population")).alias("total_gdp")
-        )
-        
-        missing_countries_lf = dem_eco_lf.join(wiod_countries, left_on="country_id", right_on="iso3", how="anti")
-        
-        total_missing_gdp = missing_countries_lf.select(pl.col("total_gdp").sum()).collect().item()
-        total_missing_pop = missing_countries_lf.select(pl.col("total_population").sum()).collect().item()
-        
-        row_data = wiod_mapped.filter(pl.col("iso3") == "RoW").select([
-            "game_resource_id", "domestic_production"
-        ]).rename({"domestic_production": "row_total_production"})
-        
-        missing_production = missing_countries_lf.join(row_data, how="cross").with_columns(
-            (pl.col("row_total_production") * 
-             ((pl.col("total_gdp") / total_missing_gdp) * 0.5 + (pl.col("total_population") / total_missing_pop) * 0.5)
-            ).alias("domestic_production")
         ).select(["country_id", "game_resource_id", "domestic_production"])
-
-        known_production = wiod_mapped.filter(~pl.col("iso3").is_in(["RoW", "TOT"])).select([
-            pl.col("iso3").alias("country_id"), "game_resource_id", "domestic_production"
-        ])
-
-        final_production = pl.concat([known_production, missing_production]).group_by(["country_id", "game_resource_id"]).agg(
-            pl.col("domestic_production").sum()
-        )
-        
-        return final_production
-
-
-class MacroeconomicSanityChecker:
-    """
-    Validates the physical limits of the generated economy to prevent negative consumption.
-    Formula: Consumption (C) = Production (P) + Imports (I) - Exports (E)
-    Rule: C >= 0. If C < 0, a country exported goods it neither produced nor imported.
-    """
-    def verify_and_heal(self, prod_lf: pl.LazyFrame, trade_agg_lf: pl.LazyFrame) -> pl.LazyFrame:
-        logger.info("Executing mathematical sanity verification (C = P + I - E)...")
-        
-        # Merge production with aggregate imports and exports
-        eval_lf = prod_lf.join(trade_agg_lf, on=["country_id", "game_resource_id"], how="full", coalesce=True).fill_null(0.0)
-
-        # Calculate Apparent Consumption
-        eval_lf = eval_lf.with_columns(
-            (pl.col("domestic_production") + pl.col("total_import") - pl.col("total_export")).alias("apparent_consumption")
-        )
-
-        # Explaining unidiomatic code: We don't eagerly evaluate (collect) here just to log the number of anomalies 
-        # to keep memory usage low. Instead, we mathematically "heal" the violations directly in the LazyFrame graph.
-        # Healing rule: If Consumption is negative, raise Production to the exact minimum needed to cover Net Exports.
-        healed_lf = eval_lf.with_columns(
-            pl.when(pl.col("apparent_consumption") < 0)
-            .then(pl.col("total_export") - pl.col("total_import"))
-            .otherwise(pl.col("domestic_production"))
-            .alias("healed_production")
-        )
-
-        return healed_lf.select([
-            "country_id", 
-            "game_resource_id", 
-            pl.col("healed_production").alias("domestic_production")
-        ])
 
 
 class InternalProductionPipeline:
     def __init__(self, config: EconomyConfig, quality_estimator: QualityEstimator, state_loader: GameStateLoader):
         self.config = config
         self.state_loader = state_loader
-        
-        self.wiod_loader = WiodLoader(config)
         self.trade_aggregator = TradeAggregator(config)
-        self.production_estimator = WiodProductionEstimator(WIOD_MAPPING)
-        
-        self.sanity_checker = MacroeconomicSanityChecker()
+        self.consumption_model = ConsumptionModel(config, CONSUMPTION_MATRIX)
+        self.calculator = ProductionCalculator()
         self.quality_estimator = quality_estimator
 
     def run(self):
-        logger.info("--- Starting Internal Production Estimation (WIOD based) ---")
+        logger.info("--- Starting Internal Production Estimation ---")
         
         eco_lf = self.state_loader.load_economy()
         pop_lf = self.state_loader.load_population()
         dem_eco_lf = pop_lf.join(eco_lf, on="country_id", how="inner")
         
+        trade_lf = self.trade_aggregator.get_net_trade()
+        consumption_lf = self.consumption_model.estimate_consumption(dem_eco_lf)
+        
+        production_lf = self.calculator.calculate(consumption_lf, trade_lf)
+        
         raw_trade_lf = pl.scan_parquet(self.config.trade_output_path)
-        trade_agg_lf = self.trade_aggregator.get_net_trade()
-        
-        wiod_lf = self.wiod_loader.load_data()
-        
-        # 1. Estimate base production from WIOD
-        production_lf = self.production_estimator.estimate(wiod_lf, raw_trade_lf, dem_eco_lf)
-        
-        # 2. Sanity Check & Heal: Ensure P + I >= E
-        production_lf = self.sanity_checker.verify_and_heal(production_lf, trade_agg_lf)
-        
-        # 3. Calculate Quality Index based on healed physical data
         production_lf = self.quality_estimator.calculate(raw_trade_lf, eco_lf, production_lf)
 
         production_lf.sink_parquet(self.config.production_output_path)
@@ -695,6 +580,7 @@ class WorldEconomyGenerator:
         
         state_loader = GameStateLoader(config)
         
+        # Inject dependencies
         mapper = EconomyMapper(GAME_MAPPING)
         service_mapper = ServiceMapper(SERVICES_MAPPING)
         validator = GameDataValidator(config)
@@ -708,43 +594,29 @@ class WorldEconomyGenerator:
         self.production_pipeline = InternalProductionPipeline(config, quality_estimator, state_loader)
 
     def log_isolated_countries(self):
-        """Identifies and logs countries present in the game world but missing from the trade network."""
+        """
+        Identifies and logs countries present in the game world but missing from the trade network.
+        """
         prod_lf = pl.scan_parquet(self.config.production_output_path)
         trade_lf = pl.scan_parquet(self.config.trade_output_path)
         
         all_countries = prod_lf.select("country_id").unique().collect()
         
+        # Combine exporters and importers to get all unique trading participants
         trade_exporters = trade_lf.select(pl.col("exporter_id").alias("country_id"))
         trade_importers = trade_lf.select(pl.col("importer_id").alias("country_id"))
         trading_countries = pl.concat([trade_exporters, trade_importers]).unique().collect()
         
+        # Anti-join returns rows from the left frame that do not have a match in the right frame
         isolated_countries = all_countries.join(trading_countries, on="country_id", how="anti")
         
         logger.info(f"Isolated countries (autarkies) missing from trade network: {isolated_countries['country_id'].to_list()}")
-
-    def print_random_countries_data(self):
-        import random
-        prod_lf = pl.scan_parquet(self.config.production_output_path)
-        all_countries = prod_lf.select("country_id").unique().collect()["country_id"].to_list()
-        
-        if not all_countries:
-            return
-            
-        sample_countries = random.sample(all_countries, min(5, len(all_countries)))
-        prod_df = prod_lf.filter(pl.col("country_id").is_in(sample_countries)).collect()
-        
-        for country in sample_countries:
-            country_data = prod_df.filter(pl.col("country_id") == country)
-            logger.info(f"\n--- Production Data for {country} ---")
-            for row in country_data.iter_rows(named=True):
-                logger.info(f"  {row['game_resource_id']:<25}: {row['domestic_production']:>15,.2f} | QI: {row['quality_index']}")
 
     def generate(self):
         try:
             self.trade_pipeline.run()
             self.production_pipeline.run()
             self.log_isolated_countries()
-            self.print_random_countries_data()
             logger.info("Global economy generation completed successfully.")
         except Exception as e:
             logger.error(f"Generation failed: {str(e)}")
@@ -758,7 +630,6 @@ if __name__ == "__main__":
     config = EconomyConfig(
         baci_input_path=Path(".temp//BACI_HS96_Y2001_V202601.csv"),
         itpd_input_path=Path(".temp//ITPD_E_R03.csv"),
-        wiod_input_path=Path(".temp//WIOT01_ROW_Apr12.tsv"),
         country_map_path=Path(".temp//country_codes_V202601.csv"),
         valid_countries_path=base_data / "countries" / "countries.tsv",
         pop_data_path=base_data / "regions" / "regions_pop.tsv",
@@ -773,8 +644,6 @@ if __name__ == "__main__":
         logger.warning(f"BACI input not found at: {config.baci_input_path}. Please place the dataset.")
     elif not config.itpd_input_path.exists():
         logger.warning(f"ITPD-E input not found at: {config.itpd_input_path}. Please place the dataset.")
-    elif not config.wiod_input_path.exists():
-        logger.warning(f"WIOD input not found at: {config.wiod_input_path}. Please place the dataset.")
     else:
         generator = WorldEconomyGenerator(config)
         generator.generate()
