@@ -144,6 +144,27 @@ class EconomyConfig:
     baseline_gdp_pc: float = 10000.0
 
 
+RESOURCE_OUTPUT_WEIGHTS = {
+    "cereals": 0.40,
+    "vegetables_and_fruits": 0.30,
+    "meat_and_fish": 0.15,
+    "dairy": 0.10,
+    "drugs_and_raw_plants": 0.05,
+    "fossil_fuels": 0.80,
+    "minerals": 0.19,
+    "precious_stones": 0.01,
+    "other_food_and_beverages": 0.90,
+    "tobacco": 0.10,
+    "chemicals": 0.80,
+    "pharmaceuticals": 0.20,
+    "iron_and_steel": 0.80,
+    "non_ferrous_metals": 0.15,
+    "arms_and_ammunition": 0.05,
+    "commodities": 0.80,
+    "luxury_commodities": 0.20
+}
+
+
 # ==============================================================================
 # DATA LOADERS & STATE ACCESS
 # ==============================================================================
@@ -530,6 +551,7 @@ class WiodLoader:
 class WiodProductionEstimator:
     """Distributes WIOD monetary output into physical volumes and interpolates missing countries."""
     def __init__(self, mapping_dict: Dict[str, List[str]]):
+        self.mapping_dict = mapping_dict
         records = []
         for wiod_cat, res_list in mapping_dict.items():
             for res in res_list:
@@ -538,18 +560,21 @@ class WiodProductionEstimator:
 
     def estimate(self, wiod_lf: pl.LazyFrame, trade_lf: pl.LazyFrame, dem_eco_lf: pl.LazyFrame) -> pl.LazyFrame:
         resource_values = trade_lf.group_by("game_resource_id").agg(
-            (pl.col("annual_volume") * pl.col("unit_price_usd")).sum().alias("global_trade_value"),
             pl.col("unit_price_usd").median().alias("global_median_price")
         )
 
-        mapping_shares = self.mapping_lf.join(resource_values, on="game_resource_id", how="left")
-        mapping_shares = mapping_shares.with_columns(
-            pl.col("global_trade_value").fill_null(1.0)
+        weight_df = pl.DataFrame({
+            "game_resource_id": list(RESOURCE_OUTPUT_WEIGHTS.keys()),
+            "static_weight": list(RESOURCE_OUTPUT_WEIGHTS.values())
+        }).lazy()
+
+        mapping_shares = self.mapping_lf.join(weight_df, on="game_resource_id", how="left").with_columns(
+            pl.col("static_weight").fill_null(1.0)
         ).with_columns(
-            (pl.col("global_trade_value") / pl.col("global_trade_value").sum().over("category")).alias("share_in_category")
+            (pl.col("static_weight") / pl.col("static_weight").sum().over("category")).alias("share_in_category")
         )
 
-        wiod_mapped = wiod_lf.join(mapping_shares, on="category", how="inner")
+        wiod_mapped = wiod_lf.join(mapping_shares, on="category", how="inner").join(resource_values, on="game_resource_id", how="left")
         
         wiod_mapped = wiod_mapped.with_columns(
             ((pl.col("total_output") * 1_000_000 * pl.col("share_in_category")) / pl.col("global_median_price"))
@@ -565,13 +590,16 @@ class WiodProductionEstimator:
         missing_countries_lf = dem_eco_lf.join(wiod_countries, left_on="country_id", right_on="iso3", how="anti")
         
         total_missing_gdp = missing_countries_lf.select(pl.col("total_gdp").sum()).collect().item()
+        total_missing_pop = missing_countries_lf.select(pl.col("total_population").sum()).collect().item()
         
         row_data = wiod_mapped.filter(pl.col("iso3") == "RoW").select([
             "game_resource_id", "domestic_production"
         ]).rename({"domestic_production": "row_total_production"})
         
         missing_production = missing_countries_lf.join(row_data, how="cross").with_columns(
-            (pl.col("row_total_production") * (pl.col("total_gdp") / total_missing_gdp)).alias("domestic_production")
+            (pl.col("row_total_production") * 
+             ((pl.col("total_gdp") / total_missing_gdp) * 0.5 + (pl.col("total_population") / total_missing_pop) * 0.5)
+            ).alias("domestic_production")
         ).select(["country_id", "game_resource_id", "domestic_production"])
 
         known_production = wiod_mapped.filter(~pl.col("iso3").is_in(["RoW", "TOT"])).select([
