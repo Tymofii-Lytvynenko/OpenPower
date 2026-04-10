@@ -266,17 +266,23 @@ class BaciTransformer:
         )
 
         def calculate_unit_price(level: str) -> pl.Expr:
-            return ((pl.col("v").sum().over(level) * 1000) / pl.col("q").sum().over(level))
+            q_sum = pl.col("q").sum().over(level)
+            return pl.when(q_sum > 0).then((pl.col("v").sum().over(level) * 1000) / q_sum).otherwise(None)
+
+        q_sum_global = pl.col("q").sum()
 
         lf = lf.with_columns(
             calculate_unit_price("hs6_code").alias("price_hs6"),
             calculate_unit_price("hs4_code").alias("price_hs4"),
             calculate_unit_price("hs2_code").alias("price_hs2"),
-            ((pl.col("v").sum() * 1000) / pl.col("q").sum()).alias("price_global")
+            pl.when(q_sum_global > 0).then((pl.col("v").sum() * 1000) / q_sum_global).otherwise(None).alias("price_global")
         )
 
         lf = lf.with_columns(
-            pl.coalesce("price_hs6", "price_hs4", "price_hs2", "price_global").alias("best_estimated_price")
+            pl.when(pl.col("hs4_code") == "2716")
+            .then(50.0)
+            .otherwise(pl.coalesce("price_hs6", "price_hs4", "price_hs2", "price_global"))
+            .alias("best_estimated_price")
         ).with_columns(
             pl.coalesce(pl.col("q"), (pl.col("v") * 1000) / pl.col("best_estimated_price")).alias("healed_quantity")
         )
