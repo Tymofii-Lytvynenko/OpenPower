@@ -510,6 +510,8 @@ class WiodLoader:
             pl.col("total_output")
             .cast(pl.Utf8)
             .str.replace_all(",", ".")
+            .str.replace_all("\xa0", "")
+            .str.replace_all(" ", "")
             .str.strip_chars()
             .cast(pl.Float64, strict=False)
             .fill_null(0.0)
