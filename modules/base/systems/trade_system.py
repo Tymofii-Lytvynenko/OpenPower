@@ -43,9 +43,9 @@ class TradeSystem(ISystem):
         countries = state.get_table("countries")
 
         # 1. Summarize monetary transfers (exports - imports) per country
-        # Transfer Value = volume * unit_price * fraction_of_year
+        # In MONETARY MODE, trade_value_usd is already in USD.
         trade_summary = trade_net.with_columns(
-            (pl.col("annual_volume") * pl.col("unit_price_usd") * fraction).alias("flow_usd")
+            (pl.col("trade_value_usd") * fraction).alias("flow_usd")
         )
 
         exports = trade_summary.group_by("exporter_id").agg(

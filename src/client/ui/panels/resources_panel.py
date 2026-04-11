@@ -15,10 +15,6 @@ class ResourcesPanel:
             return True
 
     def _render_content(self, state, target_tag):
-        # Top Table: Resources list
-        # "RESOURCE | PRODUCTION | CONSUMPTION | TRADE | BALANCE"
-        # We'll use a tree node for groupings, e.g. "Services", "Finished Goods"
-        
         # Abbreviation user preference
         abbreviate = state.globals.get("abbreviate_numbers", False)
 
@@ -33,18 +29,19 @@ class ResourcesPanel:
             try:
                 imgui.table_setup_scroll_freeze(0, 1)
                 imgui.table_setup_column("RESOURCE", imgui.TableColumnFlags_.width_stretch)
-                imgui.table_setup_column("PRODUCTION", imgui.TableColumnFlags_.width_fixed, 120)
-                imgui.table_setup_column("CONSUMPTION", imgui.TableColumnFlags_.width_fixed, 120)
-                imgui.table_setup_column("TRADE", imgui.TableColumnFlags_.width_fixed, 120)
-                imgui.table_setup_column("BALANCE", imgui.TableColumnFlags_.width_fixed, 100)
+                # We rename columns to reflect that values are purely monetary
+                imgui.table_setup_column("PRODUCTION", imgui.TableColumnFlags_.width_fixed, 140)
+                imgui.table_setup_column("CONSUMPTION", imgui.TableColumnFlags_.width_fixed, 140)
+                imgui.table_setup_column("TRADE (NET)", imgui.TableColumnFlags_.width_fixed, 140)
+                imgui.table_setup_column("BALANCE", imgui.TableColumnFlags_.width_fixed, 120)
                 imgui.table_headers_row()
+                
                 if "resource_ledger" in state.tables:
                     ledger = state.tables["resource_ledger"]
                     if target_tag:
                         ledger = ledger.filter(pl.col("country_id") == target_tag)
                     
                     if not ledger.is_empty():
-                        # Group by category, sort deterministically to prevent random shifting
                         categories = ledger.select("category").unique().to_series().to_list()
                         categories.sort()
                         for cat in categories:
@@ -69,17 +66,15 @@ class ResourcesPanel:
                             
                             if tree_open:
                                 res_df = cat_df.sort("game_resource_id")
-                                
                                 for row in res_df.iter_rows(named=True):
                                     g_id = row.get("game_resource_id")
                                     res_name = str(g_id).replace("_", " ").title() if g_id else "Unknown"
                                     self._draw_leaf_row(
                                         res_name,
-                                        row["production_vol"], row["production_usd"],
-                                        row["consumption_vol"], row["consumption_usd"],
-                                        row["trade_vol"], row["trade_usd"],
-                                        row["balance_vol"], row["balance_usd"],
-                                        str(row.get("unit_str", "")),
+                                        row["production_usd"],
+                                        row["consumption_usd"],
+                                        row["trade_usd"],
+                                        row["balance_usd"],
                                         abbreviate
                                     )
                                 imgui.tree_pop()
@@ -105,13 +100,10 @@ class ResourcesPanel:
             
             imgui.table_next_row()
             imgui.table_next_column()
-            # Bottom Left: Controls
             self._render_controls()
             
             imgui.table_next_column()
-            # Bottom Right: Image Placeholder
             w = imgui.get_content_region_avail().x
-            # We don't have the stock market image, we will draw a placeholder or dummy background
             imgui.push_style_color(imgui.Col_.child_bg, (0.0, 0.0, 0.0, 1.0))
             imgui.begin_child("ImageHolder", (w, 0), child_flags=imgui.ChildFlags_.borders)
             text = "Market Graphic Placeholder"
@@ -126,31 +118,18 @@ class ResourcesPanel:
 
     def _fmt_money(self, val, abbreviate=False) -> str:
         if val is None: return "$ 0 M" if abbreviate else "$ 0"
-        
         if abbreviate:
-            return f"$ {val/1_000_000:,.0f} M".replace(",", " ")
+            # For smaller values under 1M, show k or exact
+            if abs(val) < 1_000_000:
+                return f"$ {val/1_000:,.0f} k".replace(",", " ")
+            return f"$ {val/1_000_000:,.1f} M".replace(",", " ")
         else:
             return f"$ {val:,.0f}".replace(",", " ")
 
-    def _fmt_vol(self, val, unit, abbreviate=False) -> str:
-        if val is None: return f"0 {unit}"
-        
-        if not abbreviate:
-            return f"{val:,.0f} {unit}".replace(",", " ")
-            
-        if unit == "man hours": # typically huge
-            return f"{val/1_000_000:,.1f}M Mh".replace(",", " ")
-        if val > 1_000_000:
-            return f"{val/1_000_000:,.1f}M {unit}".replace(",", " ")
-        elif val > 1_000:
-            return f"{val/1_000:,.1f}k {unit}".replace(",", " ")
-        return f"{val:,.0f} {unit}".replace(",", " ")
-
-    def _draw_leaf_row(self, name, p_vol, p_usd, c_vol, c_usd, t_vol, t_usd, b_vol, b_usd, unit, abbreviate=False, selected=False):
+    def _draw_leaf_row(self, name, p_usd, c_usd, t_usd, b_usd, abbreviate=False, selected=False):
         imgui.table_next_row()
         imgui.table_next_column()
         
-        # Add a bit of spacing / bullet
         imgui.dummy((15, 0))
         imgui.same_line()
         if selected:
@@ -158,24 +137,16 @@ class ResourcesPanel:
         else:
             imgui.text(name)
             
-        # Draw physical volume on the first line, money on the second or just combine them
-        # We can draw two texts right-aligned sequentially using a trick or just one string
+        imgui.table_next_column()
+        Prims.right_align_text(self._fmt_money(p_usd, abbreviate))
         
         imgui.table_next_column()
-        Prims.right_align_text(self._fmt_vol(p_vol, unit, abbreviate))
-        Prims.right_align_text(self._fmt_money(p_usd, abbreviate), GAMETHEME.colors.text_dim)
+        Prims.right_align_text(self._fmt_money(c_usd, abbreviate))
         
         imgui.table_next_column()
-        Prims.right_align_text(self._fmt_vol(c_vol, unit, abbreviate))
-        Prims.right_align_text(self._fmt_money(c_usd, abbreviate), GAMETHEME.colors.text_dim)
+        Prims.right_align_text(self._fmt_money(t_usd, abbreviate))
         
         imgui.table_next_column()
-        Prims.right_align_text(self._fmt_vol(t_vol, unit, abbreviate))
-        Prims.right_align_text(self._fmt_money(t_usd, abbreviate), GAMETHEME.colors.text_dim)
-        
-        imgui.table_next_column()
-        color = GAMETHEME.colors.negative if (b_vol and b_vol < 0) else GAMETHEME.colors.positive
-        Prims.right_align_text(self._fmt_vol(b_vol, unit, abbreviate), color)
         color_usd = GAMETHEME.colors.negative if (b_usd and b_usd < 0) else GAMETHEME.colors.positive
         Prims.right_align_text(self._fmt_money(b_usd, abbreviate), color_usd)
 

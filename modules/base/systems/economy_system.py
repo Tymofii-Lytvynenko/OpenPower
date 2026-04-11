@@ -57,70 +57,38 @@ class EconomySystem(ISystem):
 
         from src.shared.economy_meta import RESOURCE_MAPPING
 
-        # 1. Prices
-        prices = trade_table.group_by("game_resource_id").agg(
-            pl.col("unit_price_usd").median().alias("avg_price")
-        )
-
-        # Baseline quality is approx 25 (Neutral price multiplier 1.0x)
-        prod_val = prod_table.rename({"domestic_production": "production_vol"})
-        if "quality_index" in prod_val.columns:
-            prod_val = prod_val.with_columns(pl.col("quality_index").fill_null(25.0))
+        # 1. Prepare Tables
+        # Baseline quality is approx 25
+        prod_usd = prod_table.rename({"domestic_production": "production_usd"})
+        if "quality_index" in prod_usd.columns:
+            prod_usd = prod_usd.with_columns(pl.col("quality_index").fill_null(25.0))
         else:
-            prod_val = prod_val.with_columns(pl.lit(25.0).alias("quality_index"))
+            prod_usd = prod_usd.with_columns(pl.lit(25.0).alias("quality_index"))
 
         
-        # 3. Trade
+        # 3. Trade (Already in USD Value)
         exports = trade_table.group_by(["exporter_id", "game_resource_id"]).agg(
-            pl.col("annual_volume").sum().alias("export_vol"),
-            (pl.col("annual_volume") * pl.col("unit_price_usd")).sum().alias("export_usd")
+            pl.col("trade_value_usd").sum().alias("export_usd")
         ).rename({"exporter_id": "country_id"})
         
         imports = trade_table.group_by(["importer_id", "game_resource_id"]).agg(
-            pl.col("annual_volume").sum().alias("import_vol"),
-            (pl.col("annual_volume") * pl.col("unit_price_usd")).sum().alias("import_usd")
+            pl.col("trade_value_usd").sum().alias("import_usd")
         ).rename({"importer_id": "country_id"})
         
         net_trade = exports.join(imports, on=["country_id", "game_resource_id"], how="full", coalesce=True).fill_null(0.0)
         net_trade = net_trade.with_columns(
-            (pl.col("export_vol") - pl.col("import_vol")).alias("trade_vol"),
             (pl.col("export_usd") - pl.col("import_usd")).alias("trade_usd")
         )
         
         # 4. Master Ledger
-        ledger = prod_val.join(net_trade, on=["country_id", "game_resource_id"], how="full", coalesce=True)
-        # Fill production/trade holes with 0, but keep avg_price/quality separate
+        ledger = prod_usd.join(net_trade, on=["country_id", "game_resource_id"], how="full", coalesce=True)
+        # Fill production/trade holes with 0
         ledger = ledger.with_columns(
-            pl.col(["production_vol", "trade_vol", "trade_usd"]).fill_null(0.0)
+            pl.col(["production_usd", "trade_usd"]).fill_null(0.0)
         )
 
-        # Join Prices & Base Price Fallbacks
-        base_prices = pl.DataFrame([
-            {"game_resource_id": k, "base_price": v.get("base_price", 1.0)}
-            for k, v in RESOURCE_MAPPING.items()
-        ])
-        
-        ledger = ledger.join(prices, on="game_resource_id", how="left")
-        ledger = ledger.join(base_prices, on="game_resource_id", how="left")
-        
-        ledger = ledger.with_columns(
-            pl.col("avg_price").fill_null(pl.col("base_price")).fill_null(1.0)
-        )
-
-        # Calculate Quality-Adjusted Price (Fair Trade Logic)
-        # For sensitive goods, index 100 = ~4.08x price multiplier, index 25 = baseline (1.0x)
-        # For others, we keep the global median price.
-        ledger = ledger.with_columns(
-            pl.when(pl.col("game_resource_id").is_in(self.QUALITY_SENSITIVE_GOODS))
-            .then(pl.col("avg_price") * (pl.col("quality_index") / 100.0) * 4.08)
-            .otherwise(pl.col("avg_price"))
-            .alias("price_final")
-        )
-
-        # Calculate Production Value
-        ledger = ledger.with_columns(
-            (pl.col("production_vol") * pl.col("price_final")).alias("production_usd")
-        )
+        # In MONETARY MODE, production_usd is taken directly from the source table.
+        # We don't multiply volume by price.
 
 
 
@@ -135,35 +103,33 @@ class EconomySystem(ISystem):
         ledger = ledger.join(country_pop, on="country_id", how="left").with_columns(pl.col("total_pop").fill_null(0.0))
         
         rates_data = [
-            {"game_resource_id": "cereals", "per_capita": 0.4},
-            {"game_resource_id": "vegetables_and_fruits", "per_capita": 0.25},
-            {"game_resource_id": "meat_and_fish", "per_capita": 0.15},
-            {"game_resource_id": "electricity", "per_capita": 5.0},
-            {"game_resource_id": "fossil_fuels", "per_capita": 2.5},
-            {"game_resource_id": "pharmaceuticals", "per_capita": 0.05},
+            {"game_resource_id": "cereals", "per_capita": 160.0},
+            {"game_resource_id": "vegetables_and_fruits", "per_capita": 200.0},
+            {"game_resource_id": "meat_and_fish", "per_capita": 525.0},
+            {"game_resource_id": "electricity", "per_capita": 400.0},
+            {"game_resource_id": "fossil_fuels", "per_capita": 375.0},
+            {"game_resource_id": "pharmaceuticals", "per_capita": 1250.0},
         ]
         consumption_rates = pl.DataFrame(rates_data, schema={"game_resource_id": pl.String, "per_capita": pl.Float64})
         
         ledger = ledger.join(consumption_rates, on="game_resource_id", how="left").with_columns(
-            pl.col("per_capita").fill_null(0.01) # Lower default fallback to avoid massive starvation in UI
+            pl.col("per_capita").fill_null(50.0) # Default fallback USD demand
         )
         
-        # Calculate real dynamic consumption 
+        # Calculate real dynamic consumption (USD Demand)
         ledger = ledger.with_columns(
-            (pl.col("total_pop") * pl.col("per_capita")).alias("consumption_vol")
-        )
-        ledger = ledger.with_columns(
-            (pl.col("consumption_vol") * pl.col("price_final")).alias("consumption_usd")
+            (pl.col("total_pop") * pl.col("per_capita")).alias("consumption_usd")
         )
 
         
         # 6. Real Balances
         ledger = ledger.with_columns(
-            (pl.col("production_vol") - pl.col("consumption_vol") - pl.col("trade_vol")).alias("balance_vol"),
             (pl.col("production_usd") - pl.col("consumption_usd") - pl.col("trade_usd")).alias("balance_usd")
         )
         
-        ledger = ledger.drop(["total_pop", "per_capita", "avg_price", "base_price", "quality_index"])
+        # Only drop columns that are actually present to avoid errors
+        cols_to_drop = ["total_pop", "per_capita", "avg_price", "base_price", "quality_index"]
+        ledger = ledger.drop([c for c in cols_to_drop if c in ledger.columns])
         
         cat_df = pl.DataFrame([
             {"game_resource_id": k, "category": v["category"], "unit_str": v["unit"]}
@@ -188,39 +154,11 @@ class EconomySystem(ISystem):
         trade_table = state.get_table("trade_network")
         countries = state.get_table("countries")
 
-        # 1. Calculate Global Price Index for each resource
-        # (This is a simplified approach using median trade prices)
-        prices = trade_table.group_by("game_resource_id").agg(
-            pl.col("unit_price_usd").median().alias("avg_price")
-        )
-
-        # 2. Join production with prices
-        prod_val = prod_table.join(prices, on="game_resource_id", how="left")
-        
-        # Fallback to base prices from meta if no trade price exists
-        from src.shared.economy_meta import RESOURCE_MAPPING
-        base_prices = pl.DataFrame([
-            {"game_resource_id": k, "base_price": v.get("base_price", 1.0)}
-            for k, v in RESOURCE_MAPPING.items()
-        ])
-        prod_val = prod_val.join(base_prices, on="game_resource_id", how="left")
-
-        prod_val = prod_val.with_columns([
-            pl.col("avg_price").fill_null(pl.col("base_price")).fill_null(1.0),
-            pl.col("quality_index").fill_null(25.0) # Baseline quality if missing
-        ])
-
-
-        # 3. Calculate value generated per country (Quality-Adjusted Valuation)
-        prod_val = prod_val.with_columns(
-            pl.when(pl.col("game_resource_id").is_in(self.QUALITY_SENSITIVE_GOODS))
-            .then(pl.col("avg_price") * (pl.col("quality_index") / 100.0) * 4.08)
-            .otherwise(pl.col("avg_price"))
-            .alias("price_final")
-        )
-
-        prod_val = prod_val.with_columns(
-            (pl.col("domestic_production") * pl.col("price_final") * fraction).alias("generated_value")
+        # 3. Calculate value generated per country 
+        # In MONETARY MODE, domestic_production is already USD. 
+        # Quality is already baked in by the generator.
+        prod_val = prod_table.with_columns(
+            (pl.col("domestic_production") * fraction).alias("generated_value")
         )
 
 
