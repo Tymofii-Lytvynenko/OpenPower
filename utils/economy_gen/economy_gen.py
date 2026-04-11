@@ -526,8 +526,9 @@ class WiodLoader:
 
 class WiodProductionEstimator:
     """
-    Distributes WIOD monetary output into game resources using Gross Trade Proportionality.
-    Uses Trade Affinity Profiles to intelligently distribute missing RoW data.
+    Distributes WIOD monetary output into game resources.
+    Uses Macroeconomic Consumption Propensity to intelligently estimate RoW data,
+    preventing non-tradable services from zeroing out.
     """
     def __init__(self, config: EconomyConfig, mapping_dict: Dict[str, List[str]]):
         self.cfg = config
@@ -538,23 +539,54 @@ class WiodProductionEstimator:
                 records.append({"category": wiod_cat, "game_resource_id": res})
         self.mapping_lf = pl.DataFrame(records).lazy()
 
-    def estimate(self, wiod_lf: pl.LazyFrame, trade_agg_lf: pl.LazyFrame, dem_eco_lf: pl.LazyFrame) -> pl.LazyFrame:
-        # Extract trade values from aggregator
-        country_trade = trade_agg_lf.rename({
-            "total_export": "export_usd", 
-            "total_import": "import_usd"
-        }).join(self.mapping_lf, on="game_resource_id", how="left")
-
-        cat_trade = country_trade.group_by(["country_id", "category"]).agg(
-            pl.col("export_usd").sum().alias("cat_export_usd"),
-            pl.col("import_usd").sum().alias("cat_import_usd")
+    def _calculate_consumption_propensity(self, res_macro: pl.LazyFrame, known_gdp: float) -> pl.LazyFrame:
+        """
+        Calculates the global average consumption per dollar of GDP for each resource.
+        
+        Why: Relying on the WIOD 'RoW' residual combined with trade weights mathematically 
+        erases non-tradable sectors (like industrial services) because their trade weight is ~0.
+        Instead, we establish a baseline consumption habit from high-quality data.
+        
+        TODO: Future iterations could introduce income elasticity here, as wealthier nations 
+        spend a non-linear, higher proportion of GDP on services compared to agriculture.
+        """
+        safe_gdp = max(known_gdp, 1.0)
+        return res_macro.group_by("game_resource_id").agg(
+            (pl.col("res_absorption_usd").sum() / safe_gdp).alias("propensity_c")
         )
 
+    def estimate(self, wiod_lf: pl.LazyFrame, trade_agg_lf: pl.LazyFrame, dem_eco_lf: pl.LazyFrame) -> pl.LazyFrame:
+        
         wiod_val = wiod_lf.with_columns(
             (pl.col("total_output") * self.cfg.wiod_value_multiplier).alias("wiod_output_usd")
         ).rename({"iso3": "country_id"}).select(["country_id", "category", "wiod_output_usd"])
 
         wiod_countries = wiod_val.filter(~pl.col("country_id").is_in(["RoW", "TOT"]))
+        
+        # --- FIX: Base Grid Construction ---
+        # Why cross join here? Relying solely on `trade_agg_lf` drops entirely non-tradable resources 
+        # (like local services) from the dataset because they have 0 exports/imports globally.
+        # By forcing a cross join of all known countries and all possible resources first, 
+        # we guarantee that non-tradables survive the pipeline with 0 trade but intact domestic absorption.
+        all_resources_df = self.mapping_lf.select("game_resource_id").unique()
+        known_countries_df = wiod_countries.select("country_id").unique()
+        
+        base_grid = known_countries_df.join(all_resources_df, how="cross").join(
+            self.mapping_lf, on="game_resource_id", how="left"
+        )
+
+        # Extract trade values and map to the complete grid, filling missing trade with 0
+        country_trade = base_grid.join(
+            trade_agg_lf.rename({"total_export": "export_usd", "total_import": "import_usd"}),
+            on=["country_id", "game_resource_id"], 
+            how="left"
+        ).fill_null(0.0)
+        # -----------------------------------
+
+        cat_trade = country_trade.group_by(["country_id", "category"]).agg(
+            pl.col("export_usd").sum().alias("cat_export_usd"),
+            pl.col("import_usd").sum().alias("cat_import_usd")
+        )
 
         # Domestic Absorption (A_C = Y_C - X_C + M_C) for primary WIOD nations
         cat_macro = wiod_countries.join(cat_trade, on=["country_id", "category"], how="left").fill_null(0.0)
@@ -602,74 +634,42 @@ class WiodProductionEstimator:
         ).select(["country_id", "game_resource_id", "domestic_production"])
 
 
-        # --- RoW (Rest of World) Interpolation with Macro-Consumption Identity ---
+        # --- RoW (Rest of World) Interpolation via Macroeconomic Propensity ---
         
-        row_wiod = wiod_val.filter(pl.col("country_id") == "RoW")
-        
-        # 1. Total RoW Production per resource
-        row_res = row_wiod.join(self.mapping_lf, on="category", how="inner").join(
-            global_trade, on="game_resource_id", how="left"
-        ).with_columns(
-            (pl.col("wiod_output_usd") * pl.col("global_trade_weight")).alias("row_total_production")
-        ).select(["game_resource_id", "row_total_production"])
-
-        # Prepare demographic data for missing countries
         dem_eco_lf = dem_eco_lf.with_columns(
             (pl.col("gdp_per_capita") * pl.col("total_population")).alias("total_gdp")
         )
+        
+        known_countries_gdp_lf = dem_eco_lf.join(
+            wiod_countries.select("country_id").unique(), on="country_id", how="inner"
+        )
+        total_known_gdp = known_countries_gdp_lf.select(pl.col("total_gdp").sum()).collect().item()
+        
         missing_countries_lf = dem_eco_lf.join(
             wiod_countries.select("country_id").unique(), on="country_id", how="anti"
         )
-        
-        total_missing_gdp = missing_countries_lf.select(pl.col("total_gdp").sum()).collect().item() or 1.0
-        total_missing_pop = missing_countries_lf.select(pl.col("total_population").sum()).collect().item() or 1.0
-        
-        gdp_w = self.cfg.missing_country_gdp_weight
-        pop_w = 1.0 - gdp_w
 
-        # 2. Base Macro Weight (Economic mass for CONSUMPTION capacity)
-        missing_countries_lf = missing_countries_lf.with_columns(
-            (((pl.col("total_gdp") / total_missing_gdp) * gdp_w) + 
-             ((pl.col("total_population") / total_missing_pop) * pop_w)).alias("macro_weight")
+        propensity_lf = self._calculate_consumption_propensity(res_macro, total_known_gdp)
+        
+        missing_grid = missing_countries_lf.select(["country_id", "total_gdp"]).join(all_resources_df, how="cross")
+        
+        missing_consumption = missing_grid.join(propensity_lf, on="game_resource_id", how="left").fill_null(0.0)
+        missing_consumption = missing_consumption.with_columns(
+            (pl.col("total_gdp") * pl.col("propensity_c")).alias("estimated_consumption_usd")
         )
 
-        all_resources_df = self.mapping_lf.select("game_resource_id").unique()
-        missing_grid = missing_countries_lf.select(["country_id", "macro_weight"]).join(all_resources_df, how="cross")
-        
-        # 3. Pull in actual trade data for RoW countries
-        missing_trade = missing_grid.join(
+        missing_trade = missing_consumption.join(
             country_trade.select(["country_id", "game_resource_id", "export_usd", "import_usd"]),
             on=["country_id", "game_resource_id"], how="left"
         ).fill_null(0.0)
 
-        # 4. Calculate Total RoW Exports and Imports per resource
-        row_trade_totals = missing_trade.group_by("game_resource_id").agg(
-            pl.col("export_usd").sum().alias("row_total_export"),
-            pl.col("import_usd").sum().alias("row_total_import")
-        )
-
-        # 5. Calculate Total RoW Consumption (C = P - E + I)
-        row_macro = row_res.join(row_trade_totals, on="game_resource_id", how="left").fill_null(0.0)
-        row_macro = row_macro.with_columns(
-            (pl.col("row_total_production") - pl.col("row_total_export") + pl.col("row_total_import")).alias("row_total_consumption")
+        missing_production = missing_trade.with_columns(
+            (pl.col("estimated_consumption_usd") + pl.col("export_usd") - pl.col("import_usd")).alias("domestic_production")
         ).with_columns(
-            pl.when(pl.col("row_total_consumption") < 0).then(0.0)
-            .otherwise(pl.col("row_total_consumption")).alias("row_total_consumption")
-        )
-
-        # 6. Apportion Consumption by Macro Weight, then derive Production (P = C + E - I)
-        missing_production = missing_trade.join(row_macro.select(["game_resource_id", "row_total_consumption"]), on="game_resource_id", how="left")
-        missing_production = missing_production.with_columns(
-            (pl.col("row_total_consumption") * pl.col("macro_weight")).alias("country_consumption_usd")
-        ).with_columns(
-            (pl.col("country_consumption_usd") + pl.col("export_usd") - pl.col("import_usd")).alias("domestic_production")
-        ).with_columns(
-            # Clamp negative production to 0 (happens if a country imports drastically more than their macro_weight suggests)
             pl.when(pl.col("domestic_production") < 0).then(0.0)
             .otherwise(pl.col("domestic_production")).alias("domestic_production")
         ).select(["country_id", "game_resource_id", "domestic_production"])
 
-        # Combine WIOD and RoW
         combined_production = pl.concat([known_production, missing_production]).group_by(["country_id", "game_resource_id"]).agg(
             pl.col("domestic_production").sum()
         )
