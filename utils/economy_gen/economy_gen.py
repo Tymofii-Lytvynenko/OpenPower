@@ -360,7 +360,7 @@ class ServicesManHourConverter:
         lf = lf.with_columns(pl.col("gdp_per_capita").fill_null(mean_gdp))
         lf = self.mapper.map_services(lf)
 
-        # Output trade_value_usd directly without calculating physical man-hours
+        # Output trade_value_usd directly
         lf = lf.with_columns(
             (pl.col("gdp_per_capita") / self.cfg.working_hours_per_year).alias("unit_price_usd"),
             (pl.col("trade") * self.cfg.itpd_value_multiplier).alias("trade_value_usd")
@@ -527,7 +527,7 @@ class WiodLoader:
 class WiodProductionEstimator:
     """
     Distributes WIOD monetary output into game resources using Gross Trade Proportionality.
-    Outputs the final result purely in USD (No physical conversion!).
+    Uses Trade Affinity Profiles to intelligently distribute missing RoW data.
     """
     def __init__(self, config: EconomyConfig, mapping_dict: Dict[str, List[str]]):
         self.cfg = config
@@ -539,7 +539,7 @@ class WiodProductionEstimator:
         self.mapping_lf = pl.DataFrame(records).lazy()
 
     def estimate(self, wiod_lf: pl.LazyFrame, trade_agg_lf: pl.LazyFrame, dem_eco_lf: pl.LazyFrame) -> pl.LazyFrame:
-        # Extract trade values from aggregator instead of raw trade_lf for efficiency
+        # Extract trade values from aggregator
         country_trade = trade_agg_lf.rename({
             "total_export": "export_usd", 
             "total_import": "import_usd"
@@ -556,7 +556,7 @@ class WiodProductionEstimator:
 
         wiod_countries = wiod_val.filter(~pl.col("country_id").is_in(["RoW", "TOT"]))
 
-        # Domestic Absorption (A_C = Y_C - X_C + M_C)
+        # Domestic Absorption (A_C = Y_C - X_C + M_C) for primary WIOD nations
         cat_macro = wiod_countries.join(cat_trade, on=["country_id", "category"], how="left").fill_null(0.0)
         cat_macro = cat_macro.with_columns(
             (pl.col("wiod_output_usd") - pl.col("cat_export_usd") + pl.col("cat_import_usd")).alias("absorption_usd")
@@ -565,7 +565,6 @@ class WiodProductionEstimator:
             .otherwise(pl.col("absorption_usd")).alias("absorption_usd")
         )
 
-        # Global gross trade proportions
         global_trade = country_trade.group_by("game_resource_id").agg(
             (pl.col("import_usd").sum() + pl.col("export_usd").sum()).alias("global_res_trade")
         ).join(self.mapping_lf, on="game_resource_id", how="left")
@@ -577,7 +576,6 @@ class WiodProductionEstimator:
             .alias("global_trade_weight")
         ).fill_null(0.0)
 
-        # Execute the Gross Trade Proportionality Assumption
         res_macro = country_trade.join(cat_macro, on=["country_id", "category"], how="inner")
         res_macro = res_macro.join(
             global_trade.select(["game_resource_id", "global_trade_weight"]), 
@@ -595,7 +593,7 @@ class WiodProductionEstimator:
             (pl.col("absorption_usd") * pl.col("resource_weight")).alias("res_absorption_usd")
         )
 
-        # Calculate production: P = A + E - I. This is now the final value in USD!
+        # Base Production for WIOD nations
         known_production = res_macro.with_columns(
             (pl.col("res_absorption_usd") + pl.col("export_usd") - pl.col("import_usd")).alias("domestic_production")
         ).with_columns(
@@ -604,42 +602,78 @@ class WiodProductionEstimator:
         ).select(["country_id", "game_resource_id", "domestic_production"])
 
 
-        # --- RoW (Rest of World) ---
+        # --- RoW (Rest of World) Interpolation with Macro-Consumption Identity ---
+        
         row_wiod = wiod_val.filter(pl.col("country_id") == "RoW")
+        
+        # 1. Total RoW Production per resource
         row_res = row_wiod.join(self.mapping_lf, on="category", how="inner").join(
             global_trade, on="game_resource_id", how="left"
         ).with_columns(
             (pl.col("wiod_output_usd") * pl.col("global_trade_weight")).alias("row_total_production")
         ).select(["game_resource_id", "row_total_production"])
 
+        # Prepare demographic data for missing countries
         dem_eco_lf = dem_eco_lf.with_columns(
             (pl.col("gdp_per_capita") * pl.col("total_population")).alias("total_gdp")
         )
-        
         missing_countries_lf = dem_eco_lf.join(
             wiod_countries.select("country_id").unique(), on="country_id", how="anti"
         )
         
-        total_missing_gdp = missing_countries_lf.select(pl.col("total_gdp").sum()).collect().item()
-        total_missing_pop = missing_countries_lf.select(pl.col("total_population").sum()).collect().item()
-        
-        total_missing_gdp = total_missing_gdp if total_missing_gdp and total_missing_gdp > 0 else 1.0
-        total_missing_pop = total_missing_pop if total_missing_pop and total_missing_pop > 0 else 1.0
+        total_missing_gdp = missing_countries_lf.select(pl.col("total_gdp").sum()).collect().item() or 1.0
+        total_missing_pop = missing_countries_lf.select(pl.col("total_population").sum()).collect().item() or 1.0
         
         gdp_w = self.cfg.missing_country_gdp_weight
         pop_w = 1.0 - gdp_w
 
-        missing_production = missing_countries_lf.join(row_res, how="cross").with_columns(
-            (pl.col("row_total_production") * ((pl.col("total_gdp") / total_missing_gdp) * gdp_w + (pl.col("total_population") / total_missing_pop) * pop_w)
-            ).alias("domestic_production")
+        # 2. Base Macro Weight (Economic mass for CONSUMPTION capacity)
+        missing_countries_lf = missing_countries_lf.with_columns(
+            (((pl.col("total_gdp") / total_missing_gdp) * gdp_w) + 
+             ((pl.col("total_population") / total_missing_pop) * pop_w)).alias("macro_weight")
+        )
+
+        all_resources_df = self.mapping_lf.select("game_resource_id").unique()
+        missing_grid = missing_countries_lf.select(["country_id", "macro_weight"]).join(all_resources_df, how="cross")
+        
+        # 3. Pull in actual trade data for RoW countries
+        missing_trade = missing_grid.join(
+            country_trade.select(["country_id", "game_resource_id", "export_usd", "import_usd"]),
+            on=["country_id", "game_resource_id"], how="left"
+        ).fill_null(0.0)
+
+        # 4. Calculate Total RoW Exports and Imports per resource
+        row_trade_totals = missing_trade.group_by("game_resource_id").agg(
+            pl.col("export_usd").sum().alias("row_total_export"),
+            pl.col("import_usd").sum().alias("row_total_import")
+        )
+
+        # 5. Calculate Total RoW Consumption (C = P - E + I)
+        row_macro = row_res.join(row_trade_totals, on="game_resource_id", how="left").fill_null(0.0)
+        row_macro = row_macro.with_columns(
+            (pl.col("row_total_production") - pl.col("row_total_export") + pl.col("row_total_import")).alias("row_total_consumption")
+        ).with_columns(
+            pl.when(pl.col("row_total_consumption") < 0).then(0.0)
+            .otherwise(pl.col("row_total_consumption")).alias("row_total_consumption")
+        )
+
+        # 6. Apportion Consumption by Macro Weight, then derive Production (P = C + E - I)
+        missing_production = missing_trade.join(row_macro.select(["game_resource_id", "row_total_consumption"]), on="game_resource_id", how="left")
+        missing_production = missing_production.with_columns(
+            (pl.col("row_total_consumption") * pl.col("macro_weight")).alias("country_consumption_usd")
+        ).with_columns(
+            (pl.col("country_consumption_usd") + pl.col("export_usd") - pl.col("import_usd")).alias("domestic_production")
+        ).with_columns(
+            # Clamp negative production to 0 (happens if a country imports drastically more than their macro_weight suggests)
+            pl.when(pl.col("domestic_production") < 0).then(0.0)
+            .otherwise(pl.col("domestic_production")).alias("domestic_production")
         ).select(["country_id", "game_resource_id", "domestic_production"])
 
-        # Combine everything
+        # Combine WIOD and RoW
         combined_production = pl.concat([known_production, missing_production]).group_by(["country_id", "game_resource_id"]).agg(
             pl.col("domestic_production").sum()
         )
         
-        all_resources_df = self.mapping_lf.select("game_resource_id").unique()
         all_countries_df = dem_eco_lf.select("country_id").unique()
         complete_grid = all_countries_df.join(all_resources_df, how="cross")
         
@@ -648,7 +682,6 @@ class WiodProductionEstimator:
         )
         
         return final_production
-
 
 class MacroeconomicSanityChecker:
     def verify_and_heal(self, prod_lf: pl.LazyFrame, trade_agg_lf: pl.LazyFrame) -> pl.LazyFrame:
@@ -714,72 +747,8 @@ class InternalProductionPipeline:
 
 
 # ==============================================================================
-# ORCHESTRATION & VALIDATION
+# ORCHESTRATION & LOGGING
 # ==============================================================================
-
-class HistoricalProductionValidator:
-    def __init__(self, tolerance: float = 0.10):
-        self.tolerance = tolerance
-        
-        # TARGETS RESET FOR USD MODE. 
-        # The script now outputs monetary value in US Dollars, NOT physical tons.
-        # Placeholder values set to 0 to bypass crash on first run.
-        self.control_data = {
-            "USA": {
-                "cereals": 0.0,
-                "electricity": 0.0, 
-            },
-            "DEU": {
-                "vehicles": 0.0, 
-                "iron_and_steel": 0.0,
-            },
-            "UKR": {
-                "iron_and_steel": 0.0,
-                "cereals": 0.0,
-            }
-        }
-
-    def validate(self, production_path: Path):
-        logger.info("Validating generated production volumes against historical baselines...")
-        df = pl.read_parquet(production_path)
-        
-        failed_checks = []
-
-        for country, resources in self.control_data.items():
-            for resource, expected_vol in resources.items():
-                if expected_vol == 0.0:
-                    #logger.warning(f"  [SKIP] Validation target for {country} {resource} is reset to 0 (USD mode update). Please recalibrate after first run.")
-                    continue
-
-                actual_row = df.filter(
-                    (pl.col("country_id") == country) & 
-                    (pl.col("game_resource_id") == resource)
-                )
-                
-                if actual_row.is_empty():
-                    #logger.error(f"Validation target missing in dataset: {country} - {resource}")
-                    continue
-                    
-                actual_vol = actual_row["domestic_production"][0]
-                
-                deviation = abs(actual_vol - expected_vol) / expected_vol
-                
-                if deviation > self.tolerance:
-                    failed_checks.append(
-                        f"{country} [{resource}]: Expected ${expected_vol:,.0f}, "
-                        f"Got ${actual_vol:,.0f} (Delta: {deviation:.1%})"
-                    )
-                else:
-                    logger.info(f"  [PASS] {country} {resource} (Delta: {deviation:.1%})")
-
-        if failed_checks:
-            error_msg = "Macroeconomic outputs deviated beyond acceptable thresholds:\n" + "\n".join(failed_checks)
-            logger.error(error_msg)
-            # Temporarily commented out the crash raise so you can see the new USD values in the log.
-            # raise ValueError("Sanity check failed. Check logs for delta details.")
-        
-        logger.info("Historical production validation routine completed.")
-
 
 class WorldEconomyGenerator:
     def __init__(self, config: EconomyConfig):
@@ -814,11 +783,6 @@ class WorldEconomyGenerator:
         logger.info(f"Isolated countries (autarkies) missing from trade network: {isolated_countries['country_id'].to_list()}")
 
     def log_random_validation_samples(self):
-        """
-        Outputs 5 random trade pairs and 10 random production values 
-        (5 from WIOD Base, 5 from RoW Interpolated) to the console for sanity checking.
-        """
-        # --- 1. Log 5 Random Trade Samples ---
         trade_lf = pl.scan_parquet(self.config.trade_output_path)
         trade_df = trade_lf.collect()
         
@@ -828,7 +792,6 @@ class WorldEconomyGenerator:
             for row in sample_trade:
                 logger.info(f"  {row['exporter_id']} -> {row['importer_id']} [{row['game_resource_id']}]: ${row['trade_value_usd']:,.2f}")
 
-        # --- 2. Log 10 Random Production Samples (5 WIOD, 5 RoW) ---
         prod_lf = pl.scan_parquet(self.config.production_output_path)
         prod_df = prod_lf.collect()
         
@@ -841,12 +804,12 @@ class WorldEconomyGenerator:
         
         logger.info("\n--- Random Production Samples (USD) ---")
         if not wiod_prod_df.is_empty():
-            sample_wiod = wiod_prod_df.sample(n=min(5, len(wiod_prod_df))).iter_rows(named=True)
+            sample_wiod = wiod_prod_df.sample(n=min(30, len(wiod_prod_df))).iter_rows(named=True)
             for row in sample_wiod:
                 logger.info(f"  [WIOD Base] {row['country_id']} - {row['game_resource_id']}: ${row['domestic_production']:>15,.2f} | QI: {row['quality_index']}")
                 
         if not row_prod_df.is_empty():
-            sample_row = row_prod_df.sample(n=min(5, len(row_prod_df))).iter_rows(named=True)
+            sample_row = row_prod_df.sample(n=min(30, len(row_prod_df))).iter_rows(named=True)
             for row in sample_row:
                 logger.info(f"  [RoW Interpolated] {row['country_id']} - {row['game_resource_id']}: ${row['domestic_production']:>15,.2f} | QI: {row['quality_index']}")
 
@@ -854,8 +817,6 @@ class WorldEconomyGenerator:
         try:
             self.trade_pipeline.run()
             self.production_pipeline.run()
-            
-            # Валідацію прибрано звідси
             
             self.log_isolated_countries()
             self.log_random_validation_samples()
