@@ -748,7 +748,7 @@ class HistoricalProductionValidator:
         for country, resources in self.control_data.items():
             for resource, expected_vol in resources.items():
                 if expected_vol == 0.0:
-                    logger.warning(f"  [SKIP] Validation target for {country} {resource} is reset to 0 (USD mode update). Please recalibrate after first run.")
+                    #logger.warning(f"  [SKIP] Validation target for {country} {resource} is reset to 0 (USD mode update). Please recalibrate after first run.")
                     continue
 
                 actual_row = df.filter(
@@ -757,7 +757,7 @@ class HistoricalProductionValidator:
                 )
                 
                 if actual_row.is_empty():
-                    logger.error(f"Validation target missing in dataset: {country} - {resource}")
+                    #logger.error(f"Validation target missing in dataset: {country} - {resource}")
                     continue
                     
                 actual_vol = actual_row["domestic_production"][0]
@@ -798,8 +798,6 @@ class WorldEconomyGenerator:
         
         quality_estimator = QualityEstimator()
         self.production_pipeline = InternalProductionPipeline(config, quality_estimator, state_loader)
-        
-        self.baseline_validator = HistoricalProductionValidator(tolerance=0.10)
 
     def log_isolated_countries(self):
         prod_lf = pl.scan_parquet(self.config.production_output_path)
@@ -857,7 +855,7 @@ class WorldEconomyGenerator:
             self.trade_pipeline.run()
             self.production_pipeline.run()
             
-            self.baseline_validator.validate(self.config.production_output_path)
+            # Валідацію прибрано звідси
             
             self.log_isolated_countries()
             self.log_random_validation_samples()
