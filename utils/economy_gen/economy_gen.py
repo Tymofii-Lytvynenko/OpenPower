@@ -3,6 +3,7 @@ from pathlib import Path
 from dataclasses import dataclass
 import logging
 from typing import Dict, List
+import random
 
 # Configure production logging
 logging.basicConfig(
@@ -133,36 +134,23 @@ class EconomyConfig:
     production_output_path: Path
     
     target_year: int = 2001
-    min_quantity_tons: float = 1.0
-    working_hours_per_year: float = 2000.0
     
-    enable_percentile_clipping: bool = False
-    clip_lower_percentile: float = 0.05
-    clip_upper_percentile: float = 0.95
-    max_fallback_price: float = 5000000.0
+    # Thresholds and Real-World Constants
+    min_quantity_tons: float = 0.0  # Set to 0.0 to capture all realistic trade flow, regardless of size.
+    working_hours_per_year: float = 1750.0  # Approximate OECD average for realistic labor valuation
     
-    baseline_gdp_pc: float = 10000.0
-
-
-RESOURCE_OUTPUT_WEIGHTS = {
-    "cereals": 0.40,
-    "vegetables_and_fruits": 0.30,
-    "meat_and_fish": 0.15,
-    "dairy": 0.10,
-    "drugs_and_raw_plants": 0.05,
-    "fossil_fuels": 0.80,
-    "minerals": 0.19,
-    "precious_stones": 0.01,
-    "other_food_and_beverages": 0.90,
-    "tobacco": 0.10,
-    "chemicals": 0.80,
-    "pharmaceuticals": 0.20,
-    "iron_and_steel": 0.80,
-    "non_ferrous_metals": 0.15,
-    "arms_and_ammunition": 0.05,
-    "commodities": 0.80,
-    "luxury_commodities": 0.20
-}
+    # Dataset Unit Multipliers
+    baci_value_multiplier: float = 1000.0       # BACI values 'v' are reported in thousands of USD
+    itpd_value_multiplier: float = 1_000_000.0  # ITPD-E values are reported in millions of USD
+    wiod_value_multiplier: float = 1_000_000.0  # WIOD output values are in millions of USD
+    
+    # Missing Data Imputation Weights
+    missing_country_gdp_weight: float = 1.0     
+    
+    # Outlier Processing Parameters
+    enable_percentile_clipping: bool = True
+    clip_lower_percentile: float = 0.01 
+    clip_upper_percentile: float = 0.99 
 
 
 # ==============================================================================
@@ -288,7 +276,7 @@ class BaciTransformer:
 
         def calculate_unit_price(level: str) -> pl.Expr:
             q_sum = pl.col("q").sum().over(level)
-            return pl.when(q_sum > 0).then((pl.col("v").sum().over(level) * 1000) / q_sum).otherwise(None)
+            return pl.when(q_sum > 0).then((pl.col("v").sum().over(level) * self.cfg.baci_value_multiplier) / q_sum).otherwise(None)
 
         q_sum_global = pl.col("q").sum()
 
@@ -296,16 +284,13 @@ class BaciTransformer:
             calculate_unit_price("hs6_code").alias("price_hs6"),
             calculate_unit_price("hs4_code").alias("price_hs4"),
             calculate_unit_price("hs2_code").alias("price_hs2"),
-            pl.when(q_sum_global > 0).then((pl.col("v").sum() * 1000) / q_sum_global).otherwise(None).alias("price_global")
+            pl.when(q_sum_global > 0).then((pl.col("v").sum() * self.cfg.baci_value_multiplier) / q_sum_global).otherwise(None).alias("price_global")
         )
 
         lf = lf.with_columns(
-            pl.when(pl.col("hs4_code") == "2716")
-            .then(50.0)
-            .otherwise(pl.coalesce("price_hs6", "price_hs4", "price_hs2", "price_global"))
-            .alias("best_estimated_price")
+            pl.coalesce("price_hs6", "price_hs4", "price_hs2", "price_global").alias("best_estimated_price")
         ).with_columns(
-            pl.coalesce(pl.col("q"), (pl.col("v") * 1000) / pl.col("best_estimated_price")).alias("healed_quantity")
+            pl.coalesce(pl.col("q"), (pl.col("v") * self.cfg.baci_value_multiplier) / pl.col("best_estimated_price")).alias("healed_quantity")
         )
 
         lf = lf.filter(pl.col("healed_quantity") >= self.cfg.min_quantity_tons)
@@ -319,7 +304,7 @@ class BaciTransformer:
         lf_agg = lf_agg.filter(
             pl.col("annual_volume").is_not_null() & (pl.col("annual_volume") > 0)
         ).with_columns(
-            ((pl.col("total_v") * 1000) / pl.col("annual_volume")).alias("unit_price_usd")
+            ((pl.col("total_v") * self.cfg.baci_value_multiplier) / pl.col("annual_volume")).alias("unit_price_usd")
         )
         return lf_agg
 
@@ -355,8 +340,11 @@ class ServicesManHourConverter:
         eco_lf = self.state_loader.load_economy()
 
         lf = lf.join(eco_lf, left_on="exporter_id", right_on="country_id", how="left")
+        
+        mean_gdp = eco_lf.select(pl.col("gdp_per_capita").mean()).collect().item()
+        
         lf = lf.with_columns(
-            pl.col("gdp_per_capita").fill_null(self.cfg.baseline_gdp_pc)
+            pl.col("gdp_per_capita").fill_null(mean_gdp)
         )
 
         lf = self.mapper.map_services(lf)
@@ -364,7 +352,7 @@ class ServicesManHourConverter:
         lf = lf.with_columns(
             (pl.col("gdp_per_capita") / self.cfg.working_hours_per_year).alias("hourly_wage")
         ).with_columns(
-            ((pl.col("trade") * 1_000_000) / pl.col("hourly_wage")).alias("annual_volume"),
+            ((pl.col("trade") * self.cfg.itpd_value_multiplier) / pl.col("hourly_wage")).alias("annual_volume"),
             pl.col("hourly_wage").alias("unit_price_usd")
         )
 
@@ -375,28 +363,23 @@ class ServicesManHourConverter:
 
 
 class OutlierProcessor:
-    """Sanitizes unit prices to handle customs reporting errors."""
+    """Sanitizes unit prices to handle customs reporting errors using statistical percentiles."""
     def __init__(self, config: EconomyConfig):
         self.cfg = config
 
     def process(self, lf: pl.LazyFrame) -> pl.LazyFrame:
-        if self.cfg.enable_percentile_clipping:
-            lower_bound = pl.col("unit_price_usd").quantile(self.cfg.clip_lower_percentile).over("game_resource_id")
-            upper_bound = pl.col("unit_price_usd").quantile(self.cfg.clip_upper_percentile).over("game_resource_id")
+        if not self.cfg.enable_percentile_clipping:
+            return lf
+            
+        lower_bound = pl.col("unit_price_usd").quantile(self.cfg.clip_lower_percentile).over("game_resource_id")
+        upper_bound = pl.col("unit_price_usd").quantile(self.cfg.clip_upper_percentile).over("game_resource_id")
 
-            lf = lf.with_columns(
-                pl.when(pl.col("unit_price_usd") > upper_bound).then(upper_bound)
-                .when(pl.col("unit_price_usd") < lower_bound).then(lower_bound)
-                .otherwise(pl.col("unit_price_usd"))
-                .alias("unit_price_usd")
-            )
-        else:
-            lf = lf.with_columns(
-                pl.when(pl.col("unit_price_usd") > self.cfg.max_fallback_price).then(self.cfg.max_fallback_price)
-                .otherwise(pl.col("unit_price_usd"))
-                .alias("unit_price_usd")
-            )
-        return lf
+        return lf.with_columns(
+            pl.when(pl.col("unit_price_usd") > upper_bound).then(upper_bound)
+            .when(pl.col("unit_price_usd") < lower_bound).then(lower_bound)
+            .otherwise(pl.col("unit_price_usd"))
+            .alias("unit_price_usd")
+        )
 
 
 class TradeConverterPipeline:
@@ -461,14 +444,13 @@ class TradeAggregator:
 
 
 class QualityEstimator:
-    """Calculates a Quality Index (1-100) for complex manufactured goods and services."""
-    def __init__(self, baseline_gdp_pc: float = 10000.0, price_weight: float = 0.4, tech_weight: float = 0.6):
-        self.baseline_gdp = baseline_gdp_pc
+    """Calculates a Quality Index dynamically scaled against the dataset's realistic maximums."""
+    def __init__(self, price_weight: float = 0.5, tech_weight: float = 0.5):
         self.w_price = price_weight
         self.w_tech = tech_weight
 
     def calculate(self, trade_lf: pl.LazyFrame, eco_lf: pl.LazyFrame, production_lf: pl.LazyFrame) -> pl.LazyFrame:
-        logger.info("Calculating Quality Index for manufactured goods and services...")
+        logger.info("Calculating dynamically scaled Quality Index...")
 
         global_prices = trade_lf.group_by("game_resource_id").agg(
             pl.col("unit_price_usd").median().alias("global_median_price")
@@ -491,18 +473,18 @@ class QualityEstimator:
         )
 
         eval_lf = eval_lf.with_columns(
-            (pl.col("local_price") / pl.col("global_median_price")).clip(0.5, 3.0).alias("price_ratio"),
-            (pl.col("gdp_per_capita") / self.baseline_gdp).clip(0.1, 5.0).alias("tech_ratio")
+            (pl.col("local_price") / pl.col("global_median_price")).alias("price_ratio"),
+            (pl.col("gdp_per_capita") / pl.col("gdp_per_capita").mean()).alias("tech_ratio")
         ).with_columns(
             ((pl.col("price_ratio") ** self.w_price) * (pl.col("tech_ratio") ** self.w_tech)).alias("raw_quality")
         )
 
-        max_theoretical_quality = (3.0 ** self.w_price) * (5.0 ** self.w_tech)
-        
         eval_lf = eval_lf.with_columns(
+            pl.col("raw_quality").max().alias("max_raw_quality")
+        ).with_columns(
             pl.when(pl.col("game_resource_id").is_in(QUALITY_SENSITIVE_GOODS))
             .then(
-                ((pl.col("raw_quality") / max_theoretical_quality) * 100).round(0).clip(1.0, 100.0)
+                ((pl.col("raw_quality") / pl.col("max_raw_quality")) * 100).round(0).clip(1.0, 100.0)
             )
             .otherwise(1.0)
             .cast(pl.Int32)
@@ -523,7 +505,6 @@ class WiodLoader:
         self.cfg = config
 
     def _detect_separator(self, file_path: Path) -> str:
-        """Автоматично визначає роздільник, перевіряючи перший рядок файлу."""
         with open(file_path, 'r', encoding='utf-8') as f:
             first_line = f.readline()
             if '\t' in first_line:
@@ -549,8 +530,15 @@ class WiodLoader:
         return lf
 
 class WiodProductionEstimator:
-    """Distributes WIOD monetary output into physical volumes and interpolates missing countries."""
-    def __init__(self, mapping_dict: Dict[str, List[str]]):
+    """
+    Distributes WIOD monetary output into physical volumes using the Import Proportionality Assumption.
+    
+    Rather than relying on global export volumes (which penalizes highly consumed but rarely exported goods),
+    this implementation utilizes the standard macroeconomic identity: Y = A + X - M.
+    Where Y is Production, A is Domestic Absorption (Consumption), X is Exports, and M is Imports.
+    """
+    def __init__(self, config: EconomyConfig, mapping_dict: Dict[str, List[str]]):
+        self.cfg = config
         self.mapping_dict = mapping_dict
         records = []
         for wiod_cat, res_list in mapping_dict.items():
@@ -559,55 +547,159 @@ class WiodProductionEstimator:
         self.mapping_lf = pl.DataFrame(records).lazy()
 
     def estimate(self, wiod_lf: pl.LazyFrame, trade_lf: pl.LazyFrame, dem_eco_lf: pl.LazyFrame) -> pl.LazyFrame:
-        resource_values = trade_lf.group_by("game_resource_id").agg(
+        # 1. Calculate global median prices for final volume conversion
+        # Ensure a robust fallback price exists to completely prevent NaN values if a resource has 0 global trade.
+        global_fallback_price = trade_lf.select(pl.col("unit_price_usd").median()).collect().item()
+        if global_fallback_price is None:
+            global_fallback_price = 1000.0
+
+        prices = trade_lf.group_by("game_resource_id").agg(
             pl.col("unit_price_usd").median().alias("global_median_price")
         )
+        
+        # Cross join with mapping to guarantee every mapped resource has a valid price row
+        all_resources_df = self.mapping_lf.select("game_resource_id").unique()
+        prices = all_resources_df.join(prices, on="game_resource_id", how="left").with_columns(
+            pl.col("global_median_price").fill_null(global_fallback_price).fill_nan(global_fallback_price)
+        )
 
-        weight_df = pl.DataFrame({
-            "game_resource_id": list(RESOURCE_OUTPUT_WEIGHTS.keys()),
-            "static_weight": list(RESOURCE_OUTPUT_WEIGHTS.values())
-        }).lazy()
+        # 2. Extract detailed trade values in USD per country and resource (X_k and M_k)
+        trade_val = trade_lf.with_columns(
+            (pl.col("annual_volume") * pl.col("unit_price_usd")).alias("trade_usd")
+        )
+        exports = trade_val.group_by(["exporter_id", "game_resource_id"]).agg(
+            pl.col("trade_usd").sum().alias("export_usd")
+        ).rename({"exporter_id": "country_id"})
+        
+        imports = trade_val.group_by(["importer_id", "game_resource_id"]).agg(
+            pl.col("trade_usd").sum().alias("import_usd")
+        ).rename({"importer_id": "country_id"})
 
-        mapping_shares = self.mapping_lf.join(weight_df, on="game_resource_id", how="left").with_columns(
-            pl.col("static_weight").fill_null(1.0)
+        # Combine granular trade into one comprehensive table per country
+        country_trade = exports.join(
+            imports, on=["country_id", "game_resource_id"], how="full", coalesce=True
+        ).fill_null(0.0)
+
+        # Attach broad WIOD category mapping
+        country_trade = country_trade.join(self.mapping_lf, on="game_resource_id", how="left")
+
+        # 3. Aggregate trade per broad category (X_C and M_C)
+        cat_trade = country_trade.group_by(["country_id", "category"]).agg(
+            pl.col("export_usd").sum().alias("cat_export_usd"),
+            pl.col("import_usd").sum().alias("cat_import_usd")
+        )
+
+        # 4. Prepare WIOD total output data (Y_C)
+        wiod_val = wiod_lf.with_columns(
+            (pl.col("total_output") * self.cfg.wiod_value_multiplier).alias("wiod_output_usd")
+        ).rename({"iso3": "country_id"}).select(["country_id", "category", "wiod_output_usd"])
+
+        # Exclude synthetic regions for the main country pass
+        wiod_countries = wiod_val.filter(~pl.col("country_id").is_in(["RoW", "TOT"]))
+
+        # 5. Compute broad Domestic Absorption (A_C = Y_C - X_C + M_C)
+        cat_macro = wiod_countries.join(cat_trade, on=["country_id", "category"], how="left").fill_null(0.0)
+        
+        cat_macro = cat_macro.with_columns(
+            (pl.col("wiod_output_usd") - pl.col("cat_export_usd") + pl.col("cat_import_usd")).alias("absorption_usd")
         ).with_columns(
-            (pl.col("static_weight") / pl.col("static_weight").sum().over("category")).alias("share_in_category")
+            # Unidiomatic clamping (ReLU): Prevents mathematical breakdown from negative absorption.
+            pl.when(pl.col("absorption_usd") < 0).then(0.0)
+            .otherwise(pl.col("absorption_usd")).alias("absorption_usd")
         )
 
-        wiod_mapped = wiod_lf.join(mapping_shares, on="category", how="inner").join(resource_values, on="game_resource_id", how="left")
+        # 6. Establish global import proportions as a fallback
+        global_imports = country_trade.group_by("game_resource_id").agg(
+            pl.col("import_usd").sum().alias("global_res_import")
+        ).join(self.mapping_lf, on="game_resource_id", how="left")
         
-        wiod_mapped = wiod_mapped.with_columns(
-            ((pl.col("total_output") * 1_000_000 * pl.col("share_in_category")) / pl.col("global_median_price"))
-            .alias("domestic_production")
+        # Prevent division by zero if an entire category has 0 imports globally
+        global_imports = global_imports.with_columns(
+            pl.when(pl.col("global_res_import").sum().over("category") > 0)
+            .then(pl.col("global_res_import") / pl.col("global_res_import").sum().over("category"))
+            .otherwise(1.0 / pl.col("game_resource_id").count().over("category"))
+            .alias("global_import_weight")
+        ).fill_null(0.0)
+
+        # 7. Execute the Import Proportionality Assumption
+        res_macro = country_trade.join(cat_macro, on=["country_id", "category"], how="inner")
+        res_macro = res_macro.join(
+            global_imports.select(["game_resource_id", "global_import_weight"]), 
+            on="game_resource_id", how="left"
         )
 
-        wiod_countries = wiod_mapped.filter(~pl.col("iso3").is_in(["RoW", "TOT"])).select(pl.col("iso3").unique())
+        # Calculate proportional weight (w_k = m_k / M_C)
+        res_macro = res_macro.with_columns(
+            pl.when(pl.col("cat_import_usd") > 0)
+            .then(pl.col("import_usd") / pl.col("cat_import_usd"))
+            .otherwise(pl.col("global_import_weight"))
+            .alias("resource_weight")
+        )
+
+        # Estimate granular absorption (a_k = A_C * w_k)
+        res_macro = res_macro.with_columns(
+            (pl.col("absorption_usd") * pl.col("resource_weight")).alias("res_absorption_usd")
+        )
+
+        # 8. Calculate precise granular production (y_k = a_k + x_k - m_k)
+        res_macro = res_macro.with_columns(
+            (pl.col("res_absorption_usd") + pl.col("export_usd") - pl.col("import_usd")).alias("res_production_usd")
+        ).with_columns(
+            pl.when(pl.col("res_production_usd") < 0).then(0.0)
+            .otherwise(pl.col("res_production_usd")).alias("res_production_usd")
+        )
+
+        # 9. Convert the final production estimate from USD back to physical volumes
+        res_macro = res_macro.join(prices, on="game_resource_id", how="left")
+        known_production = res_macro.with_columns(
+            (pl.col("res_production_usd") / pl.col("global_median_price")).alias("domestic_production")
+        ).select(["country_id", "game_resource_id", "domestic_production"])
+
+
+        # 10. Handle Rest of World (RoW) interpolation
+        row_wiod = wiod_val.filter(pl.col("country_id") == "RoW")
+        row_res = row_wiod.join(self.mapping_lf, on="category", how="inner").join(
+            global_imports, on="game_resource_id", how="left"
+        ).join(prices, on="game_resource_id", how="left")
         
+        row_res = row_res.with_columns(
+            ((pl.col("wiod_output_usd") * pl.col("global_import_weight")) / pl.col("global_median_price")).alias("row_total_production")
+        ).select(["game_resource_id", "row_total_production"])
+
         dem_eco_lf = dem_eco_lf.with_columns(
             (pl.col("gdp_per_capita") * pl.col("total_population")).alias("total_gdp")
         )
         
-        missing_countries_lf = dem_eco_lf.join(wiod_countries, left_on="country_id", right_on="iso3", how="anti")
+        missing_countries_lf = dem_eco_lf.join(
+            wiod_countries.select("country_id").unique(), on="country_id", how="anti"
+        )
         
         total_missing_gdp = missing_countries_lf.select(pl.col("total_gdp").sum()).collect().item()
         total_missing_pop = missing_countries_lf.select(pl.col("total_population").sum()).collect().item()
         
-        row_data = wiod_mapped.filter(pl.col("iso3") == "RoW").select([
-            "game_resource_id", "domestic_production"
-        ]).rename({"domestic_production": "row_total_production"})
+        # Prevent division by zero if demographic dataset is malformed
+        total_missing_gdp = total_missing_gdp if total_missing_gdp and total_missing_gdp > 0 else 1.0
+        total_missing_pop = total_missing_pop if total_missing_pop and total_missing_pop > 0 else 1.0
         
-        missing_production = missing_countries_lf.join(row_data, how="cross").with_columns(
-            (pl.col("row_total_production") * 
-             ((pl.col("total_gdp") / total_missing_gdp) * 0.5 + (pl.col("total_population") / total_missing_pop) * 0.5)
+        gdp_w = self.cfg.missing_country_gdp_weight
+        pop_w = 1.0 - gdp_w
+
+        missing_production = missing_countries_lf.join(row_res, how="cross").with_columns(
+            (pl.col("row_total_production") * ((pl.col("total_gdp") / total_missing_gdp) * gdp_w + (pl.col("total_population") / total_missing_pop) * pop_w)
             ).alias("domestic_production")
         ).select(["country_id", "game_resource_id", "domestic_production"])
 
-        known_production = wiod_mapped.filter(~pl.col("iso3").is_in(["RoW", "TOT"])).select([
-            pl.col("iso3").alias("country_id"), "game_resource_id", "domestic_production"
-        ])
-
-        final_production = pl.concat([known_production, missing_production]).group_by(["country_id", "game_resource_id"]).agg(
+        # 11. Finalize, combine, and GUARANTEE absolute matrix completeness (No NaNs, No Gaps)
+        combined_production = pl.concat([known_production, missing_production]).group_by(["country_id", "game_resource_id"]).agg(
             pl.col("domestic_production").sum()
+        )
+        
+        # Creates a perfect Cartesian grid of all valid game countries X all mapped game resources
+        all_countries_df = dem_eco_lf.select("country_id").unique()
+        complete_grid = all_countries_df.join(all_resources_df, how="cross")
+        
+        final_production = complete_grid.join(combined_production, on=["country_id", "game_resource_id"], how="left").with_columns(
+            pl.col("domestic_production").fill_null(0.0).fill_nan(0.0)
         )
         
         return final_production
@@ -630,9 +722,9 @@ class MacroeconomicSanityChecker:
             (pl.col("domestic_production") + pl.col("total_import") - pl.col("total_export")).alias("apparent_consumption")
         )
 
-        # Explaining unidiomatic code: We don't eagerly evaluate (collect) here just to log the number of anomalies 
-        # to keep memory usage low. Instead, we mathematically "heal" the violations directly in the LazyFrame graph.
-        # Healing rule: If Consumption is negative, raise Production to the exact minimum needed to cover Net Exports.
+        # Unidiomatic code block explanation: We don't eagerly evaluate (collect) here just to log anomalies.
+        # This keeps RAM usage negligible while applying a mathematical "healing" rule directly within the LazyFrame graph.
+        # Healing rule: If Consumption is negative, strictly raise Production to the exact minimum needed to cover Net Exports.
         healed_lf = eval_lf.with_columns(
             pl.when(pl.col("apparent_consumption") < 0)
             .then(pl.col("total_export") - pl.col("total_import"))
@@ -654,7 +746,7 @@ class InternalProductionPipeline:
         
         self.wiod_loader = WiodLoader(config)
         self.trade_aggregator = TradeAggregator(config)
-        self.production_estimator = WiodProductionEstimator(WIOD_MAPPING)
+        self.production_estimator = WiodProductionEstimator(config, WIOD_MAPPING)
         
         self.sanity_checker = MacroeconomicSanityChecker()
         self.quality_estimator = quality_estimator
@@ -671,22 +763,99 @@ class InternalProductionPipeline:
         
         wiod_lf = self.wiod_loader.load_data()
         
-        # 1. Estimate base production from WIOD
+        # 1. Estimate base production from WIOD using Import Proportionality Assumption
         production_lf = self.production_estimator.estimate(wiod_lf, raw_trade_lf, dem_eco_lf)
         
         # 2. Sanity Check & Heal: Ensure P + I >= E
+        # With the new macroeconomic equation (Y = A + X - M), this step serves primarily to correct
+        # statistical errors originating from the Rest of the World (RoW) interpolation phase.
         production_lf = self.sanity_checker.verify_and_heal(production_lf, trade_agg_lf)
         
         # 3. Calculate Quality Index based on healed physical data
         production_lf = self.quality_estimator.calculate(raw_trade_lf, eco_lf, production_lf)
+
+        # Guarantee no NaNs leak into the final storage files
+        production_lf = production_lf.with_columns(
+            pl.col("domestic_production").fill_null(0.0).fill_nan(0.0),
+            pl.col("quality_index").fill_null(1).fill_nan(1)
+        )
 
         production_lf.sink_parquet(self.config.production_output_path)
         logger.info(f"Domestic production saved to {self.config.production_output_path}")
 
 
 # ==============================================================================
-# ORCHESTRATION
+# ORCHESTRATION & VALIDATION
 # ==============================================================================
+
+class HistoricalProductionValidator:
+    """
+    Prevents silent regressions in macroeconomic calculations by anchoring 
+    outputs to known historical baselines. This ensures that changes to 
+    trade healing or price estimation formulas do not break the physical 
+    reality of the simulation.
+    """
+    def __init__(self, tolerance: float = 0.10):
+        self.tolerance = tolerance
+        
+        # 2001 historical baselines. Values are expressed in physical units (e.g., tons).
+        # These specific nodes are chosen for their economic stability and global significance.
+        self.control_data = {
+            "USA": {
+                "cereals": 320_000_000.0,       # Approximate US grain harvest, 2001
+                "electricity": 3_800_000_000.0, 
+            },
+            "DEU": {
+                "vehicles": 5_500_000.0,        # Proxy physical volume for German auto industry
+                "iron_and_steel": 45_000_000.0,
+            },
+            "UKR": {
+                "iron_and_steel": 33_000_000.0, # Known historical steel output
+                "cereals": 39_000_000.0,
+            }
+        }
+
+    def validate(self, production_path: Path):
+        logger.info("Validating generated production volumes against historical baselines...")
+        df = pl.read_parquet(production_path)
+        
+        failed_checks = []
+
+        for country, resources in self.control_data.items():
+            for resource, expected_vol in resources.items():
+                actual_row = df.filter(
+                    (pl.col("country_id") == country) & 
+                    (pl.col("game_resource_id") == resource)
+                )
+                
+                if actual_row.is_empty():
+                    logger.error(f"Validation target missing in dataset: {country} - {resource}")
+                    continue
+                    
+                actual_vol = actual_row["domestic_production"][0]
+                
+                # A fallback is necessary to avoid ZeroDivisionError if the pipeline outputs a broken 0.0 state.
+                if expected_vol == 0:
+                    deviation = 1.0 if actual_vol != 0 else 0.0
+                else:
+                    deviation = abs(actual_vol - expected_vol) / expected_vol
+                
+                if deviation > self.tolerance:
+                    failed_checks.append(
+                        f"{country} [{resource}]: Expected {expected_vol:,.0f}, "
+                        f"Got {actual_vol:,.0f} (Delta: {deviation:.1%})"
+                    )
+                else:
+                    logger.info(f"  [PASS] {country} {resource} (Delta: {deviation:.1%})")
+
+        if failed_checks:
+            error_msg = "Macroeconomic outputs deviated beyond acceptable thresholds:\n" + "\n".join(failed_checks)
+            logger.error(error_msg)
+            # Failing fast prevents saving a compromised database to the game engine.
+            raise ValueError("Sanity check failed. Check logs for delta details.")
+        
+        logger.info("All historical production baselines passed within tolerance.")
+
 
 class WorldEconomyGenerator:
     """Master orchestrator combining data pipelines in sequence."""
@@ -704,8 +873,11 @@ class WorldEconomyGenerator:
             config, mapper, service_mapper, validator, out_processor, state_loader
         )
         
-        quality_estimator = QualityEstimator(config.baseline_gdp_pc)
+        quality_estimator = QualityEstimator()
         self.production_pipeline = InternalProductionPipeline(config, quality_estimator, state_loader)
+        
+        # Inject validator via composition to enforce data integrity post-generation
+        self.baseline_validator = HistoricalProductionValidator(tolerance=0.10)
 
     def log_isolated_countries(self):
         """Identifies and logs countries present in the game world but missing from the trade network."""
@@ -723,19 +895,37 @@ class WorldEconomyGenerator:
         logger.info(f"Isolated countries (autarkies) missing from trade network: {isolated_countries['country_id'].to_list()}")
 
     def print_random_countries_data(self):
-        import random
+        """
+        Outputs production data for 5 sample countries to the console.
+        Ensures representation of both base WIOD countries and interpolated Rest of World (RoW) countries.
+        """
         prod_lf = pl.scan_parquet(self.config.production_output_path)
         all_countries = prod_lf.select("country_id").unique().collect()["country_id"].to_list()
         
         if not all_countries:
             return
-            
-        sample_countries = random.sample(all_countries, min(5, len(all_countries)))
+
+        # Dynamically determine which countries are from WIOD directly and which are interpolated
+        wiod_loader = WiodLoader(self.config)
+        wiod_lf = wiod_loader.load_data()
+        wiod_iso3 = wiod_lf.filter(~pl.col("iso3").is_in(["RoW", "TOT"])).select("iso3").unique().collect()["iso3"].to_list()
+        
+        wiod_pool = [c for c in all_countries if c in wiod_iso3]
+        row_pool = [c for c in all_countries if c not in wiod_iso3]
+        
+        # Select exactly 2 WIOD and 3 RoW (or as many as available)
+        sample_wiod = random.sample(wiod_pool, min(2, len(wiod_pool)))
+        sample_row = random.sample(row_pool, min(3, len(row_pool)))
+        
+        sample_countries = sample_wiod + sample_row
+        random.shuffle(sample_countries) # Display them in random order
+        
         prod_df = prod_lf.filter(pl.col("country_id").is_in(sample_countries)).collect()
         
         for country in sample_countries:
+            origin_type = "WIOD Base" if country in wiod_pool else "Rest of World (Interpolated)"
             country_data = prod_df.filter(pl.col("country_id") == country)
-            logger.info(f"\n--- Production Data for {country} ---")
+            logger.info(f"\n--- Production Data for {country} [{origin_type}] ---")
             for row in country_data.iter_rows(named=True):
                 logger.info(f"  {row['game_resource_id']:<25}: {row['domestic_production']:>15,.2f} | QI: {row['quality_index']}")
 
@@ -743,6 +933,10 @@ class WorldEconomyGenerator:
         try:
             self.trade_pipeline.run()
             self.production_pipeline.run()
+            
+            # Run validation before logging final success
+            self.baseline_validator.validate(self.config.production_output_path)
+            
             self.log_isolated_countries()
             self.print_random_countries_data()
             logger.info("Global economy generation completed successfully.")
@@ -766,7 +960,7 @@ if __name__ == "__main__":
         trade_output_path=base_data / "world" / "trade_network.parquet",
         production_output_path=base_data / "world" / "domestic_production.parquet",
         target_year=2001,
-        enable_percentile_clipping=False
+        enable_percentile_clipping=True
     )
 
     if not config.baci_input_path.exists():
