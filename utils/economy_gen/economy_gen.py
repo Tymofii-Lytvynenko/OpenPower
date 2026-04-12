@@ -200,13 +200,14 @@ class GameStateLoader:
         pop_lf = self.load_population()
         eco_lf = pl.scan_csv(self.cfg.eco_data_path, separator='\t').rename({"id": "country_id"})
         
-        # If 'gdp' exists (total), convert to 'gdp_per_capita'
+        # Return both total and per-capita
         return eco_lf.join(pop_lf, on="country_id", how="left").with_columns(
+            pl.col("gdp").alias("total_gdp"),
             pl.when(pl.col("total_population") > 0)
             .then(pl.col("gdp") / pl.col("total_population"))
             .otherwise(0.0)
             .alias("gdp_per_capita")
-        ).select(["country_id", "gdp_per_capita"])
+        ).select(["country_id", "total_gdp", "gdp_per_capita"])
 
 
 class GameDataValidator:
@@ -645,6 +646,8 @@ class WiodProductionEstimator:
 
         # --- RoW (Rest of World) Interpolation via Macroeconomic Propensity ---
         
+        # We follow the simulation philosophy: use gdp_per_capita * total_population
+        # to derive total_gdp, even though the source was total_gdp.
         dem_eco_lf = dem_eco_lf.with_columns(
             (pl.col("gdp_per_capita") * pl.col("total_population")).alias("total_gdp")
         )
