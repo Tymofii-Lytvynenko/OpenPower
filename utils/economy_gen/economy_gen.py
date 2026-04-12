@@ -543,7 +543,6 @@ class WiodProductionEstimator:
         self.mapping_lf = pl.DataFrame(records).lazy()
 
     def estimate(self, wiod_lf: pl.LazyFrame, trade_agg_lf: pl.LazyFrame, dem_eco_lf: pl.LazyFrame) -> pl.LazyFrame:
-        # 1. Setup Base Grids
         all_resources_df = self.mapping_lf.select("game_resource_id").unique()
         all_countries_df = dem_eco_lf.select("country_id").unique()
         
@@ -551,7 +550,6 @@ class WiodProductionEstimator:
             self.mapping_lf, on="game_resource_id", how="left"
         )
 
-        # 2. Extract Local & Global Export Data for Intra-Category Splitting
         country_trade = base_grid.join(
             trade_agg_lf.rename({"total_export": "export_usd", "total_import": "import_usd"}),
             on=["country_id", "game_resource_id"], 
@@ -574,7 +572,6 @@ class WiodProductionEstimator:
             ).alias("intra_cat_weight")
         )
 
-        # 3. Create Unique Profiles for WIOD Countries
         wiod_val = wiod_lf.with_columns(
             (pl.col("total_output") * self.cfg.wiod_value_multiplier).alias("wiod_output_usd")
         ).rename({"iso3": "country_id"}).select(["country_id", "category", "wiod_output_usd"])
@@ -600,7 +597,6 @@ class WiodProductionEstimator:
             (pl.col("profile_weight") / pl.col("profile_weight").sum().over("country_id")).alias("profile_weight")
         ).fill_null(0.0).fill_nan(0.0)
 
-        # 4. Extract Global Average Profile (Foundation for RoW nations)
         global_profile = wiod_macro.group_by("game_resource_id").agg(
             pl.col("profile_weight").mean().alias("global_avg_profile")
         )
@@ -608,7 +604,6 @@ class WiodProductionEstimator:
             (pl.col("global_avg_profile") / pl.col("global_avg_profile").sum()).alias("global_avg_profile")
         )
 
-        # 5. Create Unique Profiles for RoW (Rest of World) Countries
         row_macro = country_trade.join(wiod_countries_list, on="country_id", how="anti")
         row_macro = row_macro.join(global_profile, on="game_resource_id", how="left")
 
@@ -616,7 +611,6 @@ class WiodProductionEstimator:
             pl.col("export_usd").sum().over("country_id").alias("country_total_export")
         )
 
-        # Blend: Global Average ensures survival of local services; Export share handles monopolies
         row_macro = row_macro.with_columns(
             pl.when(pl.col("country_total_export") > 0)
             .then(pl.col("global_avg_profile") + (pl.col("export_usd") / pl.col("country_total_export")))
@@ -627,17 +621,59 @@ class WiodProductionEstimator:
             (pl.col("raw_profile_weight") / pl.col("raw_profile_weight").sum().over("country_id")).alias("profile_weight")
         ).fill_null(0.0).fill_nan(0.0)
 
-        # 6. Apply Profiles to Country GDP (Top-Down Output)
+        # Merge profiles and attach origin types for debugging
         all_profiles = pl.concat([
-            wiod_macro.select(["country_id", "game_resource_id", "profile_weight"]),
-            row_macro.select(["country_id", "game_resource_id", "profile_weight"])
-        ])
+            wiod_macro.select([
+                "country_id", "game_resource_id", "profile_weight", 
+                pl.lit("WIOD").alias("origin_type"), "cat_weight", "intra_cat_weight"
+            ]),
+            row_macro.select([
+                "country_id", "game_resource_id", "profile_weight", 
+                pl.lit("RoW").alias("origin_type"), "global_avg_profile", "export_usd", "country_total_export"
+            ])
+        ], how="diagonal")
 
         final_production = all_profiles.join(dem_eco_lf.select(["country_id", "total_gdp"]), on="country_id", how="left")
         
         final_production = final_production.with_columns(
             (pl.col("total_gdp") * pl.col("profile_weight")).alias("domestic_production")
         ).fill_null(0.0).fill_nan(0.0)
+
+        # --- DEBUG EXPORT ---
+        debug_df = final_production.filter(
+            (pl.col("domestic_production") > 0) & (pl.col("domestic_production") < 100000)
+        ).collect()
+
+        if not debug_df.is_empty():
+            logger.info("\n" + "="*80)
+            logger.info("DEBUG: CALCULATION CHAIN FOR PRODUCTION < $100,000")
+            logger.info("="*80)
+            
+            sample_records = debug_df.sample(n=min(50, len(debug_df))) 
+            
+            for row in sample_records.iter_rows(named=True):
+                country = row['country_id']
+                res = row['game_resource_id']
+                prod = row['domestic_production']
+                gdp = row['total_gdp']
+                pw = row['profile_weight']
+                
+                if row['origin_type'] == "WIOD":
+                    cw = row.get('cat_weight') or 0.0
+                    icw = row.get('intra_cat_weight') or 0.0
+                    logger.info(f"[WIOD] {country} | {res:<25} | Prod: ${prod:>9,.2f}")
+                    logger.info(f"       Chain: GDP (${gdp:,.0f}) * Final Profile Weight ({pw:.8%})")
+                    logger.info(f"       Derivation: Category Weight ({cw:.6%}) * Intra-Category Weight ({icw:.6%})")
+                else:
+                    ga = row.get('global_avg_profile') or 0.0
+                    exp = row.get('export_usd') or 0.0
+                    tot_exp = row.get('country_total_export') or 0.0
+                    exp_share = (exp / tot_exp) if tot_exp > 0 else 0.0
+                    logger.info(f"[RoW ] {country} | {res:<25} | Prod: ${prod:>9,.2f}")
+                    logger.info(f"       Chain: GDP (${gdp:,.0f}) * Final Profile Weight ({pw:.8%})")
+                    logger.info(f"       Derivation: Global Avg ({ga:.6%}) + Local Export Share ({exp_share:.6%} from ${exp:,.0f}/${tot_exp:,.0f})")
+            logger.info("="*80 + "\n")
+        # --------------------
 
         return final_production.select(["country_id", "game_resource_id", "domestic_production"])
 
@@ -652,8 +688,6 @@ class MacroeconomicSanityChecker:
             (pl.col("domestic_production") + pl.col("total_import") - pl.col("total_export")).alias("apparent_consumption")
         )
 
-        # In Top-Down methodology, if a country exports > its GDP-allocated production, we heal
-        # the production up to the export threshold. This corrects anomalous GDP reporting vs Trade volume.
         healed_lf = eval_lf.with_columns(
             pl.when(pl.col("apparent_consumption") < 0)
             .then(pl.col("total_export") - pl.col("total_import"))
@@ -765,12 +799,12 @@ class WorldEconomyGenerator:
         
         logger.info("\n--- Random Production Samples (USD) ---")
         if not wiod_prod_df.is_empty():
-            sample_wiod = wiod_prod_df.sample(n=min(25, len(wiod_prod_df))).iter_rows(named=True)
+            sample_wiod = wiod_prod_df.sample(n=min(10, len(wiod_prod_df))).iter_rows(named=True)
             for row in sample_wiod:
                 logger.info(f"  [WIOD Base] {row['country_id']} - {row['game_resource_id']}: ${row['domestic_production']:>15,.2f} | QI: {row['quality_index']}")
                 
         if not row_prod_df.is_empty():
-            sample_row = row_prod_df.sample(n=min(25, len(row_prod_df))).iter_rows(named=True)
+            sample_row = row_prod_df.sample(n=min(10, len(row_prod_df))).iter_rows(named=True)
             for row in sample_row:
                 logger.info(f"  [RoW Interpolated] {row['country_id']} - {row['game_resource_id']}: ${row['domestic_production']:>15,.2f} | QI: {row['quality_index']}")
 
