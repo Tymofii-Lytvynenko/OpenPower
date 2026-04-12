@@ -197,7 +197,16 @@ class GameStateLoader:
         ).rename({"_owner": "country_id"})
 
     def load_economy(self) -> pl.LazyFrame:
-        return pl.scan_csv(self.cfg.eco_data_path, separator='\t').select(["id", "gdp_per_capita"]).rename({"id": "country_id"})
+        pop_lf = self.load_population()
+        eco_lf = pl.scan_csv(self.cfg.eco_data_path, separator='\t').rename({"id": "country_id"})
+        
+        # If 'gdp' exists (total), convert to 'gdp_per_capita'
+        return eco_lf.join(pop_lf, on="country_id", how="left").with_columns(
+            pl.when(pl.col("total_population") > 0)
+            .then(pl.col("gdp") / pl.col("total_population"))
+            .otherwise(0.0)
+            .alias("gdp_per_capita")
+        ).select(["country_id", "gdp_per_capita"])
 
 
 class GameDataValidator:

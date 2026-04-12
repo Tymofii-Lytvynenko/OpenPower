@@ -114,7 +114,7 @@ class DataLoader:
             state.update_table("regions", pl.DataFrame())
 
         # --- 2. COUNTRIES ---
-        countries_df = self._load_countries()
+        countries_df = self._load_countries(regions_df)
         state.update_table("countries", countries_df if not countries_df.is_empty() else pl.DataFrame())
 
         # --- 3. WORLD DATA (Parquets) ---
@@ -196,7 +196,7 @@ class DataLoader:
                 
         return main_df
 
-    def _load_countries(self) -> pl.DataFrame:
+    def _load_countries(self, regions_df: pl.DataFrame) -> pl.DataFrame:
         print("[DataLoader] Loading Countries...")
         main_df = pl.DataFrame()
         
@@ -221,7 +221,34 @@ class DataLoader:
                 if "id" not in aux_df.columns: continue
                 main_df = main_df.join(aux_df, on="id", how="left")
 
-        # 3. Safety Fill
+        # 3. Aggregate Population from Regions to calculate GDP Per Capita
+        # regions_df has 'pop_14', 'pop_15_64', 'pop_65' and 'owner' (from enrich logic? no, wait)
+        # Let's check column name for owner in regions_df. 
+        # In regions_pop.tsv it's '_owner'. In regions.tsv it might be 'owner'.
+        # Most of our joins use 'id'.
+        
+        owner_col = "_owner" if "_owner" in regions_df.columns else "owner"
+        if owner_col in regions_df.columns:
+            pop_agg = regions_df.group_by(owner_col).agg(
+                (pl.col("pop_14").fill_null(0) + 
+                 pl.col("pop_15_64").fill_null(0) + 
+                 pl.col("pop_65").fill_null(0)).sum().alias("_total_pop")
+            ).rename({owner_col: "id"})
+            
+            main_df = main_df.join(pop_agg, on="id", how="left")
+            
+            # If 'gdp' exists (total), convert to 'gdp_per_capita'
+            if "gdp" in main_df.columns:
+                main_df = main_df.with_columns(
+                    pl.when(pl.col("_total_pop") > 0)
+                    .then(pl.col("gdp") / pl.col("_total_pop"))
+                    .otherwise(0.0)
+                    .alias("gdp_per_capita")
+                )
+            
+            main_df = main_df.drop("_total_pop")
+
+        # 4. Safety Fill
         num_cols = [c for c, t in main_df.schema.items() if t in (pl.Float64, pl.Int64, pl.Int32)]
         if num_cols:
             main_df = main_df.with_columns(pl.col(num_cols).fill_null(0))
