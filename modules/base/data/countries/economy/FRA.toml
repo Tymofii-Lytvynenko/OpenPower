@@ -1,0 +1,7 @@
+[resources]
+vehicles = 0.10
+tourism_services = 0.20
+luxury_commodities = 0.15
+business_services = 0.30
+dairy = 0.10
+cereals = 0.15

@@ -1,0 +1,5 @@
+[resources]
+vehicles = 0.25
+machinery_and_instruments = 0.25
+appliances = 0.20
+business_services = 0.30

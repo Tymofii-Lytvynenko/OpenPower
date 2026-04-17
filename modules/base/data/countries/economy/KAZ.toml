@@ -1,0 +1,5 @@
+[resources]
+fossil_fuels = 0.50
+minerals = 0.20
+cereals = 0.15
+transport_services = 0.15

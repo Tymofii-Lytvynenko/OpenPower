@@ -1,0 +1,7 @@
+[resources]
+chemicals = 0.20
+machinery_and_instruments = 0.20
+transport_services = 0.30
+dairy = 0.10
+meat_and_fish = 0.10
+vegetables_and_fruits = 0.10

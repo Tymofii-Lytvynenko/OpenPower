@@ -1,0 +1,5 @@
+[resources]
+machinery_and_instruments = 0.20
+tourism_services = 0.25
+financial_services = 0.25
+business_services = 0.30

@@ -1,0 +1,5 @@
+[resources]
+transport_services = 0.30
+other_food_and_beverages = 0.20
+minerals = 0.20
+tourism_services = 0.30

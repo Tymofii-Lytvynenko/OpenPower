@@ -1,0 +1,4 @@
+[resources]
+tourism_services = 0.60
+transport_services = 0.20
+government_services = 0.20

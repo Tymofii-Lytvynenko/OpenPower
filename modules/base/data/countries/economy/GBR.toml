@@ -1,0 +1,6 @@
+[resources]
+financial_services = 0.40
+business_services = 0.30
+vehicles = 0.10
+machinery_and_instruments = 0.10
+pharmaceuticals = 0.10

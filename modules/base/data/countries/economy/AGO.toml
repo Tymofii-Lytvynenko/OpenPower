@@ -1,0 +1,5 @@
+[resources]
+fossil_fuels = 0.60
+precious_stones = 0.15
+construction_services = 0.15
+government_services = 0.10

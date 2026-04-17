@@ -1,0 +1,6 @@
+[resources]
+minerals = 0.25
+non_ferrous_metals = 0.20
+cereals = 0.15
+business_services = 0.20
+government_services = 0.20

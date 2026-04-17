@@ -1,0 +1,6 @@
+[resources]
+minerals = 0.20
+fossil_fuels = 0.15
+meat_and_fish = 0.10
+financial_services = 0.25
+business_services = 0.30

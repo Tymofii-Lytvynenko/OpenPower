@@ -1,0 +1,5 @@
+[resources]
+tourism_services = 0.30
+fossil_fuels = 0.20
+cereals = 0.20
+transport_services = 0.30

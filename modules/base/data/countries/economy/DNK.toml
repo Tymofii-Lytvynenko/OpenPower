@@ -1,0 +1,6 @@
+[resources]
+pharmaceuticals = 0.20
+transport_services = 0.30
+dairy = 0.10
+meat_and_fish = 0.10
+business_services = 0.30

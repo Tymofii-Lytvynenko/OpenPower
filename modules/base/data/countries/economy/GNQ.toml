@@ -1,0 +1,4 @@
+[resources]
+fossil_fuels = 0.80
+construction_services = 0.10
+government_services = 0.10

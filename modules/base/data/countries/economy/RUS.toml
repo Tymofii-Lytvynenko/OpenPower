@@ -1,0 +1,6 @@
+[resources]
+fossil_fuels = 0.50
+minerals = 0.10
+iron_and_steel = 0.15
+non_ferrous_metals = 0.15
+arms_and_ammunition = 0.10

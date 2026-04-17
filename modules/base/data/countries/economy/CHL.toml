@@ -1,0 +1,5 @@
+[resources]
+non_ferrous_metals = 0.30
+minerals = 0.20
+vegetables_and_fruits = 0.10
+business_services = 0.40

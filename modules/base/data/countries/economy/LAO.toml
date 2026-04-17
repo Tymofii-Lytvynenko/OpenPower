@@ -1,0 +1,5 @@
+[resources]
+electricity = 0.30
+non_ferrous_metals = 0.30
+fabrics_and_leather = 0.20
+cereals = 0.20

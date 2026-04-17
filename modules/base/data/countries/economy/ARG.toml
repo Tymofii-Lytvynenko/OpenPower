@@ -1,0 +1,6 @@
+[resources]
+cereals = 0.15
+meat_and_fish = 0.15
+business_services = 0.30
+transport_services = 0.20
+industrial_services = 0.20

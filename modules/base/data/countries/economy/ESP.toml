@@ -1,0 +1,6 @@
+[resources]
+tourism_services = 0.30
+vehicles = 0.15
+vegetables_and_fruits = 0.15
+financial_services = 0.20
+construction_services = 0.20

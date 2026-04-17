@@ -1,0 +1,5 @@
+[resources]
+tourism_services = 0.30
+health_services = 0.30
+tobacco = 0.10
+other_food_and_beverages = 0.30

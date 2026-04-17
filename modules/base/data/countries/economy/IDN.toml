@@ -1,0 +1,6 @@
+[resources]
+fossil_fuels = 0.25
+other_food_and_beverages = 0.15
+minerals = 0.15
+fabrics_and_leather = 0.15
+transport_services = 0.30

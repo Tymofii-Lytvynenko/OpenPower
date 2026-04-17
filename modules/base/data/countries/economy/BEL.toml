@@ -1,0 +1,6 @@
+[resources]
+chemicals = 0.15
+pharmaceuticals = 0.10
+financial_services = 0.25
+transport_services = 0.25
+business_services = 0.25

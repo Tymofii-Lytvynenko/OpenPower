@@ -1,0 +1,4 @@
+[resources]
+tourism_services = 0.50
+financial_services = 0.40
+government_services = 0.10

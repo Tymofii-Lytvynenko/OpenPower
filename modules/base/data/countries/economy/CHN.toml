@@ -1,0 +1,7 @@
+[resources]
+appliances = 0.15
+machinery_and_instruments = 0.15
+fabrics_and_leather = 0.15
+iron_and_steel = 0.15
+construction_services = 0.20
+business_services = 0.20

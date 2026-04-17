@@ -1,0 +1,4 @@
+[resources]
+transport_services = 0.60
+government_services = 0.30
+cereals = 0.10

@@ -1,0 +1,5 @@
+[resources]
+fossil_fuels = 0.40
+financial_services = 0.15
+transport_services = 0.25
+construction_services = 0.20
