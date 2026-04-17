@@ -49,6 +49,13 @@ class ViewportController:
                 use_percentile=True,
                 steps=10
             ),
+            "gdp_total": GradientMapMode(
+                mode_name="GDP (Total)",
+                column_name="gdp",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10
+            ),
             "gvt_stability": GradientMapMode(
                 mode_name="Government Stability",
                 column_name="gvt_stability",
