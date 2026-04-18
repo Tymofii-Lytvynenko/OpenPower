@@ -1,12 +1,12 @@
 [resources]
-other_food_and_beverages = 0.69976197
-tourism_services = 0.29989803
-cereals = 0.00001
+cereals = 0.50
+tourism_services = 0.30
+meat_and_fish = 0.19968
 vegetables_and_fruits = 0.00001
-meat_and_fish = 0.00001
 dairy = 0.00001
 tobacco = 0.00001
 drugs_and_raw_plants = 0.00001
+other_food_and_beverages = 0.00001
 wood_and_paper = 0.00001
 minerals = 0.00001
 fossil_fuels = 0.00001

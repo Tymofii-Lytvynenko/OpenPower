@@ -1,19 +1,19 @@
 [resources]
-tobacco = 0.39986794
-precious_stones = 0.29990103
-cereals = 0.29990103
+minerals = 0.40
+cereals = 0.40
+fabrics_and_leather = 0.19968
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
 dairy = 0.00001
+tobacco = 0.00001
 drugs_and_raw_plants = 0.00001
 other_food_and_beverages = 0.00001
 wood_and_paper = 0.00001
-minerals = 0.00001
 fossil_fuels = 0.00001
 electricity = 0.00001
 iron_and_steel = 0.00001
 non_ferrous_metals = 0.00001
-fabrics_and_leather = 0.00001
+precious_stones = 0.00001
 plastics_and_rubber = 0.00001
 chemicals = 0.00001
 construction_materials = 0.00001

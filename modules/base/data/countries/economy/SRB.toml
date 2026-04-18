@@ -1,8 +1,8 @@
 [resources]
-vehicles = 0.19993602
-machinery_and_instruments = 0.19993602
-cereals = 0.29990393
-iron_and_steel = 0.29990403
+machinery_and_instruments = 0.30
+iron_and_steel = 0.30
+cereals = 0.20
+vehicles = 0.19968
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
 dairy = 0.00001

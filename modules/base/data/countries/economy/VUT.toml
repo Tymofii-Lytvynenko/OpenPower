@@ -1,7 +1,7 @@
 [resources]
-tourism_services = 0.59979595
-meat_and_fish = 0.39986405
-cereals = 0.00001
+tourism_services = 0.60
+meat_and_fish = 0.30
+cereals = 0.09968
 vegetables_and_fruits = 0.00001
 dairy = 0.00001
 tobacco = 0.00001

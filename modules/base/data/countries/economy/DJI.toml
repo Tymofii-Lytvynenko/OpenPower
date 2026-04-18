@@ -1,7 +1,7 @@
 [resources]
-transport_services = 0.59980196
-government_services = 0.29990103
-cereals = 0.09996701
+transport_services = 0.70
+government_services = 0.29969
+cereals = 0.00001
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
 dairy = 0.00001

@@ -1,10 +1,9 @@
 [resources]
-minerals = 0.19993802
-fossil_fuels = 0.14995351
-meat_and_fish = 0.09996901
-financial_services = 0.24992252
-business_services = 0.29990694
-cereals = 0.00001
+minerals = 0.30
+fossil_fuels = 0.30
+cereals = 0.20
+meat_and_fish = 0.10
+financial_services = 0.09969
 vegetables_and_fruits = 0.00001
 dairy = 0.00001
 tobacco = 0.00001
@@ -30,6 +29,7 @@ transport_services = 0.00001
 tourism_services = 0.00001
 construction_services = 0.00001
 it_and_telecom_services = 0.00001
+business_services = 0.00001
 recreational_services = 0.00001
 health_services = 0.00001
 education_services = 0.00001

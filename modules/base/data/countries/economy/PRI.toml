@@ -1,7 +1,7 @@
 [resources]
-pharmaceuticals = 0.49983495
-chemicals = 0.29990103
-machinery_and_instruments = 0.19993402
+pharmaceuticals = 0.50
+machinery_and_instruments = 0.30
+chemicals = 0.19968
 cereals = 0.00001
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001

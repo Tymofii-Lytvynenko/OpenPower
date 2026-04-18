@@ -1,8 +1,7 @@
 [resources]
-fabrics_and_leather = 0.39987193
-cereals = 0.29990403
-construction_services = 0.14995202
-transport_services = 0.14995202
+fabrics_and_leather = 0.60
+cereals = 0.20
+transport_services = 0.19967
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
 dairy = 0.00001
@@ -27,6 +26,7 @@ commodities = 0.00001
 luxury_commodities = 0.00001
 arms_and_ammunition = 0.00001
 tourism_services = 0.00001
+construction_services = 0.00001
 financial_services = 0.00001
 it_and_telecom_services = 0.00001
 business_services = 0.00001

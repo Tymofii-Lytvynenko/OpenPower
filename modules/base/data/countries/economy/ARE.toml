@@ -1,8 +1,7 @@
 [resources]
-fossil_fuels = 0.39987193
-financial_services = 0.14995202
-transport_services = 0.24992003
-construction_services = 0.19993602
+fossil_fuels = 0.60
+business_services = 0.20
+transport_services = 0.19967
 cereals = 0.00001
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
@@ -28,8 +27,9 @@ commodities = 0.00001
 luxury_commodities = 0.00001
 arms_and_ammunition = 0.00001
 tourism_services = 0.00001
+construction_services = 0.00001
+financial_services = 0.00001
 it_and_telecom_services = 0.00001
-business_services = 0.00001
 recreational_services = 0.00001
 health_services = 0.00001
 education_services = 0.00001

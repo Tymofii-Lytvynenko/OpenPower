@@ -1,14 +1,13 @@
 [resources]
-tourism_services = 0.29990393
-other_food_and_beverages = 0.19993602
-fabrics_and_leather = 0.19993602
-financial_services = 0.29990403
-cereals = 0.00001
+tourism_services = 0.50
+fabrics_and_leather = 0.30
+cereals = 0.19968
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
 dairy = 0.00001
 tobacco = 0.00001
 drugs_and_raw_plants = 0.00001
+other_food_and_beverages = 0.00001
 wood_and_paper = 0.00001
 minerals = 0.00001
 fossil_fuels = 0.00001
@@ -28,6 +27,7 @@ luxury_commodities = 0.00001
 arms_and_ammunition = 0.00001
 transport_services = 0.00001
 construction_services = 0.00001
+financial_services = 0.00001
 it_and_telecom_services = 0.00001
 business_services = 0.00001
 recreational_services = 0.00001

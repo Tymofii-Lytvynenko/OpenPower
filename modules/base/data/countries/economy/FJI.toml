@@ -1,8 +1,7 @@
 [resources]
-tourism_services = 0.49983495
-other_food_and_beverages = 0.29990103
-government_services = 0.19993402
-cereals = 0.00001
+tourism_services = 0.60
+cereals = 0.20
+other_food_and_beverages = 0.19968
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
 dairy = 0.00001
@@ -34,4 +33,5 @@ business_services = 0.00001
 recreational_services = 0.00001
 health_services = 0.00001
 education_services = 0.00001
+government_services = 0.00001
 industrial_services = 0.00001

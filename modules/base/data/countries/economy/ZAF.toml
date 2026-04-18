@@ -1,8 +1,7 @@
 [resources]
-minerals = 0.29990393
-precious_stones = 0.19993602
-financial_services = 0.29990403
-vehicles = 0.19993602
+precious_stones = 0.40
+minerals = 0.40
+machinery_and_instruments = 0.19968
 cereals = 0.00001
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
@@ -21,13 +20,14 @@ chemicals = 0.00001
 construction_materials = 0.00001
 pharmaceuticals = 0.00001
 appliances = 0.00001
-machinery_and_instruments = 0.00001
+vehicles = 0.00001
 commodities = 0.00001
 luxury_commodities = 0.00001
 arms_and_ammunition = 0.00001
 transport_services = 0.00001
 tourism_services = 0.00001
 construction_services = 0.00001
+financial_services = 0.00001
 it_and_telecom_services = 0.00001
 business_services = 0.00001
 recreational_services = 0.00001

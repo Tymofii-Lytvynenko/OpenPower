@@ -1,6 +1,6 @@
 [resources]
-non_ferrous_metals = 0.79972798
-cereals = 0.19993202
+non_ferrous_metals = 0.80
+cereals = 0.19969
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
 dairy = 0.00001

@@ -1,8 +1,8 @@
 [resources]
-pharmaceuticals = 0.19993602
-luxury_commodities = 0.14995202
-financial_services = 0.39987193
-machinery_and_instruments = 0.24992003
+financial_services = 0.40
+pharmaceuticals = 0.30
+machinery_and_instruments = 0.20
+tourism_services = 0.09968
 cereals = 0.00001
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
@@ -24,9 +24,9 @@ construction_materials = 0.00001
 appliances = 0.00001
 vehicles = 0.00001
 commodities = 0.00001
+luxury_commodities = 0.00001
 arms_and_ammunition = 0.00001
 transport_services = 0.00001
-tourism_services = 0.00001
 construction_services = 0.00001
 it_and_telecom_services = 0.00001
 business_services = 0.00001

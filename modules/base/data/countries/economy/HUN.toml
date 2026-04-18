@@ -1,7 +1,7 @@
 [resources]
-vehicles = 0.29990103
-machinery_and_instruments = 0.29990103
-business_services = 0.39986794
+machinery_and_instruments = 0.40
+vehicles = 0.30
+it_and_telecom_services = 0.29968
 cereals = 0.00001
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
@@ -29,7 +29,7 @@ transport_services = 0.00001
 tourism_services = 0.00001
 construction_services = 0.00001
 financial_services = 0.00001
-it_and_telecom_services = 0.00001
+business_services = 0.00001
 recreational_services = 0.00001
 health_services = 0.00001
 education_services = 0.00001

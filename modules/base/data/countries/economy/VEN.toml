@@ -1,6 +1,7 @@
 [resources]
-fossil_fuels = 0.89969399
-government_services = 0.09996601
+fossil_fuels = 0.80
+iron_and_steel = 0.10
+non_ferrous_metals = 0.09968
 cereals = 0.00001
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
@@ -11,8 +12,6 @@ other_food_and_beverages = 0.00001
 wood_and_paper = 0.00001
 minerals = 0.00001
 electricity = 0.00001
-iron_and_steel = 0.00001
-non_ferrous_metals = 0.00001
 precious_stones = 0.00001
 fabrics_and_leather = 0.00001
 plastics_and_rubber = 0.00001
@@ -34,4 +33,5 @@ business_services = 0.00001
 recreational_services = 0.00001
 health_services = 0.00001
 education_services = 0.00001
+government_services = 0.00001
 industrial_services = 0.00001

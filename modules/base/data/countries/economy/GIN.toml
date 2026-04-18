@@ -1,7 +1,7 @@
 [resources]
-minerals = 0.49983495
-cereals = 0.29990103
-government_services = 0.19993402
+minerals = 0.60
+precious_stones = 0.20
+cereals = 0.19968
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
 dairy = 0.00001
@@ -13,7 +13,6 @@ fossil_fuels = 0.00001
 electricity = 0.00001
 iron_and_steel = 0.00001
 non_ferrous_metals = 0.00001
-precious_stones = 0.00001
 fabrics_and_leather = 0.00001
 plastics_and_rubber = 0.00001
 chemicals = 0.00001
@@ -34,4 +33,5 @@ business_services = 0.00001
 recreational_services = 0.00001
 health_services = 0.00001
 education_services = 0.00001
+government_services = 0.00001
 industrial_services = 0.00001

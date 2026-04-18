@@ -1,8 +1,8 @@
 [resources]
-cereals = 0.29990403
-vegetables_and_fruits = 0.19993602
-drugs_and_raw_plants = 0.39987194
-government_services = 0.09996801
+drugs_and_raw_plants = 0.40
+cereals = 0.25
+vegetables_and_fruits = 0.20
+government_services = 0.14968
 meat_and_fish = 0.00001
 dairy = 0.00001
 tobacco = 0.00001

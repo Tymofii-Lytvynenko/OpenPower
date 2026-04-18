@@ -1,7 +1,7 @@
 [resources]
-fossil_fuels = 0.79972798
-government_services = 0.19993202
-cereals = 0.00001
+fossil_fuels = 0.80
+government_services = 0.10
+cereals = 0.09968
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001
 dairy = 0.00001

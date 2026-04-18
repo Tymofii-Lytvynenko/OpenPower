@@ -1,8 +1,8 @@
 [resources]
-precious_stones = 0.29990393
-fossil_fuels = 0.29990403
-wood_and_paper = 0.19993602
-minerals = 0.19993602
+fossil_fuels = 0.40
+precious_stones = 0.30
+minerals = 0.20
+wood_and_paper = 0.09968
 cereals = 0.00001
 vegetables_and_fruits = 0.00001
 meat_and_fish = 0.00001

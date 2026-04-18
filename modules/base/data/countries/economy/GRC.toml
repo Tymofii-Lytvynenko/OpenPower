@@ -1,9 +1,9 @@
 [resources]
-tourism_services = 0.39986794
-transport_services = 0.39986804
-vegetables_and_fruits = 0.19993402
-cereals = 0.00001
-meat_and_fish = 0.00001
+tourism_services = 0.40
+transport_services = 0.30
+cereals = 0.15
+meat_and_fish = 0.14968
+vegetables_and_fruits = 0.00001
 dairy = 0.00001
 tobacco = 0.00001
 drugs_and_raw_plants = 0.00001

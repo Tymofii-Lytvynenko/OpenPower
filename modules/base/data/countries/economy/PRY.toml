@@ -1,7 +1,7 @@
 [resources]
-cereals = 0.39986794
-meat_and_fish = 0.29990103
-electricity = 0.29990103
+cereals = 0.40
+electricity = 0.30
+meat_and_fish = 0.29968
 vegetables_and_fruits = 0.00001
 dairy = 0.00001
 tobacco = 0.00001
