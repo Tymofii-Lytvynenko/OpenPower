@@ -124,6 +124,10 @@ class DataLoader:
                 for p_file in world_dir.glob("*.parquet"):
                     print(f"[DataLoader] Loading world table: {p_file.stem}")
                     state.update_table(p_file.stem, pl.read_parquet(p_file))
+                    
+        # --- 4. DYNAMIC DOMESTIC PRODUCTION (TOML) ---
+        prod_df = self._load_domestic_production()
+        state.update_table("domestic_production", prod_df)
              
         return state
 
@@ -228,3 +232,29 @@ class DataLoader:
 
         print(f"[DataLoader] Countries loaded: {len(main_df)} rows.")
         return main_df
+
+    def _load_domestic_production(self) -> pl.DataFrame:
+        print("[DataLoader] Reading TOMLs for dynamic domestic production...")
+        records = []
+        for data_dir in self.config.get_data_dirs():
+            target_dir = data_dir / "countries" / "economy"
+            if not target_dir.exists(): continue
+            
+            for file_path in target_dir.glob("*.toml"):
+                country_id = file_path.stem
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        data = rtoml.load(f)
+                        if "resources" in data:
+                            for res_id, val in data["resources"].items():
+                                records.append({
+                                    "country_id": country_id,
+                                    "game_resource_id": res_id,
+                                    "domestic_production": float(val)
+                                })
+                except Exception as e:
+                    print(f"[DataLoader] Failed to parse TOML {file_path.name}: {e}")
+        
+        if records:
+            return pl.DataFrame(records)
+        return pl.DataFrame({"country_id": [], "game_resource_id": [], "domestic_production": []}, schema={"country_id": pl.Utf8, "game_resource_id": pl.Utf8, "domestic_production": pl.Float64})

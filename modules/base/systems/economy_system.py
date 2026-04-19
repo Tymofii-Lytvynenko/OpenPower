@@ -73,23 +73,23 @@ class EconomySystem(ISystem):
 
         # Finished goods
         "pharmaceuticals": {"pop_weight": 128.97, "stability_weight": 5.0, "inter_dependencies": {"health_services": 0.04}, "output_multiplier": 0.96},
-        "appliances": {"pop_weight": 685.05, "stability_weight": 7.0, "inter_dependencies": {}, "output_multiplier": 1.0},
-        "vehicles": {"pop_weight": 826.15, "stability_weight": 15.0, "inter_dependencies": {}, "output_multiplier": 1.0},
+        "appliances": {"pop_weight": 685.0, "stability_weight": 7.0, "inter_dependencies": {}, "output_multiplier": 1.0},
+        "vehicles": {"pop_weight": 826.0, "stability_weight": 15.0, "inter_dependencies": {}, "output_multiplier": 1.0},
         "machinery_and_instruments": {
-            "pop_weight": 413.81, "stability_weight": 12.0, "output_multiplier": 0.84,
+            "pop_weight": 414.0, "stability_weight": 12.0, "output_multiplier": 0.84,
             "inter_dependencies": {"construction_services": 0.05, "fossil_fuels": 0.03, "wood_and_paper": 0.02, "minerals": 0.05, "precious_stones": 0.01}
         },
-        "commodities": {"pop_weight": 1198.0, "stability_weight": 10.0, "inter_dependencies": {}, "output_multiplier": 1.0},
-        "luxury_commodities": {"pop_weight": 247.4, "stability_weight": 0.8, "inter_dependencies": {}, "output_multiplier": 1.0},
+        "commodities": {"pop_weight": 1200.0, "stability_weight": 10.0, "inter_dependencies": {}, "output_multiplier": 1.0},
+        "luxury_commodities": {"pop_weight": 250.0, "stability_weight": 0.8, "inter_dependencies": {}, "output_multiplier": 1.0},
         "arms_and_ammunition": {"pop_weight": 50.0, "stability_weight": 100.0, "inter_dependencies": {}, "output_multiplier": 1.0}, 
 
         # Services
-        "construction_services": {"pop_weight": 6473.3, "stability_weight": 130.0, "inter_dependencies": {}, "output_multiplier": 1.0},
-        "industrial_services": {"pop_weight": 2687.87, "stability_weight": 20.0, "inter_dependencies": {"construction_services": 0.02}, "output_multiplier": 0.98},
-        "health_services": {"pop_weight": 11158.28, "stability_weight": 30.0, "inter_dependencies": {}, "output_multiplier": 1.0},
-        "recreational_services": {"pop_weight": 1456.18, "stability_weight": 260.0, "inter_dependencies": {}, "output_multiplier": 1.0},
-        "business_services": {"pop_weight": 2739.6, "stability_weight": 25.0, "inter_dependencies": {}, "output_multiplier": 1.0},
-        "transport_services": {"pop_weight": 1349.0, "stability_weight": 8.0, "inter_dependencies": {"recreational_services": 0.02}, "output_multiplier": 0.98},
+        "construction_services": {"pop_weight": 6473.0, "stability_weight": 130.0, "inter_dependencies": {}, "output_multiplier": 1.0},
+        "industrial_services": {"pop_weight": 2687.0, "stability_weight": 20.0, "inter_dependencies": {"construction_services": 0.02}, "output_multiplier": 0.98},
+        "health_services": {"pop_weight": 11158.0, "stability_weight": 30.0, "inter_dependencies": {}, "output_multiplier": 1.0},
+        "recreational_services": {"pop_weight": 1456.0, "stability_weight": 260.0, "inter_dependencies": {}, "output_multiplier": 1.0},
+        "business_services": {"pop_weight": 2740.0, "stability_weight": 25.0, "inter_dependencies": {}, "output_multiplier": 1.0},
+        "transport_services": {"pop_weight": 1350.0, "stability_weight": 8.0, "inter_dependencies": {"recreational_services": 0.02}, "output_multiplier": 0.98},
         "it_and_telecom_services": {"pop_weight": 3000.0, "stability_weight": 10.0, "inter_dependencies": {"business_services": 0.05}, "output_multiplier": 1.0},
         "financial_services": {"pop_weight": 4000.0, "stability_weight": 200.0, "inter_dependencies": {}, "output_multiplier": 1.0}, 
         "tourism_services": {"pop_weight": 1000.0, "stability_weight": 500.0, "inter_dependencies": {}, "output_multiplier": 1.0}, 
@@ -203,7 +203,10 @@ class EconomySystem(ISystem):
         from src.shared.economy_meta import RESOURCE_MAPPING
 
         # 1. Prepare Production (Annual rate)
-        prod_usd = prod_table.rename({"domestic_production": "production_usd"})
+        # Group by first to ensure any duplicate rows from data generation are consolidated.
+        prod_usd = prod_table.group_by(["country_id", "game_resource_id"]).agg(
+            pl.col("domestic_production").sum().alias("production_usd")
+        )
 
         # 2. Prepare Trade (Annual rates)
         exports = trade_table.group_by(["exporter_id", "game_resource_id"]).agg(
@@ -224,7 +227,7 @@ class EconomySystem(ISystem):
         
         # 4. Master Ledger Compilation
         ledger = prod_usd.join(net_trade, on=["country_id", "game_resource_id"], how="full", coalesce=True)
-        ledger = ledger.join(consumption_table, on=["country_id", "game_resource_id"], how="left")
+        ledger = ledger.join(consumption_table, on=["country_id", "game_resource_id"], how="full", coalesce=True)
         
         ledger = ledger.with_columns(
             pl.col(["production_usd", "trade_usd", "export_usd", "import_usd", "consumption_usd"]).fill_null(0.0)
