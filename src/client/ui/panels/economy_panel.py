@@ -23,6 +23,7 @@ class EconomyPanel:
         # --- 1. Fetch Economy Data ---
         reserves = -25000000000 
         gdp_per_capita = 0
+        total_gdp = 0.0
         tax_rate = 0.2 
         
         if "countries" in state.tables:
@@ -33,32 +34,20 @@ class EconomyPanel:
                     val = row["money_reserves"][0]
                     reserves = float(val) if val is not None else 0.0
                     
-                    val_gdp = row["gdp_per_capita"][0]
-                    gdp_per_capita = int(val_gdp) if val_gdp is not None else 0
+                    if "gdp_per_capita" in row.columns:
+                        val_gdp_pc = row["gdp_per_capita"][0]
+                        gdp_per_capita = int(val_gdp_pc) if val_gdp_pc is not None else 0
+                        
+                    if "gdp" in row.columns:
+                        val_gdp = row["gdp"][0]
+                        total_gdp = float(val_gdp) if val_gdp is not None else 0.0
                     
-                    val_tax = row["global_tax_rate"][0]
-                    tax_rate = float(val_tax) if val_tax is not None else 0.2
+                    if "global_tax_rate" in row.columns:
+                        val_tax = row["global_tax_rate"][0]
+                        tax_rate = float(val_tax) if val_tax is not None else 0.2
             except Exception:
                 pass
 
-        # --- 2. Calculate Total GDP ---
-        total_pop = 0
-        if "regions" in state.tables:
-            try:
-                df_pop = state.tables["regions"]
-                # Sum population of all regions owned by target
-                target_regions = df_pop.filter(pl.col("owner") == target_tag)
-                if not target_regions.is_empty():
-                    pop_data = target_regions.select([
-                        pl.col("pop_14").fill_null(0).sum(),
-                        pl.col("pop_15_64").fill_null(0).sum(),
-                        pl.col("pop_65").fill_null(0).sum()
-                    ])
-                    total_pop = pop_data.sum_horizontal().item()
-            except Exception:
-                pass
-
-        total_gdp = total_pop * gdp_per_capita
         calculated_income = total_gdp * tax_rate
 
         # --- 4. Render UI ---
