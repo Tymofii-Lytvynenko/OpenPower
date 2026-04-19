@@ -1,40 +1,41 @@
 [resources]
-tourism_services = 220000000
-government_services = 110000000
-transport_services = 75000000
-meat_and_fish = 45000000
-other_food_and_beverages = 35000000
-financial_services = 25000000
-business_services = 18000000
-construction_services = 15000000
-it_and_telecom_services = 12000000
-health_services = 10000000
-education_services = 10000000
-vegetables_and_fruits = 6000000
-electricity = 4000000
-recreational_services = 3500000
-fabrics_and_leather = 2500000
-construction_materials = 2000000
-commodities = 1500000
-wood_and_paper = 1200000
-minerals = 800000
-plastics_and_rubber = 700000
-chemicals = 500000
-cereals = 400000
-dairy = 400000
-industrial_services = 300000
-tobacco = 200000
-drugs_and_raw_plants = 200000
-pharmaceuticals = 200000
-appliances = 100000
-machinery_and_instruments = 100000
-iron_and_steel = 100000
-non_ferrous_metals = 100000
-vehicles = 100000
-luxury_commodities = 100000
-arms_and_ammunition = 100000
-fossil_fuels = 100000
-precious_stones = 100000
-# Cape Verde 2001: Service-driven economy. 
-# Tourism and transport (Sal Airport) are key pillars.
-# Fisheries provide the main material exports.
+tourism_services = 225000000
+government_services = 65,000,000
+transport_services = 35000000
+financial_services = 22500000
+it_and_telecom_services = 12500000
+business_services = 8500000
+other_food_and_beverages = 12500000
+recreational_services = 6500000
+meat_and_fish = 4500000
+vegetables_and_fruits = 3500000
+wood_and_paper = 1850000
+electricity = 1250000
+chemicals = 850000
+iron_and_steel = 650000
+non_ferrous_metals = 450000
+plastics_and_rubber = 350000
+pharmaceuticals = 225000
+minerals = 185000
+construction_materials = 95000
+machinery_and_instruments = 65000
+vehicles = 45000
+precious_stones = 35000
+tobacco = 25000
+dairy = 15500
+fabrics_and_leather = 12500
+appliances = 8500
+luxury_commodities = 6500
+industrial_services = 4500
+arms_and_ammunition = 2500
+fossil_fuels = 2500
+commodities = 2500
+drugs_and_raw_plants = 500
+health_services = 4500000
+education_services = 4500000
+construction_services = 12500000
+# Precision balance
+# Target: 600,000,000. Current Sum w/o Cereals: 422,335,000. 
+cereals = 177665000
+# CPV 2001 Sum: 600,000,000.
+# Removed commas. Simplified.

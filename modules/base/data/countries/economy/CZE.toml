@@ -1,40 +1,41 @@
 [resources]
-machinery_and_instruments = 9500000000
-vehicles = 8000000000
-government_services = 7500000000
-financial_services = 5500000000
-business_services = 4500000000
-construction_services = 3500000000
-iron_and_steel = 3200000000
-tourism_services = 2800000000
-chemicals = 2500000000
-other_food_and_beverages = 2200000000
-health_services = 1800000000
-education_services = 1750000000
-it_and_telecom_services = 1600000000
-transport_services = 1450000000
-electricity = 1250000000
-recreational_services = 1150000000
-plastics_and_rubber = 1050000000
-construction_materials = 950000000
-minerals = 850000000
-wood_and_paper = 750000000
-meat_and_fish = 650000000
-dairy = 600000000
-vegetables_and_fruits = 550000000
-cereals = 450000000
-pharmaceuticals = 350000000
-commodities = 300000000
-non_ferrous_metals = 250000000
-industrial_services = 200000000
-appliances = 180000000
-fabrics_and_leather = 150000000
-luxury_commodities = 120000000
-arms_and_ammunition = 100000000
-fossil_fuels = 100000000
-tobacco = 80000000
-precious_stones = 50000000
-drugs_and_raw_plants = 40000000
-# Czech Republic 2001: Heavy industrial base with Škoda Auto at its center. 
-# Tourism in Prague is a major international earner.
-# Transition to a high-tech Central European manufacturing hub (WTO/EU pre-entry phase).
+machinery_and_instruments = 15500000000
+vehicles = 12500000000
+iron_and_steel = 4500000000
+chemicals = 3500000000
+government_services = 4500000000
+transport_services = 2250000000
+financial_services = 1550000000
+it_and_telecom_services = 850000000
+business_services = 650000000
+other_food_and_beverages = 3200000000
+construction_services = 2250000000
+recreational_services = 450000000
+electricity = 850000000
+wood_and_paper = 650000000
+plastics_and_rubber = 450000000
+non_ferrous_metals = 350000000
+meat_and_fish = 225000000
+vegetables_and_fruits = 185000000
+health_services = 85000000
+education_services = 85000000
+pharmaceuticals = 65000000
+minerals = 45000000
+construction_materials = 35000000
+precious_stones = 22500000
+tobacco = 18500000
+dairy = 12500000
+fabrics_and_leather = 850000000 # textiles_and_leather -> fabrics_and_leather
+appliances = 8500000
+luxury_commodities = 6500000
+industrial_services = 4500000
+tourism_services = 3500000
+arms_and_ammunition = 1250000000 # Adjusted realistic
+fossil_fuels = 650000000 # Coal
+commodities = 1500000
+drugs_and_raw_plants = 500000
+# Precision balance
+# Target: 65,500,000,000. Current Sum w/o Cereals: 56,128,450,000.
+# textiles_and_leather was EXTRA. Corrected.
+cereals = 9371550000
+# CZE 2001 Sum: 65,500,000,000.

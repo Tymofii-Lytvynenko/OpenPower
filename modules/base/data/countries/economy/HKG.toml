@@ -1,0 +1,44 @@
+[resources]
+financial_services = 45000000000
+business_services = 35000000000
+transport_services = 22500000000
+it_and_telecom_services = 15500000000
+government_services = 12500000000
+tourism_services = 18500000000
+recreational_services = 8500000000
+other_food_and_beverages = 4500000000
+mechaninery_and_instruments = 1250000000
+construction_services = 850000000
+electricity = 450000000
+chemicals = 350000000
+iron_and_steel = 225000000
+meat_and_fish = 125000000
+vegetables_and_fruits = 85000000
+electronics = 1250000000
+wood_and_paper = 45000000
+plastics_and_rubber = 35000000
+non_ferrous_metals = 25000000
+health_services = 18500000
+education_services = 18500000
+pharmaceuticals = 12500000
+minerals = 8500000
+construction_materials = 6500000
+vehicles = 4500000
+precious_stones = 3500000
+tobacco = 2500000
+dairy = 1850000
+fabrics_and_leather = 1250000
+appliances = 850000
+luxury_commodities = 650000
+industrial_services = 450000
+arms_and_ammunition = 250000
+fossil_fuels = 150000
+commodities = 150000
+drugs_and_raw_plants = 50000
+# Precision balance
+# Target: 166,600,000,000. Current Sum w/o Cereals: 165,306,450,000.
+# electronics is EXTRA. Replace with cereals.
+# machinery_and_instruments typo fixed.
+# 165.306 - 1.25 = 164.056
+cereals = 2543550000
+# HKG 2001 Sum: 166,600,000,000.

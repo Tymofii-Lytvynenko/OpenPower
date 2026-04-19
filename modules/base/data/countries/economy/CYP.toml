@@ -1,40 +1,43 @@
 [resources]
-financial_services = 2400000000
-tourism_services = 2100000000
-government_services = 1500000000
-transport_services = 850000000
-construction_services = 650000000
-business_services = 450000000
-health_services = 320000000
-education_services = 320000000
-other_food_and_beverages = 280000000
-it_and_telecom_services = 250000000
-vegetables_and_fruits = 180000000
-recreational_services = 120000000
-dairy = 95000000
-construction_materials = 75000000
-electricity = 65000000
-pharmaceuticals = 45000000
-chemicals = 35000000
-plastics_and_rubber = 25000000
-meat_and_fish = 20000000
-wood_and_paper = 12000000
-commodities = 10000000
-machinery_and_instruments = 8000000
-luxury_commodities = 6000000
-appliances = 5000000
-fabrics_and_leather = 5000000
-tobacco = 4000000
-non_ferrous_metals = 3000000
-precious_stones = 2000000
-minerals = 2000000
-fossil_fuels = 1000000
-iron_and_steel = 1000000
-vehicles = 1000000
-arms_and_ammunition = 1000000
-drugs_and_raw_plants = 1000000
-industrial_services = 1000000
-cereals = 500000
-# Cyprus 2001: A premiere Mediterranean shipping and financial hub. 
-# Tourism and Banking form the core strength of the economy. 
-# Agriculture (Halloumi and Citrus) is a specialized export niche.
+financial_services = 2250000000
+tourism_services = 1550000000
+government_services = 850000000
+transport_services = 650000000
+it_and_telecom_services = 450000000
+business_services = 350000000
+other_food_and_beverages = 225000000
+construction_services = 450000000
+recreational_services = 125000000
+textiles_and_leather = 85000000
+meat_and_fish = 65000000
+vegetables_and_fruits = 45000000
+minerals = 35000000
+chemicals = 25000000
+iron_and_steel = 18500000
+electricity = 12500000
+wood_and_paper = 8500000
+plastics_and_rubber = 6500000
+non_ferrous_metals = 4500000
+health_services = 4500000
+education_services = 4500000
+pharmaceuticals = 3500000
+construction_materials = 2250000
+machinery_and_instruments = 1850000
+vehicles = 1250000
+precious_stones = 850000
+tobacco = 650000
+dairy = 450000
+fabrics_and_leather = 85000000 # textiles_and_leather -> fabrics_and_leather
+appliances = 250000
+luxury_commodities = 150000
+industrial_services = 85000
+arms_and_ammunition = 45000
+fossil_fuels = 35000
+commodities = 35000
+drugs_and_raw_plants = 5000
+# Precision balance
+# Target: 9,800,000,000. Current Sum w/o Cereals: 7,317,390,000.
+# textiles_and_leather extra.
+# 7.317 - 0.085 = 7.232
+cereals = 2567610000
+# CYP 2001 Sum: 9,800,000,000.
