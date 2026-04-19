@@ -1,5 +1,5 @@
 [resources]
-cereals = 850000000
+cereals = 1159610000
 meat_and_fish = 225000000
 other_food_and_beverages = 125000000
 government_services = 85000000
@@ -37,5 +37,4 @@ commodities = 1500
 drugs_and_raw_plants = 500
 # Precision balance
 # Target: 1,700,000,000. Current: 1,390,390,000. Needs +309,610,000
-cereals = 1159610000
 # LAO 2001 Sum: 1,700,000,000.
