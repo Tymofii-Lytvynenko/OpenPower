@@ -237,7 +237,7 @@ class DataLoader:
         print("[DataLoader] Reading TOMLs for dynamic domestic production...")
         records = []
         for data_dir in self.config.get_data_dirs():
-            target_dir = data_dir / "countries" / "economy"
+            target_dir = data_dir / "countries" / "countries_res"
             if not target_dir.exists(): continue
             
             for file_path in target_dir.glob("*.toml"):
