@@ -1,40 +1,147 @@
-[resources]
-vehicles = 125000000000
-machinery_and_instruments = 155000000000
-financial_services = 125000000000
-business_services = 85000000000
-tourism_services = 65000000000
-other_food_and_beverages = 55000000000
-government_services = 65000000000
-transport_services = 45000000000
-it_and_telecom_services = 35000000000
-recreational_services = 22500000000
-chemicals = 18500000000
-fabrics_and_leather = 15500000000
-iron_and_steel = 12500000000
-construction_services = 9500000000
-electricity = 6500000000
-wood_and_paper = 4500000000
-plastics_and_rubber = 3500000000
-non_ferrous_metals = 2250000000
-meat_and_fish = 1850000000
-vegetables_and_fruits = 1550000000
-health_services = 1250000000
-education_services = 1250000000
-pharmaceuticals = 950000000
-construction_materials = 850000000
-dairy = 650000000
-tobacco = 450000000
-precious_stones = 350000000
-appliances = 250000000
-luxury_commodities = 185000000
-industrial_services = 125000000
-minerals = 85000000
-arms_and_ammunition = 65000000
-fossil_fuels = 45000000
-commodities = 35000000
-drugs_and_raw_plants = 10000000
+[resources.vehicles]
+production = 125000000000
+legal = true
+
+[resources.machinery_and_instruments]
+production = 155000000000
+legal = true
+
+[resources.financial_services]
+production = 125000000000
+legal = true
+
+[resources.business_services]
+production = 85000000000
+legal = true
+
+[resources.tourism_services]
+production = 65000000000
+legal = true
+
+[resources.other_food_and_beverages]
+production = 55000000000
+legal = true
+
+[resources.government_services]
+production = 65000000000
+legal = true
+
+[resources.transport_services]
+production = 45000000000
+legal = true
+
+[resources.it_and_telecom_services]
+production = 35000000000
+legal = true
+
+[resources.recreational_services]
+production = 22500000000
+legal = true
+
+[resources.chemicals]
+production = 18500000000
+legal = true
+
+[resources.fabrics_and_leather]
+production = 15500000000
+legal = true
+
+[resources.iron_and_steel]
+production = 12500000000
+legal = true
+
+[resources.construction_services]
+production = 9500000000
+legal = true
+
+[resources.electricity]
+production = 6500000000
+legal = true
+
+[resources.wood_and_paper]
+production = 4500000000
+legal = true
+
+[resources.plastics_and_rubber]
+production = 3500000000
+legal = true
+
+[resources.non_ferrous_metals]
+production = 2250000000
+legal = true
+
+[resources.meat_and_fish]
+production = 1850000000
+legal = true
+
+[resources.vegetables_and_fruits]
+production = 1550000000
+legal = true
+
+[resources.health_services]
+production = 1250000000
+legal = true
+
+[resources.education_services]
+production = 1250000000
+legal = true
+
+[resources.pharmaceuticals]
+production = 950000000
+legal = true
+
+[resources.construction_materials]
+production = 850000000
+legal = true
+
+[resources.dairy]
+production = 650000000
+legal = true
+
+[resources.tobacco]
+production = 450000000
+legal = true
+
+[resources.precious_stones]
+production = 350000000
+legal = true
+
+[resources.appliances]
+production = 250000000
+legal = true
+
+[resources.luxury_commodities]
+production = 185000000
+legal = true
+
+[resources.industrial_services]
+production = 125000000
+legal = true
+
+[resources.minerals]
+production = 85000000
+legal = true
+
+[resources.arms_and_ammunition]
+production = 65000000
+legal = true
+
+[resources.fossil_fuels]
+production = 45000000
+legal = true
+
+[resources.commodities]
+production = 35000000
+legal = true
+
+[resources.drugs_and_raw_plants]
+production = 10000000
+legal = false
+
 # Precision balance
 # Target: 1,167,000,000,000. Current Sum w/o Cereals: 885,035,000,000.
-cereals = 281965000000
+[resources.cereals]
+production = 281965000000
+legal = true
+
 # ITA 2001 Sum: 1,167,000,000,000.

@@ -1,38 +1,145 @@
-[resources]
-cereals = 0
-vegetables_and_fruits = 0
-meat_and_fish = 0
-dairy = 0
-tobacco = 0
-drugs_and_raw_plants = 0
-other_food_and_beverages = 0
-wood_and_paper = 0
-minerals = 0
-fossil_fuels = 0
-electricity = 0
-iron_and_steel = 0
-non_ferrous_metals = 0
-precious_stones = 0
-fabrics_and_leather = 0
-plastics_and_rubber = 0
-chemicals = 0
-construction_materials = 0
-pharmaceuticals = 0
-appliances = 0
-vehicles = 0
-machinery_and_instruments = 0
-commodities = 0
-luxury_commodities = 0
-arms_and_ammunition = 0
-transport_services = 0
-tourism_services = 0
-construction_services = 0
-financial_services = 0
-it_and_telecom_services = 0
-business_services = 0
-recreational_services = 0
-health_services = 0
-education_services = 0
-government_services = 0
-industrial_services = 0
+[resources.cereals]
+production = 0
+legal = true
+
+[resources.vegetables_and_fruits]
+production = 0
+legal = true
+
+[resources.meat_and_fish]
+production = 0
+legal = true
+
+[resources.dairy]
+production = 0
+legal = true
+
+[resources.tobacco]
+production = 0
+legal = true
+
+[resources.drugs_and_raw_plants]
+production = 0
+legal = false
+
+[resources.other_food_and_beverages]
+production = 0
+legal = true
+
+[resources.wood_and_paper]
+production = 0
+legal = true
+
+[resources.minerals]
+production = 0
+legal = true
+
+[resources.fossil_fuels]
+production = 0
+legal = true
+
+[resources.electricity]
+production = 0
+legal = true
+
+[resources.iron_and_steel]
+production = 0
+legal = true
+
+[resources.non_ferrous_metals]
+production = 0
+legal = true
+
+[resources.precious_stones]
+production = 0
+legal = true
+
+[resources.fabrics_and_leather]
+production = 0
+legal = true
+
+[resources.plastics_and_rubber]
+production = 0
+legal = true
+
+[resources.chemicals]
+production = 0
+legal = true
+
+[resources.construction_materials]
+production = 0
+legal = true
+
+[resources.pharmaceuticals]
+production = 0
+legal = true
+
+[resources.appliances]
+production = 0
+legal = true
+
+[resources.vehicles]
+production = 0
+legal = true
+
+[resources.machinery_and_instruments]
+production = 0
+legal = true
+
+[resources.commodities]
+production = 0
+legal = true
+
+[resources.luxury_commodities]
+production = 0
+legal = true
+
+[resources.arms_and_ammunition]
+production = 0
+legal = true
+
+[resources.transport_services]
+production = 0
+legal = true
+
+[resources.tourism_services]
+production = 0
+legal = true
+
+[resources.construction_services]
+production = 0
+legal = true
+
+[resources.financial_services]
+production = 0
+legal = true
+
+[resources.it_and_telecom_services]
+production = 0
+legal = true
+
+[resources.business_services]
+production = 0
+legal = true
+
+[resources.recreational_services]
+production = 0
+legal = true
+
+[resources.health_services]
+production = 0
+legal = true
+
+[resources.education_services]
+production = 0
+legal = true
+
+[resources.government_services]
+production = 0
+legal = true
+
+[resources.industrial_services]
+production = 0
+legal = true
+
 # ATA 2001 Sum: 0. Uninhabited research zone.
