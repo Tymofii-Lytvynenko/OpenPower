@@ -258,11 +258,35 @@ class StaticAssetLoader:
 
         # Strategy 2: Adjacency Matrix / Nested Dictionary
         elif isinstance(raw_content, dict):
+            # We need to distinguish between a Matrix (Source -> Target -> Value)
+            # and an Entity Dictionary (Entity_ID -> {Properties})
+            # If the first value is a dict, and it contains 'production' or other properties, 
+            # it's likely an Entity Dictionary.
+            first_val = next(iter(raw_content.values())) if raw_content else None
+            if isinstance(first_val, dict) and any(k in first_val for k in ['production', 'legal', 'id', 'name']):
+                return self._flatten_entity_dict(raw_content)
             return self._flatten_matrix(raw_content)
 
         else:
             print(f"[StaticLoader] Unknown data structure in {file_path.name} under key '{key}'")
             return pl.DataFrame()
+
+    def _flatten_entity_dict(self, entity_data: Dict[str, Dict[str, Any]]) -> pl.DataFrame:
+        """
+        Converts a dictionary of entities into a normalized table.
+        [section.entity_id] prop = value
+        
+        Result: | id | prop1 | prop2 |
+        """
+        rows = []
+        for entity_id, properties in entity_data.items():
+            if not isinstance(properties, dict):
+                continue
+            row = {"id": entity_id}
+            row.update(properties)
+            rows.append(row)
+        
+        return pl.from_dicts(rows)
 
     def _flatten_matrix(self, matrix_data: Dict[str, Any]) -> pl.DataFrame:
         """

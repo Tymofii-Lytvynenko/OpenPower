@@ -4,7 +4,7 @@ import csv
 from pathlib import Path
 
 # Path to the directory containing country economy TOML files
-TARGET_DIR = Path("modules/base/data/countries/economy")
+TARGET_DIR = Path("modules/base/data/countries/countries_res")
 # Path to the master GDP file
 GDP_FILE = Path("modules/base/data/countries/countries_eco.tsv")
 
@@ -71,23 +71,26 @@ def validate_file(file_path: Path, target_gdp: float):
     if missing:
         errors.append(f"Missing categories: {', '.join(missing)}")
     
-    # 2. Check for zero or negative values
-    zeros = [k for k, v in resources.items() if isinstance(v, (int, float)) and v <= 0]
+    # 2. Check for zero or negative production values
+    zeros = [k for k, v in resources.items() if isinstance(v, dict) and v.get('production', 0) <= 0]
     if zeros:
-        # Note: If target_gdp is 0 (like ATA), zeros might be acceptable, but usually we want at least $1
-        if target_gdp > 0:
-            errors.append(f"Zero/Negative values found: {', '.join(zeros)}")
+        if target_gdp and target_gdp > 0:
+            errors.append(f"Zero/Negative production values found: {', '.join(zeros)}")
     
-    # 3. Check for non-numeric values
-    non_numeric = [k for k, v in resources.items() if not isinstance(v, (int, float))]
-    if non_numeric:
-        errors.append(f"Non-numeric values found: {', '.join(non_numeric)}")
+    # 3. Check for missing fields in dict
+    required_fields = ['production', 'legal', 'is_gov_controlled', 'tax_rate']
+    for k, v in resources.items():
+        if not isinstance(v, dict):
+            errors.append(f"Resource {k} is not a dictionary (old format?)")
+            continue
+        for field in required_fields:
+            if field not in v:
+                errors.append(f"Resource {k} missing required field: {field}")
 
     # 4. Check sum if target_gdp is provided
-    total_sum = sum(v for v in resources.values() if isinstance(v, (int, float)))
+    total_sum = sum(v.get('production', 0) for v in resources.values() if isinstance(v, dict))
     if target_gdp is not None:
         diff = abs(total_sum - target_gdp)
-        # Allow small rounding threshold (e.g. $1000)
         if diff > 1000:
             errors.append(f"Sum mismatch: Found {total_sum:,.0f}, Expected {target_gdp:,.0f} (Diff: {diff:,.0f})")
     

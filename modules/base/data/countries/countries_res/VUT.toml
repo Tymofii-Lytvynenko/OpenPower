@@ -188,8 +188,8 @@ is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.tourism_services]
-production = 85
-legal = true ,000,000
+production = 85000000
+legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 

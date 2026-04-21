@@ -246,12 +246,24 @@ class DataLoader:
                     with open(file_path, "r", encoding="utf-8") as f:
                         data = rtoml.load(f)
                         if "resources" in data:
-                            for res_id, val in data["resources"].items():
-                                records.append({
+                            for res_id, res_data in data["resources"].items():
+                                row = {
                                     "country_id": country_id,
                                     "game_resource_id": res_id,
-                                    "domestic_production": float(val)
-                                })
+                                }
+                                if isinstance(res_data, dict):
+                                    row["domestic_production"] = float(res_data.get("production", 0))
+                                    row["legal"] = bool(res_data.get("legal", True))
+                                    row["is_gov_controlled"] = bool(res_data.get("is_gov_controlled", False))
+                                    row["tax_rate"] = float(res_data.get("tax_rate", 0.0))
+                                else:
+                                    # Fallback for legacy simple format
+                                    row["domestic_production"] = float(res_data)
+                                    row["legal"] = True
+                                    row["is_gov_controlled"] = False
+                                    row["tax_rate"] = 0.0
+                                
+                                records.append(row)
                 except Exception as e:
                     print(f"[DataLoader] Failed to parse TOML {file_path.name}: {e}")
         

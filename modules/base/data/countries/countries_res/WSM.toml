@@ -206,8 +206,8 @@ is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.vehicles]
-production = 35
-legal = true ,000
+production = 35000
+legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 

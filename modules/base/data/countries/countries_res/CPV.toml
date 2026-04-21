@@ -93,8 +93,8 @@ is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.government_services]
-production = 65
-legal = true ,000,000
+production = 65000000
+legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
