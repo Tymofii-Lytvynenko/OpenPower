@@ -1,133 +1,38 @@
-[resources.tourism_services]
-production = 850000000
-legal = true
-
-[resources.government_services]
-production = 225000000
-legal = true
-
-[resources.transport_services]
-production = 85000000
-legal = true
-
-[resources.financial_services]
-production = 65000000
-legal = true
-
-[resources.it_and_telecom_services]
-production = 45000000
-legal = true
-
-[resources.business_services]
-production = 35000000
-legal = true
-
-[resources.recreational_services]
-production = 18500000
-legal = true
-
-[resources.meat_and_fish]
-production = 12500000
-legal = true
-
-[resources.vegetables_and_fruits]
-production = 9500000
-legal = true
-
-[resources.iron_and_steel]
-production = 12500000
-legal = true
-
-[resources.chemicals]
-production = 8500000
-legal = true
-
-[resources.electricity]
-production = 6500000
-legal = true
-
-[resources.minerals]
-production = 4500000
-legal = true
-
-[resources.wood_and_paper]
-production = 3500000
-legal = true
-
-[resources.plastics_and_rubber]
-production = 2250000
-legal = true
-
-[resources.non_ferrous_metals]
-production = 1850000
-legal = true
-
-[resources.health_services]
-production = 4500000
-legal = true
-
-[resources.education_services]
-production = 4500000
-legal = true
-
-[resources.pharmaceuticals]
-production = 850000
-legal = true
-
-[resources.construction_services]
-production = 45000000
-legal = true
-
-[resources.construction_materials]
-production = 450000
-legal = true
-
-[resources.machinery_and_instruments]
-production = 350000
-legal = true
-
-[resources.vehicles]
-production = 250000
-legal = true
-
-[resources.precious_stones]
-production = 185000
-legal = true
-
-[resources.tobacco]
-production = 125000
-legal = true
-
-[resources.dairy]
-production = 85000
-legal = true
-
-[resources.fabrics_and_leather]
-production = 85000
-legal = true
-
 [resources.appliances]
 production = 65000
-legal = true
-
-[resources.luxury_commodities]
-production = 45000
-legal = true
-
-[resources.industrial_services]
-production = 25000
 legal = true
 
 [resources.arms_and_ammunition]
 production = 25000
 legal = true
 
-[resources.fossil_fuels]
-production = 15000
+[resources.business_services]
+production = 35000000
+legal = true
+
+[resources.cereals]
+production = 1058865000
+legal = true
+
+# BRB 2001 Sum: 2,500,000,000.
+[resources.chemicals]
+production = 8500000
 legal = true
 
 [resources.commodities]
 production = 15000
+legal = true
+
+[resources.construction_materials]
+production = 450000
+legal = true
+
+[resources.construction_services]
+production = 45000000
+legal = true
+
+[resources.dairy]
+production = 85000
 legal = true
 
 [resources.drugs_and_raw_plants]
@@ -136,8 +41,103 @@ legal = false
 
 # Precision balance
 # Target: 2,500,000,000. Current Sum w/o Cereals: 1,441,135,000.
-[resources.cereals]
-production = 1058865000
+[resources.education_services]
+production = 4500000
 legal = true
 
-# BRB 2001 Sum: 2,500,000,000.
+[resources.electricity]
+production = 6500000
+legal = true
+
+[resources.fabrics_and_leather]
+production = 85000
+legal = true
+
+[resources.financial_services]
+production = 65000000
+legal = true
+
+[resources.fossil_fuels]
+production = 15000
+legal = true
+
+[resources.government_services]
+production = 225000000
+legal = true
+
+[resources.health_services]
+production = 4500000
+legal = true
+
+[resources.industrial_services]
+production = 25000
+legal = true
+
+[resources.iron_and_steel]
+production = 12500000
+legal = true
+
+[resources.it_and_telecom_services]
+production = 45000000
+legal = true
+
+[resources.luxury_commodities]
+production = 45000
+legal = true
+
+[resources.machinery_and_instruments]
+production = 350000
+legal = true
+
+[resources.meat_and_fish]
+production = 12500000
+legal = true
+
+[resources.minerals]
+production = 4500000
+legal = true
+
+[resources.non_ferrous_metals]
+production = 1850000
+legal = true
+
+[resources.pharmaceuticals]
+production = 850000
+legal = true
+
+[resources.plastics_and_rubber]
+production = 2250000
+legal = true
+
+[resources.precious_stones]
+production = 185000
+legal = true
+
+[resources.recreational_services]
+production = 18500000
+legal = true
+
+[resources.tobacco]
+production = 125000
+legal = true
+
+[resources.tourism_services]
+production = 850000000
+legal = true
+
+[resources.transport_services]
+production = 85000000
+legal = true
+
+[resources.vegetables_and_fruits]
+production = 9500000
+legal = true
+
+[resources.vehicles]
+production = 250000
+legal = true
+
+[resources.wood_and_paper]
+production = 3500000
+legal = true
+

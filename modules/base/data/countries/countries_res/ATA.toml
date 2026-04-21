@@ -1,96 +1,4 @@
-[resources.cereals]
-production = 0
-legal = true
-
-[resources.vegetables_and_fruits]
-production = 0
-legal = true
-
-[resources.meat_and_fish]
-production = 0
-legal = true
-
-[resources.dairy]
-production = 0
-legal = true
-
-[resources.tobacco]
-production = 0
-legal = true
-
-[resources.drugs_and_raw_plants]
-production = 0
-legal = false
-
-[resources.other_food_and_beverages]
-production = 0
-legal = true
-
-[resources.wood_and_paper]
-production = 0
-legal = true
-
-[resources.minerals]
-production = 0
-legal = true
-
-[resources.fossil_fuels]
-production = 0
-legal = true
-
-[resources.electricity]
-production = 0
-legal = true
-
-[resources.iron_and_steel]
-production = 0
-legal = true
-
-[resources.non_ferrous_metals]
-production = 0
-legal = true
-
-[resources.precious_stones]
-production = 0
-legal = true
-
-[resources.fabrics_and_leather]
-production = 0
-legal = true
-
-[resources.plastics_and_rubber]
-production = 0
-legal = true
-
-[resources.chemicals]
-production = 0
-legal = true
-
-[resources.construction_materials]
-production = 0
-legal = true
-
-[resources.pharmaceuticals]
-production = 0
-legal = true
-
 [resources.appliances]
-production = 0
-legal = true
-
-[resources.vehicles]
-production = 0
-legal = true
-
-[resources.machinery_and_instruments]
-production = 0
-legal = true
-
-[resources.commodities]
-production = 0
-legal = true
-
-[resources.luxury_commodities]
 production = 0
 legal = true
 
@@ -98,11 +6,23 @@ legal = true
 production = 0
 legal = true
 
-[resources.transport_services]
+[resources.business_services]
 production = 0
 legal = true
 
-[resources.tourism_services]
+[resources.cereals]
+production = 0
+legal = true
+
+[resources.chemicals]
+production = 0
+legal = true
+
+[resources.commodities]
+production = 0
+legal = true
+
+[resources.construction_materials]
 production = 0
 legal = true
 
@@ -110,31 +30,39 @@ legal = true
 production = 0
 legal = true
 
-[resources.financial_services]
+[resources.dairy]
 production = 0
 legal = true
 
-[resources.it_and_telecom_services]
+[resources.drugs_and_raw_plants]
 production = 0
-legal = true
-
-[resources.business_services]
-production = 0
-legal = true
-
-[resources.recreational_services]
-production = 0
-legal = true
-
-[resources.health_services]
-production = 0
-legal = true
+legal = false
 
 [resources.education_services]
 production = 0
 legal = true
 
+[resources.electricity]
+production = 0
+legal = true
+
+[resources.fabrics_and_leather]
+production = 0
+legal = true
+
+[resources.financial_services]
+production = 0
+legal = true
+
+[resources.fossil_fuels]
+production = 0
+legal = true
+
 [resources.government_services]
+production = 0
+legal = true
+
+[resources.health_services]
 production = 0
 legal = true
 
@@ -143,3 +71,75 @@ production = 0
 legal = true
 
 # ATA 2001 Sum: 0. Uninhabited research zone.
+[resources.iron_and_steel]
+production = 0
+legal = true
+
+[resources.it_and_telecom_services]
+production = 0
+legal = true
+
+[resources.luxury_commodities]
+production = 0
+legal = true
+
+[resources.machinery_and_instruments]
+production = 0
+legal = true
+
+[resources.meat_and_fish]
+production = 0
+legal = true
+
+[resources.minerals]
+production = 0
+legal = true
+
+[resources.non_ferrous_metals]
+production = 0
+legal = true
+
+[resources.other_food_and_beverages]
+production = 0
+legal = true
+
+[resources.pharmaceuticals]
+production = 0
+legal = true
+
+[resources.plastics_and_rubber]
+production = 0
+legal = true
+
+[resources.precious_stones]
+production = 0
+legal = true
+
+[resources.recreational_services]
+production = 0
+legal = true
+
+[resources.tobacco]
+production = 0
+legal = true
+
+[resources.tourism_services]
+production = 0
+legal = true
+
+[resources.transport_services]
+production = 0
+legal = true
+
+[resources.vegetables_and_fruits]
+production = 0
+legal = true
+
+[resources.vehicles]
+production = 0
+legal = true
+
+[resources.wood_and_paper]
+production = 0
+legal = true
+
