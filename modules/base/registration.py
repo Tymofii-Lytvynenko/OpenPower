@@ -10,6 +10,7 @@ from modules.base.systems.territory_system import TerritorySystem
 from modules.base.systems.ai_system import AISystem
 from modules.base.systems.trade_system import TradeSystem
 from modules.base.systems.economy_system import EconomySystem
+from modules.base.systems.budget_system import BudgetSystem
 
 def register() -> List[ISystem]:
     """
@@ -24,5 +25,6 @@ def register() -> List[ISystem]:
         TerritorySystem(),
         AISystem(),
         TradeSystem(),
-        EconomySystem()
+        EconomySystem(),
+        BudgetSystem()
     ]
