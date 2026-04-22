@@ -3,11 +3,12 @@ from typing import Optional, TYPE_CHECKING
 
 from src.shared.config import GameConfig
 from src.client.services.navigation_service import NavigationService
-from src.client.tasks.startup_task import StartupTask
 from src.client.services.imgui_service import ImGuiService
 
+# UPDATED: Import the new Client Proxy instead of the heavy local session
+from src.client.client_session import ClientSessionProxy
+
 if TYPE_CHECKING:
-    from src.server.session import GameSession
     from src.client.renderers.map_renderer import MapRenderer
 
 class MainWindow(arcade.Window):
@@ -19,34 +20,47 @@ class MainWindow(arcade.Window):
         self.center_window()
         self.set_minimum_size(800, 600)
 
-        # 1. Initialize ImGui
         font_path = config.get_asset_path("fonts/main_font.ttf")
         if not font_path or not font_path.exists():
             font_path = None
         self.imgui = ImGuiService(self, font_path=font_path)
 
-        # 2. Services & State
         self.nav = NavigationService(self)
-        self.session: Optional["GameSession"] = None
-        
-        # 3. SHARED RENDERER (The Fix for Freezing)
-        # We load this once, and all Views use it.
+        self.session: Optional[ClientSessionProxy] = None
         self.shared_renderer: Optional["MapRenderer"] = None
 
     def setup(self):
-        print("[Window] Booting...")
-        task = StartupTask(self.game_config)
+        print("[Window] Booting Client Proxy...")
+        
+        # Instantiate the Proxy (This spawns the background CPU core)
+        self.session = ClientSessionProxy(str(self.game_config.project_root))
 
-        def on_boot_complete(result_session: "GameSession"):
-            print("[Window] Engine Ready.")
-            self.session = result_session
-            
-            # Note: We initialize the renderer lazily in the Main Menu 
-            # to ensure the OpenGL context is fully ready.
-            self.nav.show_main_menu(self.session, self.game_config)
-            return None
+        def check_server_boot(delta_time):
+            # Poll the progress queue from the background process
+            while not self.session.progress_queue.empty():
+                msg_type, progress, text = self.session.progress_queue.get_nowait()
+                
+                if msg_type == "PROGRESS":
+                    # If you have a LoadingView, you can update its UI here
+                    print(f"[Loading] {text} ({progress*100}%)")
+                    
+                elif msg_type == "READY":
+                    print("[Window] Engine Ready! Server connected.")
+                    arcade.unschedule(check_server_boot)
+                    
+                    # Fetch initial state
+                    self.session.tick(0) 
+                    self.nav.show_main_menu(self.session, self.game_config)
+                    
+                elif msg_type == "ERROR":
+                    print(f"[Window] FATAL SERVER ERROR: {text}")
+                    arcade.unschedule(check_server_boot)
 
-        self.nav.show_loading(task, on_success=on_boot_complete)
+        # Schedule the UI to listen for server boot progress
+        arcade.schedule(check_server_boot, 1/60)
+        
+        # Show your visual Loading Screen while the server boots in the background
+        # self.nav.show_loading_view() 
 
     def on_resize(self, width: int, height: int):
         super().on_resize(width, height)
@@ -57,4 +71,11 @@ class MainWindow(arcade.Window):
 
     def on_update(self, delta_time: float):
         if self.session:
+            # Grabs the latest IPC payload (Takes < 0.001 seconds!)
             self.session.tick(delta_time)
+            
+    def on_close(self):
+        if self.session:
+            print("[Window] Shutting down Server Process...")
+            self.session.shutdown()
+        super().on_close()

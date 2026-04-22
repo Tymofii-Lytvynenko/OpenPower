@@ -1,6 +1,7 @@
 import arcade
 import sys
 import os
+import multiprocessing as mp
 from pathlib import Path
 from pyinstrument import Profiler
 
@@ -49,4 +50,6 @@ def main():
 
 
 if __name__ == "__main__":
+    mp.freeze_support()
+    mp.set_start_method('spawn', force=True)
     main()

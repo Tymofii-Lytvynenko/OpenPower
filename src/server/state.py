@@ -2,6 +2,7 @@ import polars as pl
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, TYPE_CHECKING
 from datetime import datetime
+import io
 
 if TYPE_CHECKING:
     from src.shared.actions import GameAction
@@ -86,3 +87,36 @@ class GameState:
         Replaces a table in the state (Copy-on-Write).
         """
         self.tables[name] = df
+    
+    # --- MULTIPROCESSING IPC METHODS ---
+    
+    def to_ipc(self) -> dict:
+        """
+        Packs the state into raw bytes using Zero-Copy Arrow IPC.
+        Executes on the Server Process.
+        """
+        ipc_tables = {}
+        for name, df in self.tables.items():
+            f = io.BytesIO()
+            df.write_ipc(f)
+            ipc_tables[name] = f.getvalue()
+            
+        return {
+            "tables": ipc_tables,
+            "time": self.time, 
+            "globals": self.globals
+        }
+
+    @classmethod
+    def from_ipc(cls, data: dict) -> 'GameState':
+        """
+        Unpacks the bytes back into Polars DataFrames.
+        Executes on the Client Process (Window).
+        """
+        state = cls()
+        for name, b_data in data["tables"].items():
+            state.tables[name] = pl.read_ipc(io.BytesIO(b_data))
+            
+        state.time = data["time"]
+        state.globals = data["globals"]
+        return state
