@@ -5,8 +5,8 @@ from src.shared.events import EventRealSecond
 
 class TradeSystem(ISystem):
     """
-    Simulates a Proportional Global Market Clearing cycle with National Stockpiles.
-    Vectorized and LAZY in Polars.
+    Simulates Global Market Clearing with Physical Constraints.
+    Features: Service Evaporation, Asset Depreciation, and Organic Market Pressure.
     """
 
     TRADE_PRIORITY_MATRIX = {
@@ -21,6 +21,53 @@ class TradeSystem(ISystem):
         "luxury_commodities": 64, "precious_stones": 65, "non_ferrous_metals": 66, 
         "arms_and_ammunition": 67, "education_services": 68, "government_services": 69, 
         "financial_services": 70, "other_food_and_beverages": 71
+    }
+
+    # Physical properties of resources: Can they be stored? How quickly do they depreciate/spoil per year?
+    RESOURCE_PHYSICS = {
+        # Services and energy: CANNOT be stored. They are consumed instantly.
+        "electricity": {"is_storable": False, "decay_rate": 1.0},
+        "construction_services": {"is_storable": False, "decay_rate": 1.0},
+        "industrial_services": {"is_storable": False, "decay_rate": 1.0},
+        "health_services": {"is_storable": False, "decay_rate": 1.0},
+        "recreational_services": {"is_storable": False, "decay_rate": 1.0},
+        "business_services": {"is_storable": False, "decay_rate": 1.0},
+        "transport_services": {"is_storable": False, "decay_rate": 1.0},
+        "education_services": {"is_storable": False, "decay_rate": 1.0},
+        "government_services": {"is_storable": False, "decay_rate": 1.0},
+        "financial_services": {"is_storable": False, "decay_rate": 1.0},
+        "it_and_telecom_services": {"is_storable": False, "decay_rate": 1.0},
+        "tourism_services": {"is_storable": False, "decay_rate": 1.0},
+
+        # Fast depreciation (Finished goods, 20-25% per year due to aging/fashion)
+        "appliances": {"is_storable": True, "decay_rate": 0.20},
+        "vehicles": {"is_storable": True, "decay_rate": 0.25},
+        "machinery_and_instruments": {"is_storable": True, "decay_rate": 0.20},
+        "commodities": {"is_storable": True, "decay_rate": 0.25},
+        "luxury_commodities": {"is_storable": True, "decay_rate": 0.20},
+        "pharmaceuticals": {"is_storable": True, "decay_rate": 0.15}, # Expiry date / Shelf life
+        "arms_and_ammunition": {"is_storable": True, "decay_rate": 0.10}, 
+
+        # Medium spoilage (Food and Agro, 10-15% annual losses)
+        "cereals": {"is_storable": True, "decay_rate": 0.10},
+        "vegetables_and_fruits": {"is_storable": True, "decay_rate": 0.15},
+        "meat_and_fish": {"is_storable": True, "decay_rate": 0.15},
+        "dairy": {"is_storable": True, "decay_rate": 0.15},
+        "tobacco": {"is_storable": True, "decay_rate": 0.10},
+        "drugs_and_raw_plants": {"is_storable": True, "decay_rate": 0.10},
+        "other_food_and_beverages": {"is_storable": True, "decay_rate": 0.10},
+
+        # Slow spoilage (Raw materials and Materials, 2-5% per year)
+        "fossil_fuels": {"is_storable": True, "decay_rate": 0.05}, # Evaporation, leakage
+        "wood_and_paper": {"is_storable": True, "decay_rate": 0.05},
+        "minerals": {"is_storable": True, "decay_rate": 0.02},
+        "iron_and_steel": {"is_storable": True, "decay_rate": 0.03}, # Rust
+        "precious_stones": {"is_storable": True, "decay_rate": 0.00}, # Eternal
+        "non_ferrous_metals": {"is_storable": True, "decay_rate": 0.02},
+        "fabrics_and_leather": {"is_storable": True, "decay_rate": 0.05},
+        "plastics_and_rubber": {"is_storable": True, "decay_rate": 0.05},
+        "chemicals": {"is_storable": True, "decay_rate": 0.08},
+        "construction_materials": {"is_storable": True, "decay_rate": 0.05},
     }
 
     @property
@@ -41,11 +88,9 @@ class TradeSystem(ISystem):
     def _simulate_market_cycle(self, state: GameState, fraction: float):
         if "countries" not in state.tables or "domestic_production" not in state.tables: return
 
-        # 1. ENTER LAZY MODE
         countries_lf = state.get_table("countries").lazy()
         prod_lf = state.get_table("domestic_production").lazy()
         
-        # Load normalized Demand from EconomySystem
         if "resource_ledger" in state.tables:
             demand_lf = state.get_table("resource_ledger").lazy().select(
                 pl.col("country_id"), pl.col("game_resource_id"), pl.col("consumption_usd").alias("demand")
@@ -53,13 +98,11 @@ class TradeSystem(ISystem):
         else:
             demand_lf = prod_lf.select(["country_id", "game_resource_id"]).with_columns(pl.lit(0.0).alias("demand"))
 
-        # Load or Initialize National Stockpiles (Reserves)
         if "stockpiles" in state.tables:
             stock_lf = state.get_table("stockpiles").lazy()
         else:
             stock_lf = prod_lf.select(["country_id", "game_resource_id"]).with_columns(pl.lit(0.0).alias("stock_amount"))
 
-        # Join Market Data
         market_lf = prod_lf.join(demand_lf, on=["country_id", "game_resource_id"], how="left").fill_null(0.0)
         market_lf = market_lf.join(stock_lf, on=["country_id", "game_resource_id"], how="left").fill_null(0.0)
 
@@ -72,41 +115,32 @@ class TradeSystem(ISystem):
         if "tax_rate" not in market_cols:
             market_lf = market_lf.with_columns(pl.lit(0.05).alias("tax_rate"))
 
+        # Add Physical Properties
+        physics_df = pl.DataFrame([
+            {"game_resource_id": k, "is_storable": v["is_storable"], "decay_rate": v["decay_rate"]}
+            for k, v in self.RESOURCE_PHYSICS.items()
+        ])
+        market_lf = market_lf.join(physics_df.lazy(), on="game_resource_id", how="left").with_columns([
+            pl.col("is_storable").fill_null(True),
+            pl.col("decay_rate").fill_null(0.10)
+        ])
+
         # ---------------------------------------------------------
-        # 2. Local Supply & Desired Trade
+        # Local Supply & Trade Desires
         # ---------------------------------------------------------
-        # Local Supply is what we just produced PLUS what was sitting in the stockpile
         market_lf = market_lf.with_columns(
             (pl.col("domestic_production") + pl.col("stock_amount")).alias("local_supply")
         )
 
         market_lf = market_lf.with_columns([
-            # If we have more than we need, we want to export the surplus
-            pl.when(pl.col("local_supply") >= pl.col("demand"))
-            .then(pl.col("local_supply") - pl.col("demand"))
-            .otherwise(0.0).alias("export_desired"),
-            
-            # If our production + stockpile isn't enough, we must import
-            pl.when(pl.col("demand") > pl.col("local_supply"))
-            .then(pl.col("demand") - pl.col("local_supply"))
-            .otherwise(0.0).alias("import_desired")
+            pl.when(pl.col("local_supply") >= pl.col("demand")).then(pl.col("local_supply") - pl.col("demand")).otherwise(0.0).alias("export_desired"),
+            pl.when(pl.col("demand") > pl.col("local_supply")).then(pl.col("demand") - pl.col("local_supply")).otherwise(0.0).alias("import_desired")
         ])
 
-        # Priority mapping
-        priority_df = pl.DataFrame([{"game_resource_id": k, "priority": v} for k, v in self.TRADE_PRIORITY_MATRIX.items()])
-        market_lf = market_lf.join(priority_df.lazy(), on="game_resource_id", how="left").with_columns(pl.col("priority").fill_null(999))
-
-        # Because EconomySystem already applied the Wealth/GDP Normalization constraint,
-        # we completely trust that the requested demand is affordable. No more artificial 50% GDP caps!
-        market_lf = market_lf.with_columns(
-            pl.when(pl.col("is_gov_controlled") | ~pl.col("is_legal"))
-            .then(pl.col("import_desired"))
-            .otherwise(pl.col("import_desired")) # Trusted demand
-            .alias("affordable_import")
-        )
+        market_lf = market_lf.with_columns(pl.col("import_desired").alias("affordable_import"))
 
         # ---------------------------------------------------------
-        # 3. Global Market Clearing (Lazy)
+        # Global Market Clearing
         # ---------------------------------------------------------
         world_market_lf = market_lf.group_by("game_resource_id").agg(
             pl.col("export_desired").sum().alias("global_supply"),
@@ -114,8 +148,6 @@ class TradeSystem(ISystem):
         )
 
         market_lf = market_lf.join(world_market_lf, on="game_resource_id", how="left")
-
-        # Calculate clearing ratios to satisfy supply/demand proportionally
         market_lf = market_lf.with_columns(
             pl.when(pl.col("global_demand") > 0).then(pl.min_horizontal(1.0, pl.col("global_supply") / pl.col("global_demand"))).otherwise(0.0).alias("imp_ratio"),
             pl.when(pl.col("global_supply") > 0).then(pl.min_horizontal(1.0, pl.col("global_demand") / pl.col("global_supply"))).otherwise(0.0).alias("exp_ratio")
@@ -127,24 +159,33 @@ class TradeSystem(ISystem):
         )
 
         # ---------------------------------------------------------
-        # 4. Update Stockpiles & Apply Organic Market Pressure
+        # The Core Fix: Stockpile Decay & Dynamic Penalties
         # ---------------------------------------------------------
-        # Whatever we put up for export but couldn't sell goes back to the stockpile
+        # 1. How much is left over after trading?
         market_lf = market_lf.with_columns(
-            (pl.col("export_desired") - pl.col("export_actual")).alias("new_stock_amount")
+            (pl.col("export_desired") - pl.col("export_actual")).alias("unsold_amount")
         )
 
-        # Calculate how big the stockpile is relative to what we produce in a year.
+        # 2. Update Stockpiles (with Decay) for Storable Goods
         market_lf = market_lf.with_columns(
-            (pl.col("new_stock_amount") / pl.max_horizontal(pl.col("domestic_production"), 1.0)).alias("stock_to_prod_ratio")
+            pl.when(pl.col("is_storable"))
+            .then(pl.col("unsold_amount") * (1.0 - (pl.col("decay_rate") * fraction)))
+            .otherwise(0.0)
+            .alias("new_stock_amount")
         )
 
-        # Organic Penalty (Law of Supply): 
-        # If stockpiles exceed 50% of annual production, start scaling back factories.
-        # Max penalty is 10% reduction per year (realistic recession), NOT an instant 80% nuke.
+        # 3. Apply Asymmetric Penalties (Organic Bankruptcy vs Service Layoffs)
         market_lf = market_lf.with_columns(
-            pl.when(pl.col("stock_to_prod_ratio") > 0.5)
-            .then(pl.min_horizontal(pl.col("stock_to_prod_ratio") * 0.05, 0.10) * fraction)
+            # If it's services (NOT storable): Penalty is harsh and immediate. 
+            # If 20% of services are unwanted, lay off staff (minus 10% capacity per year)
+            pl.when(~pl.col("is_storable"))
+            .then((pl.col("unsold_amount") / pl.max_horizontal(pl.col("domestic_production"), 1.0)) * 0.5 * fraction)
+            
+            # If it's goods (Storable): Soft penalty.
+            # We only punish when warehouses swell to more than 50% of annual production. Maximum 10% reduction per year.
+            .when(pl.col("is_storable") & ((pl.col("new_stock_amount") / pl.max_horizontal(pl.col("domestic_production"), 1.0)) > 0.5))
+            .then(pl.min_horizontal((pl.col("new_stock_amount") / pl.max_horizontal(pl.col("domestic_production"), 1.0)) * 0.05, 0.10) * fraction)
+            
             .otherwise(0.0).alias("production_penalty_pct")
         )
 
@@ -153,11 +194,10 @@ class TradeSystem(ISystem):
         )
 
         # ---------------------------------------------------------
-        # 5. Financial & Budget Application (Lazy)
+        # Financial Execution & Output
         # ---------------------------------------------------------
         global_tax_mod = 0.02
         market_lf = market_lf.with_columns((pl.col("tax_rate") + global_tax_mod).alias("total_tax"))
-
         market_lf = market_lf.with_columns(
             pl.when(pl.col("is_gov_controlled")).then(pl.col("import_actual") * 1.5).otherwise(0.0).alias("gov_import_expense"),
             pl.when(pl.col("is_gov_controlled")).then(pl.col("export_actual") * 1.5)
@@ -171,50 +211,24 @@ class TradeSystem(ISystem):
         )
 
         countries_lf = countries_lf.join(budget_updates_lf, left_on="id", right_on="country_id", how="left").fill_null(0.0)
-        
-        # Ensure 'money_reserves' column exists
         if "money_reserves" not in countries_lf.columns:
             countries_lf = countries_lf.with_columns(pl.lit(0.0).alias("money_reserves"))
-            
         countries_lf = countries_lf.with_columns(
             (pl.col("money_reserves") + pl.col("trade_income") - pl.col("trade_expense")).alias("money_reserves")
         )
 
-        # ---------------------------------------------------------
-        # 6. EXECUTE GRAPH (POLARS MAGIC)
-        # ---------------------------------------------------------
+        # EXECUTE
         market_df = market_lf.collect()
         countries_df = countries_lf.collect()
 
-        # ---------------------------------------------------------
-        # 7. Generate Trade Network & Update State
-        # ---------------------------------------------------------
-        exporters = market_df.filter(pl.col("export_actual") > 0).select(["country_id", "game_resource_id", "export_actual", "global_supply"])
-        importers = market_df.filter(pl.col("import_actual") > 0).select(["country_id", "game_resource_id", "import_actual"])
-        
-        trade_net = exporters.join(importers, on="game_resource_id", suffix="_imp")
-        trade_net = trade_net.with_columns(
-            (pl.col("import_actual") * (pl.col("export_actual") / pl.col("global_supply"))).alias("trade_value_usd")
-        ).select([
-            pl.col("country_id").alias("exporter_id"),
-            pl.col("country_id_imp").alias("importer_id"),
-            "game_resource_id", "trade_value_usd"
-        ])
-
-        # STATE UPDATES
-        state.update_table("trade_network", trade_net)
-        
-        # Update Stockpiles
+        # Update State
         state.update_table("stockpiles", market_df.select(["country_id", "game_resource_id", pl.col("new_stock_amount").alias("stock_amount")]))
         
-        # Preserve core production columns
         final_prod_cols = [c for c in market_df.columns if c not in [
             "demand", "stock_amount", "local_supply", "export_desired", "import_desired", "priority", 
             "affordable_import", "global_supply", "global_demand", "imp_ratio", "exp_ratio", 
-            "import_actual", "export_actual", "new_stock_amount", "stock_to_prod_ratio", 
-            "production_penalty_pct", "total_tax", "gov_import_expense", "gov_tax_revenue"
+            "import_actual", "export_actual", "unsold_amount", "new_stock_amount", "stock_to_prod_ratio", 
+            "production_penalty_pct", "total_tax", "gov_import_expense", "gov_tax_revenue", "is_storable", "decay_rate"
         ]]
         state.update_table("domestic_production", market_df.select(final_prod_cols))
-        
-        cols_to_drop = ["trade_income", "trade_expense"]
-        state.update_table("countries", countries_df.drop([c for c in cols_to_drop if c in countries_df.columns]))
+        state.update_table("countries", countries_df.drop(["trade_income", "trade_expense"]))
