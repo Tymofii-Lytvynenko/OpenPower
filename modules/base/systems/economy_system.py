@@ -84,6 +84,17 @@ class EconomySystem(ISystem):
         "recreational_services": {"solvent_base_consumption": 1456.18, "general_base_consumption": 260.0, "resource_dependencies": {}, "output_multiplier": 1.0},
         "business_services": {"solvent_base_consumption": 2739.6, "general_base_consumption": 25.0, "resource_dependencies": {}, "output_multiplier": 1.0},
         "transport_services": {"solvent_base_consumption": 1349.0, "general_base_consumption": 8.0, "resource_dependencies": {"recreational_services": 0.02}, "output_multiplier": 0.98},
+        
+        # Missing Services & Goods
+        "education_services": {"solvent_base_consumption": 4500.0, "general_base_consumption": 150.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "government_services": {"solvent_base_consumption": 8000.0, "general_base_consumption": 500.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "financial_services": {"solvent_base_consumption": 6500.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "it_and_telecom_services": {"solvent_base_consumption": 3500.0, "general_base_consumption": 40.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "tourism_services": {"solvent_base_consumption": 2500.0, "general_base_consumption": 50.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "arms_and_ammunition": {"solvent_base_consumption": 150.0, "general_base_consumption": 5.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "other_food_and_beverages": {"solvent_base_consumption": 800.0, "general_base_consumption": 100.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "non_ferrous_metals": {"solvent_base_consumption": 450.0, "general_base_consumption": 15.0, "resource_dependencies": {"machinery_and_instruments": 0.02}, "output_multiplier": 1.0},
+        "construction_materials": {"solvent_base_consumption": 1200.0, "general_base_consumption": 80.0, "resource_dependencies": {"construction_services": 0.08}, "output_multiplier": 1.0},
     }
 
     def update(self, state: GameState, delta_time: float) -> None:
@@ -140,7 +151,11 @@ class EconomySystem(ISystem):
             "vegetables_and_fruits", "tobacco", "drugs_and_raw_plants", "business_services",
             "pharmaceuticals", "transport_services", "wood_and_paper", "industrial_services",
             "machinery_and_instruments", "iron_and_steel", "plastics_and_rubber", 
-            "fabrics_and_leather", "cereals", "chemicals", "electricity"
+            "fabrics_and_leather", "cereals", "chemicals", "electricity",
+            # Newly added
+            "education_services", "government_services", "financial_services",
+            "it_and_telecom_services", "tourism_services", "arms_and_ammunition",
+            "other_food_and_beverages", "non_ferrous_metals", "construction_materials"
         ]
         
         res_dfs = data.clone()

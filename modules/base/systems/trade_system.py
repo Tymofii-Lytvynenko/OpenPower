@@ -53,12 +53,14 @@ class TradeSystem(ISystem):
         else:
             market_lf = prod_lf.with_columns((pl.col("domestic_production") * 0.9).alias("demand"))
 
-        # Add stubs lazily
-        market_lf = market_lf.with_columns([
-            pl.lit(False).alias("is_gov_controlled"),
-            pl.lit(True).alias("is_legal"),
-            pl.lit(0.05).alias("tax_rate")
-        ])
+        # Ensure columns exist lazily (respecting existing data if present)
+        market_cols = market_lf.columns
+        if "is_gov_controlled" not in market_cols:
+            market_lf = market_lf.with_columns(pl.lit(False).alias("is_gov_controlled"))
+        if "is_legal" not in market_cols:
+            market_lf = market_lf.with_columns(pl.lit(True).alias("is_legal"))
+        if "tax_rate" not in market_cols:
+            market_lf = market_lf.with_columns(pl.lit(0.05).alias("tax_rate"))
 
         # Ensure columns exist lazily
         current_cols = state.get_table("countries").columns
@@ -179,7 +181,10 @@ class TradeSystem(ISystem):
 
         # UPDATE STATE
         state.update_table("trade_network", trade_net)
-        state.update_table("domestic_production", market_df.select(["country_id", "game_resource_id", "domestic_production"]))
+        
+        # Preserve all columns (like is_gov_controlled, tax_rate) that were in market_df
+        final_prod_cols = [c for c in market_df.columns if c not in ["export_desired", "import_desired", "priority", "cum_import_cost", "purchasing_power", "affordable_import", "global_supply", "global_demand", "imp_ratio", "exp_ratio", "import_actual", "export_actual", "gov_import_expense", "gov_tax_revenue", "unsold_balance"]]
+        state.update_table("domestic_production", market_df.select(final_prod_cols))
         
         cols_to_drop = ["purchasing_power", "trade_income", "trade_expense"]
         state.update_table("countries", countries_df.drop([c for c in cols_to_drop if c in countries_df.columns]))
