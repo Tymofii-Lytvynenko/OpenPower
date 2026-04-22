@@ -93,10 +93,12 @@ class GameState:
     def to_ipc(self) -> dict:
         """
         Packs the state into raw bytes using Zero-Copy Arrow IPC.
-        Executes on the Server Process.
         """
         ipc_tables = {}
         for name, df in self.tables.items():
+            if name in ["trade_network"]:
+                continue 
+            
             f = io.BytesIO()
             df.write_ipc(f)
             ipc_tables[name] = f.getvalue()

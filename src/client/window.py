@@ -33,7 +33,7 @@ class MainWindow(arcade.Window):
         print("[Window] Booting Client Proxy...")
         
         # Instantiate the Proxy (This spawns the background CPU core)
-        self.session = ClientSessionProxy(str(self.game_config.project_root))
+        self.session = ClientSessionProxy(self.game_config)
 
         def check_server_boot(delta_time):
             # Poll the progress queue from the background process
