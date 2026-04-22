@@ -78,24 +78,17 @@ class EconomySystem(ISystem):
         "luxury_commodities": {"solvent_base_consumption": 247.4, "general_base_consumption": 0.8, "resource_dependencies": {}, "output_multiplier": 1.0},
 
         # Services
-        "construction_services": {"solvent_base_consumption": 6473.3, "general_base_consumption": 130.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "industrial_services": {"solvent_base_consumption": 2687.87, "general_base_consumption": 20.0, "resource_dependencies": {"construction_services": 0.02}, "output_multiplier": 0.98},
-        "health_services": {"solvent_base_consumption": 11158.28, "general_base_consumption": 30.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "recreational_services": {"solvent_base_consumption": 1456.18, "general_base_consumption": 260.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "business_services": {"solvent_base_consumption": 2739.6, "general_base_consumption": 25.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "transport_services": {"solvent_base_consumption": 1349.0, "general_base_consumption": 8.0, "resource_dependencies": {"recreational_services": 0.02}, "output_multiplier": 0.98},
-        
-        # Missing Services & Goods
-        "education_services": {"solvent_base_consumption": 4500.0, "general_base_consumption": 150.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "government_services": {"solvent_base_consumption": 8000.0, "general_base_consumption": 500.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "financial_services": {"solvent_base_consumption": 6500.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "it_and_telecom_services": {"solvent_base_consumption": 3500.0, "general_base_consumption": 40.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "tourism_services": {"solvent_base_consumption": 2500.0, "general_base_consumption": 50.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "arms_and_ammunition": {"solvent_base_consumption": 150.0, "general_base_consumption": 5.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "other_food_and_beverages": {"solvent_base_consumption": 800.0, "general_base_consumption": 100.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "non_ferrous_metals": {"solvent_base_consumption": 450.0, "general_base_consumption": 15.0, "resource_dependencies": {"machinery_and_instruments": 0.02}, "output_multiplier": 1.0},
-        "construction_materials": {"solvent_base_consumption": 1200.0, "general_base_consumption": 80.0, "resource_dependencies": {"construction_services": 0.08}, "output_multiplier": 1.0},
-    }
+        "construction_services": {"solvent_base_consumption": 1800.0, "general_base_consumption": 40.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "industrial_services": {"solvent_base_consumption": 800.0, "general_base_consumption": 5.0, "resource_dependencies": {"construction_services": 0.02}, "output_multiplier": 0.98},
+        "health_services": {"solvent_base_consumption": 3200.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "recreational_services": {"solvent_base_consumption": 400.0, "general_base_consumption": 70.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "business_services": {"solvent_base_consumption": 800.0, "general_base_consumption": 5.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "transport_services": {"solvent_base_consumption": 400.0, "general_base_consumption": 2.0, "resource_dependencies": {"recreational_services": 0.02}, "output_multiplier": 0.98},
+        "education_services": {"solvent_base_consumption": 1200.0, "general_base_consumption": 40.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "government_services": {"solvent_base_consumption": 2200.0, "general_base_consumption": 120.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "financial_services": {"solvent_base_consumption": 1800.0, "general_base_consumption": 5.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "it_and_telecom_services": {"solvent_base_consumption": 900.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "tourism_services": {"solvent_base_consumption": 600.0, "general_base_consumption": 15.0, "resource_dependencies": {}, "output_multiplier": 1.0},    }
 
     def update(self, state: GameState, delta_time: float) -> None:
         rebuild_ledger = False
