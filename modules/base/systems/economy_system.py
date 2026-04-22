@@ -8,6 +8,7 @@ class EconomySystem(ISystem):
     """
     Handles internal macroeconomic simulation, including domestic production value 
     generation, base internal taxation, and calculating national demand (consumption).
+    Now features Dynamic Wealth Anchoring, Propensity to Consume, and Income Elasticity.
     """
     
     @property
@@ -27,19 +28,21 @@ class EconomySystem(ISystem):
         "health_services", "industrial_services"
     ]
 
-    # Pattern: C = ((SolventPopulation * solvent_base_consumption + Population * general_base_consumption) * multiplier) + dependencies
+    # TOTAL BASELINE BASKET = 1,000 POINTS (100%). 10 points = 1% of the consumer's baseline budget.
+    # Pattern: C = ((SolventPopulation * solvent_base * (WI^Elasticity)) + Population * general_base) * multiplier + deps
     CONSUMPTION_FORMULAS = {
-        # Food and agriculture
-        "cereals": {"solvent_base_consumption": 592.46, "general_base_consumption": 75.0, "resource_dependencies": {"dairy": 0.01, "meat_and_fish": 0.05}, "output_multiplier": 0.94},
-        "vegetables_and_fruits": {"solvent_base_consumption": 764.3, "general_base_consumption": 40.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "meat_and_fish": {"solvent_base_consumption": 498.2, "general_base_consumption": 30.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "dairy": {"solvent_base_consumption": 830.9, "general_base_consumption": 25.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "tobacco": {"solvent_base_consumption": 143.49, "general_base_consumption": 4.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "drugs_and_raw_plants": {"solvent_base_consumption": 95.18, "general_base_consumption": 5.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        # --- FOOD & AGRO (Target: ~120 points / 12% of the economy) ---
+        "cereals": {"solvent_base_consumption": 5.0, "general_base_consumption": 15.0, "resource_dependencies": {"dairy": 0.01, "meat_and_fish": 0.05}, "output_multiplier": 0.94, "income_elasticity": 0.2}, # 2% (mostly general)
+        "vegetables_and_fruits": {"solvent_base_consumption": 15.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 0.4}, # 2.5%
+        "meat_and_fish": {"solvent_base_consumption": 20.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 0.6}, # 3%
+        "dairy": {"solvent_base_consumption": 15.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 0.5}, # 2.5%
+        "tobacco": {"solvent_base_consumption": 6.0, "general_base_consumption": 4.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 0.5}, # 1%
+        "drugs_and_raw_plants": {"solvent_base_consumption": 3.0, "general_base_consumption": 2.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 0.5}, # 0.5%
+        "other_food_and_beverages": {"solvent_base_consumption": 20.0, "general_base_consumption": 15.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 0.7}, # 3.5%
 
-        # Energy
+        # --- ENERGY (Target: ~80 points / 8% of the economy) ---
         "electricity": {
-            "solvent_base_consumption": 1401.75, "general_base_consumption": 35.0, "output_multiplier": 0.78,
+            "solvent_base_consumption": 20.0, "general_base_consumption": 20.0, "output_multiplier": 0.78, "income_elasticity": 1.0, # 4%
             "resource_dependencies": {
                 "wood_and_paper": 0.02, "plastics_and_rubber": 0.04, "fabrics_and_leather": 0.02,
                 "chemicals": 0.01, "pharmaceuticals": 0.02, "appliances": 0.04,
@@ -47,54 +50,43 @@ class EconomySystem(ISystem):
                 "luxury_commodities": 0.02
             }
         },
-        "fossil_fuels": {"solvent_base_consumption": 1142.7, "general_base_consumption": 40.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "fossil_fuels": {"solvent_base_consumption": 25.0, "general_base_consumption": 15.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 0.8}, # 4%
 
-        # Raw materials
-        "wood_and_paper": {"solvent_base_consumption": 183.88, "general_base_consumption": 10.0, "resource_dependencies": {"construction_services": 0.04}, "output_multiplier": 0.96},
-        "minerals": {"solvent_base_consumption": 567.25, "general_base_consumption": 30.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "iron_and_steel": {
-            "solvent_base_consumption": 1078.88, "general_base_consumption": 50.0, "output_multiplier": 0.82,
-            "resource_dependencies": {"appliances": 0.04, "vehicles": 0.04, "machinery_and_instruments": 0.04, "construction_services": 0.06}
-        },
-        "precious_stones": {"solvent_base_consumption": 35.2, "general_base_consumption": 0.8, "resource_dependencies": {}, "output_multiplier": 1.0},
-
-        # Industrial materials
-        "fabrics_and_leather": {"solvent_base_consumption": 1338.8, "general_base_consumption": 75.0, "resource_dependencies": {"commodities": 0.01, "luxury_commodities": 0.05}, "output_multiplier": 0.94},
-        "plastics_and_rubber": {"solvent_base_consumption": 615.9, "general_base_consumption": 10.0, "resource_dependencies": {"luxury_commodities": 0.01, "commodities": 0.02}, "output_multiplier": 0.97},
-        "chemicals": {
-            "solvent_base_consumption": 1517.0, "general_base_consumption": 40.0, "output_multiplier": 0.95,
-            "resource_dependencies": {"luxury_commodities": 0.01, "commodities": 0.02, "plastics_and_rubber": 0.01, "pharmaceuticals": 0.01}
-        },
-
-        # Finished goods
-        "pharmaceuticals": {"solvent_base_consumption": 128.97, "general_base_consumption": 5.0, "resource_dependencies": {"health_services": 0.04}, "output_multiplier": 0.96},
-        "appliances": {"solvent_base_consumption": 685.05, "general_base_consumption": 7.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "vehicles": {"solvent_base_consumption": 826.15, "general_base_consumption": 15.0, "resource_dependencies": {}, "output_multiplier": 1.0},
+        # --- READY-MADE GOODS (Target: ~180 points / 18% of the economy) ---
+        "vehicles": {"solvent_base_consumption": 35.0, "general_base_consumption": 5.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.5}, # 4%
+        "commodities": {"solvent_base_consumption": 30.0, "general_base_consumption": 20.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.0}, # 5% (clothing, household items)
+        "appliances": {"solvent_base_consumption": 20.0, "general_base_consumption": 5.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.2}, # 2.5%
+        "pharmaceuticals": {"solvent_base_consumption": 20.0, "general_base_consumption": 10.0, "resource_dependencies": {"health_services": 0.04}, "output_multiplier": 0.96, "income_elasticity": 0.8}, # 3%
         "machinery_and_instruments": {
-            "solvent_base_consumption": 413.81, "general_base_consumption": 12.0, "output_multiplier": 0.84,
+            "solvent_base_consumption": 15.0, "general_base_consumption": 2.0, "output_multiplier": 0.84, "income_elasticity": 1.2, # 1.7%
             "resource_dependencies": {"construction_services": 0.05, "fossil_fuels": 0.03, "wood_and_paper": 0.02, "minerals": 0.05, "precious_stones": 0.01}
         },
-        "commodities": {"solvent_base_consumption": 1198.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "luxury_commodities": {"solvent_base_consumption": 247.4, "general_base_consumption": 0.8, "resource_dependencies": {}, "output_multiplier": 1.0},
+        "luxury_commodities": {"solvent_base_consumption": 15.0, "general_base_consumption": 0.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 2.0}, # 1.5% (only solvent)
+        "arms_and_ammunition": {"solvent_base_consumption": 2.0, "general_base_consumption": 1.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.0}, # 0.3%
 
-        # Services
-        "construction_services": {"solvent_base_consumption": 6473.3, "general_base_consumption": 130.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "industrial_services": {"solvent_base_consumption": 2687.87, "general_base_consumption": 20.0, "resource_dependencies": {"construction_services": 0.02}, "output_multiplier": 0.98},
-        "health_services": {"solvent_base_consumption": 11158.28, "general_base_consumption": 30.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "recreational_services": {"solvent_base_consumption": 1456.18, "general_base_consumption": 260.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "business_services": {"solvent_base_consumption": 2739.6, "general_base_consumption": 25.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "transport_services": {"solvent_base_consumption": 1349.0, "general_base_consumption": 8.0, "resource_dependencies": {"recreational_services": 0.02}, "output_multiplier": 0.98},
-        
-        # Missing Services & Goods
-        "education_services": {"solvent_base_consumption": 4500.0, "general_base_consumption": 150.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "government_services": {"solvent_base_consumption": 8000.0, "general_base_consumption": 500.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "financial_services": {"solvent_base_consumption": 6500.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "it_and_telecom_services": {"solvent_base_consumption": 3500.0, "general_base_consumption": 40.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "tourism_services": {"solvent_base_consumption": 2500.0, "general_base_consumption": 50.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "arms_and_ammunition": {"solvent_base_consumption": 150.0, "general_base_consumption": 5.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "other_food_and_beverages": {"solvent_base_consumption": 800.0, "general_base_consumption": 100.0, "resource_dependencies": {}, "output_multiplier": 1.0},
-        "non_ferrous_metals": {"solvent_base_consumption": 450.0, "general_base_consumption": 15.0, "resource_dependencies": {"machinery_and_instruments": 0.02}, "output_multiplier": 1.0},
-        "construction_materials": {"solvent_base_consumption": 1200.0, "general_base_consumption": 80.0, "resource_dependencies": {"construction_services": 0.08}, "output_multiplier": 1.0},
+        # --- SERVICES (Target: ~600 points / 60% of the economy) ---
+        "health_services": {"solvent_base_consumption": 80.0, "general_base_consumption": 40.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.1}, # 12%
+        "government_services": {"solvent_base_consumption": 50.0, "general_base_consumption": 50.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.0}, # 10%
+        "construction_services": {"solvent_base_consumption": 60.0, "general_base_consumption": 20.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.1}, # 8%
+        "financial_services": {"solvent_base_consumption": 50.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.5}, # 6%
+        "education_services": {"solvent_base_consumption": 35.0, "general_base_consumption": 25.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.0}, # 6%
+        "business_services": {"solvent_base_consumption": 40.0, "general_base_consumption": 10.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.2}, # 5%
+        "it_and_telecom_services": {"solvent_base_consumption": 35.0, "general_base_consumption": 5.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.4}, # 4%
+        "recreational_services": {"solvent_base_consumption": 25.0, "general_base_consumption": 5.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.8}, # 3%
+        "tourism_services": {"solvent_base_consumption": 25.0, "general_base_consumption": 0.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 2.0}, # 2.5%
+        "industrial_services": {"solvent_base_consumption": 20.0, "general_base_consumption": 5.0, "resource_dependencies": {"construction_services": 0.02}, "output_multiplier": 0.98, "income_elasticity": 1.0}, # 2.5%
+        "transport_services": {"solvent_base_consumption": 5.0, "general_base_consumption": 5.0, "resource_dependencies": {"recreational_services": 0.02}, "output_multiplier": 0.98, "income_elasticity": 1.0}, # 1%
+
+        # --- RAW MATERIALS & MATERIALS (Target: ~20 points / 2% of DIRECT consumption, the rest through factories) ---
+        "construction_materials": {"solvent_base_consumption": 8.0, "general_base_consumption": 2.0, "resource_dependencies": {"construction_services": 0.08}, "output_multiplier": 1.0, "income_elasticity": 1.1}, # 1%
+        "chemicals": {"solvent_base_consumption": 3.0, "general_base_consumption": 2.0, "resource_dependencies": {"luxury_commodities": 0.01, "commodities": 0.02, "plastics_and_rubber": 0.01, "pharmaceuticals": 0.01}, "output_multiplier": 0.95, "income_elasticity": 1.0}, # 0.5%
+        "fabrics_and_leather": {"solvent_base_consumption": 2.0, "general_base_consumption": 1.0, "resource_dependencies": {"commodities": 0.01, "luxury_commodities": 0.05}, "output_multiplier": 0.94, "income_elasticity": 1.0}, # 0.3%
+        "iron_and_steel": {"solvent_base_consumption": 1.0, "general_base_consumption": 1.0, "resource_dependencies": {"appliances": 0.04, "vehicles": 0.04, "machinery_and_instruments": 0.04, "construction_services": 0.06}, "output_multiplier": 0.82, "income_elasticity": 1.0}, # 0.2%
+        "plastics_and_rubber": {"solvent_base_consumption": 1.0, "general_base_consumption": 1.0, "resource_dependencies": {"luxury_commodities": 0.01, "commodities": 0.02}, "output_multiplier": 0.97, "income_elasticity": 1.0}, # 0.2%
+        "wood_and_paper": {"solvent_base_consumption": 1.0, "general_base_consumption": 1.0, "resource_dependencies": {"construction_services": 0.04}, "output_multiplier": 0.96, "income_elasticity": 0.9}, # 0.2%
+        "minerals": {"solvent_base_consumption": 1.0, "general_base_consumption": 1.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.0}, # 0.2%
+        "non_ferrous_metals": {"solvent_base_consumption": 1.0, "general_base_consumption": 0.0, "resource_dependencies": {"machinery_and_instruments": 0.02}, "output_multiplier": 1.0, "income_elasticity": 1.0}, # 0.1%
+        "precious_stones": {"solvent_base_consumption": 1.0, "general_base_consumption": 0.0, "resource_dependencies": {}, "output_multiplier": 1.0, "income_elasticity": 1.8}, # 0.1%
     }
 
     def update(self, state: GameState, delta_time: float) -> None:
@@ -126,22 +118,41 @@ class EconomySystem(ISystem):
 
     def _calculate_formulaic_consumption(self, state: GameState) -> pl.DataFrame:
         """
-        Calculates annual consumption (Demand) per country/resource.
-        Provides the baseline demand values that the TradeSystem relies on.
+        Calculates annual consumption (Demand) per country/resource dynamically.
+        Uses a Global GDP Anchor, Propensity to Consume logic, and Income Elasticity
+        to ensure countries only demand what their economies can realistically afford.
         """
         countries = state.get_table("countries")
         data = self._get_population(state)
         
         metrics_data = countries.select(
             pl.col("id").alias("country_id"),
-            pl.col("poverty_rate"),
-            pl.col("human_dev")
+            pl.col("poverty_rate").fill_null(0.0),
+            pl.col("human_dev").fill_null(0.5),
+            pl.col("gdp_per_capita").fill_null(1000.0) 
         )
 
         data = data.join(metrics_data, on="country_id", how="inner")
         
+        # --- 1. DYNAMIC ANCHOR & CONSUMPTION POOL ---
+        # Calculate total GDP to find the global average
+        data = data.with_columns((pl.col("gdp_per_capita") * pl.col("population")).alias("total_gdp"))
+        
+        total_gdp_sum = data["total_gdp"].sum() if not data.is_empty() else 0.0
+        total_pop_sum = data["population"].sum() if not data.is_empty() else 1.0
+        
+        # The zero-mile marker for global wealth, minimum $100
+        global_avg_gdp_pc = max(total_gdp_sum / max(total_pop_sum, 1.0), 100.0)
+
+        # Calculate Wealth Index (WI) and Propensity to Consume
         data = data.with_columns(
-            (pl.col("population") * (1.0 - pl.col("poverty_rate")) * pl.col("human_dev")).alias("solvent_population")
+            (pl.col("gdp_per_capita") / global_avg_gdp_pc).clip(0.05, 10.0).alias("wealth_index")
+        )
+        
+        data = data.with_columns(
+            (pl.col("population") * (1.0 - pl.col("poverty_rate")) * pl.col("human_dev")).alias("solvent_population"),
+            # Propensity formula: Poor countries spend ~90% GDP on consumption, rich ~55%
+            (pl.col("total_gdp") * (0.50 + (0.40 / (1.0 + pl.col("wealth_index"))))).alias("total_consumption_pool")
         )
         
         calc_order = [
@@ -152,30 +163,56 @@ class EconomySystem(ISystem):
             "pharmaceuticals", "transport_services", "wood_and_paper", "industrial_services",
             "machinery_and_instruments", "iron_and_steel", "plastics_and_rubber", 
             "fabrics_and_leather", "cereals", "chemicals", "electricity",
-            # Newly added
             "education_services", "government_services", "financial_services",
             "it_and_telecom_services", "tourism_services", "arms_and_ammunition",
             "other_food_and_beverages", "non_ferrous_metals", "construction_materials"
         ]
         
         res_dfs = data.clone()
+        raw_demand_cols = []
+        
+        # --- 2. RAW DEMAND CALCULATION WITH ELASTICITY ---
         for res_id in calc_order:
             formula = self.CONSUMPTION_FORMULAS[res_id]
+            elasticity = formula.get("income_elasticity", 1.0)
             
-            expr = (pl.col("solvent_population") * formula["solvent_base_consumption"] + 
-                    pl.col("population") * formula["general_base_consumption"]) * formula["output_multiplier"]
+            # Apply elasticity to the wealth modifier ONLY for the solvent population
+            expr = (
+                pl.col("solvent_population") * formula["solvent_base_consumption"] * (pl.col("wealth_index") ** elasticity) + 
+                pl.col("population") * formula["general_base_consumption"]
+            ) * formula["output_multiplier"]
             
-            for req_id, req_coeff in formula["resource_dependencies"].items():
+            for req_id, req_coeff in formula.get("resource_dependencies", {}).items():
                 if req_id in res_dfs.columns:
                     expr = expr + (pl.col(req_id) * req_coeff)
             
             res_dfs = res_dfs.with_columns(expr.alias(res_id))
+            raw_demand_cols.append(res_id)
             
-        output_res = list(self.CONSUMPTION_FORMULAS.keys())
+        # --- 3. NORMALIZATION TO FIT THE POOL ---
+        # Sum all raw demands to find what the population "wants"
+        res_dfs = res_dfs.with_columns(
+            pl.sum_horizontal(raw_demand_cols).alias("total_raw_demand")
+        )
         
-        long_consumption = res_dfs.select(["country_id"] + output_res).melt(
+        # Create a compression ratio: what they can afford / what they want
+        res_dfs = res_dfs.with_columns(
+            pl.when(pl.col("total_raw_demand") > 0)
+            .then(pl.col("total_consumption_pool") / pl.col("total_raw_demand"))
+            .otherwise(0.0)
+            .alias("normalization_factor")
+        )
+        
+        # Compress (or expand) all requests to perfectly match their real economic capacity
+        for res_id in raw_demand_cols:
+            res_dfs = res_dfs.with_columns(
+                (pl.col(res_id) * pl.col("normalization_factor")).alias(res_id)
+            )
+            
+        # Format output
+        long_consumption = res_dfs.select(["country_id"] + raw_demand_cols).melt(
             id_vars="country_id",
-            value_vars=output_res,
+            value_vars=raw_demand_cols,
             variable_name="game_resource_id",
             value_name="consumption_usd"
         )
@@ -273,7 +310,6 @@ class EconomySystem(ISystem):
         updated_countries = countries.join(prod_val.select(["id", "production_income", "gdp", "gdp_per_capita"]), on="id", how="left").fill_null(0)
         
         # Internal Taxation mechanic: The government budget collects a flat % of generated GDP.
-        # Private consumption costs are NO LONGER drained directly from the state budget.
         internal_tax_rate = 0.20 # 20% flat baseline tax for state budget
         updated_countries = updated_countries.with_columns(
             (pl.col("money_reserves") + (pl.col("production_income") * internal_tax_rate)).alias("money_reserves")
