@@ -3,9 +3,10 @@
 The Shared layer is the **Passive Data Dictionary** of the project. It contains only definitions, types, and constants used to communicate between layers.
 
 ## 🎯 Responsibilities
-* **Data Contracts:** Defining the structure of `GameAction` (commands) and `GameEvent` (signals).
+* **Data Contracts:** Defining the structure of `GameAction` (commands) and `GameEvent` (signals) used across the IPC boundary.
 * **Configuration:** `GameConfig` schemas and path resolution logic (abstracts paths, but doesn't load files).
 * **Type Definitions:** Python `Protocols` and `Dataclasses` used for type hinting across the project.
+* **Metadata Dictionaries:** Mapping keys to human-readable info (e.g., `RESOURCE_MAPPING` in `economy_meta.py`).
 * **Global Constants:** Fixed values like `GAME_EPOCH`, `MAX_PLAYERS`, or `VERSION`.
 
 ## 🛡️ The Golden Rule
@@ -23,6 +24,6 @@ If it calculates something, move it to `src/core`. If it holds state, move it to
     * Python Standard Library (`typing`, `dataclasses`, `pathlib`).
     * **ABSOLUTELY NOTHING** from `core`, `client`, `server`, `engine`, or `modules`.
 * **Used by:**
-    * **EVERYONE:** `client`, `server`, `engine`, `core`, and `modules` all depend on `shared` to speak the same language.
+    * **EVERYONE:** `client`, `server`, `engine`, `core`, and `modules` all depend on `shared` to speak the same language. It is the bridge between the **Main Process** (Client) and **Simulation Process** (Server).
 * **NEVER imports:**
     * Any other layer. Importing anything else here will cause immediate **Circular Dependency** errors.

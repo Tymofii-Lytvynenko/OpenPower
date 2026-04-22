@@ -10,6 +10,8 @@ The Engine is the generic machinery that orchestrates the execution of the simul
 ## 🛡️ The Golden Rule
 The Engine must remain **content-agnostic**. It knows *how* to run a system, but not *what* the system does.
 
+**Note:** The Engine runs inside the **Simulation Process**. It is designed to be highly deterministic and performance-focused, processing ticks independently of the UI frame rate.
+
 | ✅ Correct Usage | ❌ Incorrect Usage |
 | :--- | :--- |
 | Calling `system.update(state, dt)` generically. | Hardcoding logic like `if system.id == "economy": ...`. |
@@ -22,7 +24,7 @@ The Engine must remain **content-agnostic**. It knows *how* to run a system, but
     * `src/core`: To use `SimulationTimer`, generic Algorithms, and Logging.
     * `src/server`: To manipulate the `GameState` object during the tick.
 * **Used by:**
-    * `src/server`: The Session instantiates and owns the Engine.
+    * `src/server`: The Session instantiates and owns the Engine within the background process.
 * **NEVER imports:**
     * `src/client`: The Engine must run even on a headless server.
     * `modules`: No hard dependencies on specific content (e.g., "base" mod).

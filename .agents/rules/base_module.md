@@ -10,6 +10,8 @@ This is the **Game Layer**. Everything that makes "OpenPower" a specific game (a
 ## 🛡️ The Golden Rule
 Code here represents **Policy**. It uses the **Mechanisms** provided by `src/core` to implement game rules.
 
+**Note:** Modules are loaded and executed within the **Simulation Process**. They have no direct access to the UI/Window context. They communicate with the player exclusively through `GameEvents` and by modifying the `GameState`.
+
 | ✅ Correct Usage | ❌ Incorrect Usage |
 | :--- | :--- |
 | Using `core.SimulationTimer` to calculate consumption. | Writing a custom `while` loop to manage time. |
@@ -22,7 +24,7 @@ Code here represents **Policy**. It uses the **Mechanisms** provided by `src/cor
     * `src/core`: To use Standard Simulation Tools (Timers, Math) and Utils.
     * `src/engine` (Interfaces only): To implement `ISystem`.
 * **Used by:**
-    * `src/engine`: The Engine dynamically loads these modules.
+    * `src/engine`: The Engine dynamically loads these modules within the background process.
 * **NEVER imports:**
     * `src/engine` (Internals): Do not touch the loop logic.
     * `src/server`: Do not manually save files or touch the session.

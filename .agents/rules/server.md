@@ -7,9 +7,12 @@ The Server is the "Source of Truth" and handles the lifecycle of the data. It ac
 * **Persistence (I/O):** Loading static assets (TSV) and saving/loading user sessions (Parquet/JSON).
 * **Session Lifecycle:** Assembling the game (connecting Engine, Loader, and State) via `GameSession`.
 * **Atomic Writes:** Ensuring save files are written safely to disk to prevent corruption.
+* **IPC Serialization:** Packing the `GameState` into Arrow IPC format for delivery to the Client process.
 
 ## 🛡️ The Golden Rule
 The Server cares about **Data Integrity**, not Data Processing. It ensures data is valid when loaded, but it does not simulate changes over time.
+
+**Note:** In the current architecture, the Server lives in a **Background Process** (`server_process.py`). It is isolated from the UI to ensure the simulation doesn't hitch when the UI is busy, and vice-versa.
 
 | ✅ Correct Usage | ❌ Incorrect Usage |
 | :--- | :--- |
@@ -23,6 +26,6 @@ The Server cares about **Data Integrity**, not Data Processing. It ensures data 
     * `src/core`: File utils, ID generators.
     * `src/engine`: To instantiate the simulation driver.
 * **Used by:**
-    * `src/client`: The Client requests the `GameState` snapshot for rendering.
+    * `src/client`: The Client requests the `GameState` snapshot (via IPC) for rendering.
 * **NEVER imports:**
     * `src/client`: The Server must not know about the UI.
