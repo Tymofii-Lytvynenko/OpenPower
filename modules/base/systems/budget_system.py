@@ -12,13 +12,12 @@ class BudgetSystem(ISystem):
     PERSONAL_INCOME_TAX_CONSTANT = 3.0 
     DEBT_INTEREST_RATE = 0.05
     
-    # Global scaling constant for budget sector expenses (SP2 logic)
     K_BUDGET = 0.15
     
-    # Specific multipliers determining the relative cost weight of each sector
     M_SECTOR = {
         "budget_health_ratio": 0.25,
         "budget_edu_ratio": 0.23,
+        "budget_social_ratio": 0.15,
         "budget_gov_ratio": 0.14,
         "budget_env_ratio": 0.10,
         "budget_research_ratio": 0.09,
@@ -51,15 +50,12 @@ class BudgetSystem(ISystem):
         if "countries" not in state.tables:
             return
 
-        # 1. Calculate Total Demand across all resources per country
-        # This anchors the budget expenses to the actual physical consumption scope of the population.
         if "resource_ledger" in state.tables:
             ledger_lf = state.get_table("resource_ledger").lazy()
             demand_lf = ledger_lf.group_by("country_id").agg(
                 pl.col("consumption_usd").sum().alias("total_demand")
             )
         else:
-            # Fallback to zero if the economy system hasn't initialized the ledger yet
             demand_lf = pl.DataFrame({"country_id": [], "total_demand": []}, schema={"country_id": pl.Utf8, "total_demand": pl.Float64}).lazy()
 
         lf = state.get_table("countries").lazy()
@@ -68,7 +64,7 @@ class BudgetSystem(ISystem):
         required_cols = {
             "gdp": 0.0, "human_dev": 0.5, "personal_income_tax_rate": 0.2, 
             "tourism_income": 0.0, "imf_revenue": 0.0, "trade_income": 0.0, "trade_expense": 0.0,
-            "budget_edu_ratio": 0.5, "budget_health_ratio": 0.5, "budget_env_ratio": 0.5, 
+            "budget_edu_ratio": 0.5, "budget_health_ratio": 0.5, "budget_social_ratio": 0.5, "budget_env_ratio": 0.5, 
             "budget_infra_ratio": 0.5, "budget_telecom_ratio": 0.5, "budget_gov_ratio": 0.5,
             "budget_propaganda_ratio": 0.5, "budget_tourism_promo_ratio": 0.5,
             "budget_research_ratio": 0.5, "budget_imf_ratio": 0.0,
@@ -81,7 +77,6 @@ class BudgetSystem(ISystem):
             if col not in existing_cols:
                 lf = lf.with_columns(pl.lit(default_val).alias(col))
 
-        # 2. Revenue Calculations
         lf = lf.with_columns(
             (
                 (pl.col("gdp") * pl.col("human_dev") * pl.col("personal_income_tax_rate")) 
@@ -98,8 +93,6 @@ class BudgetSystem(ISystem):
             ).alias("total_annual_revenue")
         )
 
-        # 3. Dynamic Expense Calculations (SP2 Formula)
-        # Using horizontal sum of vectorized operations to avoid breaking lazy execution graph.
         expense_components = [
             (pl.col("total_demand") * self.K_BUDGET * multiplier * pl.col(col_name))
             for col_name, multiplier in self.M_SECTOR.items()
@@ -113,7 +106,7 @@ class BudgetSystem(ISystem):
             (pl.col("gdp") * pl.col("budget_gov_ratio") * pl.col("corruption_index")).alias("expense_corruption")
         )
 
-        # TODO: Refactor military upkeep to dynamically poll actual unit configurations from the ECS military module.
+        # TODO: Refactor military upkeep to dynamically poll actual unit configurations
         BASE_UNIT_COST = 500_000.0
         lf = lf.with_columns(
             (pl.col("military_count") * BASE_UNIT_COST * pl.col("human_dev")).alias("expense_military_upkeep")
@@ -138,13 +131,13 @@ class BudgetSystem(ISystem):
             ).alias("total_annual_expense")
         )
 
-        # 4. Tax Fairness Factor
-        # Exposes the spending-to-taxation ratio to the political system for stability calculations.
+        # The divisor changes to 6.0 due to the addition of Social Support 
+        # to the tax fairness evaluation factor.
         lf = lf.with_columns(
             (
                 (pl.col("budget_edu_ratio") + pl.col("budget_env_ratio") + 
                  pl.col("budget_health_ratio") + pl.col("budget_telecom_ratio") + 
-                 pl.col("budget_infra_ratio")) / 5.0
+                 pl.col("budget_infra_ratio") + pl.col("budget_social_ratio")) / 6.0
             ).alias("_avg_social_spending")
         )
 
@@ -160,7 +153,6 @@ class BudgetSystem(ISystem):
             ).alias("tax_fairness_factor")
         )
 
-        # 5. Apply the delta to Monetary Supply
         lf = lf.with_columns(
             (
                 pl.col("money_reserves") + 

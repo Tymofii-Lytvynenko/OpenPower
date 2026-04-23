@@ -11,44 +11,46 @@ class BudgetPanel:
     Calculates UI previews of sector expenses dynamically based on global economic demand.
     """
     def __init__(self):
-        # Base multiplier logic identical to the server-side simulation
         self.K_BUDGET = 0.15
+        
         self.M_SECTOR = {
+            "INFRASTRUCTURE": 0.07,
+            "PROPAGANDA": 0.03,
+            "ENVIRONMENT": 0.10,
             "HEALTH CARE": 0.25,
             "EDUCATION": 0.23,
-            "GOVERNMENT": 0.14,
-            "ENVIRONMENT": 0.10,
-            "RESEARCH": 0.09,
-            "INFRASTRUCTURE": 0.07,
             "TELECOM": 0.04,
-            "IMF": 0.04,
-            "PROPAGANDA": 0.03,
-            "TOURISM": 0.01
+            "GOVERNMENT": 0.14,
+            "FOREIGN AID (IMF)": 0.04,
+            "RESEARCH": 0.09,
+            "TOURISM": 0.01,
+            "SOCIAL SUPPORT": 0.15
         }
         
         self.allocations = {k: 0.50 for k in self.M_SECTOR.keys()}
         self.requirements = {
+            "INFRASTRUCTURE": 0.40,
+            "PROPAGANDA": 0.35,
+            "ENVIRONMENT": 0.40,
             "HEALTH CARE": 0.40,
             "EDUCATION": 0.40,
-            "GOVERNMENT": 0.38,
-            "ENVIRONMENT": 0.40,
-            "RESEARCH": 0.40,
-            "INFRASTRUCTURE": 0.40,
             "TELECOM": 0.40,
-            "IMF": 0.15,
-            "PROPAGANDA": 0.35,
-            "TOURISM": 0.40
+            "GOVERNMENT": 0.38,
+            "FOREIGN AID (IMF)": 0.15,
+            "RESEARCH": 0.40,
+            "TOURISM": 0.40,
+            "SOCIAL SUPPORT": 0.40
         }
 
     def render(self, state, **kwargs) -> bool:
-        with WindowManager.window("BUDGET", x=300, y=100, w=480, h=750) as is_open:
+        # Increased panel height slightly to accommodate the new sector
+        with WindowManager.window("BUDGET", x=300, y=100, w=480, h=780) as is_open:
             if not is_open: 
                 return False
             self._render_content(state)
             return True
 
     def _get_player_total_demand(self, state) -> float:
-        # Extracts current total consumption demand to seed the UI preview calculations.
         if "resource_ledger" not in state.tables:
             return 0.0
             
@@ -78,8 +80,6 @@ class BudgetPanel:
         # --- EXPENSES SECTION ---
         Prims.header("EXPENSES")
         
-        # We calculate total discretionary expenses by summing all sliders locally 
-        # so the 'TOTAL' block stays perfectly synced during dragging without network delay.
         total_expense = sum(
             total_demand * self.K_BUDGET * self.M_SECTOR[label] * self.allocations[label]
             for label in self.M_SECTOR.keys()
@@ -87,9 +87,11 @@ class BudgetPanel:
         
         self._draw_total_bar("TOTAL", total_expense, GAMETHEME.colors.negative)
         
-        # Ensure iteration order respects UI design hierarchy, not dict key order
-        ui_order = ["INFRASTRUCTURE", "PROPAGANDA", "ENVIRONMENT", "HEALTH CARE", 
-                    "EDUCATION", "TELECOM", "GOVERNMENT", "IMF", "RESEARCH", "TOURISM"]
+        ui_order = [
+            "INFRASTRUCTURE", "PROPAGANDA", "ENVIRONMENT", "HEALTH CARE", 
+            "EDUCATION", "TELECOM", "GOVERNMENT", "FOREIGN AID (IMF)", 
+            "RESEARCH", "TOURISM", "SOCIAL SUPPORT"
+        ]
                     
         for label in ui_order:
             preview_cost = total_demand * self.K_BUDGET * self.M_SECTOR[label] * self.allocations[label]
@@ -184,7 +186,6 @@ class BudgetPanel:
         slider_w = 120.0
         slider_h = 14.0
         
-        # Invisible button creates a hit-box over custom rendering for input capture
         imgui.invisible_button(f"##drag_{label}", (slider_w, slider_h))
         if imgui.is_item_active():
             mouse_x = imgui.get_io().mouse_pos.x
