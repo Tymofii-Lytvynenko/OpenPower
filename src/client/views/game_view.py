@@ -80,6 +80,10 @@ class GameView(BaseImGuiView):
         self.window.background_color = (10, 10, 10, 255)
         self.viewport_ctrl.refresh_map_layer()
 
+    def on_game_update(self, delta_time: float):
+        # Feed real delta_time into ImGuiService so real_fps stays accurate.
+        self.imgui.update_time(delta_time)
+
     def on_selection_changed(self, region_id: int | None):
         self.selected_region_id = region_id
 
@@ -105,7 +109,7 @@ class GameView(BaseImGuiView):
         try:
             self.layout.render(
                 self.selected_region_id,
-                self.imgui.io.framerate,
+                self.imgui.real_fps,
                 self.nav
             )
         except Exception as e:

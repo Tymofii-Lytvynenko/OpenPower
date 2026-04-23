@@ -60,6 +60,7 @@ class ImGuiService:
         
         self._frame_started = False
         self._current_delta_time = 1.0 / 60.0
+        self._real_fps: float = 60.0  # Fast EMA for display
 
     def resize(self, width: int, height: int):
         """
@@ -73,11 +74,21 @@ class ImGuiService:
         """
         self.io.display_size = imgui.ImVec2(float(width), float(height))
 
+    @property
+    def real_fps(self) -> float:
+        """FPS with a very light EMA (3-4 frames) to smooth jitter while remaining sensitive to stutters."""
+        return self._real_fps
+
     def update_time(self, delta_time: float):
         """
         Called by the View's on_update to sync game speed with UI speed.
         """
-        self._current_delta_time = delta_time
+        self._current_delta_time = max(delta_time, 1e-6)
+        instant_fps = 1.0 / self._current_delta_time
+        
+        # Alpha = 0.3 (Filters out single-frame timing noise bigger is more sensitive)
+        alpha = 0.1
+        self._real_fps = (alpha * instant_fps) + ((1.0 - alpha) * self._real_fps)
 
     def new_frame(self):
         """Prepares the ImGui context using the actual stored delta time."""
