@@ -43,7 +43,8 @@ class GameLayout:
         
         # Economy Panel with callback to open Resources
         self.panel_manager.register("ECO", EconomyPanel(
-            toggle_resources_cb=lambda: self.panel_manager.toggle("RESOURCES")
+            toggle_resources_cb=lambda: self.panel_manager.toggle("RESOURCES"),
+            toggle_budget_cb=lambda: self.panel_manager.toggle("BUDGET")
         ), icons_fontawesome_6.ICON_FA_SACK_DOLLAR, GAMETHEME.colors.economy)
         
         self.panel_manager.register("DEM", DemographicsPanel(), icons_fontawesome_6.ICON_FA_PEOPLE_GROUP, GAMETHEME.colors.demographics)
