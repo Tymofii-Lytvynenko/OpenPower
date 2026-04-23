@@ -69,6 +69,9 @@ class BudgetSystem(ISystem):
             demand_lf = pl.DataFrame({"country_id": [], "total_demand": []}, schema={"country_id": pl.Utf8, "total_demand": pl.Float64}).lazy()
 
         lf = state.get_table("countries").lazy()
+        # Drop existing total_demand if present to avoid join clash
+        lf = lf.drop("total_demand", strict=False)
+        
         lf = lf.join(demand_lf, left_on="id", right_on="country_id", how="left").with_columns(
             pl.col("total_demand").fill_null(0.0)
         )

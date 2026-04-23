@@ -253,13 +253,13 @@ class DataLoader:
                                 }
                                 if isinstance(res_data, dict):
                                     row["domestic_production"] = float(res_data.get("production", 0))
-                                    row["legal"] = bool(res_data.get("legal", True))
+                                    row["is_legal"] = bool(res_data.get("is_legal", True))
                                     row["is_gov_controlled"] = bool(res_data.get("is_gov_controlled", False))
                                     row["tax_rate"] = float(res_data.get("tax_rate", 0.0))
                                 else:
                                     # Fallback for legacy simple format
                                     row["domestic_production"] = float(res_data)
-                                    row["legal"] = True
+                                    row["is_legal"] = True
                                     row["is_gov_controlled"] = False
                                     row["tax_rate"] = 0.0
                                 
