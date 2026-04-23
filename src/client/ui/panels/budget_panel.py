@@ -178,16 +178,16 @@ class BudgetPanel:
         revenue_tax = country_row.get("revenue_tax", 0.0)
         trade_income = country_row.get("trade_income", 0.0)
         tourism_income = country_row.get("tourism_income", 0.0)
-        imf_revenue = country_row.get("imf_revenue", 0.0)
-        total_income = country_row.get("total_annual_revenue", revenue_tax + trade_income + tourism_income + imf_revenue)
+        budget_imf_ratio = country_row.get("budget_imf_ratio", 0.0)
+        total_income = country_row.get("total_annual_revenue", revenue_tax + trade_income + tourism_income + budget_imf_ratio)
 
         Prims.header("INCOME", show_bg=False)
         self._draw_total_bar("TOTAL", total_income, GAMETHEME.colors.positive)
         self._draw_standard_row("PERSONAL INCOME TAX", revenue_tax, has_more=True)
         self._draw_standard_row("TRADE", trade_income, has_more=True)
         self._draw_standard_row("TOURISM", tourism_income)
-        if imf_revenue > 0:
-            self._draw_standard_row("IMF AID", imf_revenue)
+        if budget_imf_ratio > 0:
+            self._draw_standard_row("IMF AID", budget_imf_ratio)
         imgui.dummy((0, 5))
 
         # 2. SECTOR EXPENSES (Dynamic Preview)

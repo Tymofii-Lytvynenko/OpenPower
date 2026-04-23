@@ -122,7 +122,7 @@ class BudgetSystem(ISystem):
         # Ensure required columns for calculations exist with defaults
         required_cols = {
             "gdp": 0.0, "human_dev": 0.5, "personal_income_tax_rate": 0.2, 
-            "imf_revenue": 0.0, "trade_income": 0.0, "trade_expense": 0.0,
+            "budget_imf_ratio": 0.0, "trade_income": 0.0, "trade_expense": 0.0,
             "budget_edu_ratio": 0.5, "budget_health_ratio": 0.5, "budget_social_ratio": 0.5, "budget_env_ratio": 0.5, 
             "budget_infra_ratio": 0.5, "budget_telecom_ratio": 0.5, "budget_gov_ratio": 0.5,
             "budget_propaganda_ratio": 0.5, "budget_tourism_promo_ratio": 0.5,
@@ -153,7 +153,7 @@ class BudgetSystem(ISystem):
                 pl.col("revenue_tax") + 
                 pl.col("trade_income") + 
                 pl.col("tourism_income") + 
-                pl.col("imf_revenue")
+                pl.col("budget_imf_ratio")
             ).alias("total_annual_revenue")
         )
 
