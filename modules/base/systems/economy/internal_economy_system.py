@@ -4,7 +4,7 @@ from src.server.state import GameState
 from src.shared.events import EventRealSecond
 from src.shared.economy_meta import RESOURCE_MAPPING
 
-class EconomySystem(ISystem):
+class InternalEconomySystem(ISystem):
     """
     Handles internal macroeconomic simulation, including domestic production value 
     generation, base internal taxation, and calculating national demand (consumption).

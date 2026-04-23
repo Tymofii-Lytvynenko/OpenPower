@@ -11,7 +11,7 @@ class Engine:
     """
     
     def __init__(self):
-        # Map: "base.economy" -> EconomySystem instance
+        # Map: "base.economy" -> InternalEconomySystem instance
         self.systems_map: Dict[str, ISystem] = {}
         
         # The finalized, sorted list used in the loop

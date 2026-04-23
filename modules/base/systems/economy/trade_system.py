@@ -242,7 +242,7 @@ class TradeSystem(ISystem):
         # Update State
         state.update_table("stockpiles", market_df.select(["country_id", "game_resource_id", pl.col("new_stock_amount").alias("stock_amount")]))
         
-        # Create trade_network table for EconomySystem ledger
+        # Create trade_network table for InternalEconomySystem ledger
         # In a global pool model, we represent this as flows between countries and the "WORLD"
         exports_df = market_df.filter(pl.col("export_actual") > 0).select([
             pl.col("country_id").alias("exporter_id"),
@@ -265,4 +265,4 @@ class TradeSystem(ISystem):
             "production_penalty_pct", "total_tax", "gov_import_expense", "gov_tax_revenue", "is_storable", "decay_rate"
         ]]
         state.update_table("domestic_production", market_df.select(final_prod_cols))
-        state.update_table("countries", countries_df)
+        state.update_table("countries", countries_df)
