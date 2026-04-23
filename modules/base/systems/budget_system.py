@@ -1,6 +1,7 @@
 import polars as pl
 from src.engine.interfaces import ISystem
 from src.server.state import GameState
+from src.shared.actions import GameAction, ActionUpdateBudget
 from src.shared.events import EventRealSecond
 
 class BudgetSystem(ISystem):
@@ -40,6 +41,12 @@ class BudgetSystem(ISystem):
         return ["base.time", "base.economy", "base.trade"]
 
     def update(self, state: GameState, delta_time: float) -> None:
+        # 1. Handle Incoming Actions
+        for action in state.current_actions:
+            if isinstance(action, ActionUpdateBudget):
+                self._handle_update_budget(state, action)
+
+        # 2. Process Periodic Simulation
         real_sec_events = [e for e in state.events if isinstance(e, EventRealSecond)]
         
         for event in real_sec_events:
@@ -168,8 +175,29 @@ class BudgetSystem(ISystem):
             ).alias("money_reserves")
         )
 
-        lf = lf.drop(["_avg_social_spending", "_expected_spending", "revenue_tax", 
-                      "expense_social_and_infra", "expense_corruption", "expense_military_upkeep", 
-                      "expense_debt_interest", "total_demand"])
+        # We keep the intermediate columns for the UI to display breakdown
+        lf = lf.drop(["_avg_social_spending", "_expected_spending"])
 
         state.update_table("countries", lf.collect())
+
+    def _handle_update_budget(self, state: GameState, action: ActionUpdateBudget) -> None:
+        if "countries" not in state.tables:
+            return
+        
+        df = state.get_table("countries")
+        
+        # Apply new ratios to the specific country
+        updates = []
+        for col, val in action.allocations.items():
+            if col in self.M_SECTOR:
+                # Clamp value between 0.0 and 1.0
+                clamped_val = max(0.0, min(1.0, float(val)))
+                updates.append(
+                    pl.when(pl.col("id") == action.country_tag)
+                    .then(pl.lit(clamped_val))
+                    .otherwise(pl.col(col))
+                    .alias(col)
+                )
+        
+        if updates:
+            state.update_table("countries", df.with_columns(updates))

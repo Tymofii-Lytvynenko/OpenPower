@@ -92,3 +92,11 @@ class ActionOccupyRegion(GameAction):
     """
     region_id: int
     new_controller_tag: str
+
+@dataclass
+class ActionUpdateBudget(GameAction):
+    """
+    Updates budget allocation ratios for a country.
+    """
+    country_tag: str
+    allocations: dict # Map of column_name -> ratio (0.0 to 1.0)

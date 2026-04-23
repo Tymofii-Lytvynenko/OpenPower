@@ -89,7 +89,8 @@ class GameLayout:
             target_tag=target_tag, 
             is_own_country=is_own,
             selected_region_id=selected_region_id,
-            on_focus_request=self._on_focus_region
+            on_focus_request=self._on_focus_region,
+            net_client=self.net
         )
 
         # Render Context Menu
