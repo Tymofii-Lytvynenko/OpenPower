@@ -269,7 +269,9 @@ class EconomySystem(ISystem):
             exports = pl.DataFrame(schema={"country_id": pl.Utf8, "game_resource_id": pl.Utf8, "export_usd": pl.Float64})
             imports = pl.DataFrame(schema={"country_id": pl.Utf8, "game_resource_id": pl.Utf8, "import_usd": pl.Float64})
         
-        net_trade = exports.join(imports, on=["country_id", "game_resource_id"], how="full", coalesce=True).fill_null(0.0)
+        net_trade = exports.join(imports, on=["country_id", "game_resource_id"], how="full", coalesce=True).with_columns(
+            pl.col(["export_usd", "import_usd"]).fill_null(0.0)
+        )
         net_trade = net_trade.with_columns(
             (pl.col("export_usd") - pl.col("import_usd")).alias("trade_usd")
         )
@@ -324,7 +326,9 @@ class EconomySystem(ISystem):
         ).rename({"country_id": "id"})
 
         pop_data = self._get_population(state).rename({"country_id": "id"})
-        prod_val = prod_val.join(pop_data, on="id", how="left").fill_null(0)
+        prod_val = prod_val.join(pop_data, on="id", how="left").with_columns(
+            pl.col(["production_income", "gdp", "population"]).fill_null(0)
+        )
         prod_val = prod_val.with_columns(
             pl.when(pl.col("population") > 0)
             .then(pl.col("gdp") / pl.col("population"))
@@ -336,7 +340,9 @@ class EconomySystem(ISystem):
         if cols_to_drop:
             countries = countries.drop(cols_to_drop)
 
-        updated_countries = countries.join(prod_val.select(["id", "production_income", "gdp", "gdp_per_capita"]), on="id", how="left").fill_null(0)
+        updated_countries = countries.join(prod_val.select(["id", "production_income", "gdp", "gdp_per_capita"]), on="id", how="left").with_columns(
+            pl.col(["production_income", "gdp", "gdp_per_capita"]).fill_null(0)
+        )
         
         # Internal Taxation mechanic: The government budget collects a flat % of generated GDP.
         # Fallback to 0.20 if column is missing or null
@@ -363,7 +369,9 @@ class EconomySystem(ISystem):
         prod_table = prod_table.join(
             updated_countries.select(["id", "industrial_growth_rate"]),
             left_on="country_id", right_on="id", how="left"
-        ).fill_null({"industrial_growth_rate": 0.025})
+        ).with_columns(
+            pl.col("industrial_growth_rate").fill_null(0.025)
+        )
 
         prod_table = prod_table.with_columns(
             (pl.col("domestic_production") * (1.0 + (pl.col("industrial_growth_rate") * fraction))).alias("domestic_production")

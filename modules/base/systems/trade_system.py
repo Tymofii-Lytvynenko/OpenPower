@@ -106,8 +106,12 @@ class TradeSystem(ISystem):
         else:
             stock_lf = prod_lf.select(["country_id", "game_resource_id"]).with_columns(pl.lit(0.0).alias("stock_amount"))
 
-        market_lf = prod_lf.join(demand_lf, on=["country_id", "game_resource_id"], how="left").fill_null(0.0)
-        market_lf = market_lf.join(stock_lf, on=["country_id", "game_resource_id"], how="left").fill_null(0.0)
+        market_lf = prod_lf.join(demand_lf, on=["country_id", "game_resource_id"], how="left").with_columns(
+            pl.col("demand").fill_null(0.0)
+        )
+        market_lf = market_lf.join(stock_lf, on=["country_id", "game_resource_id"], how="left").with_columns(
+            pl.col("stock_amount").fill_null(0.0)
+        )
 
         # Ensure Meta columns exist
         market_cols = market_lf.collect_schema().names()
@@ -224,7 +228,9 @@ class TradeSystem(ISystem):
 
         # Drop old trade columns before join to avoid _right suffix clashes
         countries_lf = countries_lf.drop(["trade_income", "trade_expense"], strict=False)
-        countries_lf = countries_lf.join(budget_updates_lf, left_on="id", right_on="country_id", how="left").fill_null(0.0)
+        countries_lf = countries_lf.join(budget_updates_lf, left_on="id", right_on="country_id", how="left").with_columns(
+            pl.col(["trade_income", "trade_expense"]).fill_null(0.0)
+        )
         
         # We NO LONGER update money_reserves here. 
         # BudgetSystem handles the annual rates we just stored in countries_lf.

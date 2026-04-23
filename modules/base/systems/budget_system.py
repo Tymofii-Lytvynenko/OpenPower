@@ -62,7 +62,9 @@ class BudgetSystem(ISystem):
             demand_lf = pl.DataFrame({"country_id": [], "total_demand": []}, schema={"country_id": pl.Utf8, "total_demand": pl.Float64}).lazy()
 
         lf = state.get_table("countries").lazy()
-        lf = lf.join(demand_lf, left_on="id", right_on="country_id", how="left").fill_null(0.0)
+        lf = lf.join(demand_lf, left_on="id", right_on="country_id", how="left").with_columns(
+            pl.col("total_demand").fill_null(0.0)
+        )
 
         required_cols = {
             "gdp": 0.0, "human_dev": 0.5, "personal_income_tax_rate": 0.2, 

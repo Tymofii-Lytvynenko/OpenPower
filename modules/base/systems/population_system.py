@@ -53,7 +53,10 @@ class PopulationSystem(ISystem):
         pop_data = regions.join(
             countries.select(["id", "fertility_rate", "life_expectancy"]),
             left_on="owner", right_on="id", how="left"
-        ).fill_null({"fertility_rate": 2.7, "life_expectancy": 67.0})
+        ).with_columns([
+            pl.col("fertility_rate").fill_null(2.7),
+            pl.col("life_expectancy").fill_null(67.0)
+        ])
 
         # --- 2001 CONSTANTS ---
         FEMALE_RATIO = 0.25      # ~25% of pop are women of childbearing age
