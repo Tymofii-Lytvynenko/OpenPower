@@ -107,7 +107,7 @@ class TradeSystem(ISystem):
         market_lf = market_lf.join(stock_lf, on=["country_id", "game_resource_id"], how="left").fill_null(0.0)
 
         # Ensure Meta columns exist
-        market_cols = market_lf.columns
+        market_cols = market_lf.collect_schema().names()
         if "is_gov_controlled" not in market_cols:
             market_lf = market_lf.with_columns(pl.lit(False).alias("is_gov_controlled"))
         if "is_legal" not in market_cols:
@@ -206,16 +206,16 @@ class TradeSystem(ISystem):
         )
 
         budget_updates_lf = market_lf.group_by("country_id").agg(
-            (pl.col("gov_tax_revenue").sum() * fraction).alias("trade_income"),
-            (pl.col("gov_import_expense").sum() * fraction).alias("trade_expense")
+            pl.col("gov_tax_revenue").sum().alias("trade_income"),
+            pl.col("gov_import_expense").sum().alias("trade_expense")
         )
 
+        # Drop old trade columns before join to avoid _right suffix clashes
+        countries_lf = countries_lf.drop(["trade_income", "trade_expense"], strict=False)
         countries_lf = countries_lf.join(budget_updates_lf, left_on="id", right_on="country_id", how="left").fill_null(0.0)
-        if "money_reserves" not in countries_lf.columns:
-            countries_lf = countries_lf.with_columns(pl.lit(0.0).alias("money_reserves"))
-        countries_lf = countries_lf.with_columns(
-            (pl.col("money_reserves") + pl.col("trade_income") - pl.col("trade_expense")).alias("money_reserves")
-        )
+        
+        # We NO LONGER update money_reserves here. 
+        # BudgetSystem handles the annual rates we just stored in countries_lf.
 
         # EXECUTE
         market_df = market_lf.collect()
@@ -224,6 +224,22 @@ class TradeSystem(ISystem):
         # Update State
         state.update_table("stockpiles", market_df.select(["country_id", "game_resource_id", pl.col("new_stock_amount").alias("stock_amount")]))
         
+        # Create trade_network table for EconomySystem ledger
+        # In a global pool model, we represent this as flows between countries and the "WORLD"
+        exports_df = market_df.filter(pl.col("export_actual") > 0).select([
+            pl.col("country_id").alias("exporter_id"),
+            pl.lit("WORLD").alias("importer_id"),
+            pl.col("game_resource_id"),
+            pl.col("export_actual").alias("trade_value_usd")
+        ])
+        imports_df = market_df.filter(pl.col("import_actual") > 0).select([
+            pl.lit("WORLD").alias("exporter_id"),
+            pl.col("country_id").alias("importer_id"),
+            pl.col("game_resource_id"),
+            pl.col("import_actual").alias("trade_value_usd")
+        ])
+        state.update_table("trade_network", pl.concat([exports_df, imports_df]))
+
         final_prod_cols = [c for c in market_df.columns if c not in [
             "demand", "stock_amount", "local_supply", "export_desired", "import_desired", "priority", 
             "affordable_import", "global_supply", "global_demand", "imp_ratio", "exp_ratio", 
@@ -231,4 +247,4 @@ class TradeSystem(ISystem):
             "production_penalty_pct", "total_tax", "gov_import_expense", "gov_tax_revenue", "is_storable", "decay_rate"
         ]]
         state.update_table("domestic_production", market_df.select(final_prod_cols))
-        state.update_table("countries", countries_df.drop(["trade_income", "trade_expense"]))
+        state.update_table("countries", countries_df)
