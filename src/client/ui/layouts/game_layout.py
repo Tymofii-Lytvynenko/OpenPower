@@ -21,6 +21,7 @@ from src.client.ui.panels.demographics_panel import DemographicsPanel
 from src.client.ui.panels.region_inspector import RegionInspectorPanel
 from src.client.ui.panels.data_insp_panel import DataInspectorPanel
 from src.client.ui.panels.resources_panel import ResourcesPanel
+from src.client.ui.panels.budget_panel import BudgetPanel
 
 class GameLayout:
     """
@@ -51,6 +52,7 @@ class GameLayout:
         
         # Resources Panel (no icon = won't appear in toggle bar)
         self.panel_manager.register("RESOURCES", ResourcesPanel())
+        self.panel_manager.register("BUDGET", BudgetPanel())
 
         # 3. Compose HUD Components
         self.central_bar = CentralBar()
