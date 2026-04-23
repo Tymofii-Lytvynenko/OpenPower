@@ -6,7 +6,7 @@ Previous iterations of this generator attempted to calculate physical production
 (e.g., tons, Megawatts) and strict Macroeconomic Consumption (C = P + I - E). 
 
 Those approaches were archived in favor of a "Top-Down GDP Profile" simulation (similar 
-to classic Grand Strategy engines like SuperPower 2). Macroeconomic datasets (WIOD/BACI) 
+to classic Grand Strategy engines). Macroeconomic datasets (WIOD/BACI) 
 contain fundamental incompatibilities that prevent 1:1 physical or absolute monetary extraction:
 1. The Aggregation Illusion: WIOD groups high-value goods (meat, dairy) and low-value 
    bulk goods (cereals) into a single "Agriculture" sector, making physical extraction impossible.
