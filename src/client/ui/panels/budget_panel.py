@@ -209,10 +209,10 @@ class BudgetPanel:
 
         # 3. Dynamic bright fill
         if alloc_pct < self.REQUIREMENT_THRESHOLD:
-            # Deficit: bright red from start to current slider position
+            # Deficit: bright red grows from center to current slider position
             if alloc_pct > 0:
                 draw_list.add_rect_filled(
-                    p, (alloc_x, p.y + slider_h), 
+                    (alloc_x, p.y), (mid_x, p.y + slider_h), 
                     imgui.get_color_u32((0.8, 0.15, 0.15, 1.0))
                 )
         elif alloc_pct > self.REQUIREMENT_THRESHOLD:
@@ -220,7 +220,7 @@ class BudgetPanel:
             draw_list.add_rect_filled(
                 (mid_x, p.y), (alloc_x, p.y + slider_h), 
                 imgui.get_color_u32((0.2, 0.7, 0.2, 1.0))
-            )
+                )
 
         # 4. Central marker (anchor)
         draw_list.add_line(
