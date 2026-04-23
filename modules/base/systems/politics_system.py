@@ -4,6 +4,9 @@ from src.engine.interfaces import ISystem
 from src.server.state import GameState
 
 class PoliticsSystem(ISystem):
+    def __init__(self):
+        self._missing_columns = set()
+
     @property
     def id(self) -> str:
         return "base.politics"
@@ -21,12 +24,20 @@ class PoliticsSystem(ISystem):
 
         countries = state.get_table("countries")
         
-        # Logic: 
-        # Expected Stability = (Approval * 0.7) + (HumanDev * 0.3) - Corruption
-        # Current Stability moves towards Expected Stability by 1% per week.
+        # 1. Ensure columns exist with fallbacks
+        required = {
+            "gvt_approval": 50.0,
+            "human_dev": 0.5,
+            "gvt_corruption": 0.1,
+            "gvt_stability": 50.0
+        }
+        for col, default in required.items():
+            if col not in countries.columns:
+                if col not in self._missing_columns:
+                    print(f"[{self.id}] Column '{col}' not found in 'countries'. Defaulting to {default}.")
+                    self._missing_columns.add(col)
+                countries = countries.with_columns(pl.lit(default).alias(col))
 
-        # Note: We use .fill_null(0) generously because map data is often incomplete during dev
-        
         # 1. Calculate Target
         countries = countries.with_columns(
             (

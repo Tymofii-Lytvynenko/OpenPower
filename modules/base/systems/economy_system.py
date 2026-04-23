@@ -11,6 +11,9 @@ class EconomySystem(ISystem):
     Now features Dynamic Wealth Anchoring, Propensity to Consume, and Income Elasticity.
     """
     
+    def __init__(self):
+        self._missing_columns = set()
+
     @property
     def id(self) -> str:
         return "base.economy"
@@ -112,6 +115,16 @@ class EconomySystem(ISystem):
 
     def _get_population(self, state: GameState) -> pl.DataFrame:
         regions = state.get_table("regions")
+        
+        # Ensure core population columns exist
+        required = ["pop_14", "pop_15_64", "pop_65"]
+        for col in required:
+            if col not in regions.columns:
+                if col not in self._missing_columns:
+                    print(f"[{self.id}] Column '{col}' not found in 'regions'. Defaulting to 0.")
+                    self._missing_columns.add(col)
+                regions = regions.with_columns(pl.lit(0).alias(col))
+
         return regions.group_by("owner").agg(
             (pl.col("pop_14").fill_null(0) + pl.col("pop_15_64").fill_null(0) + pl.col("pop_65").fill_null(0)).sum().alias("population")
         ).rename({"owner": "country_id"})
@@ -125,6 +138,19 @@ class EconomySystem(ISystem):
         countries = state.get_table("countries")
         data = self._get_population(state)
         
+        required_metrics = {
+            "poverty_rate": 0.0,
+            "human_dev": 0.5,
+            "gdp_per_capita": 1000.0
+        }
+        
+        for col, default in required_metrics.items():
+            if col not in countries.columns:
+                if col not in self._missing_columns:
+                    print(f"[{self.id}] Column '{col}' not found in 'countries'. Defaulting to {default}.")
+                    self._missing_columns.add(col)
+                countries = countries.with_columns(pl.lit(default).alias(col))
+
         metrics_data = countries.select(
             pl.col("id").alias("country_id"),
             pl.col("poverty_rate").fill_null(0.0),
@@ -315,6 +341,9 @@ class EconomySystem(ISystem):
         # Internal Taxation mechanic: The government budget collects a flat % of generated GDP.
         # Fallback to 0.20 if column is missing or null
         if "internal_tax_rate" not in updated_countries.columns:
+            if "internal_tax_rate" not in self._missing_columns:
+                print(f"[{self.id}] Column 'internal_tax_rate' not found in 'countries'. Defaulting to 0.20.")
+                self._missing_columns.add("internal_tax_rate")
             updated_countries = updated_countries.with_columns(pl.lit(0.20).alias("internal_tax_rate"))
             
         updated_countries = updated_countries.with_columns(
@@ -325,6 +354,12 @@ class EconomySystem(ISystem):
 
         # Base organic industrial growth over time
         # Join with countries to get per-country growth rate
+        if "industrial_growth_rate" not in updated_countries.columns:
+            if "industrial_growth_rate" not in self._missing_columns:
+                print(f"[{self.id}] Column 'industrial_growth_rate' not found in 'countries'. Defaulting to 0.025.")
+                self._missing_columns.add("industrial_growth_rate")
+            updated_countries = updated_countries.with_columns(pl.lit(0.025).alias("industrial_growth_rate"))
+
         prod_table = prod_table.join(
             updated_countries.select(["id", "industrial_growth_rate"]),
             left_on="country_id", right_on="id", how="left"

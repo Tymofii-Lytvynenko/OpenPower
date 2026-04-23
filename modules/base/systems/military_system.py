@@ -4,6 +4,9 @@ from src.server.state import GameState
 from src.shared.actions import ActionBuildUnit
 
 class MilitarySystem(ISystem):
+    def __init__(self):
+        self._missing_columns = set()
+
     @property
     def id(self) -> str:
         return "base.military"
@@ -30,7 +33,16 @@ class MilitarySystem(ISystem):
                 
                 # We assume 'military_count' column exists. If not, we create/fill it.
                 if "military_count" not in countries.columns:
+                     if "military_count" not in self._missing_columns:
+                         print(f"[{self.id}] Column 'military_count' not found in 'countries'. Defaulting to 0.")
+                         self._missing_columns.add("military_count")
                      countries = countries.with_columns(pl.lit(0).alias("military_count"))
+                
+                if "money_reserves" not in countries.columns:
+                     if "money_reserves" not in self._missing_columns:
+                         print(f"[{self.id}] Column 'money_reserves' not found in 'countries'. Defaulting to 0.")
+                         self._missing_columns.add("money_reserves")
+                     countries = countries.with_columns(pl.lit(0.0).alias("money_reserves"))
 
                 # Apply update
                 countries = countries.with_columns(

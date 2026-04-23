@@ -8,6 +8,9 @@ class AISystem(ISystem):
     """
     Basic AI that performs actions for non-player countries.
     """
+    def __init__(self):
+        self._missing_columns = set()
+
     @property
     def id(self) -> str:
         return "base.ai"
@@ -24,6 +27,13 @@ class AISystem(ISystem):
 
         countries = state.get_table("countries")
         
+        # Ensure money_reserves exists
+        if "money_reserves" not in countries.columns:
+            if "money_reserves" not in self._missing_columns:
+                print(f"[{self.id}] Column 'money_reserves' not found in 'countries'. Defaulting to 0.")
+                self._missing_columns.add("money_reserves")
+            countries = countries.with_columns(pl.lit(0.0).alias("money_reserves"))
+
         # Filter: Only AI countries (assuming we have a 'is_player' flag or check external map)
         # For MVP, let's assume any country with > 1B money is rich enough to build armies
         

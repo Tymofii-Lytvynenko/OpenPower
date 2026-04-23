@@ -28,6 +28,9 @@ class BudgetSystem(ISystem):
         "budget_tourism_promo_ratio": 0.01
     }
 
+    def __init__(self):
+        self._missing_columns = set()
+
     @property
     def id(self) -> str:
         return "base.budget"
@@ -75,6 +78,9 @@ class BudgetSystem(ISystem):
         existing_cols = lf.collect_schema().names()
         for col, default_val in required_cols.items():
             if col not in existing_cols:
+                if col not in self._missing_columns:
+                    print(f"[{self.id}] Column '{col}' not found in 'countries'. Defaulting to {default_val}.")
+                    self._missing_columns.add(col)
                 lf = lf.with_columns(pl.lit(default_val).alias(col))
 
         lf = lf.with_columns(

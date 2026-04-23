@@ -4,6 +4,9 @@ from src.server.state import GameState
 from src.shared.events import EventRealSecond
 
 class PopulationSystem(ISystem):
+    def __init__(self):
+        self._missing_columns = set()
+
     @property
     def id(self) -> str:
         return "base.population"
@@ -25,10 +28,28 @@ class PopulationSystem(ISystem):
 
     def _apply_tfr_growth(self, state: GameState, days_passed: float):
         regions = state.get_table("regions")
+        
+        # Ensure core population columns exist in regions
+        required_regions = {"pop_14": 0, "pop_15_64": 0, "pop_65": 0}
+        for col, default in required_regions.items():
+            if col not in regions.columns:
+                if col not in self._missing_columns:
+                    print(f"[{self.id}] Column '{col}' not found in 'regions'. Defaulting to {default}.")
+                    self._missing_columns.add(col)
+                regions = regions.with_columns(pl.lit(default).alias(col))
+
         countries = state.get_table("countries")
         
         # Merge regions with country demographics
         # We need fertility_rate and life_expectancy
+        required = {"fertility_rate": 2.7, "life_expectancy": 67.0}
+        for col, default in required.items():
+            if col not in countries.columns:
+                if col not in self._missing_columns:
+                    print(f"[{self.id}] Column '{col}' not found in 'countries'. Defaulting to {default}.")
+                    self._missing_columns.add(col)
+                countries = countries.with_columns(pl.lit(default).alias(col))
+
         pop_data = regions.join(
             countries.select(["id", "fertility_rate", "life_expectancy"]),
             left_on="owner", right_on="id", how="left"

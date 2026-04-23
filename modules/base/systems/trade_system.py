@@ -70,6 +70,9 @@ class TradeSystem(ISystem):
         "construction_materials": {"is_storable": True, "decay_rate": 0.05},
     }
 
+    def __init__(self):
+        self._missing_columns = set()
+
     @property
     def id(self) -> str:
         return "base.trade"
@@ -109,10 +112,19 @@ class TradeSystem(ISystem):
         # Ensure Meta columns exist
         market_cols = market_lf.collect_schema().names()
         if "is_gov_controlled" not in market_cols:
+            if "is_gov_controlled" not in self._missing_columns:
+                print(f"[{self.id}] Column 'is_gov_controlled' not found in 'domestic_production'. Defaulting to False.")
+                self._missing_columns.add("is_gov_controlled")
             market_lf = market_lf.with_columns(pl.lit(False).alias("is_gov_controlled"))
         if "is_legal" not in market_cols:
+            if "is_legal" not in self._missing_columns:
+                print(f"[{self.id}] Column 'is_legal' not found in 'domestic_production'. Defaulting to True.")
+                self._missing_columns.add("is_legal")
             market_lf = market_lf.with_columns(pl.lit(True).alias("is_legal"))
         if "tax_rate" not in market_cols:
+            if "tax_rate" not in self._missing_columns:
+                print(f"[{self.id}] Column 'tax_rate' not found in 'domestic_production'. Defaulting to 0.05.")
+                self._missing_columns.add("tax_rate")
             market_lf = market_lf.with_columns(pl.lit(0.05).alias("tax_rate"))
 
         # Add Physical Properties

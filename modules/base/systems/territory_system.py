@@ -4,6 +4,9 @@ from src.server.state import GameState
 from src.shared.actions import ActionAnnexRegion, ActionOccupyRegion, ActionSetRegionOwner
 
 class TerritorySystem(ISystem):
+    def __init__(self):
+        self._missing_columns = set()
+
     @property
     def id(self) -> str:
         return "base.territory"
@@ -28,6 +31,9 @@ class TerritorySystem(ISystem):
         
         # Ensure controller column exists
         if "controller" not in regions.columns:
+            if "controller" not in self._missing_columns:
+                print(f"[{self.id}] Column 'controller' not found in 'regions'. Defaulting to values from 'owner'.")
+                self._missing_columns.add("controller")
             regions = regions.with_columns(pl.col("owner").alias("controller"))
 
         for action in relevant_actions:
