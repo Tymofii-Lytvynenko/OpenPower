@@ -313,15 +313,24 @@ class EconomySystem(ISystem):
         updated_countries = countries.join(prod_val.select(["id", "production_income", "gdp", "gdp_per_capita"]), on="id", how="left").fill_null(0)
         
         # Internal Taxation mechanic: The government budget collects a flat % of generated GDP.
-        internal_tax_rate = 0.20 # 20% flat baseline tax for state budget
+        # Fallback to 0.20 if column is missing or null
+        if "internal_tax_rate" not in updated_countries.columns:
+            updated_countries = updated_countries.with_columns(pl.lit(0.20).alias("internal_tax_rate"))
+            
         updated_countries = updated_countries.with_columns(
-            (pl.col("money_reserves") + (pl.col("production_income") * internal_tax_rate)).alias("money_reserves")
+            (pl.col("money_reserves") + (pl.col("production_income") * pl.col("internal_tax_rate").fill_null(0.20))).alias("money_reserves")
         )
 
         state.update_table("countries", updated_countries.drop(["production_income"]))
 
         # Base organic industrial growth over time
+        # Join with countries to get per-country growth rate
+        prod_table = prod_table.join(
+            updated_countries.select(["id", "industrial_growth_rate"]),
+            left_on="country_id", right_on="id", how="left"
+        ).fill_null({"industrial_growth_rate": 0.025})
+
         prod_table = prod_table.with_columns(
-            (pl.col("domestic_production") * (1.0 + (0.025 * fraction))).alias("domestic_production")
+            (pl.col("domestic_production") * (1.0 + (pl.col("industrial_growth_rate") * fraction))).alias("domestic_production")
         )
-        state.update_table("domestic_production", prod_table)
+        state.update_table("domestic_production", prod_table.drop("industrial_growth_rate"))
