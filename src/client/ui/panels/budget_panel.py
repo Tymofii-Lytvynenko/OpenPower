@@ -9,6 +9,7 @@ class BudgetPanel:
     """
     Detailed National Budget Panel.
     Calculates UI previews of sector expenses dynamically based on global economic demand.
+    Sliders are anchored at 50% (0.5), representing the neutral baseline.
     """
     def __init__(self):
         self.K_BUDGET = 0.15
@@ -27,23 +28,11 @@ class BudgetPanel:
             "SOCIAL SUPPORT": 0.15
         }
         
+        # All sectors start at exactly 50% (neutral point)
         self.allocations = {k: 0.50 for k in self.M_SECTOR.keys()}
-        self.requirements = {
-            "INFRASTRUCTURE": 0.40,
-            "PROPAGANDA": 0.35,
-            "ENVIRONMENT": 0.40,
-            "HEALTH CARE": 0.40,
-            "EDUCATION": 0.40,
-            "TELECOM": 0.40,
-            "GOVERNMENT": 0.38,
-            "FOREIGN AID (IMF)": 0.15,
-            "RESEARCH": 0.40,
-            "TOURISM": 0.40,
-            "SOCIAL SUPPORT": 0.40
-        }
+        self.REQUIREMENT_THRESHOLD = 0.50
 
     def render(self, state, **kwargs) -> bool:
-        # Increased panel height slightly to accommodate the new sector
         with WindowManager.window("BUDGET", x=300, y=100, w=480, h=780) as is_open:
             if not is_open: 
                 return False
@@ -54,7 +43,6 @@ class BudgetPanel:
         if "resource_ledger" not in state.tables:
             return 0.0
             
-        # FIXME: 'UKR' is hardcoded for MVP. Query the actual active session context tag here.
         player_id = state.globals.get("player_country_id", "UKR")
         ledger = state.get_table("resource_ledger")
         
@@ -145,7 +133,7 @@ class BudgetPanel:
             imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.bg_input)
             
             if imgui.button(f"more##{label}"):
-                pass # TODO: Implement state transition to specific breakdown sub-panel
+                pass 
                 
             imgui.pop_style_color()
             imgui.pop_style_var()
@@ -169,6 +157,10 @@ class BudgetPanel:
             p, (p.x + avail_w, p.y + h), 
             imgui.get_color_u32((0.12, 0.12, 0.12, 1.0))
         )
+        draw_list.add_rect(
+            p, (p.x + avail_w, p.y + h), 
+            imgui.get_color_u32((0.0, 0.0, 0.0, 1.0))
+        )
         imgui.dummy((avail_w, h))
 
         val_str = self._fmt_money(value)
@@ -179,52 +171,80 @@ class BudgetPanel:
         imgui.text(label)
         imgui.same_line(180)
 
-        req_pct = self.requirements.get(label, 0.2)
         alloc_pct = self.allocations.get(label, 0.5)
 
         p = imgui.get_cursor_screen_pos()
         slider_w = 120.0
         slider_h = 14.0
         
+        # Input handling with snapping anchor
         imgui.invisible_button(f"##drag_{label}", (slider_w, slider_h))
         if imgui.is_item_active():
             mouse_x = imgui.get_io().mouse_pos.x
             new_pct = max(0.0, min((mouse_x - p.x) / slider_w, 1.0))
+            
+            # Magnetic anchor in the middle: if deviation is less than 2%, snap to 0.5
+            if 0.48 <= new_pct <= 0.52:
+                new_pct = self.REQUIREMENT_THRESHOLD
+                
             self.allocations[label] = new_pct
             alloc_pct = new_pct
 
         draw_list = imgui.get_window_draw_list()
         
+        mid_x = p.x + (slider_w * self.REQUIREMENT_THRESHOLD)
+        alloc_x = p.x + (slider_w * alloc_pct)
+
+        # 1. Permanent darkened background for the left half (Dark Red)
         draw_list.add_rect_filled(
+            p, (mid_x, p.y + slider_h), 
+            imgui.get_color_u32((0.2, 0.05, 0.05, 1.0))
+        )
+        
+        # 2. Permanent darkened background for the right half (Dark Green)
+        draw_list.add_rect_filled(
+            (mid_x, p.y), (p.x + slider_w, p.y + slider_h), 
+            imgui.get_color_u32((0.05, 0.15, 0.05, 1.0))
+        )
+
+        # 3. Dynamic bright fill
+        if alloc_pct < self.REQUIREMENT_THRESHOLD:
+            # Deficit: bright red from start to current slider position
+            if alloc_pct > 0:
+                draw_list.add_rect_filled(
+                    p, (alloc_x, p.y + slider_h), 
+                    imgui.get_color_u32((0.8, 0.15, 0.15, 1.0))
+                )
+        elif alloc_pct > self.REQUIREMENT_THRESHOLD:
+            # Surplus: green bar grows from the center to the right
+            draw_list.add_rect_filled(
+                (mid_x, p.y), (alloc_x, p.y + slider_h), 
+                imgui.get_color_u32((0.2, 0.7, 0.2, 1.0))
+            )
+
+        # 4. Central marker (anchor)
+        draw_list.add_line(
+            (mid_x, p.y - 3), (mid_x, p.y + slider_h + 3),
+            imgui.get_color_u32((0.4, 0.4, 0.4, 1.0)), 2.0
+        )
+
+        # 5. Black border around the slider
+        draw_list.add_rect(
             p, (p.x + slider_w, p.y + slider_h), 
-            imgui.get_color_u32((0.15, 0.15, 0.15, 1.0)), 2.0
+            imgui.get_color_u32((0.0, 0.0, 0.0, 1.0))
         )
 
-        red_w = slider_w * req_pct
+        # 6. Slider Thumb
         draw_list.add_rect_filled(
-            p, (p.x + red_w, p.y + slider_h), 
-            imgui.get_color_u32((0.6, 0.2, 0.2, 1.0)), 2.0
-        )
-
-        if alloc_pct > req_pct:
-            alloc_w = slider_w * alloc_pct
-            draw_list.add_rect_filled(
-                (p.x + red_w, p.y), (p.x + alloc_w, p.y + slider_h), 
-                imgui.get_color_u32((0.3, 0.7, 0.4, 1.0)), 2.0
-            )
-        elif alloc_pct > 0:
-            alloc_w = slider_w * alloc_pct
-            draw_list.add_rect_filled(
-                p, (p.x + alloc_w, p.y + slider_h), 
-                imgui.get_color_u32((0.4, 0.2, 0.2, 1.0)), 2.0
-            )
-
-        thumb_x = p.x + (slider_w * alloc_pct)
-        draw_list.add_rect_filled(
-            (thumb_x - 1, p.y - 1), (thumb_x + 1, p.y + slider_h + 1), 
+            (alloc_x - 2, p.y - 2), (alloc_x + 2, p.y + slider_h + 2), 
             imgui.get_color_u32((0.9, 0.9, 0.9, 1.0))
         )
+        draw_list.add_rect(
+            (alloc_x - 2, p.y - 2), (alloc_x + 2, p.y + slider_h + 2), 
+            imgui.get_color_u32((0.0, 0.0, 0.0, 1.0))
+        )
 
+        # Values on the right
         imgui.same_line()
         val_str = self._fmt_short_money(value)
         Prims.right_align_text(val_str, GAMETHEME.colors.text_main)
