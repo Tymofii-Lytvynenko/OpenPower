@@ -1,6 +1,5 @@
 {
     "recommendations": [
-        "repreng.csv",
         "tamasfe.even-better-toml",
         "dtoplak.vscode-glsllint",
         "moshfeu.diff-merge",
