@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Modules (Content & Gameplay)
 
 This is the **Game Layer**. Everything that makes "OpenPower" a specific game (and not just a generic engine) lives here.

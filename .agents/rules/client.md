@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Client Layer (Frontend)
 
 The Client is responsible for the **Presentation** and **User Interaction** layers of the application. It acts as the "Player's Terminal."

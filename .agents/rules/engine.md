@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Engine Layer (Simulation Runner)
 
 The Engine is the generic machinery that orchestrates the execution of the simulation. It is the "CPU" of the game world.

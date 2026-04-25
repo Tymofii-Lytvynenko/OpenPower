@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Shared Layer (Data Contracts & Constants)
 
 The Shared layer is the **Passive Data Dictionary** of the project. It contains only definitions, types, and constants used to communicate between layers.

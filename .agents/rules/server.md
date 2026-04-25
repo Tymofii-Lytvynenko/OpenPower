@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Server Layer (State & Persistence)
 
 The Server is the "Source of Truth" and handles the lifecycle of the data. It acts as the Host (even in single-player).

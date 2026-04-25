@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # OpenPower MVP Roadmap
 
 This document tracks the progress of the Minimum Viable Product (MVP) features for the OpenPower engine.
@@ -31,8 +35,3 @@ This document tracks the progress of the Minimum Viable Product (MVP) features f
     - [ ] **Advanced Economy:** Global trade network simulation and market prices.
     - [ ] **Headless Server:** Ability to run the simulation process without an OpenGL context.
     - [ ] **Military:** Unit spawning, movement, and combat resolution.
-
-## 🎯 Target Milestones
-1.  **Milestone 1 (Stable Core):** All systems functional in single-player with basic AI.
-2.  **Milestone 2 (World Content):** Full world map (195+ countries, 3000+ regions) with balanced starting data.
-3.  **Milestone 3 (Multiplayer Beta):** Network bridge for multi-client synchronization.

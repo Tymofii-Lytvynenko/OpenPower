@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Core Layer (Game Framework & SDK)
 
 The **Core** layer contains the functional building blocks and standardized algorithms used to build the game logic. Unlike `shared` (which is for passive data), `core` contains **active logic** that is safe to share between the Engine and Modules.
