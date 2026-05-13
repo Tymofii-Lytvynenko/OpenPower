@@ -1,69 +1,76 @@
 # OpenPower Engine
 
-> **🏗️ Status: Alpha (In Active Development)**
-> OpenPower is currently in the **prototype phase**. Core systems are functional, but networking and advanced AI are still being integrated.
+> **Status: Alpha / Prototype**
+> Core simulation, loading, IPC, map rendering, and base gameplay systems are functional. AI, diplomacy, headless mode, and multiplayer are still in progress.
 
-**OpenPower** is a high-performance, open-source Grand Strategy Game (GSG) engine built in Python. It leverages **Data-Oriented Design** and **Multiprocessing** to simulate deep, complex worlds with thousands of actors without sacrificing UI responsiveness.
+**OpenPower** is an open-source grand strategy game engine built in Python. It uses a data-oriented architecture with multiprocessing so the simulation can run in a background process while the UI stays responsive.
 
-## 🚀 Key Features
+## What Works Today
 
-*   **Multiprocess Simulation:** The simulation engine runs on a dedicated background CPU core, completely isolated from the UI rendering thread. This ensures zero frame drops during heavy calculations.
-*   **Zero-Copy State Management:** Uses **Polars (Rust-backed DataFrames)** and **Arrow IPC** to transfer authoritative game state between processes with sub-millisecond overhead.
-*   **Advanced Map Rendering:**
-    *   **GPU-Accelerated:** Custom shaders for rendering thousands of regions with dynamic political and economic overlays.
-    *   **Color-as-ID Pipeline:** High-speed map interaction using OpenCV and GPU picking.
-*   **Modular ECS-Lite:** Systems (Economy, Politics, AI) are fully modular, dependency-aware, and support topological execution ordering.
-*   **Professional UI:** Integration of **Dear ImGui** for a dockable, high-density dashboard experience.
+- **Multiprocess simulation:** The main UI runs separately from the simulation process.
+- **IPC state transfer:** Game state is transferred with Arrow IPC / Polars data frames.
+- **Dynamic module loading:** The engine loads gameplay content from `modules/` through mod manifests and registration entry points.
+- **Base world loading:** Regions, countries, and other world data are loaded from TSV and TOML files.
+- **Map rendering:** The client includes GPU-backed map rendering, political overlays, and region picking.
+- **Core gameplay systems:** Time, population, politics, trade, internal economy, and budget systems are present.
 
-## 📂 Project Structure
+## In Progress
+
+- **AI:** Present as a stub; strategic decision-making is not implemented yet.
+- **Military:** Build and manpower scaffolding exists, but combat and movement are not implemented.
+- **Diplomacy:** Treaty, war, and peace systems are not implemented yet.
+- **Headless server:** The simulation still expects the current client/server flow.
+- **Mod data chaining:** `mods.json` integration is still stubbed in config.
+
+## Project Structure
 
 ```text
 OpenPower/
-├── modules/                # Game Content & Mods
-│   └── base/               # The core game module
-│       ├── data/           # TSV/TOML/Parquet data files
-│       └── systems/        # Gameplay logic (Economy, Population, etc.)
-├── user_data/              # Local saves, logs, and user configs
+├── modules/              # Game content and mods
+│   └── base/             # Core game module
+│       ├── data/         # TSV/TOML/Parquet data files
+│       └── systems/      # Gameplay systems
+├── user_data/            # Local saves, logs, and user configs
 ├── src/
-│   ├── client/             # Frontend (Arcade, Shaders, ImGui)
-│   │   ├── client_session.py # Proxy that talks to the background server
-│   │   ├── renderers/      # GPU-specific map & flag rendering
-│   │   ├── ui/             # Panel managers & Composers
-│   │   └── window.py       # Main Application Window
-│   ├── engine/             # The "CPU" of the game
-│   │   ├── mod_manager.py  # Dynamically loads systems from modules/
-│   │   └── simulator.py    # Executes the System Dependency Graph
-│   ├── server/             # Backend (State & Persistence)
-│   │   ├── server_process.py # The background process entry point
-│   │   ├── session.py      # Simulation lifecycle host
-│   │   └── state.py        # Central Polars state container
-│   └── shared/             # Common contracts (Actions, Events, Metadata)
-└── main.py                 # Application Entry Point
+│   ├── client/           # Frontend, rendering, and UI
+│   ├── engine/           # Simulation orchestration
+│   ├── server/           # State, persistence, and session lifecycle
+│   └── shared/           # Shared contracts, config, actions, and events
+└── main.py               # Application entry point
 ```
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-*   **Logic:** Python 3.10+
-*   **Data:** [Polars](https://pola.rs/) (Arrow-based DataFrames)
-*   **Graphics:** [Arcade](https://api.arcade.academy/) (OpenGL 3.3+)
-*   **Interface:** [ImGui Bundle](https://github.com/pthom/imgui_bundle) (Dear ImGui)
-*   **Serialization:** [Orjson](https://github.com/ijl/orjson) & [RToml](https://github.com/samuelcolvin/rtoml)
+- **Logic:** Python 3.10+
+- **Data:** Polars
+- **Graphics:** Arcade / OpenGL
+- **Interface:** Dear ImGui via imgui_bundle
+- **Serialization:** Orjson and RToml
 
+## Getting Started
 
-## 🚀 Getting Started
+### Requirements
 
-### 1. Requirements
-Ensure you have Python 3.10 or newer installed.
+Install Python 3.10 or newer.
 
-### 2. Installation
+### Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Run the Engine
+### Run
+
 ```bash
 python main.py
 ```
 
-## 📜 License
-This project is licensed under the **PolyForm Noncommercial License 1.0.0** - see [LICENSE.md](LICENSE.md) for details.
+## Roadmap Snapshot
+
+1. **Stable core:** Mostly in place. Simulation, loading, rendering, and the economy stack work.
+2. **World content:** The base world dataset exists, but balance and coverage still need verification.
+3. **Multiplayer beta:** Not implemented yet.
+
+## License
+
+This project is licensed under the **PolyForm Noncommercial License 1.0.0**. See [LICENSE.md](LICENSE.md) for details.
