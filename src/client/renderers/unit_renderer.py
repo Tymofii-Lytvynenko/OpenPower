@@ -9,9 +9,14 @@ from src.client.controllers.camera_controller import CameraController
 from src.client.renderers.flag_renderer import FlagRenderer, FlagTexture
 from src.client.renderers.unit_projection import ProjectedUnit, RegionAnchor, UnitProjectionService
 from src.client.ui.core.theme import GAMETHEME
+from src.shared.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 
 if TYPE_CHECKING:
     from src.server.state import GameState
+
+
+UNIT_DRAG_PREVIEW_WIDTH = 22.0
+UNIT_DRAG_PREVIEW_HEIGHT = 15.0
 
 
 @dataclass(frozen=True)
@@ -38,6 +43,7 @@ class UnitRenderer:
         globe_radius: float,
     ):
         self._projection = UnitProjectionService(camera, map_width, map_height, globe_radius)
+        self._geo_projection = EquirectangularProjection(map_width, map_height)
         self._flags = FlagRenderer()
         self._region_lookup: dict[int, RegionAnchor] = {}
         self._region_count = -1
@@ -123,29 +129,49 @@ class UnitRenderer:
         if regions.height == self._region_count and self._region_lookup:
             return
 
-        required = {"id", "center_x", "center_y"}
+        required = {"id"}
         if regions.is_empty() or not required.issubset(set(regions.columns)):
             self._region_lookup = {}
             self._region_count = -1
             return
 
         owner_expr = "owner" if "owner" in regions.columns else None
-        columns = ["id", "center_x", "center_y"]
+        columns = ["id"]
+        if {"latitude", "longitude"}.issubset(set(regions.columns)):
+            columns.extend(["latitude", "longitude"])
+        elif {"center_x", "center_y"}.issubset(set(regions.columns)):
+            columns.extend(["center_x", "center_y"])
+        else:
+            self._region_lookup = {}
+            self._region_count = -1
+            return
+
         if owner_expr:
             columns.append(owner_expr)
 
         lookup = {}
         for row in regions.select(columns).iter_rows(named=True):
             region_id = int(row["id"])
+            geo = self._row_to_geo(row)
             lookup[region_id] = RegionAnchor(
                 region_id=region_id,
-                center_x=float(row["center_x"]),
-                center_y=float(row["center_y"]),
+                geo=geo,
                 owner=str(row.get("owner", "")),
             )
 
         self._region_lookup = lookup
         self._region_count = regions.height
+
+    def _row_to_geo(self, row: dict) -> GeoCoordinate:
+        if "latitude" in row and "longitude" in row:
+            return GeoCoordinate(
+                latitude=float(row["latitude"]),
+                longitude=float(row["longitude"]),
+            )
+
+        return self._geo_projection.pixel_to_geo(
+            MapPixelCoordinate(float(row["center_x"]), float(row["center_y"]))
+        )
 
     def _draw_unit(
         self,
@@ -289,8 +315,8 @@ class UnitRenderer:
         )
 
         texture = self._flags.get_texture(preview.owner)
-        width = 44.0
-        height = 30.0
+        width = UNIT_DRAG_PREVIEW_WIDTH
+        height = UNIT_DRAG_PREVIEW_HEIGHT
         left = preview.mouse_x - width * 0.5
         top = mouse_y - height * 0.5
         right = left + width

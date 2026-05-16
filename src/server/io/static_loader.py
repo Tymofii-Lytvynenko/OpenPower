@@ -2,6 +2,7 @@ import rtoml
 import polars as pl
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from PIL import Image
 from src.shared.config import GameConfig
 from src.server.state import GameState
 
@@ -80,8 +81,8 @@ class StaticAssetLoader:
         # keep='last' means the last loaded mod (highest priority) wins.
         master_df = pl.concat(dfs, how="vertical").unique(subset=["hex"], keep="last")
         
-        # Pre-calculate integer IDs for faster rendering lookups
-        return self._generate_runtime_ids(master_df)
+        master_df = self._generate_runtime_ids(master_df)
+        return self._add_region_geo_columns(master_df)
 
     def _load_countries(self) -> pl.DataFrame:
         """
@@ -173,6 +174,35 @@ class StaticAssetLoader:
         )
         
         return df.drop(["_r", "_g", "_b"])
+
+    def _add_region_geo_columns(self, regions_df: pl.DataFrame) -> pl.DataFrame:
+        if regions_df.is_empty() or not {"center_x", "center_y"}.issubset(set(regions_df.columns)):
+            return regions_df
+
+        map_width, map_height = self._get_region_map_dimensions(regions_df)
+        return regions_df.with_columns(
+            (90.0 - (pl.col("center_y").cast(pl.Float64) / float(map_height)) * 180.0).alias("latitude"),
+            ((pl.col("center_x").cast(pl.Float64) / float(map_width)) * 360.0 - 180.0).alias("longitude"),
+        )
+
+    def _get_region_map_dimensions(self, regions_df: pl.DataFrame) -> tuple[int, int]:
+        for data_dir in self.config.get_data_dirs():
+            candidate = data_dir / "regions" / "regions.png"
+            if candidate.exists():
+                return self._read_image_size(candidate)
+
+        fallback = self.config.get_asset_path("map/regions.png")
+        if fallback.exists():
+            return self._read_image_size(fallback)
+
+        max_x = int(regions_df["center_x"].max() or 1) + 1
+        max_y = int(regions_df["center_y"].max() or 1) + 1
+        return max_x, max_y
+
+    def _read_image_size(self, path: Path) -> tuple[int, int]:
+        Image.MAX_IMAGE_PIXELS = None
+        with Image.open(path) as image:
+            return image.size
 
     # =========================================================================
     # SECTION: TOML LOADING (Definitions & World)

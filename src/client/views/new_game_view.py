@@ -204,7 +204,8 @@ class NewGameView(BaseImGuiView):
         df = state.tables["regions"]
         owned_regions = df.filter(pl.col("owner") == country_tag)
         map_height = self.session.map_data.height
-        centroid = calculate_centroid(owned_regions, map_height)
+        map_width = self.session.map_data.width
+        centroid = calculate_centroid(owned_regions, map_height, map_width)
         
         if centroid:
             world_x, world_y = centroid

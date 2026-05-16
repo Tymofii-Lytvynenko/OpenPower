@@ -6,13 +6,18 @@ from typing import Optional
 import numpy as np
 
 from src.client.controllers.camera_controller import CameraController
+from src.shared.map.geo import EquirectangularProjection, GeoCoordinate
+
+
+UNIT_BILLBOARD_BASE_WIDTH = 17.0
+UNIT_BILLBOARD_ZOOM_BONUS = 9.0
+UNIT_BILLBOARD_ASPECT_RATIO = 0.68
 
 
 @dataclass(frozen=True)
 class RegionAnchor:
     region_id: int
-    center_x: float
-    center_y: float
+    geo: GeoCoordinate
     owner: str
 
 
@@ -62,6 +67,7 @@ class UnitProjectionService:
         self.map_height = max(1, int(map_height))
         self.globe_radius = float(globe_radius)
         self.surface_radius = float(globe_radius + surface_offset)
+        self._geo_projection = EquirectangularProjection(self.map_width, self.map_height)
 
     def project_units(
         self,
@@ -149,31 +155,47 @@ class UnitProjectionService:
         target_region_id = int(row.get("target_region_id", -1) or -1)
         progress = float(row.get("movement_progress", 0.0) or 0.0)
 
-        source = region_lookup.get(source_region_id) or region_lookup.get(current_region_id)
+        current_geo = self._row_geo(row, "latitude", "longitude")
+        source_geo = self._row_geo(row, "source_latitude", "source_longitude")
+        target_geo = self._row_geo(row, "target_latitude", "target_longitude")
+
+        source = source_geo or current_geo or self._anchor_geo(region_lookup, source_region_id, current_region_id)
         if source is None:
             return None
 
-        source_vec = self._anchor_to_unit_vector(source)
+        source_vec = self._geo_to_unit_vector(source)
         if target_region_id <= 0 or progress <= 0.0:
             return source_vec * self.surface_radius
 
-        target = region_lookup.get(target_region_id)
+        target = target_geo or self._anchor_geo(region_lookup, target_region_id)
         if target is None:
             return source_vec * self.surface_radius
 
-        target_vec = self._anchor_to_unit_vector(target)
+        target_vec = self._geo_to_unit_vector(target)
         return self._slerp(source_vec, target_vec, progress) * self.surface_radius
 
-    def _anchor_to_unit_vector(self, anchor: RegionAnchor) -> np.ndarray:
-        u = anchor.center_x / self.map_width
-        v = anchor.center_y / self.map_height
-        lon = u * (2.0 * np.pi)
-        lat = (0.5 - v) * np.pi
-
-        x = np.cos(lat) * np.cos(lon)
-        y = np.sin(lat)
-        z = np.cos(lat) * np.sin(lon)
+    def _geo_to_unit_vector(self, geo: GeoCoordinate) -> np.ndarray:
+        x, y, z = self._geo_projection.geo_to_unit_vector(geo)
         return np.array([x, y, z], dtype=np.float32)
+
+    def _row_geo(self, row: dict, latitude_key: str, longitude_key: str) -> Optional[GeoCoordinate]:
+        latitude = row.get(latitude_key)
+        longitude = row.get(longitude_key)
+        if latitude is None or longitude is None:
+            return None
+
+        return GeoCoordinate(latitude=float(latitude), longitude=float(longitude))
+
+    def _anchor_geo(
+        self,
+        region_lookup: dict[int, RegionAnchor],
+        primary_region_id: int,
+        fallback_region_id: Optional[int] = None,
+    ) -> Optional[GeoCoordinate]:
+        anchor = region_lookup.get(primary_region_id)
+        if anchor is None and fallback_region_id is not None:
+            anchor = region_lookup.get(fallback_region_id)
+        return anchor.geo if anchor is not None else None
 
     def _slerp(self, start: np.ndarray, end: np.ndarray, progress: float) -> np.ndarray:
         t = max(0.0, min(1.0, progress))
@@ -202,8 +224,8 @@ class UnitProjectionService:
             self.camera.max_distance - self.camera.min_distance,
             1e-6,
         )
-        width = 34.0 + max(0.0, min(1.0, zoom)) * 18.0
-        return width, width * 0.68
+        width = UNIT_BILLBOARD_BASE_WIDTH + max(0.0, min(1.0, zoom)) * UNIT_BILLBOARD_ZOOM_BONUS
+        return width, width * UNIT_BILLBOARD_ASPECT_RATIO
 
     def _apply_stack_offsets(self, units: list[ProjectedUnit]) -> None:
         groups: dict[tuple[int, int], list[ProjectedUnit]] = {}

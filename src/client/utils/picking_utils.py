@@ -2,6 +2,8 @@ import numpy as np
 from typing import Optional
 import arcade
 
+from src.shared.map.geo import EquirectangularProjection
+
 
 class PickingUtils:
     """Utility class for 3D picking operations (mouse to world conversion)."""
@@ -116,7 +118,6 @@ class PickingUtils:
         texture_height: int
     ) -> tuple[int, int]:
         """Convert UV coordinates to pixel coordinates."""
-        px = int(u * texture_width) % texture_width
-        py = int((1.0 - v) * texture_height)
-        py = max(0, min(py, texture_height - 1))
-        return px, py
+        projection = EquirectangularProjection(texture_width, texture_height)
+        pixel = projection.uv_to_pixel(u, v)
+        return int(pixel.x) % texture_width, int(pixel.y)

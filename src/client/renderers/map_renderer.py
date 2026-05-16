@@ -14,6 +14,7 @@ from src.client.renderers.texture_manager import TextureManager
 from src.client.utils.picking_utils import PickingUtils
 from src.client.services.cache_service import CacheService
 from src.core.paths import ProjectPaths
+from src.shared.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 
 class MapRenderer(BaseRenderer):
     """
@@ -152,26 +153,45 @@ class MapRenderer(BaseRenderer):
         self._disable_rendering_state()
 
     def get_region_id_at_screen_pos(self, sx: float, sy: float) -> int:
+        pixel = self.get_pixel_at_screen_pos(sx, sy)
+        if pixel is None:
+            return 0
+
+        px, py = pixel
+        return self.map_data.get_region_id(px, py)
+
+    def get_geo_at_screen_pos(self, sx: float, sy: float) -> Optional[GeoCoordinate]:
+        pixel = self.get_pixel_at_screen_pos(sx, sy)
+        if pixel is None:
+            return None
+
+        projection = EquirectangularProjection(self.width, self.height)
+        return projection.pixel_to_geo(MapPixelCoordinate(pixel[0], pixel[1]))
+
+    def get_pixel_at_screen_pos(self, sx: float, sy: float) -> Optional[tuple[int, int]]:
         w, h = self.window.get_size()
-        if w <= 0 or h <= 0: return 0
+        if w <= 0 or h <= 0:
+            return None
 
         self.camera.update_matrices(w, h)
         vp_matrix, model_matrix = self.camera.get_cached_matrices()
         
         if vp_matrix is None or model_matrix is None:
-            return 0
+            return None
 
         ray_o, ray_d = PickingUtils.screen_to_ray(sx, sy, w, h, vp_matrix)
-        if ray_o is None or ray_d is None: return 0
+        if ray_o is None or ray_d is None:
+            return None
 
         t = PickingUtils.ray_sphere_intersect(ray_o, ray_d, self.globe_radius)
-        if t is None: return 0
+        if t is None:
+            return None
 
         hit = ray_o + ray_d * t
         uv_result = PickingUtils.world_to_uv_coords(hit, model_matrix)
-        if uv_result is None: return 0
+        if uv_result is None:
+            return None
         
         u, v = uv_result
         px, py = PickingUtils.uv_to_pixel_coords(u, v, self.width, self.height)
-
-        return self.map_data.get_region_id(px, py)
+        return px, py

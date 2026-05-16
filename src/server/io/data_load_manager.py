@@ -5,6 +5,7 @@ import orjson
 from pathlib import Path
 from typing import List, Dict, Any, get_type_hints
 from datetime import datetime
+from PIL import Image
 
 from src.server.state import GameState
 from src.shared.config import GameConfig
@@ -101,6 +102,7 @@ class DataLoader:
             regions_df = self._generate_int_id(regions_df)
             # Enrich with pop/res data
             regions_df = self._enrich_regions_data(regions_df)
+            regions_df = self._add_region_geo_columns(regions_df)
             
             # Safety Fill
             num_cols = [c for c, t in regions_df.schema.items() if t in (pl.Float64, pl.Int64, pl.Int32)]
@@ -238,6 +240,35 @@ class DataLoader:
 
         print(f"[DataLoader] Countries loaded: {len(main_df)} rows.")
         return main_df
+
+    def _add_region_geo_columns(self, regions_df: pl.DataFrame) -> pl.DataFrame:
+        if regions_df.is_empty() or not {"center_x", "center_y"}.issubset(set(regions_df.columns)):
+            return regions_df
+
+        map_width, map_height = self._get_region_map_dimensions(regions_df)
+        return regions_df.with_columns(
+            (90.0 - (pl.col("center_y").cast(pl.Float64) / float(map_height)) * 180.0).alias("latitude"),
+            ((pl.col("center_x").cast(pl.Float64) / float(map_width)) * 360.0 - 180.0).alias("longitude"),
+        )
+
+    def _get_region_map_dimensions(self, regions_df: pl.DataFrame) -> tuple[int, int]:
+        for data_dir in self.config.get_data_dirs():
+            candidate = data_dir / "regions" / "regions.png"
+            if candidate.exists():
+                return self._read_image_size(candidate)
+
+        fallback = self.config.get_asset_path("map/regions.png")
+        if fallback.exists():
+            return self._read_image_size(fallback)
+
+        max_x = int(regions_df["center_x"].max() or 1) + 1
+        max_y = int(regions_df["center_y"].max() or 1) + 1
+        return max_x, max_y
+
+    def _read_image_size(self, path: Path) -> tuple[int, int]:
+        Image.MAX_IMAGE_PIXELS = None
+        with Image.open(path) as image:
+            return image.size
 
     def _load_world_toml(self, path: Path) -> pl.DataFrame:
         try:

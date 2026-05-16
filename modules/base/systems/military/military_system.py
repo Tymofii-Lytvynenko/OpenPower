@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from typing import Any
 
 import polars as pl
@@ -8,6 +7,7 @@ import polars as pl
 from src.engine.interfaces import ISystem
 from src.server.state import GameState
 from src.shared.actions import ActionBuildUnit, ActionMoveUnit
+from src.shared.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 
 
 UNIT_TABLE = "units"
@@ -21,8 +21,14 @@ UNIT_SCHEMA: dict[str, pl.DataType] = {
     "unit_type": pl.Utf8,
     "strength": pl.Int64,
     "current_region_id": pl.Int32,
+    "latitude": pl.Float64,
+    "longitude": pl.Float64,
     "source_region_id": pl.Int32,
+    "source_latitude": pl.Float64,
+    "source_longitude": pl.Float64,
     "target_region_id": pl.Int32,
+    "target_latitude": pl.Float64,
+    "target_longitude": pl.Float64,
     "departed_at_minute": pl.Int64,
     "arrival_at_minute": pl.Int64,
     "movement_progress": pl.Float64,
@@ -31,7 +37,7 @@ UNIT_SCHEMA: dict[str, pl.DataType] = {
 
 
 class MovementDurationPolicy:
-    """Estimates direct movement duration from source and target region centers."""
+    """Estimates direct movement duration from source and target geolocations."""
 
     def estimate_minutes(
         self,
@@ -39,34 +45,49 @@ class MovementDurationPolicy:
         source_region_id: int,
         target_region_id: int,
     ) -> int:
-        centers = self._region_centers(regions)
-        source = centers.get(source_region_id)
-        target = centers.get(target_region_id)
+        locations = self.region_locations(regions)
+        source = locations.get(source_region_id)
+        target = locations.get(target_region_id)
 
         if source is None or target is None:
             return DEFAULT_MOVE_MINUTES
 
-        max_x = max((x for x, _ in centers.values()), default=1.0)
-        max_y = max((y for _, y in centers.values()), default=1.0)
-        width = max(max_x, 1.0)
-        height = max(max_y, 1.0)
+        return self.estimate_between(source, target)
 
-        dx = abs(target[0] - source[0])
-        dy = abs(target[1] - source[1])
-        normalized_distance = math.sqrt((dx / width) ** 2 + (dy / height) ** 2)
+    def estimate_between(self, source: GeoCoordinate, target: GeoCoordinate) -> int:
+        projection = EquirectangularProjection(360.0, 180.0)
+        distance_km = projection.geo_distance_km(source, target)
+        return int(max(360, min(10080, 360 + distance_km * 0.45)))
 
-        return int(max(360, min(10080, 720 + normalized_distance * 7200)))
-
-    def _region_centers(self, regions: pl.DataFrame) -> dict[int, tuple[float, float]]:
-        required = {"id", "center_x", "center_y"}
+    def region_locations(self, regions: pl.DataFrame) -> dict[int, GeoCoordinate]:
+        required = {"id"}
         if regions.is_empty() or not required.issubset(set(regions.columns)):
             return {}
 
-        return {
-            int(row["id"]): (float(row["center_x"]), float(row["center_y"]))
-            for row in regions.select(["id", "center_x", "center_y"]).iter_rows(named=True)
-            if row["id"] is not None
-        }
+        if {"latitude", "longitude"}.issubset(set(regions.columns)):
+            return {
+                int(row["id"]): GeoCoordinate(
+                    latitude=float(row["latitude"]),
+                    longitude=float(row["longitude"]),
+                )
+                for row in regions.select(["id", "latitude", "longitude"]).iter_rows(named=True)
+                if row["id"] is not None
+            }
+
+        if {"center_x", "center_y"}.issubset(set(regions.columns)):
+            projection = EquirectangularProjection(
+                max(float(regions["center_x"].max() or 1.0) + 1.0, 1.0),
+                max(float(regions["center_y"].max() or 1.0) + 1.0, 1.0),
+            )
+            return {
+                int(row["id"]): projection.pixel_to_geo(
+                    MapPixelCoordinate(float(row["center_x"]), float(row["center_y"]))
+                )
+                for row in regions.select(["id", "center_x", "center_y"]).iter_rows(named=True)
+                if row["id"] is not None
+            }
+
+        return {}
 
 
 class UnitFactory:
@@ -79,6 +100,7 @@ class UnitFactory:
         unit_type: str,
         strength: int,
         region_id: int,
+        geo: GeoCoordinate,
         current_minute: int,
     ) -> dict[str, Any]:
         safe_strength = max(1, int(strength))
@@ -88,8 +110,14 @@ class UnitFactory:
             "unit_type": unit_type or DEFAULT_UNIT_TYPE,
             "strength": safe_strength,
             "current_region_id": int(region_id),
+            "latitude": float(geo.latitude),
+            "longitude": float(geo.longitude),
             "source_region_id": int(region_id),
+            "source_latitude": float(geo.latitude),
+            "source_longitude": float(geo.longitude),
             "target_region_id": NO_TARGET_REGION,
+            "target_latitude": float(geo.latitude),
+            "target_longitude": float(geo.longitude),
             "departed_at_minute": int(current_minute),
             "arrival_at_minute": int(current_minute),
             "movement_progress": 0.0,
@@ -128,7 +156,7 @@ class MilitarySystem(ISystem):
             state.update_table(UNIT_TABLE, units)
             return units
 
-        return self._normalize_units_table(state.get_table(UNIT_TABLE))
+        return self._normalize_units_table(state.get_table(UNIT_TABLE), state)
 
     def _create_initial_units(self, state: GameState) -> pl.DataFrame:
         if "regions" not in state.tables or "countries" not in state.tables:
@@ -140,6 +168,7 @@ class MilitarySystem(ISystem):
             return self._empty_units()
 
         home_regions = self._home_regions_by_country(regions)
+        region_locations = self._duration_policy.region_locations(regions)
         country_strength = self._country_strengths(countries)
         current_minute = state.time.total_minutes
         rows = []
@@ -149,13 +178,16 @@ class MilitarySystem(ISystem):
             if clean_tag not in home_regions:
                 continue
 
+            home_region_id = home_regions[clean_tag]
+            home_geo = region_locations.get(home_region_id, GeoCoordinate(0.0, 0.0))
             rows.append(
                 self._unit_factory.create(
                     unit_id=f"{clean_tag}-{DEFAULT_UNIT_TYPE}-001",
                     owner=clean_tag,
                     unit_type=DEFAULT_UNIT_TYPE,
                     strength=country_strength.get(clean_tag, 1),
-                    region_id=home_regions[clean_tag],
+                    region_id=home_region_id,
+                    geo=home_geo,
                     current_minute=current_minute,
                 )
             )
@@ -205,7 +237,9 @@ class MilitarySystem(ISystem):
             return units
 
         countries = self._ensure_country_columns(state.get_table("countries"))
-        home_regions = self._home_regions_by_country(state.get_table("regions"))
+        regions = state.get_table("regions")
+        home_regions = self._home_regions_by_country(regions)
+        region_locations = self._duration_policy.region_locations(regions)
         rows = units.to_dicts()
 
         for action in actions_to_process:
@@ -224,6 +258,7 @@ class MilitarySystem(ISystem):
             home_region_id = home_regions.get(action.country_tag)
             if home_region_id is None:
                 continue
+            home_geo = region_locations.get(home_region_id, GeoCoordinate(0.0, 0.0))
 
             rows.append(
                 self._unit_factory.create(
@@ -232,6 +267,7 @@ class MilitarySystem(ISystem):
                     unit_type=action.unit_type,
                     strength=action.count,
                     region_id=home_region_id,
+                    geo=home_geo,
                     current_minute=state.time.total_minutes,
                 )
             )
@@ -256,6 +292,7 @@ class MilitarySystem(ISystem):
         rows = []
         now = int(state.time.total_minutes)
         regions = state.get_table("regions")
+        region_locations = self._duration_policy.region_locations(regions)
 
         for row in units.to_dicts():
             action = action_by_unit.get(str(row["id"]))
@@ -265,23 +302,22 @@ class MilitarySystem(ISystem):
 
             source_region_id = int(row["current_region_id"])
             target_region_id = int(action.target_region_id)
-            if source_region_id == target_region_id:
-                row["target_region_id"] = NO_TARGET_REGION
-                row["source_region_id"] = source_region_id
-                row["departed_at_minute"] = now
-                row["arrival_at_minute"] = now
-                row["movement_progress"] = 0.0
-                row["is_moving"] = False
+            source_geo = GeoCoordinate(
+                latitude=float(row["latitude"]),
+                longitude=float(row["longitude"]),
+            )
+            target_geo = self._resolve_action_target_geo(action, target_region_id, region_locations)
+            if target_geo is None:
                 rows.append(row)
                 continue
 
-            duration = self._duration_policy.estimate_minutes(
-                regions,
-                source_region_id,
-                target_region_id,
-            )
+            duration = self._duration_policy.estimate_between(source_geo, target_geo)
             row["source_region_id"] = source_region_id
+            row["source_latitude"] = source_geo.latitude
+            row["source_longitude"] = source_geo.longitude
             row["target_region_id"] = target_region_id
+            row["target_latitude"] = target_geo.latitude
+            row["target_longitude"] = target_geo.longitude
             row["departed_at_minute"] = now
             row["arrival_at_minute"] = now + duration
             row["movement_progress"] = 0.0
@@ -289,6 +325,20 @@ class MilitarySystem(ISystem):
             rows.append(row)
 
         return self._units_from_rows(rows)
+
+    def _resolve_action_target_geo(
+        self,
+        action: ActionMoveUnit,
+        target_region_id: int,
+        region_locations: dict[int, GeoCoordinate],
+    ) -> GeoCoordinate | None:
+        if action.target_latitude is not None and action.target_longitude is not None:
+            return GeoCoordinate(
+                latitude=float(action.target_latitude),
+                longitude=float(action.target_longitude),
+            )
+
+        return region_locations.get(target_region_id)
 
     def _update_unit_movements(self, units: pl.DataFrame, current_minute: int) -> pl.DataFrame:
         if units.is_empty():
@@ -310,8 +360,14 @@ class MilitarySystem(ISystem):
 
             if progress >= 1.0:
                 row["current_region_id"] = target_region_id
+                row["latitude"] = float(row["target_latitude"])
+                row["longitude"] = float(row["target_longitude"])
                 row["source_region_id"] = target_region_id
+                row["source_latitude"] = float(row["target_latitude"])
+                row["source_longitude"] = float(row["target_longitude"])
                 row["target_region_id"] = NO_TARGET_REGION
+                row["target_latitude"] = float(row["latitude"])
+                row["target_longitude"] = float(row["longitude"])
                 row["departed_at_minute"] = current_minute
                 row["arrival_at_minute"] = current_minute
                 row["movement_progress"] = 0.0
@@ -351,26 +407,52 @@ class MilitarySystem(ISystem):
                 return unit_id
             index += 1
 
-    def _normalize_units_table(self, units: pl.DataFrame) -> pl.DataFrame:
+    def _normalize_units_table(self, units: pl.DataFrame, state: GameState | None = None) -> pl.DataFrame:
         defaults: dict[str, Any] = {
             "id": "",
             "owner": "",
             "unit_type": DEFAULT_UNIT_TYPE,
             "strength": 1,
             "current_region_id": 0,
+            "latitude": 0.0,
+            "longitude": 0.0,
             "source_region_id": 0,
+            "source_latitude": 0.0,
+            "source_longitude": 0.0,
             "target_region_id": NO_TARGET_REGION,
+            "target_latitude": 0.0,
+            "target_longitude": 0.0,
             "departed_at_minute": 0,
             "arrival_at_minute": 0,
             "movement_progress": 0.0,
             "is_moving": False,
         }
 
+        had_latitude = "latitude" in units.columns
+        had_longitude = "longitude" in units.columns
         for column, default_value in defaults.items():
             if column not in units.columns:
                 units = units.with_columns(pl.lit(default_value).alias(column))
 
+        if state is not None and (not had_latitude or not had_longitude) and "regions" in state.tables:
+            units = self._backfill_unit_geo_from_regions(units, state.get_table("regions"))
+
         return units.select([pl.col(column).cast(dtype) for column, dtype in UNIT_SCHEMA.items()])
+
+    def _backfill_unit_geo_from_regions(self, units: pl.DataFrame, regions: pl.DataFrame) -> pl.DataFrame:
+        locations = self._duration_policy.region_locations(regions)
+        rows = []
+        for row in units.to_dicts():
+            geo = locations.get(int(row["current_region_id"]), GeoCoordinate(0.0, 0.0))
+            row["latitude"] = geo.latitude
+            row["longitude"] = geo.longitude
+            row["source_latitude"] = geo.latitude
+            row["source_longitude"] = geo.longitude
+            row["target_latitude"] = geo.latitude
+            row["target_longitude"] = geo.longitude
+            rows.append(row)
+
+        return pl.DataFrame(rows) if rows else units
 
     def _units_from_rows(self, rows: list[dict[str, Any]]) -> pl.DataFrame:
         if not rows:

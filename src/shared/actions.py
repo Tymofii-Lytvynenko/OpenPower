@@ -80,12 +80,14 @@ class ActionBuildUnit(GameAction):
 @dataclass
 class ActionMoveUnit(GameAction):
     """
-    Orders a unit to move directly to a target region.
+    Orders a unit to move directly to a target coordinate.
     Routing is intentionally omitted; the military system interpolates progress
-    between the source and target region centers.
+    between the source and target geolocation.
     """
     unit_id: str
     target_region_id: int
+    target_latitude: Optional[float] = None
+    target_longitude: Optional[float] = None
 
 @dataclass
 class ActionAnnexRegion(GameAction):

@@ -98,7 +98,11 @@ class UnitInteractionController:
             return True
 
         target_region_id = self._map_renderer.get_region_id_at_screen_pos(x, y)
-        if target_region_id <= 0 or target_region_id == unit.current_region_id:
+        if target_region_id <= 0:
+            return True
+
+        target_geo = self._map_renderer.get_geo_at_screen_pos(x, y)
+        if target_geo is None:
             return True
 
         self._net.send_action(
@@ -106,6 +110,8 @@ class UnitInteractionController:
                 player_id=self._net.player_id,
                 unit_id=unit.unit_id,
                 target_region_id=target_region_id,
+                target_latitude=target_geo.latitude,
+                target_longitude=target_geo.longitude,
             )
         )
         return True

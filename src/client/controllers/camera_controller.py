@@ -1,6 +1,8 @@
 import numpy as np
 from typing import Tuple, Optional
 
+from src.shared.map.geo import EquirectangularProjection, MapPixelCoordinate
+
 class CameraController:
     """
     3D Orbit Camera Controller.
@@ -84,19 +86,14 @@ class CameraController:
         Rotates the camera so the specific pixel on the texture map is centered.
         Used for 'Focus on Region'.
         """
-        # 1. Normalize Pixel to UV (0..1)
-        u = px / texture_width
-        v = py / texture_height
+        projection = EquirectangularProjection(texture_width, texture_height)
+        geo = projection.pixel_to_geo(MapPixelCoordinate(px, py))
+        lon = np.radians(geo.longitude + 180.0)
+        lat = np.radians(geo.latitude)
 
-        # 2. Convert UV to Spherical Angles (matching sphere_mesh.py mapping)
-        # lon = u * 2pi
-        # lat = (0.5 - v) * pi
-        lon = u * (2.0 * np.pi)
-        lat = (0.5 - v) * np.pi
-
-        # 3. Apply to Camera
-        # We need to invert the logic because rotating the model is inverse to rotating the camera.
-        # This alignment might need slight tweaking depending on texture phase.
+        # 3. Apply to Camera.
+        # Map textures are uploaded flipped vertically and the model has base_flip,
+        # so positive geo latitude is the correct pitch for centering rendered pixels.
         self.yaw = -lon - (np.pi / 2.0) 
         self.pitch = lat
 

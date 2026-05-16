@@ -39,7 +39,8 @@ class NewGameTask:
                 df = state.tables["regions"]
                 owned_regions = df.filter(pl.col("owner") == self.player_tag)
                 map_height = self.session.map_data.height
-                start_pos = calculate_centroid(owned_regions, map_height)
+                map_width = self.session.map_data.width
+                start_pos = calculate_centroid(owned_regions, map_height, map_width)
         except Exception as e:
             print(f"Error: {e}")
 
