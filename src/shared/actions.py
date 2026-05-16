@@ -78,6 +78,16 @@ class ActionBuildUnit(GameAction):
     count: int
 
 @dataclass
+class ActionMoveUnit(GameAction):
+    """
+    Orders a unit to move directly to a target region.
+    Routing is intentionally omitted; the military system interpolates progress
+    between the source and target region centers.
+    """
+    unit_id: str
+    target_region_id: int
+
+@dataclass
 class ActionAnnexRegion(GameAction):
     """
     Formal annexation of territory (Change Owner).

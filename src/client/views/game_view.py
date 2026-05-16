@@ -5,8 +5,10 @@ from src.client.views.base_view import BaseImGuiView
 from typing import Optional
 
 from src.client.renderers.map_renderer import MapRenderer
+from src.client.renderers.unit_renderer import UnitRenderer
 from src.client.ui.layouts.game_layout import GameLayout
 from src.client.controllers.camera_controller import CameraController
+from src.client.controllers.unit_interaction_controller import UnitInteractionController
 from src.client.controllers.viewport_controller import ViewportController
 from src.client.ui.core.theme import GAMETHEME
 
@@ -55,6 +57,17 @@ class GameView(BaseImGuiView):
 
         # 3. Initialize UI Layout
         self.layout = GameLayout(self.net, player_tag, self.viewport_ctrl)
+        self.unit_renderer = UnitRenderer(
+            camera=self.cam_ctrl,
+            map_width=self.renderer.width,
+            map_height=self.renderer.height,
+            globe_radius=self.renderer.globe_radius,
+        )
+        self.unit_interactions = UnitInteractionController(
+            unit_renderer=self.unit_renderer,
+            map_renderer=self.renderer,
+            net_client=self.net,
+        )
 
         self.selected_region_id = None
         self._drag_start_pos = None
@@ -104,8 +117,14 @@ class GameView(BaseImGuiView):
 
         self.renderer.draw()
 
-        # 4. Render UI
+        # 4. Render Unit Overlay and UI
         self.window.use() # Switch back for UI
+        self.unit_renderer.render(
+            state=self.net.get_state(),
+            selected_unit_id=self.unit_interactions.selected_unit_id,
+            hovered_unit_id=self.unit_interactions.hovered_unit_id,
+            drag_preview=self.unit_interactions.drag_preview,
+        )
         try:
             self.layout.render(
                 self.selected_region_id,
@@ -121,6 +140,9 @@ class GameView(BaseImGuiView):
 
     def on_game_mouse_press(self, x, y, button, modifiers):
         if button == arcade.MOUSE_BUTTON_LEFT:
+            if self.unit_interactions.on_mouse_press(x, y, button):
+                self._drag_start_pos = None
+                return
             self._drag_start_pos = (x, y)
 
         if button == arcade.MOUSE_BUTTON_RIGHT:
@@ -130,6 +152,10 @@ class GameView(BaseImGuiView):
                     self.layout.show_context_menu(target_region_id)
 
     def on_game_mouse_release(self, x, y, button, modifiers):
+        if self.unit_interactions.on_mouse_release(x, y, button):
+            self._drag_start_pos = None
+            return
+
         # Handle "Click" vs "Drag"
         if button == arcade.MOUSE_BUTTON_LEFT and self._drag_start_pos:
             drag_threshold = 5.0
@@ -144,7 +170,12 @@ class GameView(BaseImGuiView):
             self._drag_start_pos = None
 
     def on_game_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
+        if self.unit_interactions.on_mouse_drag(x, y, buttons):
+            return
         self.viewport_ctrl.on_mouse_drag(x, y, dx, dy, buttons)
+
+    def on_game_mouse_motion(self, x, y, dx, dy):
+        self.unit_interactions.on_mouse_motion(x, y)
 
     def on_game_mouse_scroll(self, x, y, scroll_x, scroll_y):
         self.viewport_ctrl.on_mouse_scroll(x, y, scroll_x, scroll_y)
