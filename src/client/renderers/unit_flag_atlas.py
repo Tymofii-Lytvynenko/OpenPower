@@ -19,8 +19,18 @@ FLAG_ATLAS_PADDING = 2
 
 @dataclass(frozen=True)
 class FlagAtlasEntry:
-    uv_min: imgui.ImVec2
-    uv_max: imgui.ImVec2
+    u0: float
+    v0: float
+    u1: float
+    v1: float
+
+    @property
+    def uv_min(self) -> imgui.ImVec2:
+        return imgui.ImVec2(self.u0, self.v0)
+
+    @property
+    def uv_max(self) -> imgui.ImVec2:
+        return imgui.ImVec2(self.u1, self.v1)
 
 
 class UnitFlagAtlas:
@@ -42,6 +52,13 @@ class UnitFlagAtlas:
     @property
     def texture_id(self) -> int:
         return self._texture_id
+
+    @property
+    def texture(self) -> Optional[Any]:
+        return self._texture
+
+    def entry_for(self, owner: str) -> Optional[FlagAtlasEntry]:
+        return self._entries.get(self._clean_tag(owner)) or self._entries.get(self._fallback_tag)
 
     def ensure_owners(self, owners: Iterable[str]) -> None:
         requested = frozenset(self._clean_tag(owner) for owner in owners if owner)
@@ -103,8 +120,10 @@ class UnitFlagAtlas:
             atlas.paste(flag, (x, y), flag)
 
             entries[tag] = FlagAtlasEntry(
-                uv_min=imgui.ImVec2(x / atlas_w, y / atlas_h),
-                uv_max=imgui.ImVec2((x + FLAG_ATLAS_CELL_WIDTH) / atlas_w, (y + FLAG_ATLAS_CELL_HEIGHT) / atlas_h),
+                u0=x / atlas_w,
+                v0=y / atlas_h,
+                u1=(x + FLAG_ATLAS_CELL_WIDTH) / atlas_w,
+                v1=(y + FLAG_ATLAS_CELL_HEIGHT) / atlas_h,
             )
 
         texture = self._upload_to_gpu(atlas)

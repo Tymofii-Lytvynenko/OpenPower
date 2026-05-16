@@ -22,6 +22,8 @@ class ClientSessionProxy:
         self.progress_queue = mp.Queue()
         
         self.state: Optional[GameState] = None
+        self._state_poll_accumulator = 0.0
+        self._state_poll_interval = 1.0 / 30.0
         
         map_path = None
         for data_dir in config.get_data_dirs():
@@ -52,6 +54,15 @@ class ClientSessionProxy:
         """
         Called by the Window. Grabs the latest pre-calculated state from the server.
         """
+        if delta_time > 0.0:
+            self._state_poll_accumulator += delta_time
+            if self._state_poll_accumulator < self._state_poll_interval:
+                return
+            self._state_poll_accumulator = min(
+                self._state_poll_accumulator - self._state_poll_interval,
+                self._state_poll_interval,
+            )
+
         try:
             latest_ipc = None
             while not self.state_queue.empty():
