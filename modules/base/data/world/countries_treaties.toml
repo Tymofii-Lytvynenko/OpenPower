@@ -1,0 +1,113 @@
+[[countries_treaties]]
+id = "nato"
+name = "North Atlantic Treaty Organization"
+type = "military_alliance"
+members = ["BEL", "CAN", "CZE", "DNK", "FRA", "DEU", "GRC", "HUN", "ISL", "ITA", "LUX", "NLD", "NOR", "POL", "PRT", "ESP", "TUR", "GBR", "USA"]
+
+[[countries_treaties]]
+id = "anzus"
+name = "ANZUS Security Treaty"
+type = "military_alliance"
+members = ["AUS", "NZL", "USA"]
+
+[[countries_treaties]]
+id = "rio_pact"
+name = "Inter-American Treaty of Reciprocal Assistance"
+type = "defensive_alliance"
+members = ["ARG", "BHS", "BOL", "BRA", "CHL", "COL", "CRI", "DOM", "ECU", "GTM", "HND", "MEX", "PAN", "PRY", "PER", "SLV", "TTO", "URY", "USA", "VEN"]
+
+[[countries_treaties]]
+id = "csto_predecessor"
+name = "Collective Security Treaty"
+type = "military_alliance"
+members = ["ARM", "BLR", "KAZ", "KGZ", "RUS", "TJK"]
+
+[[countries_treaties]]
+id = "gcc_joint_defense"
+name = "GCC Joint Defense Agreement"
+type = "defensive_alliance"
+members = ["ARE", "BHR", "KWT", "OMN", "QAT", "SAU"]
+
+[[countries_treaties]]
+id = "us_japan_security"
+name = "Treaty of Mutual Cooperation and Security"
+type = "military_alliance"
+members = ["JPN", "USA"]
+
+[[countries_treaties]]
+id = "us_south_korea_defense"
+name = "United States-Republic of Korea Mutual Defense Treaty"
+type = "military_alliance"
+members = ["KOR", "USA"]
+
+[[countries_treaties]]
+id = "us_philippines_defense"
+name = "Mutual Defense Treaty Between the Philippines and the United States"
+type = "military_alliance"
+members = ["PHL", "USA"]
+
+[[countries_treaties]]
+id = "us_thailand_major_ally"
+name = "United States-Thailand Security Partnership"
+type = "defensive_alliance"
+members = ["THA", "USA"]
+
+[[countries_treaties]]
+id = "us_israel_security"
+name = "United States-Israel Strategic Cooperation"
+type = "military_alliance"
+members = ["ISR", "USA"]
+
+[[countries_treaties]]
+id = "uk_portugal_alliance"
+name = "Anglo-Portuguese Alliance"
+type = "defensive_alliance"
+members = ["GBR", "PRT"]
+
+[[countries_treaties]]
+id = "australia_png_defense"
+name = "Australia-Papua New Guinea Defense Cooperation"
+type = "defensive_alliance"
+members = ["AUS", "PNG"]
+
+[[countries_treaties]]
+id = "france_djibouti_defense"
+name = "France-Djibouti Defense Agreement"
+type = "defensive_alliance"
+members = ["DJI", "FRA"]
+
+[[countries_treaties]]
+id = "france_gabon_defense"
+name = "France-Gabon Defense Agreement"
+type = "defensive_alliance"
+members = ["FRA", "GAB"]
+
+[[countries_treaties]]
+id = "france_senegal_defense"
+name = "France-Senegal Defense Cooperation"
+type = "defensive_alliance"
+members = ["FRA", "SEN"]
+
+[[countries_treaties]]
+id = "france_ivory_coast_defense"
+name = "France-Cote d'Ivoire Defense Agreement"
+type = "defensive_alliance"
+members = ["CIV", "FRA"]
+
+[[countries_treaties]]
+id = "senegambia_defense"
+name = "Senegal-Gambia Defense Cooperation"
+type = "defensive_alliance"
+members = ["GMB", "SEN"]
+
+[[countries_treaties]]
+id = "russia_armenia_base"
+name = "Russia-Armenia Military Cooperation"
+type = "military_alliance"
+members = ["ARM", "RUS"]
+
+[[countries_treaties]]
+id = "russia_belarus_union_defense"
+name = "Russia-Belarus Union Defense Cooperation"
+type = "military_alliance"
+members = ["BLR", "RUS"]
