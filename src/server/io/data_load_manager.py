@@ -117,13 +117,19 @@ class DataLoader:
         countries_df = self._load_countries(regions_df)
         state.update_table("countries", countries_df if not countries_df.is_empty() else pl.DataFrame())
 
-        # --- 3. WORLD DATA (Parquets) ---
+        # --- 3. WORLD DATA (Parquet/TOML) ---
         for data_dir in self.config.get_data_dirs():
             world_dir = data_dir / "world"
             if world_dir.exists():
                 for p_file in world_dir.glob("*.parquet"):
                     print(f"[DataLoader] Loading world table: {p_file.stem}")
                     state.update_table(p_file.stem, pl.read_parquet(p_file))
+
+                for t_file in world_dir.glob("*.toml"):
+                    world_df = self._load_world_toml(t_file)
+                    if not world_df.is_empty():
+                        print(f"[DataLoader] Loading world table: {t_file.stem}")
+                        state.update_table(t_file.stem, world_df)
                     
         # --- 4. DYNAMIC DOMESTIC PRODUCTION (TOML) ---
         prod_df = self._load_domestic_production()
@@ -232,6 +238,52 @@ class DataLoader:
 
         print(f"[DataLoader] Countries loaded: {len(main_df)} rows.")
         return main_df
+
+    def _load_world_toml(self, path: Path) -> pl.DataFrame:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = rtoml.load(f)
+        except Exception as e:
+            print(f"[DataLoader] Failed to parse world TOML {path.name}: {e}")
+            return pl.DataFrame()
+
+        if not data:
+            return pl.DataFrame()
+
+        if path.stem in data:
+            raw = data[path.stem]
+        elif len(data) == 1:
+            raw = next(iter(data.values()))
+        else:
+            print(f"[DataLoader] World TOML {path.name} has no '{path.stem}' root table.")
+            return pl.DataFrame()
+
+        if isinstance(raw, list):
+            return pl.from_dicts(raw) if raw else pl.DataFrame()
+
+        if isinstance(raw, dict):
+            return self._flatten_world_matrix(raw)
+
+        return pl.DataFrame()
+
+    def _flatten_world_matrix(self, matrix: Dict[str, Any]) -> pl.DataFrame:
+        rows = []
+        for source, targets in matrix.items():
+            if not isinstance(targets, dict):
+                continue
+
+            for target, value in targets.items():
+                row = {
+                    "source": source,
+                    "target": target,
+                }
+                if isinstance(value, dict):
+                    row.update(value)
+                else:
+                    row["value"] = value
+                rows.append(row)
+
+        return pl.from_dicts(rows) if rows else pl.DataFrame()
 
     def _load_domestic_production(self) -> pl.DataFrame:
         print("[DataLoader] Reading TOMLs for dynamic domestic production...")
