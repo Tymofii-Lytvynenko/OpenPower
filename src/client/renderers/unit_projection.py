@@ -96,12 +96,15 @@ class UnitProjectionService:
         map_width: int,
         map_height: int,
         globe_radius: float,
-        surface_offset: float = 0.018,
+        surface_offset: float = 0.0,
     ):
         self.camera = camera
         self.map_width = max(1, int(map_width))
         self.map_height = max(1, int(map_height))
         self.globe_radius = float(globe_radius)
+        # Billboards are drawn in screen space, so lifting their anchor above the
+        # globe creates visible parallax drift at close zoom instead of preventing
+        # z-fighting.
         self.surface_radius = float(globe_radius + surface_offset)
         self._geo_projection = EquirectangularProjection(self.map_width, self.map_height)
 
