@@ -6,7 +6,7 @@ from typing import Optional, TYPE_CHECKING
 from imgui_bundle import imgui
 
 from src.client.controllers.camera_controller import CameraController
-from src.client.renderers.flag_renderer import FlagRenderer, FlagTexture
+from src.client.renderers.unit_flag_atlas import UnitFlagAtlas
 from src.client.renderers.unit_projection import ProjectedUnit, RegionAnchor, UnitProjectionService
 from src.client.ui.core.theme import GAMETHEME
 from src.shared.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
@@ -43,11 +43,13 @@ class UnitRenderer:
         globe_radius: float,
     ):
         self._projection = UnitProjectionService(camera, map_width, map_height, globe_radius)
+        self._camera = camera
         self._geo_projection = EquirectangularProjection(map_width, map_height)
-        self._flags = FlagRenderer()
+        self._flags = UnitFlagAtlas()
         self._region_lookup: dict[int, RegionAnchor] = {}
         self._region_count = -1
         self._billboards: list[ProjectedUnit] = []
+        self._projection_cache_key: tuple | None = None
 
     @property
     def billboards(self) -> list[ProjectedUnit]:
@@ -64,6 +66,7 @@ class UnitRenderer:
         width = int(window.x)
         height = int(window.y)
 
+        self._prepare_flag_atlas_for_state(state, drag_preview)
         self._billboards = self._project_units(state, width, height)
 
         flags = (
@@ -112,12 +115,46 @@ class UnitRenderer:
             return []
 
         self._refresh_region_lookup(state)
+        cache_key = self._make_projection_cache_key(units, window_width, window_height)
+        if cache_key == self._projection_cache_key:
+            return self._billboards
+
+        unit_rows = units.to_dicts()
+        self._projection_cache_key = cache_key
         return self._projection.project_units(
-            units.to_dicts(),
+            unit_rows,
             self._region_lookup,
             window_width,
             window_height,
         )
+
+    def _make_projection_cache_key(self, units, window_width: int, window_height: int) -> tuple:
+        return (
+            id(units),
+            units.height,
+            window_width,
+            window_height,
+            round(self._camera.yaw, 6),
+            round(self._camera.pitch, 6),
+            round(self._camera.distance, 4),
+            self._region_count,
+        )
+
+    def _prepare_flag_atlas_for_state(
+        self,
+        state: Optional["GameState"],
+        drag_preview: Optional[UnitDragPreview],
+    ) -> None:
+        owners = set()
+        if state is not None and "units" in state.tables:
+            units = state.tables["units"]
+            if not units.is_empty() and "owner" in units.columns:
+                owners.update(str(owner) for owner in units["owner"].unique().to_list())
+
+        if drag_preview is not None:
+            owners.add(drag_preview.owner)
+
+        self._flags.ensure_owners(owners)
 
     def _refresh_region_lookup(self, state: "GameState") -> None:
         if "regions" not in state.tables:
@@ -201,10 +238,7 @@ class UnitRenderer:
             3.0,
         )
 
-        texture = self._flags.get_texture(unit.owner)
-        if texture:
-            self._draw_flag_image(draw_list, texture, left, top, right, bottom)
-        else:
+        if not self._flags.draw_flag(draw_list, unit.owner, left, top, right, bottom):
             draw_list.add_rect_filled(
                 (left, top),
                 (right, bottom),
@@ -226,29 +260,6 @@ class UnitRenderer:
 
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
-
-    def _draw_flag_image(
-        self,
-        draw_list: imgui.ImDrawList,
-        texture: FlagTexture,
-        left: float,
-        top: float,
-        right: float,
-        bottom: float,
-    ) -> None:
-        try:
-            draw_list.add_image(
-                imgui.ImTextureRef(texture.gl_id),
-                imgui.ImVec2(left, top),
-                imgui.ImVec2(right, bottom),
-            )
-        except Exception:
-            draw_list.add_rect_filled(
-                (left, top),
-                (right, bottom),
-                imgui.get_color_u32(GAMETHEME.colors.bg_input),
-                2.0,
-            )
 
     def _draw_progress_bar(
         self,
@@ -314,7 +325,6 @@ class UnitRenderer:
             2.0,
         )
 
-        texture = self._flags.get_texture(preview.owner)
         width = UNIT_DRAG_PREVIEW_WIDTH
         height = UNIT_DRAG_PREVIEW_HEIGHT
         left = preview.mouse_x - width * 0.5
@@ -329,5 +339,10 @@ class UnitRenderer:
             4.0,
         )
 
-        if texture:
-            self._draw_flag_image(draw_list, texture, left, top, right, bottom)
+        if not self._flags.draw_flag(draw_list, preview.owner, left, top, right, bottom):
+            draw_list.add_rect_filled(
+                (left, top),
+                (right, bottom),
+                imgui.get_color_u32(GAMETHEME.colors.bg_input),
+                2.0,
+            )

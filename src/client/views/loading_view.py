@@ -1,7 +1,6 @@
 import arcade
 import threading
 from typing import Callable, Any
-from src.client.services.imgui_service import ImGuiService
 from src.client.ui.core.composer import UIComposer
 from src.client.ui.core.theme import GAMETHEME
 from src.client.interfaces.loading import LoadingTask
@@ -17,7 +16,6 @@ class LoadingView(arcade.View):
         self.on_success = on_success
         self.on_failure = on_failure
         
-        self.imgui = ImGuiService(self.window)
         self.ui = UIComposer(GAMETHEME)
         
         # Threading Logic
@@ -42,6 +40,8 @@ class LoadingView(arcade.View):
             self.is_finished = True
 
     def on_update(self, delta_time: float):
+        self.window.imgui.update_time(delta_time)
+
         # If thread is done...
         if self.is_finished:
             if self.error:
@@ -61,16 +61,12 @@ class LoadingView(arcade.View):
                     self.window.show_view(next_view)
 
     def on_resize(self, width: int, height: int):
-        self.imgui.resize(width, height)
+        self.window.imgui.resize(width, height)
 
     def on_draw(self):
         self.clear()
-        
-        # 1. Start ImGui
-        self.imgui.new_frame()
-        self.ui.setup_frame()
 
-        # 2. Render Background Globe (If available)
+        # 1. Render Background Globe (If available)
         # This keeps the visualization consistent during transition
         if hasattr(self.window, "shared_renderer") and self.window.shared_renderer:
             # CRITICAL: Reset OpenGL state
@@ -81,6 +77,12 @@ class LoadingView(arcade.View):
             
             # Draw the globe (reuses existing camera position)
             self.window.shared_renderer.draw()
+
+        self.window.use()
+
+        # 2. Start ImGui after 3D drawing so the progress UI is guaranteed on top.
+        self.window.imgui.new_frame()
+        self.ui.setup_frame()
 
         # 3. Render Loading UI
         screen_w, screen_h = self.window.get_size()
@@ -95,4 +97,4 @@ class LoadingView(arcade.View):
 
             self.ui.end_panel()
 
-        self.imgui.render()
+        self.window.imgui.render()

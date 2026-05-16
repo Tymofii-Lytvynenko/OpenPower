@@ -13,6 +13,10 @@ from src.client.utils.color_generator import generate_political_colors
 if TYPE_CHECKING:
     from src.server.session import GameSession
 
+
+COUNTRY_SELECTION_FOCUS_DISTANCE = 1.55
+
+
 class NewGameView(BaseImGuiView):
     def __init__(self, session: "GameSession", config: GameConfig):
         super().__init__()
@@ -217,6 +221,15 @@ class NewGameView(BaseImGuiView):
                 self.session.map_data.width, 
                 self.session.map_data.height
             )
+            self._apply_country_selection_zoom()
+
+    def _apply_country_selection_zoom(self):
+        self.cam_ctrl.distance = float(
+            max(
+                self.cam_ctrl.min_distance,
+                min(COUNTRY_SELECTION_FOCUS_DISTANCE, self.cam_ctrl.max_distance),
+            )
+        )
 
     def _start_game(self):
         if not self.selected_country_id: return

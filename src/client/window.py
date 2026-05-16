@@ -30,23 +30,31 @@ class MainWindow(arcade.Window):
         self.shared_renderer: Optional["MapRenderer"] = None
 
     def setup(self):
-        print("[Window] Booting Client Proxy...")
-        
-        # Instantiate the Proxy (This spawns the background CPU core)
-        self.session = ClientSessionProxy(self.game_config)
+        self.boot_progress = 0.0
+        self.boot_status = "Preparing client..."
+        self.boot_error: Optional[str] = None
+
+        from src.client.views.server_boot_view import ServerBootView
+        self.show_view(ServerBootView(self.game_config))
 
         def check_server_boot(delta_time):
+            if self.session is None:
+                return
+
             # Poll the progress queue from the background process
             while not self.session.progress_queue.empty():
                 msg_type, progress, text = self.session.progress_queue.get_nowait()
                 
                 if msg_type == "PROGRESS":
-                    # If you have a LoadingView, you can update its UI here
+                    self.boot_progress = float(progress)
+                    self.boot_status = text
                     print(f"[Loading] {text} ({progress*100}%)")
                     
                 elif msg_type == "READY":
                     print("[Window] Engine Ready! Server connected.")
                     arcade.unschedule(check_server_boot)
+                    self.boot_progress = 1.0
+                    self.boot_status = "Engine ready."
                     
                     # Fetch initial state
                     self.session.tick(0) 
@@ -54,13 +62,28 @@ class MainWindow(arcade.Window):
                     
                 elif msg_type == "ERROR":
                     print(f"[Window] FATAL SERVER ERROR: {text}")
+                    self.boot_error = text
+                    self.boot_status = "Server boot failed."
                     arcade.unschedule(check_server_boot)
 
-        # Schedule the UI to listen for server boot progress
-        arcade.schedule(check_server_boot, 1/60)
-        
-        # Show your visual Loading Screen while the server boots in the background
-        # self.nav.show_loading_view() 
+        def start_client_proxy(delta_time):
+            arcade.unschedule(start_client_proxy)
+            print("[Window] Booting Client Proxy...")
+            self.boot_progress = 0.05
+            self.boot_status = "Loading map index..."
+
+            try:
+                # Instantiate the Proxy (This spawns the background CPU core)
+                self.session = ClientSessionProxy(self.game_config)
+            except Exception as exc:
+                self.boot_error = str(exc)
+                self.boot_status = "Client proxy failed."
+                return
+
+            arcade.schedule(check_server_boot, 1 / 60)
+
+        # Delay one frame so the boot screen paints before any blocking setup work.
+        arcade.schedule(start_client_proxy, 0.1)
 
     def on_resize(self, width: int, height: int):
         super().on_resize(width, height)
