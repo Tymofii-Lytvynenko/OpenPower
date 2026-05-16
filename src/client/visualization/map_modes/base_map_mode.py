@@ -31,10 +31,10 @@ class BaseMapMode(ABC):
         return 0.90
 
     @abstractmethod
-    def calculate_colors(self, state: GameState) -> Dict[int, Tuple[int, int, int]]:
+    def calculate_colors(self, state: GameState) -> Dict[int, Tuple[int, ...]]:
         """
         Pure data transformation.
         Input: State (Polars DataFrames)
-        Output: Dictionary mapping Region Real IDs to Tuple (R, G, B)
+        Output: Dictionary mapping Region Real IDs to Tuple (R, G, B) or (R, G, B, A)
         """
         pass

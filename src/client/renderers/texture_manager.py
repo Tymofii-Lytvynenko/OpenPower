@@ -26,7 +26,7 @@ class TextureManager:
         self.lut_data = np.full((self.lut_dim * self.lut_dim, 4), 0, dtype=np.uint8)
         
         # --- Color Mapping State ---
-        self._active_color_map: Dict[int, Tuple[int, int, int]] = {}
+        self._active_color_map: Dict[int, Tuple[int, ...]] = {}
         
         # --- Selection State ---
         self.multi_select_dense_ids: Set[int] = set()
@@ -131,7 +131,7 @@ class TextureManager:
         )
         self.lookup_texture.write(self.lut_data.tobytes()) # type: ignore
 
-    def update_overlay(self, color_map: Dict[int, Tuple[int, int, int]]) -> None:
+    def update_overlay(self, color_map: Dict[int, Tuple[int, ...]]) -> None:
         self._active_color_map = color_map
         self._rebuild_lut_array()
         if self.lookup_texture:
@@ -162,7 +162,8 @@ class TextureManager:
             if real_id in self.real_to_dense:
                 dense_id = self.real_to_dense[real_id]
                 if 0 < dense_id < len(self.lut_data):
-                    alpha = 255 if dense_id in self.multi_select_dense_ids else 200
+                    base_alpha = color[3] if len(color) > 3 else 200
+                    alpha = 255 if dense_id in self.multi_select_dense_ids else base_alpha
                     self.lut_data[dense_id] = [color[0], color[1], color[2], alpha]
 
     def _update_selection_texture(self) -> None:

@@ -100,7 +100,7 @@ class MapRenderer(BaseRenderer):
         self._overlay_enabled = enabled
         self._overlay_opacity = opacity
 
-    def update_overlay(self, color_map: Dict[int, Tuple[int, int, int]]):
+    def update_overlay(self, color_map: Dict[int, Tuple[int, ...]]):
         self.texture_manager.update_overlay(color_map)
 
     def set_highlight(self, real_region_ids: List[int]):

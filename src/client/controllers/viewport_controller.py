@@ -11,6 +11,7 @@ from src.client.services.network_client_service import NetworkClient
 from src.client.visualization.map_modes.base_map_mode import BaseMapMode
 from src.client.visualization.map_modes.political_mode import PoliticalMapMode
 from src.client.visualization.map_modes.gradient_mode import GradientMapMode
+from src.client.visualization.map_modes.empire_mode import EmpireMapMode
 
 
 class SelectionMode(Enum):
@@ -38,10 +39,12 @@ class ViewportController:
         self.on_selection_change = on_selection_change
 
         self.selection_mode = SelectionMode.COUNTRY
+        self.selected_country_tag: Optional[str] = None
 
         # --- MAP MODES (Composition) ---
         self.map_modes: Dict[str, BaseMapMode] = {
             "political": PoliticalMapMode(),
+            "empire": EmpireMapMode(),
             "gdp_per_capita": GradientMapMode(
                 mode_name="GDP (Per Capita)",
                 column_name="gdp_per_capita",
@@ -92,6 +95,7 @@ class ViewportController:
         # 2. Standard Data Modes
         if mode_key in self.map_modes:
             self.current_mode_key = mode_key
+            self._sync_empire_focus()
             # Ensure overlay is visible if we are switching from terrain
             self.renderer.set_overlay_style(enabled=True, opacity=0.90)
             self.refresh_map_layer()
@@ -163,6 +167,10 @@ class ViewportController:
     def select_region_by_id(self, region_id: int):
         if region_id is None or region_id <= 0:
             self.renderer.clear_highlight()
+            self.selected_country_tag = None
+            self._sync_empire_focus()
+            if self.current_mode_key == "empire":
+                self.refresh_map_layer()
             self.on_selection_change(None)
             return
         self._apply_selection_logic(region_id)
@@ -173,6 +181,7 @@ class ViewportController:
 
     def _apply_selection_logic(self, region_id: int):
         highlight_ids = [region_id]
+        selected_owner = None
 
         if self.selection_mode == SelectionMode.COUNTRY:
             state = self.net.get_state()
@@ -183,10 +192,18 @@ class ViewportController:
                 if not owner_rows.is_empty():
                     owner = owner_rows["owner"][0]
                     if owner and owner != "None":
+                        selected_owner = owner
                         # Get ALL regions by this owner for multi-select
                         highlight_ids = df.filter(pl.col("owner") == owner)["id"].to_list()
 
-        self.renderer.set_highlight(highlight_ids)
+        self.selected_country_tag = selected_owner
+        self._sync_empire_focus()
+
+        if self.current_mode_key == "empire":
+            self.renderer.clear_highlight()
+            self.refresh_map_layer()
+        else:
+            self.renderer.set_highlight(highlight_ids)
         self.on_selection_change(region_id)
 
     def get_region_at(self, screen_x: float, screen_y: float) -> Optional[int]:
@@ -195,3 +212,8 @@ class ViewportController:
             return region_id if region_id > 0 else None
         except Exception:
             return None
+
+    def _sync_empire_focus(self):
+        mode = self.map_modes.get("empire")
+        if hasattr(mode, "set_selected_country"):
+            mode.set_selected_country(self.selected_country_tag)
