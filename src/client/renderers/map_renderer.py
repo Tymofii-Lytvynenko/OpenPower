@@ -14,7 +14,7 @@ from src.client.renderers.texture_manager import TextureManager
 from src.client.utils.picking_utils import PickingUtils
 from src.client.services.cache_service import CacheService
 from src.core.paths import ProjectPaths
-from src.shared.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
+from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 
 class MapRenderer(BaseRenderer):
     """

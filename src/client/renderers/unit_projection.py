@@ -6,7 +6,7 @@ from typing import Optional
 import numpy as np
 
 from src.client.controllers.camera_controller import CameraController
-from src.shared.map.geo import EquirectangularProjection, GeoCoordinate
+from src.core.map.geo import EquirectangularProjection, GeoCoordinate
 
 
 UNIT_BILLBOARD_BASE_WIDTH = 17.0

@@ -2,7 +2,7 @@ import polars as pl
 import math
 from typing import Optional
 
-from src.shared.map.geo import EquirectangularProjection, GeoCoordinate
+from src.core.map.geo import EquirectangularProjection, GeoCoordinate
 
 def image_to_world(x: float, y: float, map_height: float) -> tuple[float, float]:
     """

@@ -2,7 +2,7 @@ import numpy as np
 from typing import Optional
 import arcade
 
-from src.shared.map.geo import EquirectangularProjection
+from src.core.map.geo import EquirectangularProjection
 
 
 class PickingUtils:

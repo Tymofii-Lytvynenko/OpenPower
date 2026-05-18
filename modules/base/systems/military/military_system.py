@@ -7,7 +7,7 @@ import polars as pl
 from src.engine.interfaces import ISystem
 from src.server.state import GameState
 from src.shared.actions import ActionBuildUnit, ActionMoveUnit
-from src.shared.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
+from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 
 
 UNIT_TABLE = "units"

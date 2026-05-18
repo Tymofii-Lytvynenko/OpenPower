@@ -1,76 +1,90 @@
-# OpenPower Engine
+# 🪐 OpenPower Engine
 
-> **Status: Alpha / Prototype**
-> Core simulation, loading, IPC, map rendering, and base gameplay systems are functional. AI, diplomacy, headless mode, and multiplayer are still in progress.
+> **Status: Alpha / Active Prototype**
+> Asynchronous simulation runner, multi-process IPC, GPU-backed map rendering, declarative AI framework, geo-coordinate military unit movement, and alliance treaty systems are fully functional. Tactical combat, headless server, and multiplayer are in progress.
 
-**OpenPower** is an open-source grand strategy game engine built in Python. It uses a data-oriented architecture with multiprocessing so the simulation can run in a background process while the UI stays responsive.
+**OpenPower** is a high-performance, open-source grand strategy game engine built in Python. It utilizes a data-oriented design powered by **Polars** and a multi-process architecture to run intensive world simulation loops asynchronously in a background thread while keeping the **Dear ImGui / Arcade** frontend running at fluid, stutter-free framerates.
 
-## What Works Today
+---
 
-- **Multiprocess simulation:** The main UI runs separately from the simulation process.
-- **IPC state transfer:** Game state is transferred with Arrow IPC / Polars data frames.
-- **Dynamic module loading:** The engine loads gameplay content from `modules/` through mod manifests and registration entry points.
-- **Base world loading:** Regions, countries, and other world data are loaded from TSV and TOML files.
-- **Map rendering:** The client includes GPU-backed map rendering, political overlays, and region picking.
-- **Core gameplay systems:** Time, population, politics, trade, internal economy, and budget systems are present.
+## 🚀 What Works Today
 
-## In Progress
+* **Asynchronous Multi-Process Core:** The main graphics engine/UI and the simulation runner (`Engine`) run in isolated processes, communicating via zero-copy Arrow IPC state transfers.
+* **Declarative Polars AI Framework:** A data-oriented AI orchestration engine (`src/engine/ai_framework.py`) powered by Polars lazy execution graphs. Implements functional scorers for financial survival auditing (burn rates, months to bankruptcy) and vectorized military ROI scoring.
+* **Geo-Coordinated Military Movement:** Active military system supporting real-time unit movements across the globe. Calculates equirectangular-to-spherical coordinates, tracking path distances and interpolating movement progress smoothly via SLERP (Spherical Linear Interpolation).
+* **Interactive Unit Renderer & Atlas:** Billboard-based unit projection batching (`src/client/renderers/unit_batch_renderer.py`) and texture atlas optimization (`src/client/renderers/unit_flag_atlas.py`) that clusters overlapping units into stacks and supports interactive mouse drags to order troop movements.
+* **Treaty & Alliance Systems:** Authorization database for military alliances, defensive pacts, and ongoing conflicts (`countries_wars.toml`, `countries_treaties.toml`).
+* **Empire Mode Map Overlay:** A superpower-style political map overlay representing diplomatic alliances, defensive treaties, and wars with highly polished, dynamic hues (selected country in green, allies in blue, enemies in red, and neutral states in charcoal).
+* **Dynamic Mod Loader:** Scans `modules/` for dynamic system registration, loading world datasets (regions, countries, demographics, resources) from TSV and TOML files on startup.
 
-- **AI:** Present as a stub; strategic decision-making is not implemented yet.
-- **Military:** Build and manpower scaffolding exists, but combat and movement are not implemented.
-- **Diplomacy:** Treaty, war, and peace systems are not implemented yet.
-- **Headless server:** The simulation still expects the current client/server flow.
-- **Mod data chaining:** `mods.json` integration is still stubbed in config.
+---
 
-## Project Structure
+## 🛠️ In Progress & Roadmap
+
+1. **Tactical Combat Resolution:** Active unit combat algorithms, frontline dynamics, and occupation resolution.
+2. **Headless Server & Multiplayer:** Headless execution drivers and network communication protocols.
+3. **Advanced Diplomacy Systems:** Action vectors for negotiating peace, demanding territory, and forming coalitions.
+4. **Mod Data Chaining:** Configuration logic for multi-mod dependency chaining (`mods.json`).
+
+---
+
+## 📂 Project Structure
 
 ```text
 OpenPower/
-├── modules/              # Game content and mods
-│   └── base/             # Core game module
-│       ├── data/         # TSV/TOML/Parquet data files
-│       └── systems/      # Gameplay systems
-├── user_data/            # Local saves, logs, and user configs
-├── src/
-│   ├── client/           # Frontend, rendering, and UI
-│   ├── engine/           # Simulation orchestration
-│   ├── server/           # State, persistence, and session lifecycle
-│   └── shared/           # Shared contracts, config, actions, and events
-└── main.py               # Application entry point
+├── modules/                   # Game content, assets, and mod systems
+│   └── base/                  # Core game module
+│       ├── data/              # TSV/TOML datasets (countries, regions, world rules)
+│       └── systems/           # Modular gameplay simulation systems
+│           ├── demographics/  # Birth, death, and population growth
+│           ├── economy/       # Industrial scaling and taxes
+│           ├── military/      # Units, building, and movement loops
+│           ├── politics/      # Government types and approvals
+│           └── world/         # Declarative AI policies and time system
+├── src/                       # Engine source code
+│   ├── client/                # UI, view controllers, and GPU batch renderers
+│   ├── core/                  # Math, coordinate conversions, and static paths
+│   │   └── map/
+│   │       └── geo.py         # Earth equirectangular & spherical projections
+│   ├── engine/                # Content-agnostic ECS simulation driver
+│   ├── server/                # State container, Arrow IPC, and session lifecycle
+│   └── shared/                # Universal contracts, schemas, actions, and events
+├── user_data/                 # Saved games, local session profiles, and logs
+├── requirements.txt           # Python dependency specifications
+└── main.py                    # Application launcher
 ```
 
-## Tech Stack
+---
 
-- **Logic:** Python 3.10+
-- **Data:** Polars
-- **Graphics:** Arcade / OpenGL
-- **Interface:** Dear ImGui via imgui_bundle
-- **Serialization:** Orjson and RToml
+## 💻 Tech Stack
 
-## Getting Started
+* **Programming Language:** Python 3.10+
+* **Data Processing:** Polars (Rust-backed DataFrame engine)
+* **Graphics Backend:** Arcade / Modern OpenGL
+* **User Interface:** Dear ImGui (via `imgui_bundle`)
+* **Serialization & Parsing:** Orjson & RToml
+* **Mathematics:** NumPy & Standard Math
 
-### Requirements
+---
 
-Install Python 3.10 or newer.
+## 🚦 Getting Started
 
-### Install Dependencies
+### Installation
+Ensure Python 3.10 or newer is installed on your system.
 
 ```bash
+# Clone the repository and install dependencies
 pip install -r requirements.txt
 ```
 
-### Run
-
+### Execution
+Run the engine via the entry point:
 ```bash
 python main.py
 ```
 
-## Roadmap Snapshot
+---
 
-1. **Stable core:** Mostly in place. Simulation, loading, rendering, and the economy stack work.
-2. **World content:** The base world dataset exists, but balance and coverage still need verification.
-3. **Multiplayer beta:** Not implemented yet.
-
-## License
+## 📄 License
 
 This project is licensed under the **PolyForm Noncommercial License 1.0.0**. See [LICENSE.md](LICENSE.md) for details.

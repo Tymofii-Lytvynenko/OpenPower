@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple, Optional
 
-from src.shared.map.geo import EquirectangularProjection, MapPixelCoordinate
+from src.core.map.geo import EquirectangularProjection, MapPixelCoordinate
 
 class CameraController:
     """

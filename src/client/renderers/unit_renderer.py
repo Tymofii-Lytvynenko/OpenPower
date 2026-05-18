@@ -15,7 +15,7 @@ from src.client.renderers.unit_projection import (
     UnitProjectionService,
 )
 from src.client.ui.core.theme import GAMETHEME
-from src.shared.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
+from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 
 if TYPE_CHECKING:
     from src.server.state import GameState
