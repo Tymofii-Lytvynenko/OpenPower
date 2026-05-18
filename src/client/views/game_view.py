@@ -17,6 +17,7 @@ class GameView(BaseImGuiView):
     def __init__(self, session, config: GameConfig, player_tag: str, initial_pos: Optional[tuple[float, float]] = None):
         super().__init__()
         self.config = config
+        self.player_tag = player_tag
         self.net = NetworkClient(session)
 
         # 1. Initialize Camera & Renderer
@@ -119,11 +120,22 @@ class GameView(BaseImGuiView):
 
         # 4. Render Unit Overlay and UI
         self.window.use() # Switch back for UI
+
+        visible_owners = None
+        if not self.viewport_ctrl.show_all_units:
+            active_country = self.viewport_ctrl.selected_country_tag or self.player_tag
+            from src.client.utils.diplomacy_utils import get_military_allies, get_military_enemies
+            state = self.net.get_state()
+            allies = get_military_allies(state, active_country)
+            enemies = get_military_enemies(state, active_country)
+            visible_owners = {active_country} | allies | enemies
+
         self.unit_renderer.render(
             state=self.net.get_state(),
             selected_unit_id=self.unit_interactions.selected_unit_id,
             hovered_unit_id=self.unit_interactions.hovered_unit_id,
             drag_preview=self.unit_interactions.drag_preview,
+            visible_owners=visible_owners,
         )
         try:
             self.layout.render(

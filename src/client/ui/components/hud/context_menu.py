@@ -76,7 +76,15 @@ class ContextMenu:
             
             self.composer.end_menu()
 
-        # 3. Tools Menu (Conditional)
+        # 3. Units Menu
+        if hasattr(self.viewport, "show_all_units"):
+            imgui.separator()
+            if self.composer.begin_menu("Units Visibility"):
+                if imgui.menu_item("Show All Units Globally", "", self.viewport.show_all_units)[0]:
+                    self.viewport.show_all_units = not self.viewport.show_all_units
+                self.composer.end_menu()
+
+        # 4. Tools Menu (Conditional)
         # Check if the Data Inspector panel is registered before showing the menu
         has_data_inspector = any(e.id == "DATA_INSPECTOR" for e in self.panels.get_entries())
         

@@ -2,6 +2,7 @@ from typing import Dict, Tuple, Optional, Set
 
 from src.server.state import GameState
 from src.client.visualization.map_modes.base_map_mode import BaseMapMode
+from src.client.utils.diplomacy_utils import get_military_allies, get_military_enemies
 
 
 class EmpireMapMode(BaseMapMode):
@@ -40,8 +41,8 @@ class EmpireMapMode(BaseMapMode):
         if "id" not in regions.columns or "owner" not in regions.columns:
             return {}
 
-        military_allies = self._build_military_allies(state)
-        military_enemies = self._build_military_enemies(state)
+        military_allies = get_military_allies(state, self.selected_country)
+        military_enemies = get_military_enemies(state, self.selected_country)
         result: Dict[int, Tuple[int, ...]] = {}
 
         for row in regions.select(["id", "owner"]).iter_rows(named=True):
@@ -69,75 +70,4 @@ class EmpireMapMode(BaseMapMode):
 
         return result
 
-    def _build_military_allies(self, state: GameState) -> Set[str]:
-        allies = self._countries_from_alliance_treaties(state)
-        allies.discard(self.selected_country)
-        return allies
 
-    def _build_military_enemies(self, state: GameState) -> Set[str]:
-        if self.selected_country is None or "countries_wars" not in state.tables:
-            return set()
-
-        enemies = set()
-        wars = state.get_table("countries_wars")
-        if "side_a" not in wars.columns or "side_b" not in wars.columns:
-            return enemies
-
-        for row in wars.select(["side_a", "side_b"]).iter_rows(named=True):
-            side_a = self._normalize_side(row["side_a"])
-            side_b = self._normalize_side(row["side_b"])
-            if self.selected_country in side_a:
-                enemies.update(side_b)
-            elif self.selected_country in side_b:
-                enemies.update(side_a)
-
-        enemies.discard(self.selected_country)
-        return enemies
-
-    def _countries_from_alliance_treaties(self, state: GameState) -> Set[str]:
-        if self.selected_country is None or "countries_treaties" not in state.tables:
-            return set()
-
-        treaties = state.get_table("countries_treaties")
-        if treaties.is_empty():
-            return set()
-
-        allies = set()
-        columns = set(treaties.columns)
-
-        if {"members", "type"}.issubset(columns):
-            for row in treaties.select(["members", "type"]).iter_rows(named=True):
-                treaty_type = str(row["type"]).lower() if row["type"] is not None else ""
-                if treaty_type not in {"alliance", "defensive_alliance", "military_alliance"}:
-                    continue
-
-                members = self._normalize_side(row["members"])
-                if self.selected_country in members:
-                    allies.update(members)
-
-        if {"side_a", "side_b", "type"}.issubset(columns):
-            for row in treaties.select(["side_a", "side_b", "type"]).iter_rows(named=True):
-                treaty_type = str(row["type"]).lower() if row["type"] is not None else ""
-                if treaty_type not in {"alliance", "defensive_alliance", "military_alliance"}:
-                    continue
-
-                side_a = self._normalize_side(row["side_a"])
-                side_b = self._normalize_side(row["side_b"])
-                if self.selected_country in side_a:
-                    allies.update(side_b)
-                elif self.selected_country in side_b:
-                    allies.update(side_a)
-
-        allies.discard(self.selected_country)
-        return allies
-
-    def _normalize_side(self, value) -> Set[str]:
-        if value is None:
-            return set()
-        if isinstance(value, list):
-            return {str(tag) for tag in value if tag is not None}
-        if isinstance(value, tuple):
-            return {str(tag) for tag in value if tag is not None}
-        if isinstance(value, str):
-            return {tag.strip() for tag in value.split(",") if tag.strip()}
-        return set()

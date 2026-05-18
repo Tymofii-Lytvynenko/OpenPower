@@ -91,14 +91,16 @@ class UnitRenderer:
         selected_unit_id: Optional[str],
         hovered_unit_id: Optional[str],
         drag_preview: Optional[UnitDragPreview],
+        visible_owners: Optional[set[str]] = None,
     ) -> None:
         window = imgui.get_io().display_size
         width = int(window.x)
         height = int(window.y)
-        units_signature = self._get_units_signature(state)
+        filtered_units = self._get_filtered_units(state, visible_owners)
+        units_signature = self._get_units_signature(state, filtered_units, visible_owners)
 
-        self._prepare_flag_atlas_for_state(state, drag_preview, units_signature)
-        self._billboards = self._project_units(state, width, height, units_signature)
+        self._prepare_flag_atlas_for_state(filtered_units, drag_preview, units_signature)
+        self._billboards = self._project_units(state, filtered_units, width, height, units_signature)
         batch_drawn = self._batch.render(self._billboards, self._flags, width, height)
         needs_imgui_overlay = (
             not batch_drawn
@@ -149,18 +151,18 @@ class UnitRenderer:
     def _project_units(
         self,
         state: Optional["GameState"],
+        filtered_units: Any,
         window_width: int,
         window_height: int,
         units_signature: tuple | None,
     ) -> list[ProjectedUnit]:
-        if state is None or "units" not in state.tables:
+        if state is None or filtered_units is None:
             self._projection_cache_key = None
             self._prepared_units_key = None
             self._prepared_units = PreparedUnitProjectionData.empty()
             return []
 
-        units = state.tables["units"]
-        if units.is_empty():
+        if filtered_units.is_empty():
             self._projection_cache_key = None
             self._prepared_units_key = None
             self._prepared_units = PreparedUnitProjectionData.empty()
@@ -171,7 +173,7 @@ class UnitRenderer:
         if cache_key == self._projection_cache_key:
             return self._billboards
 
-        prepared = self._get_prepared_units(units, units_signature)
+        prepared = self._get_prepared_units(filtered_units, units_signature)
         self._projection_cache_key = cache_key
         return self._projection.project_prepared_units(
             prepared,
@@ -204,17 +206,36 @@ class UnitRenderer:
         self._prepared_units_key = prepared_key
         return self._prepared_units
 
-    def _get_units_signature(self, state: Optional["GameState"]) -> tuple | None:
+    def _get_filtered_units(self, state: Optional["GameState"], visible_owners: Optional[set[str]]):
         if state is None or "units" not in state.tables:
+            return None
+        units = state.tables["units"]
+        if units.is_empty():
+            return units
+        if visible_owners is not None and "owner" in units.columns:
+            import polars as pl
+            units = units.filter(pl.col("owner").is_in(list(visible_owners)))
+        return units
+
+    def _get_units_signature(
+        self, 
+        state: Optional["GameState"], 
+        filtered_units: Any,
+        visible_owners: Optional[set[str]],
+    ) -> tuple | None:
+        if state is None or filtered_units is None:
             self._last_state_id = None
             self._last_units_signature = None
             return None
 
         state_id = id(state)
-        if state_id == self._last_state_id:
+        # Using hash of visible_owners if it exists to invalidate cache when filter changes
+        owners_hash = hash(frozenset(visible_owners)) if visible_owners is not None else 0
+        if state_id == self._last_state_id and owners_hash == getattr(self, '_last_owners_hash', None):
             return self._last_units_signature
 
-        units = state.tables["units"]
+        self._last_owners_hash = owners_hash
+        units = filtered_units
         if units.is_empty():
             signature = ("empty", 0)
         else:
@@ -237,17 +258,16 @@ class UnitRenderer:
 
     def _prepare_flag_atlas_for_state(
         self,
-        state: Optional["GameState"],
+        filtered_units: Any,
         drag_preview: Optional[UnitDragPreview],
         units_signature: tuple | None,
     ) -> None:
         owners = set(self._flag_owners)
         if (
-            state is not None
-            and "units" in state.tables
+            filtered_units is not None
             and units_signature != self._flag_units_signature
         ):
-            units = state.tables["units"]
+            units = filtered_units
             if not units.is_empty() and "owner" in units.columns:
                 self._flag_owners = frozenset(str(owner) for owner in units["owner"].unique().to_list())
                 owners.update(self._flag_owners)

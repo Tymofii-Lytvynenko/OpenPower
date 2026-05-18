@@ -40,6 +40,7 @@ class ViewportController:
 
         self.selection_mode = SelectionMode.COUNTRY
         self.selected_country_tag: Optional[str] = None
+        self.show_all_units: bool = False
 
         # --- MAP MODES (Composition) ---
         self.map_modes: Dict[str, BaseMapMode] = {
