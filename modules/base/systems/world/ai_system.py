@@ -1,31 +1,31 @@
 import polars as pl
-import numpy as np
 from typing import List
 
 from src.engine.interfaces import ISystem
+from src.engine.ai_framework import DeclarativeAIFramework
 from src.server.state import GameState
 from src.shared.actions import ActionBuildUnit, ActionUpdateBudget, GameAction
 
 # =========================================================================
-# 📊 FIRST-PRINCIPLES SCORERS (Utility evaluation based on real economic metrics)
-# All computations utilize absolute physical/financial metrics (currency, time, probabilities).
+# Pure Functional Scorers (Data-Driven Policy Definitions)
 # =========================================================================
 
 def audit_financial_survival(lf: pl.LazyFrame) -> pl.LazyFrame:
     """
-    LEVEL 1: SURVIVAL.
-    Calculates the financial runway (how many months a country can operate before default).
+    Evaluates existential economic threat levels across all actors concurrently.
+    Uses financial runway tracking instead of soft arbitrary thresholds.
     """
     return lf.with_columns(
-        # Net annual income or budget deficit
+        # Derive net annual balance to measure cash burn rates.
         annual_net_income = pl.col("total_annual_revenue") - pl.col("total_annual_expense")
     ).with_columns(
-        # Remaining months before bankruptcy if net income is negative; otherwise infinity (999.0)
+        # Unpredictable division by zero safety: map positive flows to infinite runway.
         months_to_bankruptcy = pl.when(pl.col("annual_net_income") < 0)
                                  .then((pl.col("money_reserves") / pl.col("annual_net_income").abs()) * 12)
                                  .otherwise(999.0)
     ).with_columns(
-        # Survival utility: as months to default drops below 12, utility scales up rapidly toward 1.0
+        # The 12-month boundary represents an economic panic trigger point.
+        # Utility curve scales dynamically up to 1.0 as the runway approaches zero.
         utility_survival_taxes = pl.when(pl.col("months_to_bankruptcy") < 12.0)
                                    .then((1.0 - (pl.col("months_to_bankruptcy") / 12.0)).clip(0.0, 1.0))
                                    .otherwise(0.0)
@@ -33,28 +33,26 @@ def audit_financial_survival(lf: pl.LazyFrame) -> pl.LazyFrame:
 
 def calculate_military_roi(lf: pl.LazyFrame) -> pl.LazyFrame:
     """
-    LEVEL 2: DEVELOPMENT (Security Investments).
-    Calculates the Total Cost of Ownership (TCO) of the military alongside its insurance value for GDP.
+    Computes direct investment value of security assets based on asset preservation physics.
+    A country buys military force only if it expects a positive yield on protecting its GDP.
     """
-    # Business assumptions (5-year planning horizon)
+    # Hardcoded macroeconomic parameters scaled to match global financial constants.
     PLANNING_HORIZON_YEARS = 5.0
     UNIT_BUILD_COST = 1_000_000.0
     UNIT_ANNUAL_UPKEEP_BASE = 500_000.0
-    # One military unit is estimated to protect 1% of GDP from damage or hostile actions
     GDP_PROTECTED_PER_UNIT = 0.01 
 
     return lf.with_columns(
-        # Total cost: Build cost plus upkeep over the 5-year planning horizon
+        # Total Cost of Ownership calculation over a standard multi-year strategic cycle.
         unit_5y_cost = UNIT_BUILD_COST + (UNIT_ANNUAL_UPKEEP_BASE * pl.col("human_dev") * PLANNING_HORIZON_YEARS)
     ).with_columns(
-        # Expected benefit: The portion of GDP preserved by the unit in absolute monetary terms.
-        # PSYCHOLOGY: A paranoid leader (trait > 1.0) perceives threat levels as higher, inflating perceived utility.
+        # Psychological bias interpolation: risk traits directly skew objective reality.
+        # Paranoid leaders overestimate asset preservation value, inflating utility.
         unit_5y_benefit = (pl.col("gdp") * GDP_PROTECTED_PER_UNIT) * pl.col("trait_threat_perception")
     ).with_columns(
-        # Net financial ROI (Return on Investment) of military deployment
         military_roi = (pl.col("unit_5y_benefit") - pl.col("unit_5y_cost")) / pl.col("unit_5y_cost")
     ).with_columns(
-        # Military buildup utility: Only triggered if ROI is positive, reserves exceed cost, and budget is not in deficit
+        # Asymmetric block logic: expansion utility drops to absolute zero during active defalcation.
         utility_build_army = pl.when(
                                 (pl.col("military_roi") > 0.0) & 
                                 (pl.col("money_reserves") > pl.col("unit_5y_cost")) &
@@ -64,13 +62,20 @@ def calculate_military_roi(lf: pl.LazyFrame) -> pl.LazyFrame:
                              .otherwise(0.0)
     )
 
+
 # =========================================================================
-# ⚙️ AI SYSTEM (Framework Orchestrator)
+# ECS System Layer Integration
 # =========================================================================
 
 class AISystem(ISystem):
+    """
+    System boundary exposing the data-driven framework to the simulation scheduler loop.
+    Acts as a pluggable driver node in the engine graph.
+    """
     def __init__(self):
         self._missing_columns = set()
+        self._framework = DeclarativeAIFramework()
+        self._bootstrap_framework()
 
     @property
     def id(self) -> str:
@@ -78,95 +83,61 @@ class AISystem(ISystem):
 
     @property
     def dependencies(self) -> list[str]:
-        # AI execution should start immediately after the time/tick progression system
+        # Critical priority assignment: AI must calculate intent vectors right after time
+        # to feed valid commands to the downstream Budget/Military simulation execution layers.
         return ["base.time"]
 
-    def _ensure_columns(self, lf: pl.LazyFrame) -> pl.LazyFrame:
-        """Validates and initializes missing columns, including psychological state indicators."""
+    def _bootstrap_framework(self) -> None:
+        """Wiring up data transformation policies and resolution commands cleanly on init."""
+        self._framework.register_scorer(audit_financial_survival)
+        self._framework.register_scorer(calculate_military_roi)
+
+        # Decoupled bindings using closure factories to keep engine structures pure.
+        self._framework.register_action_resolver(
+            "utility_survival_taxes",
+            lambda row: ActionUpdateBudget(
+                "ai_system", 
+                row["id"], 
+                {"personal_income_tax_rate": min(0.50, row["personal_income_tax_rate"] + 0.02)}
+            )
+        )
+
+        self._framework.register_action_resolver(
+            "utility_build_army",
+            lambda row: ActionBuildUnit("ai_system", row["id"], "army", 1)
+        )
+
+    def _apply_schema_fallbacks(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+        """Guarantees structural data integrity across hot-loaded mod configurations."""
         schema = lf.collect_schema().names()
-        
         defaults = {
-            "total_annual_revenue": 0.0,
-            "total_annual_expense": 0.0,
-            "money_reserves": 0.0,
-            "gdp": 10_000_000.0,
-            "human_dev": 0.5,
-            "personal_income_tax_rate": 0.20,
-            # Psychological profile: 1.0 = baseline government. >1.0 = paranoid, <1.0 = pacifist/risk-averse
-            "trait_threat_perception": 1.0 
+            "total_annual_revenue": 0.0, "total_annual_expense": 0.0,
+            "money_reserves": 0.0, "gdp": 10_000_000.0, "human_dev": 0.5,
+            "personal_income_tax_rate": 0.20, "trait_threat_perception": 1.0 
         }
 
         for col, default_val in defaults.items():
             if col not in schema:
                 if col not in self._missing_columns:
-                    print(f"[{self.id}] Column '{col}' not found. Defaulting to {default_val}.")
+                    print(f"[{self.id}] Schema anomaly recovery: Defaulting '{col}' to {default_val}")
                     self._missing_columns.add(col)
                 lf = lf.with_columns(pl.lit(default_val).alias(col))
                 
         return lf
 
     def update(self, state: GameState, delta_time: float) -> None:
+        # Throttle evaluation passes to run once per month (every 30 cycles).
+        # Eliminates CPU micro-stuttering while mimicking realistic institutional reaction intervals.
         tick = state.globals.get("tick", 0)
-        # AI decision-making throttled to monthly intervals (every 30 ticks)
-        if tick % 30 != 0:
+        if tick % 30 != 0 or "countries" not in state.tables:
             return
 
-        if "countries" not in state.tables:
-            return
-
-        # 1. DATA PREPARATION
         countries_lf = state.get_table("countries").lazy()
-        countries_lf = self._ensure_columns(countries_lf)
+        countries_lf = self._apply_schema_fallbacks(countries_lf)
 
-        # 2. VECTOR UTILITY EVALUATION (First-Principles Pipeline)
-        decision_df = (
-            countries_lf
-            .pipe(audit_financial_survival)
-            .pipe(calculate_military_roi)
-            .select([
-                "id", 
-                "personal_income_tax_rate", 
-                "utility_survival_taxes", 
-                "utility_build_army",
-                "months_to_bankruptcy",
-                "military_roi"
-            ])
-            .collect()
-        )
-
-        # 3. ACTION RESOLUTION (Hierarchical Decision Tree)
-        generated_actions: List[GameAction] = []
-
-        for row in decision_df.iter_rows(named=True):
-            country_id = row["id"]
-            
-            # National Maslow's hierarchy of needs: prioritizes survival before development/expansion
-            
-            # LEVEL 1: Default Threat Mitigation (Highest priority)
-            if row["utility_survival_taxes"] > 0.0:
-                current_tax = row["personal_income_tax_rate"]
-                # Adjust taxes conservatively (+2% increments) to prevent sudden economic collapse
-                new_tax = min(0.50, current_tax + 0.02)
-                
-                generated_actions.append(ActionUpdateBudget(
-                    player_id="ai_system",
-                    country_tag=country_id,
-                    allocations={"personal_income_tax_rate": new_tax}
-                ))
-                continue # Economic rescue takes absolute precedence; defer expansion plans for the next tick.
-
-            # LEVEL 2: Financial Surplus & Security Reinvestment
-            if row["utility_build_army"] > 0.0:
-                generated_actions.append(ActionBuildUnit(
-                    player_id="ai_system",
-                    country_tag=country_id,
-                    unit_type="army",
-                    count=1
-                ))
-                # Divergent behavior emerges naturally from underlying GDP variances and psychological traits
-
-        # 4. ACTION INJECTION
-        state.current_actions.extend(generated_actions)
-
-        # (Optional) Developer Telemetry / Debug logging
-        # print(f"[{self.id}] AI Actions Generated: {len(generated_actions)}")
+        # Framework computes changes on immutable views and emits standalone operations data.
+        actions = self._framework.evaluate_and_act(countries_lf)
+        
+        # Inject computed logic directly into the thread-safe global step context queue.
+        # TODO: Implement an optimized sorting pass if action prioritization becomes critical in Beta.
+        state.current_actions.extend(actions)
