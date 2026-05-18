@@ -7,7 +7,7 @@ from src.client.utils.diplomacy_utils import get_military_allies, get_military_e
 
 class EmpireMapMode(BaseMapMode):
     """
-    Superpower 2 style diplomatic view centered on the selected country.
+    Styled diplomatic view centered on the selected country.
     Selected country is green, military allies are blue, wartime enemies are red,
     and neutral countries stay subdued so the military blocs remain readable.
     """

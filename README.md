@@ -14,7 +14,7 @@
 * **Geo-Coordinated Military Movement:** Active military system supporting real-time unit movements across the globe. Calculates equirectangular-to-spherical coordinates, tracking path distances and interpolating movement progress smoothly via SLERP (Spherical Linear Interpolation).
 * **Interactive Unit Renderer & Atlas:** Billboard-based unit projection batching (`src/client/renderers/unit_batch_renderer.py`) and texture atlas optimization (`src/client/renderers/unit_flag_atlas.py`) that clusters overlapping units into stacks and supports interactive mouse drags to order troop movements.
 * **Treaty & Alliance Systems:** Authorization database for military alliances, defensive pacts, and ongoing conflicts (`countries_wars.toml`, `countries_treaties.toml`).
-* **Empire Mode Map Overlay:** A superpower-style political map overlay representing diplomatic alliances, defensive treaties, and wars with highly polished, dynamic hues (selected country in green, allies in blue, enemies in red, and neutral states in charcoal).
+* **Empire Mode Map Overlay:** A political map overlay representing diplomatic alliances, defensive treaties, and wars with highly polished, dynamic hues (selected country in green, allies in blue, enemies in red, and neutral states in charcoal).
 * **Dynamic Mod Loader:** Scans `modules/` for dynamic system registration, loading world datasets (regions, countries, demographics, resources) from TSV and TOML files on startup.
 
 ---
