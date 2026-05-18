@@ -5,6 +5,7 @@ from src.engine.interfaces import ISystem
 from src.engine.ai_framework import DeclarativeAIFramework
 from src.server.state import GameState
 from src.shared.actions import ActionBuildUnit, ActionUpdateBudget, GameAction
+from src.shared.events import EventRealSecond
 
 # =========================================================================
 # Pure Functional Scorers (Data-Driven Policy Definitions)
@@ -41,14 +42,15 @@ def calculate_military_roi(lf: pl.LazyFrame) -> pl.LazyFrame:
     UNIT_BUILD_COST = 1_000_000.0
     UNIT_ANNUAL_UPKEEP_BASE = 500_000.0
     GDP_PROTECTED_PER_UNIT = 0.01 
+    MILITARY_DECAY_FACTOR = 0.85
 
     return lf.with_columns(
         # Total Cost of Ownership calculation over a standard multi-year strategic cycle.
         unit_5y_cost = UNIT_BUILD_COST + (UNIT_ANNUAL_UPKEEP_BASE * pl.col("human_dev") * PLANNING_HORIZON_YEARS)
     ).with_columns(
-        # Psychological bias interpolation: risk traits directly skew objective reality.
-        # Paranoid leaders overestimate asset preservation value, inflating utility.
-        unit_5y_benefit = (pl.col("gdp") * GDP_PROTECTED_PER_UNIT) * pl.col("trait_threat_perception")
+        # Apply exponential decay to model diminishing marginal utility of army size.
+        # This prevents wealthy countries from endlessly spawning units and going bankrupt.
+        unit_5y_benefit = (pl.col("gdp") * GDP_PROTECTED_PER_UNIT * pl.lit(MILITARY_DECAY_FACTOR).pow(pl.col("military_count"))) * pl.col("trait_threat_perception")
     ).with_columns(
         military_roi = (pl.col("unit_5y_benefit") - pl.col("unit_5y_cost")) / pl.col("unit_5y_cost")
     ).with_columns(
@@ -61,6 +63,7 @@ def calculate_military_roi(lf: pl.LazyFrame) -> pl.LazyFrame:
                              .then(pl.col("military_roi").clip(0.0, 1.0))
                              .otherwise(0.0)
     )
+
 
 
 # =========================================================================
@@ -113,7 +116,8 @@ class AISystem(ISystem):
         defaults = {
             "total_annual_revenue": 0.0, "total_annual_expense": 0.0,
             "money_reserves": 0.0, "gdp": 10_000_000.0, "human_dev": 0.5,
-            "personal_income_tax_rate": 0.20, "trait_threat_perception": 1.0 
+            "personal_income_tax_rate": 0.20, "trait_threat_perception": 1.0,
+            "military_count": 0
         }
 
         for col, default_val in defaults.items():
@@ -126,10 +130,10 @@ class AISystem(ISystem):
         return lf
 
     def update(self, state: GameState, delta_time: float) -> None:
-        # Throttle evaluation passes to run once per month (every 30 cycles).
-        # Eliminates CPU micro-stuttering while mimicking realistic institutional reaction intervals.
-        tick = state.globals.get("tick", 0)
-        if tick % 30 != 0 or "countries" not in state.tables:
+        # Throttle evaluation passes to run once every real-time second.
+        # Uses the central EventRealSecond event from base.time system to keep logic synchronized.
+        has_real_second = any(isinstance(e, EventRealSecond) for e in state.events)
+        if not has_real_second or state.time.is_paused or "countries" not in state.tables:
             return
 
         countries_lf = state.get_table("countries").lazy()
