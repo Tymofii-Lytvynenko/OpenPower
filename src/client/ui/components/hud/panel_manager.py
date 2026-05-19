@@ -85,15 +85,6 @@ class PanelManager:
 
             try:
                 keep_open = entry.instance.render(state, context)
-            except TypeError:
-                try:
-                    keep_open = entry.instance.render(state, **context.to_legacy_kwargs())
-                except TypeError:
-                    logger.exception("Panel '%s' has an incompatible render signature", entry.id)
-                    continue
-                except Exception:
-                    logger.exception("Panel '%s' failed during legacy render", entry.id)
-                    continue
             except Exception:
                 logger.exception("Panel '%s' failed during render", entry.id)
                 continue

@@ -4,6 +4,8 @@ from imgui_bundle import imgui
 
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.panel_context import PanelRenderContext
+
 
 class DataInspectorPanel:
     """
@@ -14,10 +16,11 @@ class DataInspectorPanel:
         self.selected_key = None
         self.row_limit = 50 
 
-    def render(self, state, **kwargs) -> bool:
+    def render(self, state, context: PanelRenderContext) -> bool:
         # Replaces BasePanel logic with Context Manager
         with WindowManager.window("DATA INSPECTOR", x=300, y=100, w=1000, h=700) as is_open:
-            if not is_open: return False
+            if not is_open:
+                return False
             self._render_content(state)
             return True
 

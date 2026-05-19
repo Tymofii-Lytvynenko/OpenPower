@@ -4,16 +4,16 @@ from imgui_bundle import imgui
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.primitives import UIPrimitives as Prims
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.panel_context import PanelRenderContext
+
 
 class PoliticsPanel:
-    def render(self, state, **kwargs) -> bool:
-        target_tag = kwargs.get("target_tag", "")
-        is_own = kwargs.get("is_own_country", False)
-        
+    def render(self, state, context: PanelRenderContext) -> bool:
         # Composition: WindowManager handles the Begin/End
         with WindowManager.window("POLITICS", x=10, y=100, w=240, h=520) as is_open:
-            if not is_open: return False
-            self._render_content(state, target_tag, is_own)
+            if not is_open:
+                return False
+            self._render_content(state, context.target_tag, context.is_own_country)
             return True
 
     def _render_content(self, state, target_tag, is_own):
