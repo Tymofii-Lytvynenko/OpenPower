@@ -51,7 +51,6 @@ OpenPower/
 │   └── shared/                # Universal contracts, schemas, actions, and events
 ├── user_data/                 # Saved games, local session profiles, and logs
 ├── pyproject.toml             # Project metadata and dependencies
-├── requirements.txt           # Legacy dependency compatibility file
 └── main.py                    # Application launcher
 ```
 
@@ -83,12 +82,6 @@ pip install -e .
 
 ```bash
 pip install -e .[dev]
-```
-
-#### Legacy Workflow
-
-```bash
-pip install -r requirements.txt
 ```
 
 ### Execution
