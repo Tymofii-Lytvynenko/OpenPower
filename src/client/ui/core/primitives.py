@@ -73,8 +73,14 @@ class UIPrimitives:
     @staticmethod
     def right_align_text(text: str, color: tuple | None = None):
         width = imgui.calc_text_size(text).x
-        avail_w = imgui.get_content_region_avail().x
-        imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + avail_w - width)
+        # Compute the right edge of the content region in window-relative coords.
+        # This is reliable even after same_line() following a full-width dummy,
+        # where get_content_region_avail().x drops to ~0 and produces a wrong result.
+        content_max_x = imgui.get_window_content_region_max().x
+        target_x = content_max_x - width
+        current_x = imgui.get_cursor_pos_x()
+        if target_x > current_x:
+            imgui.set_cursor_pos_x(target_x)
 
         if color:
             imgui.text_colored(color, text)
