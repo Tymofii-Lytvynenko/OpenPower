@@ -74,14 +74,13 @@ class UIPrimitives:
     def right_align_text(text: str, color: tuple | None = None):
         width = imgui.calc_text_size(text).x
         avail_w = imgui.get_content_region_avail().x
-        offset = max(0.0, avail_w - width)
-        if offset:
-            imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + offset)
+        imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + avail_w - width)
 
         if color:
             imgui.text_colored(color, text)
         else:
             imgui.text(text)
+
 
     @staticmethod
     def icon_toggle(
