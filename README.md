@@ -50,7 +50,8 @@ OpenPower/
 │   ├── server/                # State container, Arrow IPC, and session lifecycle
 │   └── shared/                # Universal contracts, schemas, actions, and events
 ├── user_data/                 # Saved games, local session profiles, and logs
-├── requirements.txt           # Python dependency specifications
+├── pyproject.toml             # Project metadata and dependencies
+├── requirements.txt           # Legacy dependency compatibility file
 └── main.py                    # Application launcher
 ```
 
@@ -72,13 +73,34 @@ OpenPower/
 ### Installation
 Ensure Python 3.10 or newer is installed on your system.
 
+#### Recommended (Editable Install)
+
 ```bash
-# Clone the repository and install dependencies
+pip install -e .
+```
+
+#### Development Dependencies
+
+```bash
+pip install -e .[dev]
+```
+
+#### Legacy Workflow
+
+```bash
 pip install -r requirements.txt
 ```
 
 ### Execution
-Run the engine via the entry point:
+
+Run via the installed entrypoint:
+
+```bash
+openpower
+```
+
+Or directly:
+
 ```bash
 python main.py
 ```
