@@ -112,3 +112,14 @@ class ActionUpdateBudget(GameAction):
     """
     country_tag: str
     allocations: dict # Map of column_name -> ratio (0.0 to 1.0)
+
+@dataclass
+class ActionUpdateResourcePolicy(GameAction):
+    """
+    Updates per-resource economic policy for a country's domestic production.
+    """
+    country_tag: str
+    resource_id: str
+    is_gov_controlled: bool
+    is_legal: bool
+    tax_rate: float # Ratio, e.g. 0.05 for 5%
