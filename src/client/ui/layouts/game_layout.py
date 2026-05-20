@@ -23,6 +23,8 @@ from src.client.ui.panels.region_inspector import RegionInspectorPanel
 from src.client.ui.panels.data_insp_panel import DataInspectorPanel
 from src.client.ui.panels.resources_panel import ResourcesPanel
 from src.client.ui.panels.budget_panel import BudgetPanel
+from src.client.ui.panels.economic_health_panel import EconomicHealthPanel
+from src.client.ui.panels.trade_panel import TradePanel
 
 class GameLayout:
     """
@@ -42,20 +44,24 @@ class GameLayout:
         self.panel_manager.register("POL", PoliticsPanel(), icons_fontawesome_6.ICON_FA_BUILDING_COLUMNS, GAMETHEME.colors.politics)
         self.panel_manager.register("MIL", MilitaryPanel(), icons_fontawesome_6.ICON_FA_PERSON_MILITARY_RIFLE, GAMETHEME.colors.military)
 
-        # Economy Panel with callback to open Resources
+        # Economy Panel with callbacks to open real detailed panels.
         self.panel_manager.register("ECO", EconomyPanel(
             toggle_resources_cb=lambda: self.panel_manager.toggle("RESOURCES"),
-            toggle_budget_cb=lambda: self.panel_manager.toggle("BUDGET")
+            toggle_budget_cb=lambda: self.panel_manager.toggle("BUDGET"),
+            toggle_health_cb=lambda: self.panel_manager.toggle("ECONOMIC_HEALTH"),
+            toggle_trade_cb=lambda: self.panel_manager.toggle("TRADE"),
         ), icons_fontawesome_6.ICON_FA_SACK_DOLLAR, GAMETHEME.colors.economy)
 
         self.panel_manager.register("DEM", DemographicsPanel(), icons_fontawesome_6.ICON_FA_PEOPLE_GROUP, GAMETHEME.colors.demographics)
         self.panel_manager.register("INSPECTOR", RegionInspectorPanel())
         self.panel_manager.register("DATA_INSPECTOR", DataInspectorPanel())
 
-        # Resources and Budget are sub-panels opened via the Economy panel;
+        # Economy detail panels are opened via the Economy panel;
         # they must not appear in the toggle bar.
         self.panel_manager.register("RESOURCES", ResourcesPanel(), show_in_toggle_bar=False)
         self.panel_manager.register("BUDGET", BudgetPanel(), show_in_toggle_bar=False)
+        self.panel_manager.register("ECONOMIC_HEALTH", EconomicHealthPanel(), show_in_toggle_bar=False)
+        self.panel_manager.register("TRADE", TradePanel(), show_in_toggle_bar=False)
 
         # 3. Compose HUD Components
         self.central_bar = CentralBar()
