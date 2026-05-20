@@ -8,12 +8,17 @@ from src.client.ui.core.panel_context import PanelRenderContext
 
 
 class EconomyPanel:
-    def __init__(self, toggle_resources_cb=None, toggle_budget_cb=None):
+    def __init__(
+        self,
+        toggle_resources_cb=None,
+        toggle_budget_cb=None,
+        toggle_health_cb=None,
+        toggle_trade_cb=None,
+    ):
         self.toggle_resources_cb = toggle_resources_cb
         self.toggle_budget_cb = toggle_budget_cb
-        
-        # Local UI state
-        self.eco_model_val = 0.95  # Default towards Free Market as in screenshot
+        self.toggle_health_cb = toggle_health_cb
+        self.toggle_trade_cb = toggle_trade_cb
 
     def render(self, state, context: PanelRenderContext) -> bool:
         # Matched width from screenshot proportions
@@ -28,8 +33,9 @@ class EconomyPanel:
         revenue = 0.0
         expenses = 0.0
         reserves = 0.0
-        eco_health = 0.836  # Default fallback 83.6%
-        resources_health = 1.0  # Default fallback 100%
+        eco_health = 0.0
+        resources_health = self._get_resource_health(state, target_tag)
+        market_model_val = self._get_market_model_value(state, target_tag)
         
         if "countries" in state.tables:
             try:
@@ -51,7 +57,7 @@ class EconomyPanel:
                         
                     if "economic_health" in row.columns:
                         val_eh = row["economic_health"][0]
-                        eco_health = float(val_eh) if val_eh is not None else 0.836
+                        eco_health = float(val_eh) if val_eh is not None else 0.0
             except Exception:
                 pass
 
@@ -66,13 +72,12 @@ class EconomyPanel:
         imgui.push_style_color(imgui.Col_.frame_bg, imgui.get_color_u32((0.15, 0.15, 0.15, 1.0)))
         imgui.push_style_color(imgui.Col_.slider_grab, imgui.get_color_u32((0.4, 0.8, 0.4, 1.0)))
         
-        if not is_own: imgui.begin_disabled()
-        
-        # Slider without label
+        # This is intentionally read-only: policy changes happen through Resources.
+        imgui.begin_disabled()
         imgui.set_next_item_width(-1)
-        _, self.eco_model_val = imgui.slider_float("##eco_model", self.eco_model_val, 0.0, 1.0, "")
+        imgui.slider_float("##eco_model", market_model_val, 0.0, 1.0, "")
+        imgui.end_disabled()
         
-        if not is_own: imgui.end_disabled()
         imgui.pop_style_color(2)
         
         imgui.text_disabled("State-Controlled")
@@ -81,7 +86,7 @@ class EconomyPanel:
         imgui.dummy((0, 5))
 
         # ECONOMIC HEALTH Section
-        self._draw_header("ECONOMIC HEALTH", "health_btn", callback=lambda: None)  # Mock callback for visual 'more' button
+        self._draw_header("ECONOMIC HEALTH", "health_btn", callback=self.toggle_health_cb)
         self._draw_meter_row(eco_health)
         imgui.dummy((0, 5))
 
@@ -101,11 +106,75 @@ class EconomyPanel:
         # TRADE Button
         imgui.push_style_color(imgui.Col_.button, imgui.get_color_u32((0.15, 0.15, 0.15, 1.0)))
         imgui.push_style_color(imgui.Col_.button_hovered, imgui.get_color_u32((0.25, 0.25, 0.25, 1.0)))
-        if imgui.button("TRADE", (-1, 28)):
-            pass # TODO: Implement Trade Window toggle
+        if imgui.button("TRADE", (-1, 28)) and self.toggle_trade_cb:
+            self.toggle_trade_cb()
         imgui.pop_style_color(2)
 
         imgui.pop_style_var()
+
+    def _get_market_model_value(self, state, target_tag) -> float:
+        """Returns the free-market share of domestic production, using real production policy data."""
+        if "domestic_production" not in state.tables:
+            return 0.0
+
+        try:
+            df = state.get_table("domestic_production")
+            if "country_id" not in df.columns or "domestic_production" not in df.columns:
+                return 0.0
+
+            target_df = df.filter(pl.col("country_id") == target_tag)
+            if target_df.is_empty():
+                return 0.0
+
+            total = float(target_df["domestic_production"].sum() or 0.0)
+            if total <= 0.0:
+                return 0.0
+
+            if "is_gov_controlled" not in target_df.columns:
+                return 1.0
+
+            gov_total = float(
+                target_df
+                .filter(pl.col("is_gov_controlled") == True)
+                .select(pl.col("domestic_production").sum())
+                .item()
+                or 0.0
+            )
+            return max(0.0, min(1.0, 1.0 - (gov_total / total)))
+        except Exception:
+            return 0.0
+
+    def _get_resource_health(self, state, target_tag) -> float:
+        """Estimates demand coverage from the country resource ledger."""
+        if "resource_ledger" not in state.tables:
+            return 0.0
+
+        try:
+            ledger = state.get_table("resource_ledger")
+            if "country_id" not in ledger.columns:
+                return 0.0
+
+            country_ledger = ledger.filter(pl.col("country_id") == target_tag)
+            if country_ledger.is_empty() or "consumption_usd" not in country_ledger.columns:
+                return 0.0
+
+            consumption = float(country_ledger["consumption_usd"].sum() or 0.0)
+            if consumption <= 0.0:
+                return 1.0
+
+            if "balance_usd" not in country_ledger.columns:
+                return 1.0
+
+            shortage = abs(float(
+                country_ledger
+                .filter(pl.col("balance_usd") < 0)
+                .select(pl.col("balance_usd").sum())
+                .item()
+                or 0.0
+            ))
+            return max(0.0, min(1.0, 1.0 - (shortage / consumption)))
+        except Exception:
+            return 0.0
 
     # =========================================================================
     # Helpers & Custom Drawing Routines for exact screenshot matching
@@ -173,6 +242,7 @@ class EconomyPanel:
 
     def _draw_meter_row(self, percentage: float, has_plus=False):
         """Draws a percentage text followed by a custom green gradient progress bar."""
+        percentage = max(0.0, min(float(percentage), 1.0))
         pct_str = f"{percentage * 100:.1f} %"
         if percentage >= 1.0:
             pct_str = "100 %"
@@ -193,7 +263,7 @@ class EconomyPanel:
         )
         
         # Fill (Green)
-        fill_w = avail_w * max(0.0, min(percentage, 1.0))
+        fill_w = avail_w * percentage
         if fill_w > 0:
             # Simulating the gradient/bright green from screenshot
             draw_list.add_rect_filled(
