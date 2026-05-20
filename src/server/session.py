@@ -1,8 +1,9 @@
 from typing import List, Optional, Callable, TYPE_CHECKING
 from pathlib import Path
+import polars as pl
 
 from src.shared.config import GameConfig
-from src.shared.actions import GameAction
+from src.shared.actions import GameAction, ActionUpdateResourcePolicy
 
 # Logic & Data Systems
 from src.engine.mod_manager import ModManager
@@ -131,7 +132,48 @@ class GameSession:
         Endpoint for Clients to submit commands.
         """
         # TODO: Add validation here (e.g., "Is Player X allowed to move Unit Y?")
+        if isinstance(action, ActionUpdateResourcePolicy):
+            self._apply_resource_policy_action(action)
+            return
+
         self.action_queue.append(action)
+
+    def _apply_resource_policy_action(self, action: ActionUpdateResourcePolicy) -> None:
+        if "domestic_production" not in self.state.tables:
+            return
+
+        df = self.state.get_table("domestic_production")
+        expressions = []
+        if "is_gov_controlled" not in df.columns:
+            expressions.append(pl.lit(False).alias("is_gov_controlled"))
+        if "is_legal" not in df.columns:
+            expressions.append(pl.lit(True).alias("is_legal"))
+        if "tax_rate" not in df.columns:
+            expressions.append(pl.lit(0.0).alias("tax_rate"))
+        if expressions:
+            df = df.with_columns(expressions)
+
+        tax_rate = max(0.0, min(1.0, float(action.tax_rate)))
+        target = (
+            (pl.col("country_id") == action.country_tag) &
+            (pl.col("game_resource_id") == action.resource_id)
+        )
+
+        updated = df.with_columns([
+            pl.when(target)
+            .then(pl.lit(bool(action.is_gov_controlled)))
+            .otherwise(pl.col("is_gov_controlled"))
+            .alias("is_gov_controlled"),
+            pl.when(target)
+            .then(pl.lit(bool(action.is_legal)))
+            .otherwise(pl.col("is_legal"))
+            .alias("is_legal"),
+            pl.when(target)
+            .then(pl.lit(tax_rate))
+            .otherwise(pl.col("tax_rate"))
+            .alias("tax_rate"),
+        ])
+        self.state.update_table("domestic_production", updated)
 
     def get_state_snapshot(self) -> 'GameState':
         """
