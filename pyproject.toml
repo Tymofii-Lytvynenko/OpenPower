@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openpower-engine"
+version = "0.1.0"
+description = "Open-source grand strategy game engine built in Python."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE.md" }
+authors = [
+    { name = "Tymofii Lytvynenko" }
+]
+keywords = ["grand-strategy", "game-engine", "simulation", "polars", "arcade"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment",
+]
+dependencies = [
+    "orjson",
+    "arcade",
+    "PyOpenGL",
+    "imgui-bundle",
+    "polars==1.36.1",
+    "numpy",
+    "opencv-python",
+    "rtoml",
+    "geopandas",
+    "rasterio",
+    "shapely",
+    "unidecode",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyinstrument",
+]
+
+[project.scripts]
+openpower = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+packages = ["src"]
+
+[tool.setuptools.package-dir]
+src = "src"
+
+[tool.setuptools.package-data]
+"*" = ["*.toml", "*.tsv", "*.json", "*.png", "*.jpg", "*.jpeg", "*.glsl"]

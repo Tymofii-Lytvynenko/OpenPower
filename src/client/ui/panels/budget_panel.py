@@ -4,7 +4,9 @@ from imgui_bundle import imgui, icons_fontawesome_6
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.primitives import UIPrimitives as Prims
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.panel_context import PanelRenderContext
 from src.shared.actions import ActionUpdateBudget
+
 
 class BudgetPanel:
     """
@@ -52,10 +54,10 @@ class BudgetPanel:
         self.show_close_confirm = False
         self.current_tag = ""
 
-    def render(self, state, **kwargs) -> bool:
-        target_tag = kwargs.get("target_tag", "")
-        is_own = kwargs.get("is_own_country", False)
-        net_client = kwargs.get("net_client")
+    def render(self, state, context: PanelRenderContext) -> bool:
+        target_tag = context.target_tag
+        is_own = context.is_own_country
+        net_client = context.net_client
 
         # Sync with state if country changed
         if target_tag != self.current_tag:

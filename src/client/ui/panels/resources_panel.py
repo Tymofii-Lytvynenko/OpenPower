@@ -4,6 +4,8 @@ from imgui_bundle import imgui, icons_fontawesome_6
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.primitives import UIPrimitives as Prims
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.panel_context import PanelRenderContext
+
 
 class ResourcesPanel:
     """
@@ -24,9 +26,9 @@ class ResourcesPanel:
         self.draft_status = 0
         self.draft_tax = 50
 
-    def render(self, state, **kwargs) -> bool:
-        target_tag = kwargs.get("target_tag", "")
-        is_own = kwargs.get("is_own_country", False)
+    def render(self, state, context: PanelRenderContext) -> bool:
+        target_tag = context.target_tag
+        is_own = context.is_own_country
         
         flags = imgui.WindowFlags_.menu_bar
 

@@ -5,13 +5,14 @@ from imgui_bundle import imgui, icons_fontawesome_6
 from src.client.services.network_client_service import NetworkClient
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.composer import UIComposer
+from src.client.ui.core.panel_context import PanelRenderContext
 
 # Components
 from src.client.ui.components.hud.central_bar import CentralBar
 from src.client.ui.components.hud.system_bar import SystemBar
 from src.client.ui.components.hud.toggle_bar import ToggleBar
 from src.client.ui.components.hud.panel_manager import PanelManager
-from src.client.ui.components.hud.context_menu import ContextMenu  # <--- NEW IMPORT
+from src.client.ui.components.hud.context_menu import ContextMenu
 
 # Panels
 from src.client.ui.panels.economy_panel import EconomyPanel
@@ -40,20 +41,21 @@ class GameLayout:
         # 2. Register Panels
         self.panel_manager.register("POL", PoliticsPanel(), icons_fontawesome_6.ICON_FA_BUILDING_COLUMNS, GAMETHEME.colors.politics)
         self.panel_manager.register("MIL", MilitaryPanel(), icons_fontawesome_6.ICON_FA_PERSON_MILITARY_RIFLE, GAMETHEME.colors.military)
-        
+
         # Economy Panel with callback to open Resources
         self.panel_manager.register("ECO", EconomyPanel(
             toggle_resources_cb=lambda: self.panel_manager.toggle("RESOURCES"),
             toggle_budget_cb=lambda: self.panel_manager.toggle("BUDGET")
         ), icons_fontawesome_6.ICON_FA_SACK_DOLLAR, GAMETHEME.colors.economy)
-        
+
         self.panel_manager.register("DEM", DemographicsPanel(), icons_fontawesome_6.ICON_FA_PEOPLE_GROUP, GAMETHEME.colors.demographics)
         self.panel_manager.register("INSPECTOR", RegionInspectorPanel())
         self.panel_manager.register("DATA_INSPECTOR", DataInspectorPanel())
-        
-        # Resources Panel (no icon = won't appear in toggle bar)
-        self.panel_manager.register("RESOURCES", ResourcesPanel())
-        self.panel_manager.register("BUDGET", BudgetPanel())
+
+        # Resources and Budget are sub-panels opened via the Economy panel;
+        # they must not appear in the toggle bar.
+        self.panel_manager.register("RESOURCES", ResourcesPanel(), show_in_toggle_bar=False)
+        self.panel_manager.register("BUDGET", BudgetPanel(), show_in_toggle_bar=False)
 
         # 3. Compose HUD Components
         self.central_bar = CentralBar()
@@ -83,15 +85,17 @@ class GameLayout:
 
         self.toggle_bar.render()
 
-        # Render Panels
-        self.panel_manager.render_all(
-            state, 
-            target_tag=target_tag, 
+        # Build a typed context once per frame; all panels share it.
+        context = PanelRenderContext(
+            target_tag=target_tag,
             is_own_country=is_own,
             selected_region_id=selected_region_id,
             on_focus_request=self._on_focus_region,
-            net_client=self.net
+            net_client=self.net,
         )
+
+        # Render Panels
+        self.panel_manager.render_all(state, context)
 
         # Render Context Menu
         self.context_menu.render()

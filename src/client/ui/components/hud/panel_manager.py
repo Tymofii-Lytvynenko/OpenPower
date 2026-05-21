@@ -1,51 +1,99 @@
-from dataclasses import dataclass, field
-from typing import Any, Protocol, Dict, List
+from __future__ import annotations
 
-class Renderable(Protocol):
-    def render(self, state: Any, **kwargs) -> bool: ...
+import logging
+from dataclasses import dataclass
+from typing import Callable, Dict, List
+
+from src.client.ui.core.panel_context import PanelRenderable, PanelRenderContext
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PanelSpec:
+    id: str
+    factory: Callable[[], PanelRenderable]
+    icon: str = ""
+    color: tuple = (1, 1, 1, 1)
+    default_visible: bool = False
+    show_in_toggle_bar: bool = True
+
 
 @dataclass
 class PanelEntry:
     id: str
-    instance: Renderable
+    instance: PanelRenderable
     visible: bool
     icon: str = ""
-    color: tuple = (1,1,1,1)
+    color: tuple = (1, 1, 1, 1)
+    show_in_toggle_bar: bool = True
+
 
 class PanelManager:
-    """
-    Manages the lifecycle and visibility of UI panels via Composition.
-    """
+    """Owns panel instances, visibility, and safe frame rendering."""
+
     def __init__(self):
         self._panels: Dict[str, PanelEntry] = {}
 
-    def register(self, pid: str, panel: Renderable, icon: str = "", color: tuple = None, visible: bool = False):
-        self._panels[pid] = PanelEntry(pid, panel, visible, icon, color or (1,1,1,1))
+    def register(
+        self,
+        pid: str,
+        panel: PanelRenderable,
+        icon: str = "",
+        color: tuple | None = None,
+        visible: bool = False,
+        show_in_toggle_bar: bool = True,
+    ) -> None:
+        self._panels[pid] = PanelEntry(
+            id=pid,
+            instance=panel,
+            visible=visible,
+            icon=icon,
+            color=color or (1, 1, 1, 1),
+            show_in_toggle_bar=show_in_toggle_bar,
+        )
 
-    def toggle(self, pid: str):
-        if pid in self._panels:
-            self._panels[pid].visible = not self._panels[pid].visible
+    def register_spec(self, spec: PanelSpec) -> None:
+        self.register(
+            spec.id,
+            spec.factory(),
+            icon=spec.icon,
+            color=spec.color,
+            visible=spec.default_visible,
+            show_in_toggle_bar=spec.show_in_toggle_bar,
+        )
 
-    def set_visible(self, pid: str, is_visible: bool):
-        if pid in self._panels:
-            self._panels[pid].visible = is_visible
+    def toggle(self, pid: str) -> None:
+        entry = self._panels.get(pid)
+        if entry is not None:
+            entry.visible = not entry.visible
+
+    def set_visible(self, pid: str, is_visible: bool) -> None:
+        entry = self._panels.get(pid)
+        if entry is not None:
+            entry.visible = is_visible
 
     def is_visible(self, pid: str) -> bool:
-        return self._panels[pid].visible if pid in self._panels else False
+        entry = self._panels.get(pid)
+        return bool(entry and entry.visible)
 
-    def render_all(self, state: Any, **context):
-        """
-        Iterates registered panels. If visible, calls their render method.
-        Handles the close signal (return value False).
-        """
+    def render_all(self, state, context: PanelRenderContext) -> None:
+        """Render all visible panels without letting one broken panel kill the frame."""
         for entry in self._panels.values():
             if not entry.visible:
                 continue
-            
-            # The panel render method should return False if the user closed it via 'X'
-            keep_open = entry.instance.render(state, **context)
+
+            try:
+                keep_open = entry.instance.render(state, context)
+            except Exception:
+                logger.exception("Panel '%s' failed during render", entry.id)
+                continue
+
             if keep_open is False:
                 entry.visible = False
 
-    def get_entries(self) -> List[PanelEntry]:
-        return list(self._panels.values())
+    def get_entries(self, toggle_bar_only: bool = False) -> List[PanelEntry]:
+        entries = list(self._panels.values())
+        if toggle_bar_only:
+            return [entry for entry in entries if entry.show_in_toggle_bar]
+        return entries

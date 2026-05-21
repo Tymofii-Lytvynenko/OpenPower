@@ -2,20 +2,20 @@ import polars as pl
 from imgui_bundle import imgui
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.panel_context import PanelRenderContext
+
 
 class RegionInspectorPanel:
-    def render(self, state, **kwargs) -> bool:
-        region_id = kwargs.get("selected_region_id")
-        on_focus_request = kwargs.get("on_focus_request")
-
+    def render(self, state, context: PanelRenderContext) -> bool:
         with WindowManager.window("INSPECTOR", x=400, y=200, w=300, h=400) as is_open:
-            if not is_open: return False
-            
-            if region_id is None:
+            if not is_open:
+                return False
+
+            if context.selected_region_id is None:
                 imgui.text_disabled("Select a region...")
                 return True
 
-            self._render_details(state, region_id, on_focus_request)
+            self._render_details(state, context.selected_region_id, context.on_focus_request)
             return True
 
     def _render_details(self, state, region_id, on_focus):
