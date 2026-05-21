@@ -1,9 +1,10 @@
 import time
 import multiprocessing as mp
+from typing import Optional
 from src.server.session import GameSession
 from src.shared.config import GameConfig
 
-def run_server_process(config_root, action_queue: mp.Queue, state_queue: mp.Queue, progress_queue: mp.Queue):
+def run_server_process(config_root, action_queue: mp.Queue, state_queue: mp.Queue, progress_queue: mp.Queue, save_name: Optional[str] = None):
     """
     The infinite loop that lives on a separate CPU core.
     Completely isolated from Pyglet/Arcade OpenGL context.
@@ -17,7 +18,7 @@ def run_server_process(config_root, action_queue: mp.Queue, state_queue: mp.Queu
 
     try:
         # Load heavy data
-        session = GameSession.create_local(config, progress_cb=progress_cb)
+        session = GameSession.create_local(config, progress_cb=progress_cb, save_name=save_name)
         progress_queue.put(("READY", 1.0, "Engine Started"))
     except Exception as e:
         progress_queue.put(("ERROR", 0.0, str(e)))
@@ -39,6 +40,9 @@ def run_server_process(config_root, action_queue: mp.Queue, state_queue: mp.Queu
                 action = action_queue.get_nowait()
                 if action == "SHUTDOWN":
                     return # Graceful exit
+                if action == "SAVE_MAP_CHANGES":
+                    session.save_map_changes()
+                    continue
                 session.receive_action(action)
             except Exception:
                 pass

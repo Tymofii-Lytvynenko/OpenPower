@@ -12,7 +12,7 @@ from src.client.renderers.base_renderer import BaseRenderer
 from src.client.controllers.camera_controller import CameraController
 from src.client.renderers.texture_manager import TextureManager
 from src.client.utils.picking_utils import PickingUtils
-from src.client.services.cache_service import CacheService
+from src.core.cache_service import CacheService
 from src.core.paths import ProjectPaths
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 

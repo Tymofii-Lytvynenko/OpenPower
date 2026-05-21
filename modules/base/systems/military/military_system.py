@@ -469,4 +469,20 @@ class MilitarySystem(ISystem):
         if regions.is_empty() or "pop_15_64" not in regions.columns:
             return
 
-        regions.group_by("owner").agg(pl.col("pop_15_64").sum().alias("total_core_manpower"))
+        manpower_df = (
+            regions.group_by("owner")
+            .agg(pl.col("pop_15_64").sum().alias("total_core_manpower"))
+            .rename({"owner": "id"})
+        )
+
+        countries = state.get_table("countries")
+        if countries.is_empty():
+            return
+
+        if "total_core_manpower" in countries.columns:
+            countries = countries.drop("total_core_manpower")
+
+        countries = countries.join(manpower_df, on="id", how="left").with_columns(
+            pl.col("total_core_manpower").fill_null(0)
+        )
+        state.update_table("countries", countries)

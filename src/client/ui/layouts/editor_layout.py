@@ -19,7 +19,7 @@ class EditorLayout:
             if imgui.begin_menu("File"):
                 # FIX: Explicitly pass p_selected=False to satisfy signature
                 if imgui.menu_item("Save Map", "Ctrl+S", False)[0]:
-                    self.net.request_save()
+                    self.net.request_save(is_editor=True)
                 imgui.end_menu()
             
             if imgui.begin_menu("View"):

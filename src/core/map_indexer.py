@@ -1,7 +1,7 @@
 import numpy as np
 from pathlib import Path
 from typing import Tuple, Dict, Optional
-from src.client.services.cache_service import CacheService
+from src.core.cache_service import CacheService
 
 class MapIndexer:
     """

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, Tuple, Optional, List, Set, Any
 from PIL import Image
 
-from src.client.services.cache_service import CacheService
+from src.core.cache_service import CacheService
 
 class TextureManager:
     """

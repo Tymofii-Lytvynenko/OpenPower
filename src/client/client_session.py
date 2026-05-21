@@ -15,7 +15,7 @@ class ClientSessionProxy:
     It handles communication with the background Simulation Process.
     """
     
-    def __init__(self, config: GameConfig):
+    def __init__(self, config: GameConfig, save_name: Optional[str] = None):
         # Create Communication Pipes
         self.action_queue = mp.Queue()
         self.state_queue = mp.Queue()
@@ -41,10 +41,14 @@ class ClientSessionProxy:
         # Spawn the Background Process
         self.process = mp.Process(
             target=run_server_process,
-            args=(str(config.project_root), self.action_queue, self.state_queue, self.progress_queue),
+            args=(str(config.project_root), self.action_queue, self.state_queue, self.progress_queue, save_name),
             daemon=True # Ensures process dies if window is closed abruptly
         )
         self.process.start()
+
+    def save_map_changes(self):
+        """Request the server process to save regions data."""
+        self.action_queue.put("SAVE_MAP_CHANGES")
 
     def receive_action(self, action: GameAction):
         """Sends an action to the background server."""

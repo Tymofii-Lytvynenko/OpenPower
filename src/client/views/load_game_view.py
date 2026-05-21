@@ -83,53 +83,69 @@ class LoadGameView(BaseImGuiView):
     def _load_selected_save(self):
         print(f"Loading {self.selected_save_name}...")
         
-        # Define Task Local Class (No top-level imports needed)
+        # Define Task Local Class
         class SaveLoadTask:
-            def __init__(self, config, save_name, loader):
+            def __init__(self, window, config, save_name):
+                self.window = window
                 self.config = config
                 self.save_name = save_name
-                self.loader = loader
                 self.progress = 0.0
-                self.status_text = "Loading Save..."
+                self.status_text = "Preparing to load..."
 
             def run(self):
-                # ... (Same logic as before, local imports inside here are safe) ...
-                self.status_text = "Reading State from Disk..."
-                self.progress = 0.3
-                loaded_state = self.loader.load_save(self.save_name)
-                
-                self.status_text = "Initializing Engine..."
-                self.progress = 0.6
-                
-                # Local imports to build session
-                from src.server.session import GameSession
-                from src.server.io.data_export_manager import DataExporter
-                from src.engine.simulator import Engine
-                from src.engine.mod_manager import ModManager
-                from src.core.map_data import RegionMapData
-                
-                exporter = DataExporter(self.config)
-                engine = Engine()
-                mod_mgr = ModManager(self.config)
-                
-                mods = mod_mgr.resolve_load_order()
-                systems = mod_mgr.load_systems()
-                engine.register_systems(systems)
-                
-                map_path = self.config.get_asset_path("map/regions.png")
-                map_data = RegionMapData(str(map_path))
-                
-                session = GameSession(
-                    self.config, self.loader, exporter, engine, map_data, loaded_state
-                )
-                self.progress = 1.0
-                return session
+                import time
+                # 1. Shut down existing session proxy if it exists
+                self.status_text = "Stopping current simulation..."
+                self.progress = 0.1
+                if hasattr(self.window, "session") and self.window.session:
+                    self.window.session.shutdown()
 
-        task = SaveLoadTask(self.config, self.selected_save_name, self.loader)
+                # 2. Spawn a new ClientSessionProxy with save_name
+                self.status_text = f"Initializing load for {self.save_name}..."
+                self.progress = 0.2
+                from src.client.client_session import ClientSessionProxy
+                new_session = ClientSessionProxy(self.config, save_name=self.save_name)
+
+                # 3. Read progress from new_session.progress_queue
+                while True:
+                    try:
+                        status, p, text = new_session.progress_queue.get(timeout=10.0)
+                        if status == "PROGRESS":
+                            self.progress = 0.2 + p * 0.6
+                            self.status_text = f"Server: {text}"
+                        elif status == "READY":
+                            self.progress = 0.8
+                            self.status_text = "Server process ready."
+                            break
+                        elif status == "ERROR":
+                            raise RuntimeError(text)
+                    except Exception as e:
+                        raise RuntimeError(f"Failed to initialize simulation server for loading: {e}")
+
+                # 4. Wait for first state update
+                self.status_text = "Synchronizing game state..."
+                self.progress = 0.9
+                
+                start_time = time.perf_counter()
+                while new_session.get_state_snapshot() is None:
+                    new_session.tick(0.0)
+                    if time.perf_counter() - start_time > 5.0:
+                        raise TimeoutError("Timed out waiting for loaded game state.")
+                    time.sleep(0.05)
+
+                self.progress = 1.0
+                self.status_text = "Ready."
+                return new_session
+
+        task = SaveLoadTask(self.window, self.config, self.selected_save_name)
         
         # Callback to handle success
         def on_success(session):
-            player_tag = session.state.globals.get("player_tag", "USA") 
+            self.window.session = session
+            state = session.get_state_snapshot()
+            player_tag = "USA"
+            if state and state.globals:
+                player_tag = state.globals.get("player_tag", "USA")
             
             # USE ROUTER: Switch to GameView
             self.nav.show_game_view(session, self.config, player_tag)

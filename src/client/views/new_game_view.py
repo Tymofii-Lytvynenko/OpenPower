@@ -237,6 +237,7 @@ class NewGameView(BaseImGuiView):
         from src.client.tasks.new_game_task import NewGameTask, NewGameContext
 
         def on_task_complete(ctx: NewGameContext):
+            self.window.session = ctx.session
             self.nav.show_game_view(
                 session=ctx.session,
                 config=self.config,
@@ -245,7 +246,7 @@ class NewGameView(BaseImGuiView):
             )
             return None
 
-        task = NewGameTask(self.session, self.config, self.selected_country_id)
+        task = NewGameTask(self.window, self.config, self.selected_country_id)
         self.nav.show_loading(task, on_success=on_task_complete)
 
     def on_game_mouse_drag(self, x, y, dx, dy, buttons, modifiers):

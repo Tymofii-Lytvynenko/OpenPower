@@ -54,7 +54,7 @@ class GameSession:
         print("[GameSession] Session initialized successfully.")
 
     @classmethod
-    def create_local(cls, config: GameConfig, progress_cb: Optional[Callable[[float, str], None]] = None) -> 'GameSession':
+    def create_local(cls, config: GameConfig, progress_cb: Optional[Callable[[float, str], None]] = None, save_name: Optional[str] = None) -> 'GameSession':
         """
         Factory Method: Orchestrates the full startup sequence for a Local Game.
         """
@@ -79,7 +79,10 @@ class GameSession:
 
             # --- Step 3: World Data Loading (50%) ---
             report(0.3, "Server: Loading world database...")
-            initial_state = loader.load_initial_state()
+            if save_name:
+                initial_state = loader.load_save(save_name)
+            else:
+                initial_state = loader.load_initial_state()
 
             # --- Step 4: Map Data Processing (70%) ---
             # UPDATED: We now load the map using OpenCV via Core (Headless safe)
@@ -120,6 +123,16 @@ class GameSession:
     def tick(self, delta_time: float):
         if not self.action_queue and delta_time <= 0:
             return
+
+        # Intercept ActionSaveGame on the server side
+        from src.shared.actions import ActionSaveGame
+        save_actions = [a for a in self.action_queue if isinstance(a, ActionSaveGame)]
+        if save_actions:
+            from src.server.io.save_writer import SaveWriter
+            writer = SaveWriter(self.config)
+            for action in save_actions:
+                writer.save_game(self.state, action.save_name)
+            self.action_queue = [a for a in self.action_queue if not isinstance(a, ActionSaveGame)]
 
         # Pass the instance method of the engine
         self.engine.step(self.state, self.action_queue, delta_time)

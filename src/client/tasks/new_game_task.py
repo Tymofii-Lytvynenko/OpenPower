@@ -1,64 +1,89 @@
 import time
 import polars as pl
+import arcade
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 
 from src.shared.config import GameConfig
-from src.server.session import GameSession
 from src.client.utils.coords_util import calculate_centroid
 
 @dataclass
 class NewGameContext:
-    session: GameSession
+    session: Any
     player_tag: str
     start_pos: Optional[tuple[float, float]]
 
 class NewGameTask:
-    def __init__(self, session: GameSession, config: GameConfig, player_tag: str):
-        self.session = session
+    def __init__(self, window: arcade.Window, config: GameConfig, player_tag: str):
+        self.window = window
         self.config = config
         self.player_tag = player_tag
         self.progress: float = 0.0
         self.status_text: str = "Preparing Campaign..."
 
     def run(self) -> NewGameContext:
-        # 1. Start
-        self.status_text = f"Initializing {self.player_tag}..."
+        # 1. Shutdown the old session if it exists
+        self.status_text = "Stopping previous session..."
+        self.progress = 0.05
+        if hasattr(self.window, "session") and self.window.session:
+            self.window.session.shutdown()
+            
+        # 2. Spawn a new clean ClientSessionProxy
+        self.status_text = "Starting simulation server..."
         self.progress = 0.1
-        time.sleep(0.2) 
-
-        # 2. Math (CPU)
-        self.status_text = "Calculating strategic positions..."
-        self.progress = 0.4
+        from src.client.client_session import ClientSessionProxy
+        new_session = ClientSessionProxy(self.config, save_name=None)
         
-        state = self.session.get_state_snapshot()
+        # 3. Monitor the progress queue until READY or ERROR
+        while True:
+            try:
+                status, p, text = new_session.progress_queue.get(timeout=10.0)
+                if status == "PROGRESS":
+                    self.progress = 0.1 + p * 0.6
+                    self.status_text = f"Server: {text}"
+                elif status == "READY":
+                    self.progress = 0.7
+                    self.status_text = "Server process ready."
+                    break
+                elif status == "ERROR":
+                    raise RuntimeError(text)
+            except Exception as e:
+                raise RuntimeError(f"Failed to initialize simulation server: {e}")
+                
+        # 4. Wait for first state update to populate starting pos
+        self.status_text = "Synchronizing game state..."
+        self.progress = 0.8
+        
+        start_time = time.perf_counter()
+        while new_session.get_state_snapshot() is None:
+            new_session.tick(0.0)
+            if time.perf_counter() - start_time > 5.0:
+                raise TimeoutError("Timed out waiting for initial game state.")
+            time.sleep(0.05)
+            
+        state = new_session.get_state_snapshot()
         start_pos = None
         try:
             if "regions" in state.tables:
                 df = state.tables["regions"]
                 owned_regions = df.filter(pl.col("owner") == self.player_tag)
-                map_height = self.session.map_data.height
-                map_width = self.session.map_data.width
+                map_height = new_session.map_data.height
+                map_width = new_session.map_data.width
                 start_pos = calculate_centroid(owned_regions, map_height, map_width)
         except Exception as e:
-            print(f"Error: {e}")
-
-        # 3. Disk I/O Warmup (The Performance Trick)
-        # We read the heavy map files here in the thread so they are in RAM
-        # when the main thread asks for them.
+            print(f"Error calculating centroid: {e}")
+            
+        # 5. Warm up files
         self.status_text = "Pre-loading map assets..."
-        self.progress = 0.7
-        
+        self.progress = 0.9
         self._warmup_file("map/regions.png")
         self._warmup_file("map/terrain.png")
-
-        # 4. Done
-        self.status_text = "Ready."
-        self.progress = 1.0
-        # No sleep needed here, LoadingView's new delay will handle the visual transition
         
-        return NewGameContext(self.session, self.player_tag, start_pos)
+        self.progress = 1.0
+        self.status_text = "Ready."
+        
+        return NewGameContext(new_session, self.player_tag, start_pos)
 
     def _warmup_file(self, asset_path_str: str):
         """Reads a file into void just to force OS caching."""

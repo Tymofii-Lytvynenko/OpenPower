@@ -1,6 +1,5 @@
 from pathlib import Path
 from typing import List
-from src.core.paths import ProjectPaths
 
 class GameConfig:
     """
@@ -11,11 +10,11 @@ class GameConfig:
     2. Provide access to Data and Asset directories.
     """
     def __init__(self, project_root: Path):
-        self.project_root = ProjectPaths.root()
+        self.project_root = project_root.resolve()
         
         # Standard directory structure definitions
-        self.modules_dir = project_root / "modules"
-        self.cache_dir = project_root / ".cache"
+        self.modules_dir = self.project_root / "modules"
+        self.cache_dir = self.project_root / ".cache"
         
         # Default load order.
         # This will be populated/overwritten by ModManager in GameSession.
@@ -27,7 +26,7 @@ class GameConfig:
         Used by DataLoader to scan for content.
         """
         # TODO: Add logic here to include active mods from mods.json
-        return [ProjectPaths.data("base")]
+        return [self.project_root / "modules" / "base" / "data"]
 
     def get_write_data_dir(self) -> Path:
         """
@@ -40,4 +39,4 @@ class GameConfig:
         """
         Finds an asset (image/sound) by searching through active mods.
         """
-        return ProjectPaths.assets("base") / subpath
+        return self.project_root / "modules" / "base" / "assets" / subpath

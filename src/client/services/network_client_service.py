@@ -32,7 +32,12 @@ class NetworkClient:
         """
         return self.session.get_state_snapshot()
 
-    def request_save(self):
-        """Editor-specific command."""
-        print("[NetworkClient] Requesting server to save map data...")
-        self.session.save_map_changes()
+    def request_save(self, is_editor: bool = False):
+        """Saves gameplay state or editor state depending on the context."""
+        if is_editor:
+            print("[NetworkClient] Requesting server to save map data...")
+            self.session.save_map_changes()
+        else:
+            print("[NetworkClient] Requesting server to save gameplay state...")
+            from src.shared.actions import ActionSaveGame
+            self.send_action(ActionSaveGame(player_id=self.player_id, save_name="quicksave"))
