@@ -7,6 +7,7 @@ from typing import Optional
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.renderers.unit_renderer import UnitRenderer
 from src.client.ui.layouts.game_layout import GameLayout
+from src.client.ui.panels.unit_details_window import UnitDetailsWindow
 from src.client.controllers.camera_controller import CameraController
 from src.client.controllers.unit_interaction_controller import UnitInteractionController
 from src.client.controllers.viewport_controller import ViewportController
@@ -64,10 +65,12 @@ class GameView(BaseImGuiView):
             map_height=self.renderer.height,
             globe_radius=self.renderer.globe_radius,
         )
+        self.unit_details_window = UnitDetailsWindow()
         self.unit_interactions = UnitInteractionController(
             unit_renderer=self.unit_renderer,
             map_renderer=self.renderer,
             net_client=self.net,
+            on_unit_double_click=self.unit_details_window.open_for_unit,
         )
 
         self.selected_region_id = None
@@ -143,6 +146,7 @@ class GameView(BaseImGuiView):
                 self.imgui.real_fps,
                 self.nav
             )
+            self.unit_details_window.render(self.net.get_state())
         except Exception as e:
             print(f"[GameView] UI Rendering Error: {e}")
 

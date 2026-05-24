@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from time import perf_counter
 from typing import Optional
 
 import arcade
@@ -19,10 +21,12 @@ class UnitInteractionController:
         unit_renderer: UnitRenderer,
         map_renderer: MapRenderer,
         net_client: NetworkClient,
+        on_unit_double_click: Callable[[str], None] | None = None,
     ):
         self._unit_renderer = unit_renderer
         self._map_renderer = map_renderer
         self._net = net_client
+        self._on_unit_double_click = on_unit_double_click
 
         self.selected_unit_id: Optional[str] = None
         self.hovered_unit_id: Optional[str] = None
@@ -33,6 +37,12 @@ class UnitInteractionController:
         self._mouse_x = 0.0
         self._mouse_y = 0.0
         self._drag_threshold = 6.0
+        self._double_click_interval_seconds = 0.35
+        self._double_click_distance = 9.0
+        self._last_click_unit_id: Optional[str] = None
+        self._last_click_time = 0.0
+        self._last_click_x = 0.0
+        self._last_click_y = 0.0
 
     @property
     def drag_preview(self) -> Optional[UnitDragPreview]:
@@ -95,7 +105,11 @@ class UnitInteractionController:
         self._mouse_y = y
 
         if not dragged_far_enough:
+            self._handle_click(unit, x, y)
             return True
+
+        self._last_click_unit_id = None
+        self._last_click_time = 0.0
 
         target_region_id = self._map_renderer.get_region_id_at_screen_pos(x, y)
         if target_region_id <= 0:
@@ -115,3 +129,22 @@ class UnitInteractionController:
             )
         )
         return True
+
+    def _handle_click(self, unit: ProjectedUnit, x: float, y: float) -> None:
+        now = perf_counter()
+        distance_sq = (x - self._last_click_x) ** 2 + (y - self._last_click_y) ** 2
+        same_spot = distance_sq <= self._double_click_distance * self._double_click_distance
+        same_unit = self._last_click_unit_id == unit.unit_id
+        within_interval = (now - self._last_click_time) <= self._double_click_interval_seconds
+
+        if same_unit and same_spot and within_interval:
+            self._last_click_unit_id = None
+            self._last_click_time = 0.0
+            if self._on_unit_double_click is not None:
+                self._on_unit_double_click(unit.unit_id)
+            return
+
+        self._last_click_unit_id = unit.unit_id
+        self._last_click_time = now
+        self._last_click_x = x
+        self._last_click_y = y
