@@ -58,8 +58,7 @@ class GameView(BaseImGuiView):
             on_selection_change=self.on_selection_changed
         )
 
-        # 3. Initialize UI Layout
-        self.layout = GameLayout(self.net, player_tag, self.viewport_ctrl)
+        # 3. Initialize Renderers and HUD
         self.unit_renderer = UnitRenderer(
             camera=self.cam_ctrl,
             map_width=self.renderer.width,
@@ -73,6 +72,13 @@ class GameView(BaseImGuiView):
             net_client=self.net,
             on_unit_double_click=self.unit_details_window.open_for_unit,
         )
+        self.layout = GameLayout(
+            self.net,
+            player_tag,
+            self.viewport_ctrl,
+            has_selected_units=self.unit_interactions.has_selection,
+            on_move_selected_units=self._move_selected_units_from_context,
+        )
         self.unit_context_menu = UnitContextMenu(
             composer=self.layout.composer,
             on_deselect=self.unit_interactions.clear_selection,
@@ -85,6 +91,7 @@ class GameView(BaseImGuiView):
         self._selection_rect_current = None
         self._right_drag_start_pos = None
         self._right_context_unit_id = None
+        self._context_click_pos = None
         self._drag_threshold = 5.0
 
         # 4. Handle Initial Focusing
@@ -211,6 +218,7 @@ class GameView(BaseImGuiView):
         return (dx * dx + dy * dy) < self._drag_threshold * self._drag_threshold
 
     def _open_right_click_context(self, x: float, y: float) -> None:
+        self._context_click_pos = (x, y)
         if self._right_context_unit_id:
             self.unit_interactions.select_unit_by_id(self._right_context_unit_id)
             self.unit_context_menu.show(self._right_context_unit_id)
@@ -219,6 +227,15 @@ class GameView(BaseImGuiView):
         target_region_id = self.viewport_ctrl.get_region_at(x, y)
         if target_region_id:
             self.layout.show_context_menu(target_region_id)
+
+    def _move_selected_units_from_context(self) -> None:
+        if self._context_click_pos is None:
+            return
+
+        self.unit_interactions.move_selected_units_to_screen_pos(
+            self._context_click_pos[0],
+            self._context_click_pos[1],
+        )
 
     def on_game_mouse_release(self, x, y, button, modifiers):
         if self.unit_interactions.on_mouse_release(x, y, button):

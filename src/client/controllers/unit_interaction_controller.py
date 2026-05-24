@@ -77,8 +77,11 @@ class UnitInteractionController:
             self.hovered_unit_id = None
             return False
 
-        self.selected_unit_id = unit.unit_id
-        self.selected_unit_ids = {unit.unit_id}
+        if unit.unit_id in self.selected_unit_ids and len(self.selected_unit_ids) > 1:
+            self.selected_unit_id = unit.unit_id
+        else:
+            self.selected_unit_id = unit.unit_id
+            self.selected_unit_ids = {unit.unit_id}
         self.hovered_unit_id = unit.unit_id
         self._dragging_unit = unit
         self._press_x = x
@@ -121,15 +124,12 @@ class UnitInteractionController:
         if target_geo is None:
             return True
 
-        self._net.send_action(
-            ActionMoveUnit(
-                player_id=self._net.player_id,
-                unit_id=unit.unit_id,
-                target_region_id=target_region_id,
-                target_latitude=target_geo.latitude,
-                target_longitude=target_geo.longitude,
-            )
+        unit_ids = (
+            set(self.selected_unit_ids)
+            if unit.unit_id in self.selected_unit_ids and self.selected_unit_ids
+            else {unit.unit_id}
         )
+        self.move_units_to_target(unit_ids, target_region_id, target_geo.latitude, target_geo.longitude)
         return True
 
     def _handle_click(self, unit: ProjectedUnit, x: float, y: float) -> None:
@@ -184,6 +184,47 @@ class UnitInteractionController:
         self.selected_unit_ids = {unit.unit_id for unit in selected}
         self.selected_unit_id = selected[-1].unit_id
         return True
+
+    def has_selection(self) -> bool:
+        return bool(self.selected_unit_ids)
+
+    def move_selected_units_to_screen_pos(self, x: float, y: float) -> bool:
+        if not self.selected_unit_ids:
+            return False
+
+        target_region_id = self._map_renderer.get_region_id_at_screen_pos(x, y)
+        if target_region_id <= 0:
+            return False
+
+        target_geo = self._map_renderer.get_geo_at_screen_pos(x, y)
+        if target_geo is None:
+            return False
+
+        self.move_units_to_target(
+            self.selected_unit_ids,
+            target_region_id,
+            target_geo.latitude,
+            target_geo.longitude,
+        )
+        return True
+
+    def move_units_to_target(
+        self,
+        unit_ids: set[str],
+        target_region_id: int,
+        target_latitude: float,
+        target_longitude: float,
+    ) -> None:
+        for unit_id in sorted(unit_ids):
+            self._net.send_action(
+                ActionMoveUnit(
+                    player_id=self._net.player_id,
+                    unit_id=unit_id,
+                    target_region_id=target_region_id,
+                    target_latitude=target_latitude,
+                    target_longitude=target_longitude,
+                )
+            )
 
     def _unit_intersects_rect(
         self,

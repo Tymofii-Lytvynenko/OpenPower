@@ -18,7 +18,14 @@ from src.client.ui.layouts.game_panel_registry import build_game_panel_specs
 class GameLayout:
     """Composition root for the Game HUD."""
 
-    def __init__(self, net_client: NetworkClient, player_tag: str, viewport_ctrl):
+    def __init__(
+        self,
+        net_client: NetworkClient,
+        player_tag: str,
+        viewport_ctrl,
+        has_selected_units=None,
+        on_move_selected_units=None,
+    ):
         self.net = net_client
         self.local_player_tag = player_tag
         self.viewport_ctrl = viewport_ctrl
@@ -31,7 +38,13 @@ class GameLayout:
         self.central_bar = CentralBar()
         self.system_bar = SystemBar()
         self.toggle_bar = ToggleBar(self.panel_manager)
-        self.context_menu = ContextMenu(self.composer, self.panel_manager, self.viewport_ctrl)
+        self.context_menu = ContextMenu(
+            self.composer,
+            self.panel_manager,
+            self.viewport_ctrl,
+            has_selected_units=has_selected_units,
+            on_move_selected_units=on_move_selected_units,
+        )
 
         self._last_selected_id: Optional[int] = None
         self._cached_target_tag: str = player_tag

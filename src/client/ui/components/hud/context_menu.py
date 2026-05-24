@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Optional, Any
 from imgui_bundle import imgui
 
@@ -9,10 +10,19 @@ class ContextMenu:
     Manages the Global Right-Click Context Menu for the map.
     Handles the 'queued open' logic to prevent ImGui event conflicts.
     """
-    def __init__(self, composer: UIComposer, panel_manager: PanelManager, viewport_ctrl: Any):
+    def __init__(
+        self,
+        composer: UIComposer,
+        panel_manager: PanelManager,
+        viewport_ctrl: Any,
+        has_selected_units: Callable[[], bool] | None = None,
+        on_move_selected_units: Callable[[], None] | None = None,
+    ):
         self.composer = composer
         self.panels = panel_manager
         self.viewport = viewport_ctrl
+        self._has_selected_units = has_selected_units
+        self._on_move_selected_units = on_move_selected_units
         
         # State
         self._target_id: Optional[int] = None
@@ -44,6 +54,11 @@ class ContextMenu:
         # 1. Target Header
         if self._target_id is not None:
             imgui.text_disabled(f"Target: Region #{self._target_id}")
+
+            if self._has_selected_units is not None and self._has_selected_units():
+                if self.composer.draw_menu_item("Move", "M") and self._on_move_selected_units is not None:
+                    self._on_move_selected_units()
+                imgui.separator()
             
             if self.composer.draw_menu_item("View Details", "I"):
                 self.panels.set_visible("INSPECTOR", True)
