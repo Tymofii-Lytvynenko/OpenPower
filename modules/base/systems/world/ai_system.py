@@ -7,6 +7,16 @@ from src.server.state import GameState
 from src.shared.actions import ActionBuildUnit, ActionUpdateBudget, GameAction
 from src.shared.events import EventRealSecond
 
+PLANNING_HORIZON_YEARS = 5.0
+UNIT_BUILD_COST = 1_000_000.0
+UNIT_ANNUAL_UPKEEP_BASE = 500_000.0
+GDP_PROTECTED_PER_INFANTRY = 0.002
+MILITARY_DECAY_FACTOR = 0.85
+RECRUITMENT_SHARE = 0.001
+UNIT_COUNT_DAMPING = 0.25
+MIN_RECRUITMENT_BATCH = 1
+MAX_RECRUITMENT_BATCH = 250
+
 # =========================================================================
 # Pure Functional Scorers (Data-Driven Policy Definitions)
 # =========================================================================
@@ -32,30 +42,81 @@ def audit_financial_survival(lf: pl.LazyFrame) -> pl.LazyFrame:
                                    .otherwise(0.0)
     )
 
+def summarize_unit_snapshot(lf: pl.LazyFrame) -> pl.LazyFrame:
+    """
+    Summarizes the active unit table into country-level military signals.
+
+    The AI needs to reason about unit stacks, not raw manpower rows, because
+    the new military model stores soldiers inside named units. Using the unit
+    row count keeps the marginal ROI curve numerically stable for real-world
+    country sizes.
+    """
+    schema = set(lf.collect_schema().names())
+    required = {"owner", "strength"}
+    if not required.issubset(schema):
+        return pl.DataFrame(
+            schema={
+                "id": pl.Utf8,
+                "active_military_strength": pl.Int64,
+                "active_unit_count": pl.Int64,
+            }
+        ).lazy()
+
+    return (
+        lf.group_by("owner")
+        .agg(
+            pl.col("strength").sum().cast(pl.Int64).alias("active_military_strength"),
+            pl.count().cast(pl.Int64).alias("active_unit_count"),
+        )
+        .rename({"owner": "id"})
+    )
+
 def calculate_military_roi(lf: pl.LazyFrame) -> pl.LazyFrame:
     """
-    Computes direct investment value of security assets based on asset preservation physics.
-    A country buys military force only if it expects a positive yield on protecting its GDP.
-    """
-    # Hardcoded macroeconomic parameters scaled to match global financial constants.
-    PLANNING_HORIZON_YEARS = 5.0
-    UNIT_BUILD_COST = 1_000_000.0
-    UNIT_ANNUAL_UPKEEP_BASE = 500_000.0
-    GDP_PROTECTED_PER_UNIT = 0.01 
-    MILITARY_DECAY_FACTOR = 0.85
+    Computes the ROI of recruiting another infantry batch from the current unit model.
 
+    The old version used total manpower as the decay exponent, which underflowed
+    almost immediately for real countries. We now base diminishing returns on
+    the number of unit stacks, because that is what the tactical layer actually
+    exposes to the player.
+    """
     return lf.with_columns(
-        # Total Cost of Ownership calculation over a standard multi-year strategic cycle.
-        unit_5y_cost = UNIT_BUILD_COST + (UNIT_ANNUAL_UPKEEP_BASE * pl.col("human_dev") * PLANNING_HORIZON_YEARS)
+        current_military_strength = pl.max_horizontal(pl.col("military_count"), pl.col("active_military_strength")),
+        reinforcement_gap = pl.max_horizontal(0, pl.col("military_count") - pl.col("active_military_strength")),
     ).with_columns(
-        # Apply exponential decay to model diminishing marginal utility of army size.
-        # This prevents wealthy countries from endlessly spawning units and going bankrupt.
-        unit_5y_benefit = (pl.col("gdp") * GDP_PROTECTED_PER_UNIT * pl.lit(MILITARY_DECAY_FACTOR).pow(pl.col("military_count"))) * pl.col("trait_threat_perception")
+        # Recruit in small batches so the AI keeps one infantry stack readable in the UI.
+        planned_recruitment = pl.when(pl.col("reinforcement_gap") > 0)
+            .then(pl.col("reinforcement_gap").clip(MIN_RECRUITMENT_BATCH, MAX_RECRUITMENT_BATCH))
+            .otherwise(
+                (
+                    pl.col("current_military_strength")
+                    * RECRUITMENT_SHARE
+                    / (1.0 + (pl.col("active_unit_count") * UNIT_COUNT_DAMPING))
+                )
+                .round(0)
+                .clip(MIN_RECRUITMENT_BATCH, MAX_RECRUITMENT_BATCH)
+            )
+            .cast(pl.Int64)
+    ).with_columns(
+        # Total Cost of Ownership over the planning horizon scales with the batch size.
+        unit_5y_cost = (
+            UNIT_BUILD_COST
+            + (UNIT_ANNUAL_UPKEEP_BASE * pl.col("human_dev") * PLANNING_HORIZON_YEARS)
+        ) * pl.col("planned_recruitment")
+    ).with_columns(
+        # Larger infantry batches still matter, but with diminishing returns.
+        unit_5y_benefit = (
+            pl.col("gdp")
+            * GDP_PROTECTED_PER_INFANTRY
+            * pl.lit(MILITARY_DECAY_FACTOR).pow(pl.col("active_unit_count"))
+            * pl.col("trait_threat_perception")
+            * pl.col("planned_recruitment").cast(pl.Float64).sqrt()
+        )
     ).with_columns(
         military_roi = (pl.col("unit_5y_benefit") - pl.col("unit_5y_cost")) / pl.col("unit_5y_cost")
     ).with_columns(
-        # Asymmetric block logic: expansion utility drops to absolute zero during active defalcation.
-        utility_build_army = pl.when(
+        # Expansion only happens when the country can pay for the batch and keep the lights on.
+        utility_build_infantry = pl.when(
                                 (pl.col("military_roi") > 0.0) & 
                                 (pl.col("money_reserves") > pl.col("unit_5y_cost")) &
                                 (pl.col("annual_net_income") > 0.0)
@@ -106,8 +167,8 @@ class AISystem(ISystem):
         )
 
         self._framework.register_action_resolver(
-            "utility_build_army",
-            lambda row: ActionBuildUnit("ai_system", row["id"], "army", 1)
+            "utility_build_infantry",
+            lambda row: ActionBuildUnit("ai_system", row["id"], "infantry", int(row["planned_recruitment"]))
         )
 
     def _apply_schema_fallbacks(self, lf: pl.LazyFrame) -> pl.LazyFrame:
@@ -117,7 +178,12 @@ class AISystem(ISystem):
             "total_annual_revenue": 0.0, "total_annual_expense": 0.0,
             "money_reserves": 0.0, "gdp": 10_000_000.0, "human_dev": 0.5,
             "personal_income_tax_rate": 0.20, "trait_threat_perception": 1.0,
-            "military_count": 0
+            "military_count": 0,
+            "active_military_strength": 0,
+            "active_unit_count": 0,
+            "current_military_strength": 0,
+            "reinforcement_gap": 0,
+            "planned_recruitment": 1,
         }
 
         for col, default_val in defaults.items():
@@ -138,6 +204,7 @@ class AISystem(ISystem):
 
         countries_lf = state.get_table("countries").lazy()
         countries_lf = self._apply_schema_fallbacks(countries_lf)
+        countries_lf = self._attach_unit_snapshot(countries_lf, state)
 
         # Framework computes changes on immutable views and emits standalone operations data.
         actions = self._framework.evaluate_and_act(countries_lf)
@@ -145,3 +212,21 @@ class AISystem(ISystem):
         # Inject computed logic directly into the thread-safe global step context queue.
         # TODO: Implement an optimized sorting pass if action prioritization becomes critical in Beta.
         state.current_actions.extend(actions)
+
+    def _attach_unit_snapshot(self, countries_lf: pl.LazyFrame, state: GameState) -> pl.LazyFrame:
+        units = state.tables.get("units")
+        if units is None:
+            return countries_lf
+
+        countries_lf = countries_lf.drop(
+            ["active_military_strength", "active_unit_count"],
+            strict=False,
+        )
+        unit_snapshot = summarize_unit_snapshot(units.lazy())
+        return (
+            countries_lf.join(unit_snapshot, on="id", how="left")
+            .with_columns(
+                pl.col("active_military_strength").fill_null(0),
+                pl.col("active_unit_count").fill_null(0),
+            )
+        )
