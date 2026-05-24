@@ -14,6 +14,7 @@ from src.client.renderers.unit_projection import (
     RegionAnchor,
     UnitProjectionService,
 )
+from src.client.ui.core.primitives import UIPrimitives, UnitCompositionRow
 from src.client.ui.core.theme import GAMETHEME
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 
@@ -23,6 +24,8 @@ if TYPE_CHECKING:
 
 UNIT_DRAG_PREVIEW_WIDTH = 22.0
 UNIT_DRAG_PREVIEW_HEIGHT = 15.0
+UNIT_COMPOSITION_PLATE_WIDTH = 118.0
+UNIT_COMPOSITION_PLATE_HEIGHT = 58.0
 UNIT_SIGNATURE_COLUMNS = (
     "id",
     "owner",
@@ -127,9 +130,9 @@ class UnitRenderer:
             draw_list = imgui.get_window_draw_list()
             for unit in self._billboards:
                 if batch_drawn:
-                    self._draw_unit_overlay(draw_list, unit, height, selected_unit_id, hovered_unit_id)
+                    self._draw_unit_overlay(draw_list, unit, width, height, selected_unit_id, hovered_unit_id)
                 else:
-                    self._draw_unit(draw_list, unit, height, selected_unit_id, hovered_unit_id)
+                    self._draw_unit(draw_list, unit, width, height, selected_unit_id, hovered_unit_id)
 
             if drag_preview is not None:
                 self._draw_drag_preview(draw_list, drag_preview, height)
@@ -351,6 +354,7 @@ class UnitRenderer:
         self,
         draw_list: imgui.ImDrawList,
         unit: ProjectedUnit,
+        window_width: int,
         window_height: int,
         selected_unit_id: Optional[str],
         hovered_unit_id: Optional[str],
@@ -398,10 +402,14 @@ class UnitRenderer:
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
 
+        if is_selected:
+            self._draw_unit_composition_plate(draw_list, unit, right, top, window_width, window_height)
+
     def _draw_unit_overlay(
         self,
         draw_list: imgui.ImDrawList,
         unit: ProjectedUnit,
+        window_width: int,
         window_height: int,
         selected_unit_id: Optional[str],
         hovered_unit_id: Optional[str],
@@ -434,6 +442,54 @@ class UnitRenderer:
 
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
+
+        if is_selected:
+            self._draw_unit_composition_plate(draw_list, unit, right, top, window_width, window_height)
+
+    def _draw_unit_composition_plate(
+        self,
+        draw_list: imgui.ImDrawList,
+        unit: ProjectedUnit,
+        unit_right: float,
+        unit_top: float,
+        window_width: int,
+        window_height: int,
+    ) -> None:
+        plate_x = unit_right + 7.0
+        if plate_x + UNIT_COMPOSITION_PLATE_WIDTH > window_width - 4.0:
+            plate_x = unit.screen_x - unit.width * 0.5 - UNIT_COMPOSITION_PLATE_WIDTH - 7.0
+
+        plate_y = unit_top - 18.0
+        plate_y = max(4.0, min(plate_y, window_height - UNIT_COMPOSITION_PLATE_HEIGHT - 4.0))
+
+        UIPrimitives.unit_composition_plate(
+            draw_list=draw_list,
+            x=plate_x,
+            y=plate_y,
+            rows=self._unit_composition_rows(unit),
+            max_value=unit.strength,
+        )
+
+    def _unit_composition_rows(self, unit: ProjectedUnit) -> tuple[UnitCompositionRow, ...]:
+        infantry, ground, naval, air = self._classify_unit_strength(unit)
+        return (
+            UnitCompositionRow("I", infantry, (0.34, 0.78, 0.39, 1.0)),
+            UnitCompositionRow("G", ground, (0.78, 0.30, 0.25, 1.0)),
+            UnitCompositionRow("N", naval, (0.24, 0.50, 0.86, 1.0)),
+            UnitCompositionRow("A", air, (0.86, 0.70, 0.28, 1.0)),
+        )
+
+    def _classify_unit_strength(self, unit: ProjectedUnit) -> tuple[int, int, int, int]:
+        unit_type = unit.unit_type.casefold()
+        strength = max(0, int(unit.strength))
+
+        if any(token in unit_type for token in ("naval", "ship", "fleet")):
+            return 0, 0, strength, 0
+        if any(token in unit_type for token in ("air", "helicopter", "plane", "jet")):
+            return 0, 0, 0, strength
+        if any(token in unit_type for token in ("vehicle", "armor", "armour", "tank", "ground")):
+            return 0, strength, 0, 0
+        return strength, 0, 0, 0
 
     def _draw_progress_bar(
         self,
