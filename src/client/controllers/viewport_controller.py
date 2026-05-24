@@ -157,7 +157,7 @@ class ViewportController:
 
     def on_mouse_drag(self, x: float, y: float, dx: float, dy: float, buttons: int):
         # Handle 3D rotation via the controller
-        if buttons & arcade.MOUSE_BUTTON_LEFT:
+        if buttons & arcade.MOUSE_BUTTON_RIGHT:
             self.cam.drag(dx, dy)
 
     def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int):

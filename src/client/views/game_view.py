@@ -6,6 +6,7 @@ from typing import Optional
 
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.renderers.unit_renderer import UnitRenderer
+from src.client.ui.components.hud.unit_context_menu import UnitContextMenu
 from src.client.ui.layouts.game_layout import GameLayout
 from src.client.ui.panels.unit_details_window import UnitDetailsWindow
 from src.client.controllers.camera_controller import CameraController
@@ -72,9 +73,19 @@ class GameView(BaseImGuiView):
             net_client=self.net,
             on_unit_double_click=self.unit_details_window.open_for_unit,
         )
+        self.unit_context_menu = UnitContextMenu(
+            composer=self.layout.composer,
+            on_deselect=self.unit_interactions.clear_selection,
+            on_view_units_list=self.unit_details_window.open_for_unit,
+        )
 
         self.selected_region_id = None
         self._drag_start_pos = None
+        self._selection_rect_start = None
+        self._selection_rect_current = None
+        self._right_drag_start_pos = None
+        self._right_context_unit_id = None
+        self._drag_threshold = 5.0
 
         # 4. Handle Initial Focusing
         # If initial_pos is passed (e.g. centroid of selected country), make sure we look at it.
@@ -136,8 +147,10 @@ class GameView(BaseImGuiView):
         self.unit_renderer.render(
             state=self.net.get_state(),
             selected_unit_id=self.unit_interactions.selected_unit_id,
+            selected_unit_ids=self.unit_interactions.selected_unit_ids,
             hovered_unit_id=self.unit_interactions.hovered_unit_id,
             drag_preview=self.unit_interactions.drag_preview,
+            selection_rect=self._active_selection_rect(),
             visible_owners=visible_owners,
         )
         try:
@@ -146,6 +159,7 @@ class GameView(BaseImGuiView):
                 self.imgui.real_fps,
                 self.nav
             )
+            self.unit_context_menu.render()
             self.unit_details_window.render(self.net.get_state())
         except Exception as e:
             print(f"[GameView] UI Rendering Error: {e}")
@@ -158,36 +172,96 @@ class GameView(BaseImGuiView):
         if button == arcade.MOUSE_BUTTON_LEFT:
             if self.unit_interactions.on_mouse_press(x, y, button):
                 self._drag_start_pos = None
+                self._selection_rect_start = None
+                self._selection_rect_current = None
                 return
             self._drag_start_pos = (x, y)
+            self._selection_rect_start = (x, y)
+            self._selection_rect_current = (x, y)
 
         if button == arcade.MOUSE_BUTTON_RIGHT:
-            if self.layout.composer.is_background_clicked():
-                target_region_id = self.viewport_ctrl.get_region_at(x, y)
-                if target_region_id:
-                    self.layout.show_context_menu(target_region_id)
+            if self.imgui.io.want_capture_mouse:
+                return
+            self._right_drag_start_pos = (x, y)
+            unit = self.unit_interactions.get_unit_at(x, y)
+            self._right_context_unit_id = unit.unit_id if unit else None
+
+    def _active_selection_rect(self):
+        if self._selection_rect_start is None or self._selection_rect_current is None:
+            return None
+
+        dx = self._selection_rect_current[0] - self._selection_rect_start[0]
+        dy = self._selection_rect_current[1] - self._selection_rect_start[1]
+        if (dx * dx + dy * dy) < self._drag_threshold * self._drag_threshold:
+            return None
+
+        return (
+            self._selection_rect_start[0],
+            self._selection_rect_start[1],
+            self._selection_rect_current[0],
+            self._selection_rect_current[1],
+        )
+
+    def _is_small_drag(self, start_pos, x: float, y: float) -> bool:
+        if start_pos is None:
+            return False
+
+        dx = x - start_pos[0]
+        dy = y - start_pos[1]
+        return (dx * dx + dy * dy) < self._drag_threshold * self._drag_threshold
+
+    def _open_right_click_context(self, x: float, y: float) -> None:
+        if self._right_context_unit_id:
+            self.unit_interactions.select_unit_by_id(self._right_context_unit_id)
+            self.unit_context_menu.show(self._right_context_unit_id)
+            return
+
+        target_region_id = self.viewport_ctrl.get_region_at(x, y)
+        if target_region_id:
+            self.layout.show_context_menu(target_region_id)
 
     def on_game_mouse_release(self, x, y, button, modifiers):
         if self.unit_interactions.on_mouse_release(x, y, button):
             self._drag_start_pos = None
+            self._selection_rect_start = None
+            self._selection_rect_current = None
+            return
+
+        if button == arcade.MOUSE_BUTTON_RIGHT:
+            if self._is_small_drag(self._right_drag_start_pos, x, y):
+                self._open_right_click_context(x, y)
+            self._right_drag_start_pos = None
+            self._right_context_unit_id = None
             return
 
         # Handle "Click" vs "Drag"
         if button == arcade.MOUSE_BUTTON_LEFT and self._drag_start_pos:
-            drag_threshold = 5.0
-            dx = x - self._drag_start_pos[0]
-            dy = y - self._drag_start_pos[1]
-            drag_distance = (dx * dx + dy * dy) ** 0.5
-
-            if drag_distance < drag_threshold:
-                # It was a click
+            if self._is_small_drag(self._drag_start_pos, x, y):
+                self.unit_interactions.clear_selection()
                 self.viewport_ctrl.on_mouse_press(self._drag_start_pos[0], self._drag_start_pos[1], button)
-            
+            else:
+                self.unit_interactions.select_units_in_rect(
+                    self._drag_start_pos[0],
+                    self._drag_start_pos[1],
+                    x,
+                    y,
+                )
+
             self._drag_start_pos = None
+            self._selection_rect_start = None
+            self._selection_rect_current = None
 
     def on_game_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
         if self.unit_interactions.on_mouse_drag(x, y, buttons):
             return
+
+        if buttons & arcade.MOUSE_BUTTON_LEFT and self._selection_rect_start is not None:
+            self._selection_rect_current = (x, y)
+            return
+
+        if buttons & arcade.MOUSE_BUTTON_RIGHT and self._right_drag_start_pos is None:
+            return
+
         self.viewport_ctrl.on_mouse_drag(x, y, dx, dy, buttons)
 
     def on_game_mouse_motion(self, x, y, dx, dy):

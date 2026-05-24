@@ -29,6 +29,7 @@ class UnitInteractionController:
         self._on_unit_double_click = on_unit_double_click
 
         self.selected_unit_id: Optional[str] = None
+        self.selected_unit_ids: set[str] = set()
         self.hovered_unit_id: Optional[str] = None
 
         self._dragging_unit: Optional[ProjectedUnit] = None
@@ -77,6 +78,7 @@ class UnitInteractionController:
             return False
 
         self.selected_unit_id = unit.unit_id
+        self.selected_unit_ids = {unit.unit_id}
         self.hovered_unit_id = unit.unit_id
         self._dragging_unit = unit
         self._press_x = x
@@ -148,3 +150,58 @@ class UnitInteractionController:
         self._last_click_time = now
         self._last_click_x = x
         self._last_click_y = y
+
+    def clear_selection(self) -> None:
+        self.selected_unit_id = None
+        self.selected_unit_ids.clear()
+
+    def select_unit_by_id(self, unit_id: str) -> bool:
+        unit = self._unit_renderer.get_unit(unit_id)
+        if unit is None:
+            return False
+
+        self.selected_unit_id = unit.unit_id
+        self.selected_unit_ids = {unit.unit_id}
+        self.hovered_unit_id = unit.unit_id
+        return True
+
+    def get_unit_at(self, x: float, y: float) -> Optional[ProjectedUnit]:
+        return self._unit_renderer.get_unit_at(x, y)
+
+    def select_units_in_rect(self, x1: float, y1: float, x2: float, y2: float) -> bool:
+        left, right = sorted((x1, x2))
+        bottom, top = sorted((y1, y2))
+        selected = [
+            unit
+            for unit in self._unit_renderer.billboards
+            if self._unit_intersects_rect(unit, left, right, bottom, top)
+        ]
+
+        if not selected:
+            self.clear_selection()
+            return False
+
+        self.selected_unit_ids = {unit.unit_id for unit in selected}
+        self.selected_unit_id = selected[-1].unit_id
+        return True
+
+    def _unit_intersects_rect(
+        self,
+        unit: ProjectedUnit,
+        left: float,
+        right: float,
+        bottom: float,
+        top: float,
+    ) -> bool:
+        half_w = unit.width * 0.5
+        half_h = unit.height * 0.5
+        unit_left = unit.screen_x - half_w
+        unit_right = unit.screen_x + half_w
+        unit_bottom = unit.screen_y - half_h
+        unit_top = unit.screen_y + half_h
+        return not (
+            unit_right < left
+            or unit_left > right
+            or unit_top < bottom
+            or unit_bottom > top
+        )

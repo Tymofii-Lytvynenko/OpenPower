@@ -92,8 +92,10 @@ class UnitRenderer:
         self,
         state: Optional["GameState"],
         selected_unit_id: Optional[str],
+        selected_unit_ids: Optional[set[str]],
         hovered_unit_id: Optional[str],
         drag_preview: Optional[UnitDragPreview],
+        selection_rect: Optional[tuple[float, float, float, float]] = None,
         visible_owners: Optional[set[str]] = None,
     ) -> None:
         window = imgui.get_io().display_size
@@ -108,8 +110,9 @@ class UnitRenderer:
         needs_imgui_overlay = (
             not batch_drawn
             or drag_preview is not None
+            or selection_rect is not None
             or any(
-                self._unit_needs_imgui_overlay(unit, selected_unit_id, hovered_unit_id)
+                self._unit_needs_imgui_overlay(unit, selected_unit_id, selected_unit_ids, hovered_unit_id)
                 for unit in self._billboards
             )
         )
@@ -130,12 +133,31 @@ class UnitRenderer:
             draw_list = imgui.get_window_draw_list()
             for unit in self._billboards:
                 if batch_drawn:
-                    self._draw_unit_overlay(draw_list, unit, width, height, selected_unit_id, hovered_unit_id)
+                    self._draw_unit_overlay(
+                        draw_list,
+                        unit,
+                        width,
+                        height,
+                        selected_unit_id,
+                        selected_unit_ids,
+                        hovered_unit_id,
+                    )
                 else:
-                    self._draw_unit(draw_list, unit, width, height, selected_unit_id, hovered_unit_id)
+                    self._draw_unit(
+                        draw_list,
+                        unit,
+                        width,
+                        height,
+                        selected_unit_id,
+                        selected_unit_ids,
+                        hovered_unit_id,
+                    )
 
             if drag_preview is not None:
                 self._draw_drag_preview(draw_list, drag_preview, height)
+
+            if selection_rect is not None:
+                self._draw_selection_rect(draw_list, selection_rect, height)
 
         imgui.end()
 
@@ -287,10 +309,12 @@ class UnitRenderer:
         self,
         unit: ProjectedUnit,
         selected_unit_id: Optional[str],
+        selected_unit_ids: Optional[set[str]],
         hovered_unit_id: Optional[str],
     ) -> bool:
         return (
             unit.unit_id == selected_unit_id
+            or (selected_unit_ids is not None and unit.unit_id in selected_unit_ids)
             or unit.unit_id == hovered_unit_id
             or unit.is_moving
             or (unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1)
@@ -357,6 +381,7 @@ class UnitRenderer:
         window_width: int,
         window_height: int,
         selected_unit_id: Optional[str],
+        selected_unit_ids: Optional[set[str]],
         hovered_unit_id: Optional[str],
     ) -> None:
         image_w = unit.width
@@ -366,7 +391,8 @@ class UnitRenderer:
         right = left + image_w
         bottom = top + image_h
 
-        is_selected = unit.unit_id == selected_unit_id
+        is_primary_selected = unit.unit_id == selected_unit_id
+        is_selected = is_primary_selected or (selected_unit_ids is not None and unit.unit_id in selected_unit_ids)
         is_hovered = unit.unit_id == hovered_unit_id
         border_color = GAMETHEME.colors.warning if is_selected else GAMETHEME.colors.text_main
         if is_hovered and not is_selected:
@@ -402,7 +428,7 @@ class UnitRenderer:
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
 
-        if is_selected:
+        if is_primary_selected:
             self._draw_unit_composition_plate(draw_list, unit, right, top, window_width, window_height)
 
     def _draw_unit_overlay(
@@ -412,9 +438,10 @@ class UnitRenderer:
         window_width: int,
         window_height: int,
         selected_unit_id: Optional[str],
+        selected_unit_ids: Optional[set[str]],
         hovered_unit_id: Optional[str],
     ) -> None:
-        if not self._unit_needs_imgui_overlay(unit, selected_unit_id, hovered_unit_id):
+        if not self._unit_needs_imgui_overlay(unit, selected_unit_id, selected_unit_ids, hovered_unit_id):
             return
 
         image_w = unit.width
@@ -424,7 +451,8 @@ class UnitRenderer:
         right = left + image_w
         bottom = top + image_h
 
-        is_selected = unit.unit_id == selected_unit_id
+        is_primary_selected = unit.unit_id == selected_unit_id
+        is_selected = is_primary_selected or (selected_unit_ids is not None and unit.unit_id in selected_unit_ids)
         is_hovered = unit.unit_id == hovered_unit_id
         if is_selected or is_hovered:
             border_color = GAMETHEME.colors.warning if is_selected else GAMETHEME.colors.info
@@ -443,8 +471,34 @@ class UnitRenderer:
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
 
-        if is_selected:
+        if is_primary_selected:
             self._draw_unit_composition_plate(draw_list, unit, right, top, window_width, window_height)
+
+    def _draw_selection_rect(
+        self,
+        draw_list: imgui.ImDrawList,
+        rect: tuple[float, float, float, float],
+        window_height: int,
+    ) -> None:
+        x1, y1, x2, y2 = rect
+        left, right = sorted((x1, x2))
+        bottom, top = sorted((y1, y2))
+        draw_top = window_height - top
+        draw_bottom = window_height - bottom
+
+        draw_list.add_rect_filled(
+            (left, draw_top),
+            (right, draw_bottom),
+            imgui.get_color_u32((0.25, 0.55, 0.95, 0.14)),
+        )
+        draw_list.add_rect(
+            (left, draw_top),
+            (right, draw_bottom),
+            imgui.get_color_u32((0.45, 0.70, 1.00, 0.85)),
+            0.0,
+            0,
+            1.2,
+        )
 
     def _draw_unit_composition_plate(
         self,
