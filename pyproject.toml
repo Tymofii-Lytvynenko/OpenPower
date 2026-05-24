@@ -53,3 +53,7 @@ src = "src"
 
 [tool.setuptools.package-data]
 "*" = ["*.toml", "*.tsv", "*.json", "*.png", "*.jpg", "*.jpeg", "*.glsl"]
+
+[tool.pyright]
+extraPaths = ["."]
+
