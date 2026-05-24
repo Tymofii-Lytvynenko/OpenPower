@@ -145,7 +145,7 @@ class UIPrimitives:
         label_x = x + 7.0
         bar_x = label_x + 11.0
         bar_w = 31.0
-        value_x = x + plate_w - 7.0
+        value_x = bar_x + bar_w + 7.0
 
         draw_list.add_rect_filled(
             (x, y),
@@ -166,7 +166,6 @@ class UIPrimitives:
             row_y = rows_top + index * row_h
             value = max(0, int(row.value))
             value_text = f"{value:,}".replace(",", " ")
-            value_size = imgui.calc_text_size(value_text)
 
             draw_list.add_text(
                 (label_x, row_y - 1.0),
@@ -193,7 +192,7 @@ class UIPrimitives:
                 imgui.get_color_u32((0.42, 0.45, 0.44, 0.95)),
             )
             draw_list.add_text(
-                (value_x - value_size.x, row_y - 1.0),
+                (value_x, row_y - 1.0),
                 imgui.get_color_u32(GAMETHEME.colors.text_main),
                 value_text,
             )
