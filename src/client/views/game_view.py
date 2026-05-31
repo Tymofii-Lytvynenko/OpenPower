@@ -6,6 +6,7 @@ from typing import Optional
 
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.renderers.unit_renderer import UnitRenderer
+from src.client.renderers.event_renderer import EventRenderer
 from src.client.ui.components.hud.unit_context_menu import UnitContextMenu
 from src.client.ui.layouts.game_layout import GameLayout
 from src.client.ui.panels.unit_details_window import UnitDetailsWindow
@@ -60,6 +61,12 @@ class GameView(BaseImGuiView):
 
         # 3. Initialize Renderers and HUD
         self.unit_renderer = UnitRenderer(
+            camera=self.cam_ctrl,
+            map_width=self.renderer.width,
+            map_height=self.renderer.height,
+            globe_radius=self.renderer.globe_radius,
+        )
+        self.event_renderer = EventRenderer(
             camera=self.cam_ctrl,
             map_width=self.renderer.width,
             map_height=self.renderer.height,
@@ -160,6 +167,10 @@ class GameView(BaseImGuiView):
             selection_rect=self._active_selection_rect(),
             visible_owners=visible_owners,
         )
+
+        # Draw random event placards above affected regions
+        self.event_renderer.render(self.net.get_state())
+
         try:
             self.layout.render(
                 self.selected_region_id,

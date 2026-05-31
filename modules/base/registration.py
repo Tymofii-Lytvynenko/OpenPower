@@ -8,6 +8,7 @@ from modules.base.systems.demographics.population_system import PopulationSystem
 from modules.base.systems.military.military_system import MilitarySystem
 from modules.base.systems.world.territory_system import TerritorySystem
 from modules.base.systems.world.ai_system import AISystem
+from modules.base.systems.world.random_events_system import RandomEventsSystem
 from modules.base.systems.economy.trade_system import TradeSystem
 from modules.base.systems.economy.internal_economy_system import InternalEconomySystem
 from modules.base.systems.economy.budget_system import BudgetSystem
@@ -24,6 +25,7 @@ def register() -> List[ISystem]:
         MilitarySystem(),
         TerritorySystem(),
         AISystem(),
+        RandomEventsSystem(),
         TradeSystem(),
         InternalEconomySystem(),
         BudgetSystem()

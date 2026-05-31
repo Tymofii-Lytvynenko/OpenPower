@@ -145,3 +145,17 @@ class EventBudgetChanged(GameEvent):
     """
 
     country_tag: str
+
+
+@dataclass
+class EventRandomEventTriggered(GameEvent):
+    """
+    Fired when a new random event (disaster, boom, etc.) activates in a region.
+    Other systems can subscribe to apply gameplay effects (economy penalties,
+    population loss, etc.) without coupling to RandomEventsSystem.
+    """
+
+    event_id: str
+    event_type: str
+    region_id: int
+    severity: float  # 0.0–1.0 scale for future effect magnitude
