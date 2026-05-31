@@ -1,0 +1,1164 @@
+[country_religions.AFG]
+"Sunni Islam" = 84.0
+"Shia Islam" = 15.0
+Other = 1.0
+
+[country_religions.AGO]
+"Catholic Christianity" = 41.0
+"Protestant Christianity" = 38.0
+"Traditional Beliefs" = 10.0
+Other = 11.0
+
+[country_religions.ALB]
+Islam = 58.0
+"Orthodox Christianity" = 10.0
+"Catholic Christianity" = 10.0
+Unaffiliated = 15.0
+Other = 7.0
+
+[country_religions.AND]
+"Catholic Christianity" = 88.0
+Unaffiliated = 8.0
+Other = 4.0
+
+[country_religions.ARE]
+Islam = 76.0
+Hinduism = 8.0
+Christianity = 9.0
+Buddhism = 2.0
+Other = 5.0
+
+[country_religions.ARG]
+"Catholic Christianity" = 76.0
+"Protestant Christianity" = 9.0
+Unaffiliated = 12.0
+Other = 3.0
+
+[country_religions.ARM]
+"Armenian Apostolic Christianity" = 92.0
+Unaffiliated = 4.0
+Other = 4.0
+
+[country_religions.ATA]
+Unaffiliated = 55.0
+Christianity = 30.0
+Buddhism = 5.0
+Other = 10.0
+
+[country_religions.ATG]
+"Protestant Christianity" = 68.0
+"Catholic Christianity" = 10.0
+Unaffiliated = 12.0
+Other = 10.0
+
+[country_religions.AUS]
+Christianity = 52.0
+Unaffiliated = 30.0
+Islam = 3.0
+Buddhism = 3.0
+Hinduism = 2.0
+Other = 10.0
+
+[country_religions.AUT]
+"Catholic Christianity" = 64.0
+Unaffiliated = 17.0
+Islam = 8.0
+"Orthodox Christianity" = 5.0
+Other = 6.0
+
+[country_religions.AZE]
+"Shia Islam" = 65.0
+"Sunni Islam" = 30.0
+Christianity = 3.0
+Other = 2.0
+
+[country_religions.BDI]
+"Catholic Christianity" = 62.0
+"Protestant Christianity" = 25.0
+"Traditional Beliefs" = 5.0
+Islam = 3.0
+Other = 5.0
+
+[country_religions.BEL]
+"Catholic Christianity" = 55.0
+Unaffiliated = 30.0
+Islam = 6.0
+"Protestant Christianity" = 3.0
+Other = 6.0
+
+[country_religions.BEN]
+Christianity = 49.0
+Islam = 27.0
+Vodun = 17.0
+Other = 7.0
+
+[country_religions.BFA]
+Islam = 62.0
+"Catholic Christianity" = 20.0
+"Protestant Christianity" = 6.0
+"Traditional Beliefs" = 10.0
+Other = 2.0
+
+[country_religions.BGD]
+Islam = 89.0
+Hinduism = 10.0
+Other = 1.0
+
+[country_religions.BGR]
+"Orthodox Christianity" = 76.0
+Islam = 10.0
+Unaffiliated = 10.0
+Other = 4.0
+
+[country_religions.BHR]
+"Shia Islam" = 55.0
+"Sunni Islam" = 30.0
+Christianity = 8.0
+Hinduism = 4.0
+Other = 3.0
+
+[country_religions.BHS]
+"Protestant Christianity" = 70.0
+"Catholic Christianity" = 14.0
+Unaffiliated = 10.0
+Other = 6.0
+
+[country_religions.BIH]
+Islam = 50.0
+"Orthodox Christianity" = 31.0
+"Catholic Christianity" = 15.0
+Other = 4.0
+
+[country_religions.BLR]
+"Orthodox Christianity" = 70.0
+Unaffiliated = 20.0
+"Catholic Christianity" = 7.0
+Other = 3.0
+
+[country_religions.BLZ]
+"Catholic Christianity" = 40.0
+"Protestant Christianity" = 32.0
+Unaffiliated = 16.0
+Other = 12.0
+
+[country_religions.BOL]
+"Catholic Christianity" = 76.0
+"Protestant Christianity" = 17.0
+"Traditional Beliefs" = 4.0
+Other = 3.0
+
+[country_religions.BRA]
+"Catholic Christianity" = 65.0
+"Protestant Christianity" = 22.0
+Unaffiliated = 8.0
+Spiritism = 2.0
+Other = 3.0
+
+[country_religions.BRB]
+"Protestant Christianity" = 66.0
+"Catholic Christianity" = 4.0
+Unaffiliated = 20.0
+Other = 10.0
+
+[country_religions.BRN]
+Islam = 79.0
+Buddhism = 8.0
+Christianity = 8.0
+Other = 5.0
+
+[country_religions.BTN]
+Buddhism = 75.0
+Hinduism = 23.0
+Other = 2.0
+
+[country_religions.BWA]
+Christianity = 79.0
+"Traditional Beliefs" = 6.0
+Unaffiliated = 13.0
+Other = 2.0
+
+[country_religions.CAF]
+Christianity = 80.0
+Islam = 10.0
+"Traditional Beliefs" = 8.0
+Other = 2.0
+
+[country_religions.CAN]
+Christianity = 63.0
+Unaffiliated = 24.0
+Islam = 4.0
+Hinduism = 2.0
+Other = 7.0
+
+[country_religions.CHE]
+Christianity = 62.0
+Unaffiliated = 26.0
+Islam = 5.0
+Other = 7.0
+
+[country_religions.CHL]
+"Catholic Christianity" = 64.0
+"Protestant Christianity" = 17.0
+Unaffiliated = 15.0
+Other = 4.0
+
+[country_religions.CHN]
+Unaffiliated = 52.0
+"Folk Religion" = 22.0
+Buddhism = 18.0
+Christianity = 5.0
+Islam = 2.0
+Other = 1.0
+
+[country_religions.CIV]
+Islam = 42.0
+Christianity = 39.0
+"Traditional Beliefs" = 15.0
+Other = 4.0
+
+[country_religions.CMR]
+Christianity = 70.0
+Islam = 21.0
+"Traditional Beliefs" = 6.0
+Other = 3.0
+
+[country_religions.COD]
+Christianity = 86.0
+Kimbanguism = 5.0
+Islam = 2.0
+"Traditional Beliefs" = 5.0
+Other = 2.0
+
+[country_religions.COG]
+Christianity = 85.0
+"Traditional Beliefs" = 7.0
+Islam = 2.0
+Other = 6.0
+
+[country_religions.COL]
+"Catholic Christianity" = 74.0
+"Protestant Christianity" = 15.0
+Unaffiliated = 8.0
+Other = 3.0
+
+[country_religions.COM]
+Islam = 98.0
+Christianity = 1.0
+Other = 1.0
+
+[country_religions.CPV]
+"Catholic Christianity" = 77.0
+"Protestant Christianity" = 10.0
+Unaffiliated = 10.0
+Other = 3.0
+
+[country_religions.CRI]
+"Catholic Christianity" = 62.0
+"Protestant Christianity" = 23.0
+Unaffiliated = 10.0
+Other = 5.0
+
+[country_religions.CUB]
+Christianity = 59.0
+Unaffiliated = 24.0
+"Folk Religion" = 12.0
+Other = 5.0
+
+[country_religions.CYP]
+"Orthodox Christianity" = 73.0
+Islam = 18.0
+Unaffiliated = 5.0
+Other = 4.0
+
+[country_religions.CZE]
+Unaffiliated = 70.0
+"Catholic Christianity" = 20.0
+"Protestant Christianity" = 2.0
+Other = 8.0
+
+[country_religions.DEU]
+Christianity = 59.0
+Unaffiliated = 31.0
+Islam = 6.0
+Other = 4.0
+
+[country_religions.DJI]
+Islam = 94.0
+Christianity = 5.0
+Other = 1.0
+
+[country_religions.DMA]
+"Catholic Christianity" = 61.0
+"Protestant Christianity" = 25.0
+Unaffiliated = 7.0
+Other = 7.0
+
+[country_religions.DNK]
+Christianity = 75.0
+Unaffiliated = 19.0
+Islam = 4.0
+Other = 2.0
+
+[country_religions.DOM]
+"Catholic Christianity" = 57.0
+"Protestant Christianity" = 23.0
+Unaffiliated = 15.0
+Other = 5.0
+
+[country_religions.DZA]
+Islam = 98.0
+Christianity = 1.0
+Other = 1.0
+
+[country_religions.ECU]
+"Catholic Christianity" = 74.0
+"Protestant Christianity" = 15.0
+Unaffiliated = 8.0
+Other = 3.0
+
+[country_religions.EGY]
+Islam = 90.0
+"Coptic Christianity" = 9.0
+Other = 1.0
+
+[country_religions.ERI]
+Christianity = 50.0
+Islam = 48.0
+Other = 2.0
+
+[country_religions.ESP]
+"Catholic Christianity" = 68.0
+Unaffiliated = 24.0
+Islam = 3.0
+Other = 5.0
+
+[country_religions.EST]
+Unaffiliated = 54.0
+"Orthodox Christianity" = 16.0
+"Lutheran Christianity" = 12.0
+Other = 18.0
+
+[country_religions.ETH]
+"Orthodox Christianity" = 44.0
+Islam = 34.0
+"Protestant Christianity" = 19.0
+Other = 3.0
+
+[country_religions.FIN]
+"Lutheran Christianity" = 68.0
+Unaffiliated = 25.0
+"Orthodox Christianity" = 1.0
+Other = 6.0
+
+[country_religions.FJI]
+Christianity = 64.0
+Hinduism = 28.0
+Islam = 6.0
+Other = 2.0
+
+[country_religions.FRA]
+Christianity = 55.0
+Unaffiliated = 32.0
+Islam = 8.0
+Other = 5.0
+
+[country_religions.FSM]
+Christianity = 95.0
+Other = 5.0
+
+[country_religions.GAB]
+Christianity = 76.0
+Islam = 10.0
+"Traditional Beliefs" = 10.0
+Other = 4.0
+
+[country_religions.GBR]
+Christianity = 59.0
+Unaffiliated = 30.0
+Islam = 5.0
+Hinduism = 2.0
+Other = 4.0
+
+[country_religions.GEO]
+"Orthodox Christianity" = 83.0
+Islam = 10.0
+"Armenian Apostolic Christianity" = 4.0
+Other = 3.0
+
+[country_religions.GHA]
+Christianity = 71.0
+Islam = 18.0
+"Traditional Beliefs" = 5.0
+Other = 6.0
+
+[country_religions.GIN]
+Islam = 85.0
+Christianity = 8.0
+"Traditional Beliefs" = 5.0
+Other = 2.0
+
+[country_religions.GMB]
+Islam = 95.0
+Christianity = 4.0
+Other = 1.0
+
+[country_religions.GNB]
+Islam = 45.0
+Christianity = 30.0
+"Traditional Beliefs" = 20.0
+Other = 5.0
+
+[country_religions.GNQ]
+Christianity = 88.0
+"Traditional Beliefs" = 5.0
+Islam = 2.0
+Other = 5.0
+
+[country_religions.GRC]
+"Orthodox Christianity" = 90.0
+Islam = 3.0
+Unaffiliated = 4.0
+Other = 3.0
+
+[country_religions.GRD]
+"Protestant Christianity" = 55.0
+"Catholic Christianity" = 36.0
+Unaffiliated = 5.0
+Other = 4.0
+
+[country_religions.GTM]
+"Catholic Christianity" = 47.0
+"Protestant Christianity" = 40.0
+"Traditional Beliefs" = 5.0
+Other = 8.0
+
+[country_religions.GUY]
+Christianity = 57.0
+Hinduism = 25.0
+Islam = 7.0
+Unaffiliated = 4.0
+Other = 7.0
+
+[country_religions.HND]
+"Catholic Christianity" = 46.0
+"Protestant Christianity" = 40.0
+Unaffiliated = 10.0
+Other = 4.0
+
+[country_religions.HRV]
+"Catholic Christianity" = 86.0
+"Orthodox Christianity" = 4.0
+Unaffiliated = 6.0
+Other = 4.0
+
+[country_religions.HTI]
+"Catholic Christianity" = 55.0
+"Protestant Christianity" = 28.0
+Vodou = 10.0
+Other = 7.0
+
+[country_religions.HUN]
+"Catholic Christianity" = 54.0
+"Protestant Christianity" = 16.0
+Unaffiliated = 27.0
+Other = 3.0
+
+[country_religions.IDN]
+Islam = 87.0
+Christianity = 10.0
+Hinduism = 2.0
+Other = 1.0
+
+[country_religions.IND]
+Hinduism = 80.0
+Islam = 14.0
+Christianity = 2.0
+Sikhism = 2.0
+Buddhism = 1.0
+Other = 1.0
+
+[country_religions.IRL]
+"Catholic Christianity" = 78.0
+Unaffiliated = 10.0
+"Protestant Christianity" = 4.0
+Other = 8.0
+
+[country_religions.IRN]
+"Shia Islam" = 90.0
+"Sunni Islam" = 8.0
+Other = 2.0
+
+[country_religions.IRQ]
+"Shia Islam" = 60.0
+"Sunni Islam" = 35.0
+Christianity = 3.0
+Other = 2.0
+
+[country_religions.ISL]
+Christianity = 74.0
+Unaffiliated = 20.0
+Other = 6.0
+
+[country_religions.ISR]
+Judaism = 74.0
+Islam = 18.0
+Christianity = 2.0
+Druze = 2.0
+Other = 4.0
+
+[country_religions.ITA]
+"Catholic Christianity" = 80.0
+Unaffiliated = 13.0
+Islam = 3.0
+Other = 4.0
+
+[country_religions.JAM]
+"Protestant Christianity" = 64.0
+"Catholic Christianity" = 3.0
+Unaffiliated = 21.0
+Other = 12.0
+
+[country_religions.JOR]
+"Sunni Islam" = 92.0
+Christianity = 6.0
+Other = 2.0
+
+[country_religions.JPN]
+Shinto = 48.0
+Buddhism = 36.0
+Unaffiliated = 12.0
+Christianity = 1.0
+Other = 3.0
+
+[country_religions.KAZ]
+Islam = 70.0
+"Orthodox Christianity" = 24.0
+Unaffiliated = 4.0
+Other = 2.0
+
+[country_religions.KEN]
+Christianity = 82.0
+Islam = 11.0
+"Traditional Beliefs" = 5.0
+Other = 2.0
+
+[country_religions.KGZ]
+Islam = 88.0
+"Orthodox Christianity" = 8.0
+Other = 4.0
+
+[country_religions.KHM]
+Buddhism = 95.0
+Islam = 2.0
+Christianity = 1.0
+Other = 2.0
+
+[country_religions.KIR]
+Christianity = 96.0
+Other = 4.0
+
+[country_religions.KNA]
+"Protestant Christianity" = 74.0
+"Catholic Christianity" = 6.0
+Unaffiliated = 12.0
+Other = 8.0
+
+[country_religions.KOR]
+Unaffiliated = 43.0
+Christianity = 29.0
+Buddhism = 23.0
+Other = 5.0
+
+[country_religions.KOS]
+Islam = 90.0
+"Orthodox Christianity" = 6.0
+"Catholic Christianity" = 3.0
+Other = 1.0
+
+[country_religions.KWT]
+Islam = 74.0
+Christianity = 18.0
+Hinduism = 6.0
+Other = 2.0
+
+[country_religions.LAO]
+Buddhism = 66.0
+"Traditional Beliefs" = 30.0
+Christianity = 2.0
+Other = 2.0
+
+[country_religions.LBN]
+Islam = 59.0
+Christianity = 36.0
+Druze = 5.0
+
+[country_religions.LBR]
+Christianity = 85.0
+Islam = 12.0
+"Traditional Beliefs" = 2.0
+Other = 1.0
+
+[country_religions.LBY]
+Islam = 97.0
+Christianity = 2.0
+Other = 1.0
+
+[country_religions.LCA]
+Christianity = 90.0
+Unaffiliated = 5.0
+Other = 5.0
+
+[country_religions.LIE]
+"Catholic Christianity" = 76.0
+"Protestant Christianity" = 7.0
+Unaffiliated = 10.0
+Other = 7.0
+
+[country_religions.LKA]
+Buddhism = 70.0
+Hinduism = 13.0
+Islam = 10.0
+Christianity = 7.0
+
+[country_religions.LSO]
+Christianity = 90.0
+"Traditional Beliefs" = 5.0
+Other = 5.0
+
+[country_religions.LTU]
+"Catholic Christianity" = 77.0
+Unaffiliated = 12.0
+"Orthodox Christianity" = 4.0
+Other = 7.0
+
+[country_religions.LUX]
+"Catholic Christianity" = 68.0
+Unaffiliated = 20.0
+Islam = 3.0
+Other = 9.0
+
+[country_religions.LVA]
+Christianity = 55.0
+Unaffiliated = 38.0
+Other = 7.0
+
+[country_religions.MAR]
+Islam = 99.0
+Other = 1.0
+
+[country_religions.MCO]
+"Catholic Christianity" = 83.0
+Unaffiliated = 10.0
+Other = 7.0
+
+[country_religions.MDA]
+"Orthodox Christianity" = 90.0
+Unaffiliated = 5.0
+Other = 5.0
+
+[country_religions.MDG]
+Christianity = 41.0
+"Traditional Beliefs" = 52.0
+Islam = 3.0
+Other = 4.0
+
+[country_religions.MDV]
+Islam = 99.0
+Other = 1.0
+
+[country_religions.MEX]
+"Catholic Christianity" = 82.0
+"Protestant Christianity" = 9.0
+Unaffiliated = 6.0
+Other = 3.0
+
+[country_religions.MHL]
+Christianity = 96.0
+Other = 4.0
+
+[country_religions.MKD]
+"Orthodox Christianity" = 65.0
+Islam = 33.0
+Other = 2.0
+
+[country_religions.MLI]
+Islam = 92.0
+"Traditional Beliefs" = 5.0
+Christianity = 2.0
+Other = 1.0
+
+[country_religions.MLT]
+"Catholic Christianity" = 91.0
+Unaffiliated = 5.0
+Other = 4.0
+
+[country_religions.MMR]
+Buddhism = 88.0
+Christianity = 6.0
+Islam = 4.0
+Other = 2.0
+
+[country_religions.MNE]
+"Orthodox Christianity" = 72.0
+Islam = 19.0
+"Catholic Christianity" = 4.0
+Other = 5.0
+
+[country_religions.MNG]
+Buddhism = 53.0
+Unaffiliated = 38.0
+Shamanism = 3.0
+Islam = 3.0
+Other = 3.0
+
+[country_religions.MOZ]
+Christianity = 57.0
+Islam = 18.0
+"Traditional Beliefs" = 18.0
+Other = 7.0
+
+[country_religions.MRT]
+Islam = 99.0
+Other = 1.0
+
+[country_religions.MUS]
+Hinduism = 49.0
+Christianity = 32.0
+Islam = 17.0
+Other = 2.0
+
+[country_religions.MWI]
+Christianity = 82.0
+Islam = 13.0
+"Traditional Beliefs" = 3.0
+Other = 2.0
+
+[country_religions.MYS]
+Islam = 61.0
+Buddhism = 20.0
+Christianity = 9.0
+Hinduism = 6.0
+Other = 4.0
+
+[country_religions.NAM]
+Christianity = 90.0
+"Traditional Beliefs" = 4.0
+Unaffiliated = 4.0
+Other = 2.0
+
+[country_religions.NER]
+Islam = 95.0
+"Traditional Beliefs" = 3.0
+Christianity = 1.0
+Other = 1.0
+
+[country_religions.NGA]
+Islam = 50.0
+Christianity = 48.0
+"Traditional Beliefs" = 1.0
+Other = 1.0
+
+[country_religions.NIC]
+"Catholic Christianity" = 50.0
+"Protestant Christianity" = 33.0
+Unaffiliated = 12.0
+Other = 5.0
+
+[country_religions.NLD]
+Unaffiliated = 45.0
+Christianity = 43.0
+Islam = 5.0
+Other = 7.0
+
+[country_religions.NOR]
+Christianity = 72.0
+Unaffiliated = 21.0
+Islam = 4.0
+Other = 3.0
+
+[country_religions.NPL]
+Hinduism = 81.0
+Buddhism = 9.0
+Islam = 4.0
+Kirat = 3.0
+Other = 3.0
+
+[country_religions.NRU]
+Christianity = 93.0
+Other = 7.0
+
+[country_religions.NZL]
+Christianity = 49.0
+Unaffiliated = 37.0
+MaoriBeliefs = 3.0
+Hinduism = 2.0
+Other = 9.0
+
+[country_religions.OMN]
+Islam = 88.0
+Hinduism = 6.0
+Christianity = 4.0
+Other = 2.0
+
+[country_religions.PAK]
+Islam = 96.0
+Hinduism = 2.0
+Christianity = 1.5
+Other = 0.5
+
+[country_religions.PAN]
+"Catholic Christianity" = 70.0
+"Protestant Christianity" = 18.0
+Unaffiliated = 8.0
+Other = 4.0
+
+[country_religions.PER]
+"Catholic Christianity" = 76.0
+"Protestant Christianity" = 14.0
+Unaffiliated = 6.0
+Other = 4.0
+
+[country_religions.PHL]
+"Catholic Christianity" = 80.0
+Islam = 6.0
+"Protestant Christianity" = 10.0
+Other = 4.0
+
+[country_religions.PLW]
+Christianity = 86.0
+Modekngei = 6.0
+Other = 8.0
+
+[country_religions.PNG]
+Christianity = 96.0
+"Traditional Beliefs" = 3.0
+Other = 1.0
+
+[country_religions.POL]
+"Catholic Christianity" = 87.0
+Unaffiliated = 10.0
+Other = 3.0
+
+[country_religions.PRK]
+Unaffiliated = 65.0
+KoreanShamanism = 16.0
+Chondoism = 13.0
+Buddhism = 4.0
+Christianity = 2.0
+
+[country_religions.PRT]
+"Catholic Christianity" = 81.0
+Unaffiliated = 12.0
+Other = 7.0
+
+[country_religions.PRY]
+"Catholic Christianity" = 88.0
+"Protestant Christianity" = 7.0
+Unaffiliated = 3.0
+Other = 2.0
+
+[country_religions.PSE]
+Islam = 85.0
+Christianity = 14.0
+Other = 1.0
+
+[country_religions.QAT]
+Islam = 68.0
+Christianity = 14.0
+Hinduism = 13.0
+Buddhism = 3.0
+Other = 2.0
+
+[country_religions.ROU]
+"Orthodox Christianity" = 82.0
+Unaffiliated = 8.0
+"Catholic Christianity" = 5.0
+"Protestant Christianity" = 4.0
+Other = 1.0
+
+[country_religions.RUS]
+"Orthodox Christianity" = 71.0
+Islam = 10.0
+Unaffiliated = 15.0
+Other = 4.0
+
+[country_religions.RWA]
+Christianity = 93.0
+Islam = 2.0
+"Traditional Beliefs" = 3.0
+Other = 2.0
+
+[country_religions.SAU]
+Islam = 97.0
+Christianity = 2.0
+Other = 1.0
+
+[country_religions.SDN]
+Islam = 91.0
+Christianity = 5.0
+"Traditional Beliefs" = 3.0
+Other = 1.0
+
+[country_religions.SEN]
+Islam = 95.0
+Christianity = 4.0
+Other = 1.0
+
+[country_religions.SGP]
+Buddhism = 33.0
+Christianity = 18.0
+Islam = 15.0
+Taoism = 10.0
+Hinduism = 5.0
+Unaffiliated = 17.0
+Other = 2.0
+
+[country_religions.SLB]
+Christianity = 95.0
+"Traditional Beliefs" = 4.0
+Other = 1.0
+
+[country_religions.SLE]
+Islam = 78.0
+Christianity = 20.0
+"Traditional Beliefs" = 1.0
+Other = 1.0
+
+[country_religions.SLV]
+"Catholic Christianity" = 48.0
+"Protestant Christianity" = 36.0
+Unaffiliated = 12.0
+Other = 4.0
+
+[country_religions.SMR]
+"Catholic Christianity" = 88.0
+Unaffiliated = 8.0
+Other = 4.0
+
+[country_religions.SOM]
+"Sunni Islam" = 99.0
+Other = 1.0
+
+[country_religions.SRB]
+"Orthodox Christianity" = 85.0
+"Catholic Christianity" = 5.0
+Islam = 3.0
+Unaffiliated = 5.0
+Other = 2.0
+
+[country_religions.SSD]
+Christianity = 60.0
+"Traditional Beliefs" = 30.0
+Islam = 6.0
+Other = 4.0
+
+[country_religions.STP]
+Christianity = 87.0
+Unaffiliated = 10.0
+Other = 3.0
+
+[country_religions.SUR]
+Christianity = 48.0
+Hinduism = 22.0
+Islam = 14.0
+Unaffiliated = 8.0
+Other = 8.0
+
+[country_religions.SVK]
+"Catholic Christianity" = 62.0
+"Protestant Christianity" = 8.0
+Unaffiliated = 24.0
+Other = 6.0
+
+[country_religions.SVN]
+"Catholic Christianity" = 58.0
+Unaffiliated = 30.0
+"Orthodox Christianity" = 2.0
+Islam = 2.0
+Other = 8.0
+
+[country_religions.SWE]
+Christianity = 64.0
+Unaffiliated = 28.0
+Islam = 5.0
+Other = 3.0
+
+[country_religions.SWZ]
+Christianity = 88.0
+"Traditional Beliefs" = 7.0
+Other = 5.0
+
+[country_religions.SYC]
+Christianity = 90.0
+Hinduism = 2.0
+Islam = 1.0
+Other = 7.0
+
+[country_religions.SYR]
+"Sunni Islam" = 74.0
+"Shia Islam" = 13.0
+Christianity = 10.0
+Druze = 3.0
+
+[country_religions.TCD]
+Islam = 55.0
+Christianity = 40.0
+"Traditional Beliefs" = 4.0
+Other = 1.0
+
+[country_religions.TGO]
+Christianity = 48.0
+"Traditional Beliefs" = 33.0
+Islam = 18.0
+Other = 1.0
+
+[country_religions.THA]
+Buddhism = 93.0
+Islam = 5.0
+Christianity = 1.0
+Other = 1.0
+
+[country_religions.TJK]
+Islam = 96.0
+"Orthodox Christianity" = 2.0
+Other = 2.0
+
+[country_religions.TKM]
+Islam = 89.0
+"Orthodox Christianity" = 9.0
+Other = 2.0
+
+[country_religions.TLS]
+"Catholic Christianity" = 97.0
+Other = 3.0
+
+[country_religions.TON]
+Christianity = 98.0
+Other = 2.0
+
+[country_religions.TTO]
+Christianity = 64.0
+Hinduism = 18.0
+Islam = 5.0
+Unaffiliated = 9.0
+Other = 4.0
+
+[country_religions.TUN]
+Islam = 98.0
+Other = 2.0
+
+[country_religions.TUR]
+Islam = 96.0
+Unaffiliated = 2.0
+Christianity = 1.0
+Other = 1.0
+
+[country_religions.TUV]
+Christianity = 96.0
+Other = 4.0
+
+[country_religions.TWN]
+Buddhism = 35.0
+Taoism = 33.0
+"Folk Religion" = 15.0
+Christianity = 5.0
+Unaffiliated = 10.0
+Other = 2.0
+
+[country_religions.TZA]
+Christianity = 63.0
+Islam = 34.0
+"Traditional Beliefs" = 2.0
+Other = 1.0
+
+[country_religions.UGA]
+Christianity = 84.0
+Islam = 14.0
+Other = 2.0
+
+[country_religions.UKR]
+"Orthodox Christianity" = 72.0
+"Catholic Christianity" = 8.0
+Unaffiliated = 12.0
+Other = 8.0
+
+[country_religions.URY]
+"Catholic Christianity" = 47.0
+Unaffiliated = 38.0
+"Protestant Christianity" = 9.0
+Other = 6.0
+
+[country_religions.USA]
+Christianity = 70.0
+Unaffiliated = 20.0
+Judaism = 2.0
+Islam = 1.0
+Buddhism = 1.0
+Hinduism = 1.0
+Other = 5.0
+
+[country_religions.UZB]
+Islam = 88.0
+"Orthodox Christianity" = 9.0
+Other = 3.0
+
+[country_religions.VAT]
+"Catholic Christianity" = 100.0
+
+[country_religions.VCT]
+Christianity = 88.0
+Unaffiliated = 8.0
+Other = 4.0
+
+[country_religions.VEN]
+"Catholic Christianity" = 71.0
+"Protestant Christianity" = 17.0
+Unaffiliated = 8.0
+Other = 4.0
+
+[country_religions.VNM]
+"Folk Religion" = 45.0
+Buddhism = 16.0
+Christianity = 8.0
+Unaffiliated = 28.0
+Other = 3.0
+
+[country_religions.VUT]
+Christianity = 83.0
+"Traditional Beliefs" = 10.0
+Other = 7.0
+
+[country_religions.WSM]
+Christianity = 98.0
+Other = 2.0
+
+[country_religions.YEM]
+"Sunni Islam" = 65.0
+"Shia Islam" = 34.0
+Other = 1.0
+
+[country_religions.ZAF]
+Christianity = 80.0
+"Traditional Beliefs" = 5.0
+Islam = 2.0
+Hinduism = 1.0
+Unaffiliated = 10.0
+Other = 2.0
+
+[country_religions.ZMB]
+Christianity = 87.0
+"Traditional Beliefs" = 8.0
+Islam = 1.0
+Other = 4.0
+
+[country_religions.ZWE]
+Christianity = 85.0
+"Traditional Beliefs" = 8.0
+Unaffiliated = 5.0
+Other = 2.0
+
+[country_religions.PRI]
+"Catholic Christianity" = 56.0
+"Protestant Christianity" = 33.0
+Unaffiliated = 8.0
+Other = 3.0

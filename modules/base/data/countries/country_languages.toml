@@ -1,0 +1,1226 @@
+[country_languages.AFG]
+"Dari Persian" = 50.0
+Pashto = 35.0
+Uzbek = 8.0
+Turkmen = 3.0
+Other = 4.0
+
+[country_languages.AGO]
+Portuguese = 70.0
+Umbundu = 12.0
+Kimbundu = 8.0
+Kikongo = 6.0
+Other = 4.0
+
+[country_languages.ALB]
+Albanian = 96.0
+Greek = 2.0
+Other = 2.0
+
+[country_languages.AND]
+Catalan = 39.0
+Spanish = 35.0
+Portuguese = 15.0
+French = 5.0
+Other = 6.0
+
+[country_languages.ARE]
+Arabic = 42.0
+Hindi = 20.0
+Urdu = 15.0
+English = 10.0
+Other = 13.0
+
+[country_languages.ARG]
+Spanish = 96.0
+Italian = 1.0
+Guarani = 1.0
+Other = 2.0
+
+[country_languages.ARM]
+Armenian = 97.0
+Russian = 2.0
+Other = 1.0
+
+[country_languages.ATA]
+English = 45.0
+Russian = 20.0
+Spanish = 10.0
+French = 8.0
+Other = 17.0
+
+[country_languages.ATG]
+English = 85.0
+"Antiguan Creole" = 12.0
+Other = 3.0
+
+[country_languages.AUS]
+English = 78.0
+Mandarin = 3.0
+Arabic = 2.0
+Italian = 2.0
+Other = 15.0
+
+[country_languages.AUT]
+German = 88.0
+Turkish = 3.0
+SerboCroatian = 3.0
+Other = 6.0
+
+[country_languages.AZE]
+Azerbaijani = 92.0
+Russian = 4.0
+Armenian = 1.0
+Other = 3.0
+
+[country_languages.BDI]
+Kirundi = 89.0
+French = 4.0
+Swahili = 3.0
+Other = 4.0
+
+[country_languages.BEL]
+Dutch = 58.0
+French = 40.0
+German = 1.0
+Other = 1.0
+
+[country_languages.BEN]
+French = 35.0
+Fon = 25.0
+Yoruba = 12.0
+Bariba = 8.0
+Other = 20.0
+
+[country_languages.BFA]
+Moore = 52.0
+French = 18.0
+Fulfulde = 8.0
+Dioula = 7.0
+Other = 15.0
+
+[country_languages.BGD]
+Bengali = 98.0
+Chittagonian = 1.0
+Other = 1.0
+
+[country_languages.BGR]
+Bulgarian = 84.0
+Turkish = 9.0
+Romani = 4.0
+Other = 3.0
+
+[country_languages.BHR]
+Arabic = 55.0
+English = 15.0
+Persian = 10.0
+Urdu = 10.0
+Other = 10.0
+
+[country_languages.BHS]
+English = 85.0
+"Bahamian Creole" = 12.0
+Other = 3.0
+
+[country_languages.BIH]
+Bosnian = 50.0
+Serbian = 32.0
+Croatian = 15.0
+Other = 3.0
+
+[country_languages.BLR]
+Russian = 62.0
+Belarusian = 35.0
+Polish = 2.0
+Other = 1.0
+
+[country_languages.BLZ]
+English = 55.0
+Spanish = 30.0
+"Belizean Creole" = 10.0
+Mayan = 3.0
+Other = 2.0
+
+[country_languages.BOL]
+Spanish = 68.0
+Quechua = 18.0
+Aymara = 10.0
+Guarani = 2.0
+Other = 2.0
+
+[country_languages.BRA]
+Portuguese = 97.0
+German = 1.0
+Italian = 1.0
+Other = 1.0
+
+[country_languages.BRB]
+English = 92.0
+"Bajan Creole" = 6.0
+Other = 2.0
+
+[country_languages.BRN]
+Malay = 65.0
+English = 12.0
+Chinese = 12.0
+Other = 11.0
+
+[country_languages.BTN]
+Dzongkha = 45.0
+Nepali = 30.0
+Sharchop = 15.0
+Other = 10.0
+
+[country_languages.BWA]
+Setswana = 78.0
+English = 12.0
+Kalanga = 6.0
+Other = 4.0
+
+[country_languages.CAF]
+Sango = 55.0
+French = 15.0
+Banda = 10.0
+Gbaya = 8.0
+Other = 12.0
+
+[country_languages.CAN]
+English = 58.0
+French = 22.0
+Chinese = 4.0
+Punjabi = 2.0
+Other = 14.0
+
+[country_languages.CHE]
+German = 63.0
+French = 23.0
+Italian = 8.0
+Romansh = 1.0
+Other = 5.0
+
+[country_languages.CHL]
+Spanish = 97.0
+Mapudungun = 1.0
+Other = 2.0
+
+[country_languages.CHN]
+"Mandarin Chinese" = 70.0
+"Wu Chinese" = 8.0
+Cantonese = 5.0
+Min = 5.0
+Other = 12.0
+
+[country_languages.CIV]
+French = 35.0
+Baoule = 15.0
+Dioula = 13.0
+Bete = 8.0
+Other = 29.0
+
+[country_languages.CMR]
+French = 45.0
+English = 12.0
+Fulfulde = 10.0
+Ewondo = 6.0
+Other = 27.0
+
+[country_languages.COD]
+French = 20.0
+Lingala = 25.0
+Swahili = 22.0
+Kikongo = 15.0
+Tshiluba = 10.0
+Other = 8.0
+
+[country_languages.COG]
+French = 35.0
+Lingala = 30.0
+Kituba = 25.0
+Other = 10.0
+
+[country_languages.COL]
+Spanish = 98.0
+Wayuu = 1.0
+Other = 1.0
+
+[country_languages.COM]
+Comorian = 80.0
+French = 10.0
+Arabic = 5.0
+Other = 5.0
+
+[country_languages.CPV]
+"Cape Verdean Creole" = 85.0
+Portuguese = 10.0
+Other = 5.0
+
+[country_languages.CRI]
+Spanish = 97.0
+English = 2.0
+Other = 1.0
+
+[country_languages.CUB]
+Spanish = 98.0
+HaitianCreole = 1.0
+Other = 1.0
+
+[country_languages.CYP]
+Greek = 75.0
+Turkish = 18.0
+English = 4.0
+Other = 3.0
+
+[country_languages.CZE]
+Czech = 95.0
+Slovak = 2.0
+Other = 3.0
+
+[country_languages.DEU]
+German = 86.0
+Turkish = 3.0
+Russian = 2.0
+Arabic = 1.0
+Other = 8.0
+
+[country_languages.DJI]
+Somali = 55.0
+Afar = 30.0
+French = 8.0
+Arabic = 5.0
+Other = 2.0
+
+[country_languages.DMA]
+English = 80.0
+"Antillean Creole" = 18.0
+Other = 2.0
+
+[country_languages.DNK]
+Danish = 92.0
+German = 2.0
+Arabic = 1.0
+Other = 5.0
+
+[country_languages.DOM]
+Spanish = 97.0
+HaitianCreole = 2.0
+Other = 1.0
+
+[country_languages.DZA]
+Arabic = 72.0
+Berber = 25.0
+French = 2.0
+Other = 1.0
+
+[country_languages.ECU]
+Spanish = 93.0
+Quechua = 5.0
+Other = 2.0
+
+[country_languages.EGY]
+Arabic = 98.0
+Nubian = 1.0
+Other = 1.0
+
+[country_languages.ERI]
+Tigrinya = 55.0
+Tigre = 30.0
+Arabic = 7.0
+Other = 8.0
+
+[country_languages.ESP]
+Spanish = 74.0
+Catalan = 15.0
+Galician = 5.0
+Basque = 3.0
+Other = 3.0
+
+[country_languages.EST]
+Estonian = 68.0
+Russian = 25.0
+Ukrainian = 2.0
+Other = 5.0
+
+[country_languages.ETH]
+Oromo = 34.0
+Amharic = 29.0
+Somali = 6.0
+Tigrinya = 6.0
+Other = 25.0
+
+[country_languages.FIN]
+Finnish = 87.0
+Swedish = 6.0
+Russian = 1.0
+Other = 6.0
+
+[country_languages.FJI]
+Fijian = 50.0
+"Fiji Hindi" = 37.0
+English = 10.0
+Other = 3.0
+
+[country_languages.FRA]
+French = 87.0
+Arabic = 3.0
+Breton = 1.0
+Occitan = 1.0
+Other = 8.0
+
+[country_languages.FSM]
+Chuukese = 45.0
+Pohnpeian = 25.0
+Yapese = 7.0
+Kosraean = 6.0
+English = 10.0
+Other = 7.0
+
+[country_languages.GAB]
+French = 40.0
+Fang = 30.0
+Myene = 10.0
+Nzebi = 7.0
+Other = 13.0
+
+[country_languages.GBR]
+English = 92.0
+Welsh = 2.0
+Polish = 1.0
+ScottishGaelic = 1.0
+Other = 4.0
+
+[country_languages.GEO]
+Georgian = 87.0
+Azerbaijani = 6.0
+Armenian = 5.0
+Other = 2.0
+
+[country_languages.GHA]
+Akan = 45.0
+English = 20.0
+Ewe = 13.0
+Ga = 8.0
+Other = 14.0
+
+[country_languages.GIN]
+French = 20.0
+Pular = 40.0
+Malinke = 30.0
+Susu = 8.0
+Other = 2.0
+
+[country_languages.GMB]
+Mandinka = 38.0
+Wolof = 20.0
+Fula = 18.0
+English = 10.0
+Other = 14.0
+
+[country_languages.GNB]
+"Guinea-Bissau Creole" = 50.0
+Portuguese = 15.0
+Balanta = 15.0
+Fula = 10.0
+Other = 10.0
+
+[country_languages.GNQ]
+Spanish = 70.0
+Fang = 20.0
+Bubi = 5.0
+French = 3.0
+Other = 2.0
+
+[country_languages.GRC]
+Greek = 95.0
+Albanian = 2.0
+Other = 3.0
+
+[country_languages.GRD]
+English = 85.0
+"Grenadian Creole" = 12.0
+Other = 3.0
+
+[country_languages.GTM]
+Spanish = 65.0
+Kiche = 10.0
+Qeqchi = 8.0
+Kaqchikel = 7.0
+Other = 10.0
+
+[country_languages.GUY]
+English = 70.0
+"Guyanese Creole" = 20.0
+Hindi = 5.0
+Other = 5.0
+
+[country_languages.HND]
+Spanish = 97.0
+Garifuna = 1.0
+Other = 2.0
+
+[country_languages.HRV]
+Croatian = 95.0
+Serbian = 3.0
+Other = 2.0
+
+[country_languages.HTI]
+"Haitian Creole" = 90.0
+French = 8.0
+Other = 2.0
+
+[country_languages.HUN]
+Hungarian = 96.0
+Romani = 2.0
+Other = 2.0
+
+[country_languages.IDN]
+Indonesian = 45.0
+Javanese = 32.0
+Sundanese = 15.0
+Madurese = 4.0
+Other = 4.0
+
+[country_languages.IND]
+Hindi = 43.0
+Bengali = 8.0
+Marathi = 7.0
+Telugu = 7.0
+Tamil = 6.0
+Other = 29.0
+
+[country_languages.IRL]
+English = 94.0
+Irish = 4.0
+Polish = 1.0
+Other = 1.0
+
+[country_languages.IRN]
+Persian = 53.0
+Azerbaijani = 16.0
+Kurdish = 10.0
+Luri = 6.0
+Arabic = 2.0
+Other = 13.0
+
+[country_languages.IRQ]
+Arabic = 78.0
+Kurdish = 17.0
+Turkmen = 2.0
+Other = 3.0
+
+[country_languages.ISL]
+Icelandic = 93.0
+Polish = 3.0
+Other = 4.0
+
+[country_languages.ISR]
+Hebrew = 74.0
+Arabic = 20.0
+Russian = 4.0
+Other = 2.0
+
+[country_languages.ITA]
+Italian = 92.0
+Sardinian = 3.0
+German = 1.0
+Other = 4.0
+
+[country_languages.JAM]
+English = 65.0
+"Jamaican Patois" = 32.0
+Other = 3.0
+
+[country_languages.JOR]
+Arabic = 97.0
+English = 2.0
+Other = 1.0
+
+[country_languages.JPN]
+Japanese = 98.0
+Korean = 1.0
+Other = 1.0
+
+[country_languages.KAZ]
+Kazakh = 64.0
+Russian = 30.0
+Uzbek = 3.0
+Other = 3.0
+
+[country_languages.KEN]
+Swahili = 40.0
+English = 15.0
+Kikuyu = 15.0
+Luhya = 10.0
+Luo = 8.0
+Other = 12.0
+
+[country_languages.KGZ]
+Kyrgyz = 72.0
+Russian = 14.0
+Uzbek = 12.0
+Other = 2.0
+
+[country_languages.KHM]
+Khmer = 96.0
+Vietnamese = 2.0
+Other = 2.0
+
+[country_languages.KIR]
+Gilbertese = 90.0
+English = 8.0
+Other = 2.0
+
+[country_languages.KNA]
+English = 86.0
+"Saint Kitts Creole" = 12.0
+Other = 2.0
+
+[country_languages.KOR]
+Korean = 98.0
+English = 1.0
+Other = 1.0
+
+[country_languages.KOS]
+Albanian = 92.0
+Serbian = 5.0
+Bosnian = 2.0
+Other = 1.0
+
+[country_languages.KWT]
+Arabic = 60.0
+English = 15.0
+Hindi = 10.0
+Urdu = 8.0
+Other = 7.0
+
+[country_languages.LAO]
+Lao = 70.0
+Khmu = 10.0
+Hmong = 8.0
+Other = 12.0
+
+[country_languages.LBN]
+Arabic = 90.0
+French = 5.0
+Armenian = 3.0
+Other = 2.0
+
+[country_languages.LBR]
+English = 30.0
+Kpelle = 20.0
+Bassa = 15.0
+Grebo = 10.0
+Other = 25.0
+
+[country_languages.LBY]
+Arabic = 88.0
+Berber = 10.0
+Other = 2.0
+
+[country_languages.LCA]
+English = 80.0
+"Saint Lucian Creole" = 18.0
+Other = 2.0
+
+[country_languages.LIE]
+German = 94.0
+Italian = 2.0
+Other = 4.0
+
+[country_languages.LKA]
+Sinhala = 74.0
+Tamil = 18.0
+English = 6.0
+Other = 2.0
+
+[country_languages.LSO]
+Sesotho = 85.0
+English = 10.0
+Zulu = 3.0
+Other = 2.0
+
+[country_languages.LTU]
+Lithuanian = 85.0
+Russian = 7.0
+Polish = 6.0
+Other = 2.0
+
+[country_languages.LUX]
+Luxembourgish = 55.0
+French = 20.0
+German = 15.0
+Portuguese = 7.0
+Other = 3.0
+
+[country_languages.LVA]
+Latvian = 62.0
+Russian = 34.0
+Other = 4.0
+
+[country_languages.MAR]
+Arabic = 60.0
+Berber = 35.0
+French = 3.0
+Other = 2.0
+
+[country_languages.MCO]
+French = 58.0
+Italian = 17.0
+English = 12.0
+Monegasque = 8.0
+Other = 5.0
+
+[country_languages.MDA]
+Romanian = 78.0
+Russian = 10.0
+Ukrainian = 6.0
+Gagauz = 4.0
+Other = 2.0
+
+[country_languages.MDG]
+Malagasy = 90.0
+French = 8.0
+Other = 2.0
+
+[country_languages.MDV]
+Dhivehi = 95.0
+English = 3.0
+Other = 2.0
+
+[country_languages.MEX]
+Spanish = 93.0
+Nahuatl = 2.0
+Mayan = 2.0
+Other = 3.0
+
+[country_languages.MHL]
+Marshallese = 88.0
+English = 10.0
+Other = 2.0
+
+[country_languages.MKD]
+Macedonian = 66.0
+Albanian = 25.0
+Turkish = 4.0
+Romani = 3.0
+Other = 2.0
+
+[country_languages.MLI]
+Bambara = 46.0
+French = 12.0
+Fula = 10.0
+Songhai = 7.0
+Other = 25.0
+
+[country_languages.MLT]
+Maltese = 88.0
+English = 10.0
+Other = 2.0
+
+[country_languages.MMR]
+Burmese = 68.0
+Shan = 9.0
+Karen = 7.0
+Rakhine = 4.0
+Other = 12.0
+
+[country_languages.MNE]
+Montenegrin = 45.0
+Serbian = 35.0
+Bosnian = 8.0
+Albanian = 6.0
+Other = 6.0
+
+[country_languages.MNG]
+Mongolian = 94.0
+Kazakh = 4.0
+Other = 2.0
+
+[country_languages.MOZ]
+Portuguese = 45.0
+Makhuwa = 25.0
+Tsonga = 10.0
+Sena = 8.0
+Other = 12.0
+
+[country_languages.MRT]
+Arabic = 80.0
+Pulaar = 8.0
+Soninke = 5.0
+Wolof = 4.0
+Other = 3.0
+
+[country_languages.MUS]
+"Mauritian Creole" = 80.0
+French = 8.0
+Bhojpuri = 6.0
+English = 4.0
+Other = 2.0
+
+[country_languages.MWI]
+Chichewa = 58.0
+English = 12.0
+Yao = 10.0
+Tumbuka = 9.0
+Other = 11.0
+
+[country_languages.MYS]
+Malay = 58.0
+Chinese = 23.0
+Tamil = 7.0
+English = 7.0
+Other = 5.0
+
+[country_languages.NAM]
+Oshiwambo = 49.0
+Afrikaans = 12.0
+English = 10.0
+Khoekhoe = 8.0
+Other = 21.0
+
+[country_languages.NER]
+Hausa = 55.0
+Zarma = 21.0
+French = 8.0
+Tamasheq = 5.0
+Other = 11.0
+
+[country_languages.NGA]
+English = 20.0
+Hausa = 30.0
+Yoruba = 21.0
+Igbo = 18.0
+Other = 11.0
+
+[country_languages.NIC]
+Spanish = 96.0
+Miskito = 2.0
+English = 1.0
+Other = 1.0
+
+[country_languages.NLD]
+Dutch = 90.0
+Frisian = 3.0
+Turkish = 2.0
+Arabic = 1.0
+Other = 4.0
+
+[country_languages.NOR]
+Norwegian = 92.0
+Sami = 1.0
+Arabic = 1.0
+Other = 6.0
+
+[country_languages.NPL]
+Nepali = 45.0
+Maithili = 12.0
+Bhojpuri = 7.0
+Tharu = 6.0
+Other = 30.0
+
+[country_languages.NRU]
+Nauruan = 85.0
+English = 12.0
+Other = 3.0
+
+[country_languages.NZL]
+English = 86.0
+Maori = 4.0
+Samoan = 2.0
+Chinese = 2.0
+Other = 6.0
+
+[country_languages.OMN]
+Arabic = 76.0
+Baluchi = 8.0
+Urdu = 6.0
+English = 5.0
+Other = 5.0
+
+[country_languages.PAK]
+Punjabi = 38.0
+Pashto = 18.0
+Sindhi = 14.0
+Urdu = 10.0
+Balochi = 4.0
+Other = 16.0
+
+[country_languages.PAN]
+Spanish = 93.0
+English = 4.0
+Ngabere = 2.0
+Other = 1.0
+
+[country_languages.PER]
+Spanish = 82.0
+Quechua = 13.0
+Aymara = 2.0
+Other = 3.0
+
+[country_languages.PHL]
+Filipino = 40.0
+Cebuano = 22.0
+Ilocano = 8.0
+Hiligaynon = 7.0
+English = 5.0
+Other = 18.0
+
+[country_languages.PLW]
+Palauan = 65.0
+English = 20.0
+Filipino = 10.0
+Other = 5.0
+
+[country_languages.PNG]
+TokPisin = 45.0
+HiriMotu = 8.0
+English = 7.0
+Enga = 5.0
+Other = 35.0
+
+[country_languages.POL]
+Polish = 97.0
+German = 1.0
+Other = 2.0
+
+[country_languages.PRK]
+Korean = 99.0
+Chinese = 1.0
+
+[country_languages.PRT]
+Portuguese = 97.0
+Mirandese = 1.0
+Other = 2.0
+
+[country_languages.PRY]
+Spanish = 50.0
+Guarani = 46.0
+Portuguese = 2.0
+Other = 2.0
+
+[country_languages.PSE]
+Arabic = 96.0
+Hebrew = 2.0
+English = 1.0
+Other = 1.0
+
+[country_languages.QAT]
+Arabic = 45.0
+English = 15.0
+Hindi = 15.0
+Urdu = 10.0
+Other = 15.0
+
+[country_languages.ROU]
+Romanian = 89.0
+Hungarian = 7.0
+Romani = 2.0
+Other = 2.0
+
+[country_languages.RUS]
+Russian = 81.0
+Tatar = 4.0
+Ukrainian = 2.0
+Bashkir = 1.0
+Other = 12.0
+
+[country_languages.RWA]
+Kinyarwanda = 90.0
+French = 4.0
+English = 3.0
+Swahili = 2.0
+Other = 1.0
+
+[country_languages.SAU]
+Arabic = 85.0
+Urdu = 5.0
+English = 4.0
+Other = 6.0
+
+[country_languages.SDN]
+Arabic = 70.0
+Nubian = 8.0
+Beja = 6.0
+Fur = 5.0
+Other = 11.0
+
+[country_languages.SEN]
+Wolof = 43.0
+French = 15.0
+Pulaar = 14.0
+Serer = 10.0
+Other = 18.0
+
+[country_languages.SGP]
+English = 36.0
+Mandarin = 35.0
+Malay = 12.0
+Tamil = 8.0
+Other = 9.0
+
+[country_languages.SLB]
+"Solomon Islands Pijin" = 70.0
+English = 10.0
+Kwaio = 4.0
+Other = 16.0
+
+[country_languages.SLE]
+Krio = 50.0
+Mende = 25.0
+Temne = 20.0
+English = 3.0
+Other = 2.0
+
+[country_languages.SLV]
+Spanish = 98.0
+Nawat = 1.0
+Other = 1.0
+
+[country_languages.SMR]
+Italian = 95.0
+EmilianRomagnol = 3.0
+Other = 2.0
+
+[country_languages.SOM]
+Somali = 95.0
+Arabic = 3.0
+Other = 2.0
+
+[country_languages.SRB]
+Serbian = 88.0
+Hungarian = 4.0
+Bosnian = 3.0
+Romani = 2.0
+Other = 3.0
+
+[country_languages.SSD]
+Dinka = 35.0
+Nuer = 18.0
+Arabic = 12.0
+English = 10.0
+Other = 25.0
+
+[country_languages.STP]
+Portuguese = 90.0
+Forro = 5.0
+Angolar = 3.0
+Other = 2.0
+
+[country_languages.SUR]
+Dutch = 55.0
+SrananTongo = 20.0
+Hindustani = 12.0
+Javanese = 8.0
+Other = 5.0
+
+[country_languages.SVK]
+Slovak = 86.0
+Hungarian = 10.0
+Romani = 2.0
+Other = 2.0
+
+[country_languages.SVN]
+Slovene = 91.0
+SerboCroatian = 5.0
+Hungarian = 1.0
+Italian = 1.0
+Other = 2.0
+
+[country_languages.SWE]
+Swedish = 88.0
+Arabic = 3.0
+Finnish = 2.0
+Other = 7.0
+
+[country_languages.SWZ]
+Swazi = 86.0
+English = 10.0
+Zulu = 2.0
+Other = 2.0
+
+[country_languages.SYC]
+"Seychellois Creole" = 90.0
+English = 5.0
+French = 4.0
+Other = 1.0
+
+[country_languages.SYR]
+Arabic = 86.0
+Kurdish = 9.0
+Armenian = 2.0
+Other = 3.0
+
+[country_languages.TCD]
+Arabic = 35.0
+French = 12.0
+Sara = 25.0
+Kanembu = 8.0
+Other = 20.0
+
+[country_languages.TGO]
+French = 20.0
+Ewe = 35.0
+Kabiye = 25.0
+Other = 20.0
+
+[country_languages.THA]
+Thai = 88.0
+Lao = 5.0
+Malay = 3.0
+Other = 4.0
+
+[country_languages.TJK]
+Tajik = 80.0
+Uzbek = 14.0
+Russian = 4.0
+Other = 2.0
+
+[country_languages.TKM]
+Turkmen = 72.0
+Russian = 12.0
+Uzbek = 9.0
+Other = 7.0
+
+[country_languages.TLS]
+Tetum = 50.0
+Portuguese = 12.0
+Indonesian = 20.0
+Mambai = 8.0
+Other = 10.0
+
+[country_languages.TON]
+Tongan = 88.0
+English = 10.0
+Other = 2.0
+
+[country_languages.TTO]
+English = 85.0
+"Trinidadian Creole" = 10.0
+Hindi = 3.0
+Other = 2.0
+
+[country_languages.TUN]
+Arabic = 92.0
+French = 5.0
+Berber = 2.0
+Other = 1.0
+
+[country_languages.TUR]
+Turkish = 82.0
+Kurdish = 15.0
+Arabic = 2.0
+Other = 1.0
+
+[country_languages.TUV]
+Tuvaluan = 88.0
+English = 10.0
+Other = 2.0
+
+[country_languages.TWN]
+"Mandarin Chinese" = 70.0
+TaiwaneseHokkien = 20.0
+Hakka = 5.0
+Other = 5.0
+
+[country_languages.TZA]
+Swahili = 60.0
+English = 10.0
+Sukuma = 8.0
+Chaga = 4.0
+Other = 18.0
+
+[country_languages.UGA]
+Luganda = 25.0
+English = 15.0
+Swahili = 10.0
+Runyankole = 10.0
+Other = 40.0
+
+[country_languages.UKR]
+Ukrainian = 67.0
+Russian = 30.0
+Other = 3.0
+
+[country_languages.URY]
+Spanish = 98.0
+Portuguese = 1.0
+Other = 1.0
+
+[country_languages.USA]
+English = 78.0
+Spanish = 13.0
+Chinese = 1.0
+Tagalog = 1.0
+Other = 7.0
+
+[country_languages.UZB]
+Uzbek = 74.0
+Russian = 14.0
+Tajik = 5.0
+Karakalpak = 2.0
+Other = 5.0
+
+[country_languages.VAT]
+Italian = 60.0
+Latin = 20.0
+French = 8.0
+German = 6.0
+Other = 6.0
+
+[country_languages.VCT]
+English = 85.0
+"Vincentian Creole" = 12.0
+Other = 3.0
+
+[country_languages.VEN]
+Spanish = 96.0
+Wayuu = 1.0
+Other = 3.0
+
+[country_languages.VNM]
+Vietnamese = 86.0
+Tay = 2.0
+Thai = 2.0
+Khmer = 1.0
+Other = 9.0
+
+[country_languages.VUT]
+Bislama = 65.0
+English = 12.0
+French = 10.0
+Other = 13.0
+
+[country_languages.WSM]
+Samoan = 88.0
+English = 10.0
+Other = 2.0
+
+[country_languages.YEM]
+Arabic = 96.0
+Soqotri = 2.0
+Other = 2.0
+
+[country_languages.ZAF]
+Zulu = 23.0
+Xhosa = 16.0
+Afrikaans = 14.0
+English = 10.0
+NorthernSotho = 9.0
+Other = 28.0
+
+[country_languages.ZMB]
+Bemba = 33.0
+Nyanja = 15.0
+Tonga = 11.0
+English = 8.0
+Other = 33.0
+
+[country_languages.ZWE]
+Shona = 70.0
+Ndebele = 16.0
+English = 8.0
+Other = 6.0
+
+[country_languages.PRI]
+Spanish = 94.0
+English = 5.0
+Other = 1.0
