@@ -4,6 +4,7 @@ import polars as pl
 
 from src.shared.config import GameConfig
 from src.shared.actions import ActionUpdateResourcePolicy, GameAction
+from src.server.state_bootstrap import ensure_ui_support_tables
 
 # Logic & Data Systems
 from src.engine.mod_manager import ModManager
@@ -50,6 +51,7 @@ class GameSession:
         
         # Game Data
         self.state = initial_state
+        ensure_ui_support_tables(self.state)
         self.action_queue: List[GameAction] = []
         
         print("[GameSession] Session initialized successfully.")

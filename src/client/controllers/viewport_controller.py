@@ -74,6 +74,41 @@ class ViewportController:
                 use_percentile=True,
                 steps=10
             ),
+            "human_dev": GradientMapMode(
+                mode_name="Human Development",
+                column_name="human_dev",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10,
+            ),
+            "poverty_rate": GradientMapMode(
+                mode_name="Poverty Rate",
+                column_name="poverty_rate",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10,
+            ),
+            "military_count": GradientMapMode(
+                mode_name="Military Strength",
+                column_name="military_count",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10,
+            ),
+            "corruption_index": GradientMapMode(
+                mode_name="Corruption Index",
+                column_name="corruption_index",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10,
+            ),
+            "life_expectancy": GradientMapMode(
+                mode_name="Life Expectancy",
+                column_name="life_expectancy",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10,
+            ),
         }
         self.current_mode_key = "political"
 

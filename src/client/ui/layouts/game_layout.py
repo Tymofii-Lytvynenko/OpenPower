@@ -13,6 +13,7 @@ from src.client.ui.core.composer import UIComposer
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.layouts.game_panel_registry import build_game_panel_specs
+from src.client.ui.panels.service.feed_presenter import FeedPresenter
 
 
 class GameLayout:
@@ -35,8 +36,20 @@ class GameLayout:
         for spec in build_game_panel_specs(self.panel_manager):
             self.panel_manager.register_spec(spec)
 
-        self.central_bar = CentralBar()
-        self.system_bar = SystemBar()
+        self.feed_presenter = FeedPresenter()
+        self.central_bar = CentralBar(
+            open_objectives_cb=lambda: self.panel_manager.set_visible("OBJECTIVES", True),
+            open_statistics_cb=lambda: self.panel_manager.set_visible("DATA_INSPECTOR", True),
+            open_mail_cb=lambda: self.panel_manager.set_visible("MAIL", True),
+            open_news_cb=lambda: self.panel_manager.set_visible("NEWS_LOG", True),
+        )
+        self.system_bar = SystemBar(
+            open_help_cb=lambda: self.panel_manager.set_visible("TOOLTIP_HELP", True),
+            open_objectives_cb=lambda: self.panel_manager.set_visible("OBJECTIVES", True),
+            open_console_cb=lambda: self.panel_manager.set_visible("CONSOLE", True),
+            open_mail_cb=lambda: self.panel_manager.set_visible("MAIL", True),
+            open_news_cb=lambda: self.panel_manager.set_visible("NEWS_LOG", True),
+        )
         self.toggle_bar = ToggleBar(self.panel_manager)
         self.context_menu = ContextMenu(
             self.composer,
@@ -54,10 +67,11 @@ class GameLayout:
         state = self.net.get_state()
 
         target_tag, is_own = self._resolve_active_context(state, selected_region_id)
+        hud_summary = self.feed_presenter.build_summary(state, target_tag)
 
-        self.system_bar.render(self.net, nav_service)
+        self.system_bar.render(self.net, nav_service, hud_summary)
 
-        req_tag = self.central_bar.render(state, self.net, target_tag, is_own)
+        req_tag = self.central_bar.render(state, self.net, target_tag, is_own, hud_summary)
         if req_tag:
             self._cached_target_tag = req_tag
 

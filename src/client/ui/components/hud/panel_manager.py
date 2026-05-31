@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 class PanelSpec:
     id: str
     factory: Callable[[], PanelRenderable]
+    title: str = ""
+    category: str = "general"
+    hotkey: str = ""
     icon: str = ""
     color: tuple = (1, 1, 1, 1)
     default_visible: bool = False
@@ -24,6 +27,9 @@ class PanelEntry:
     id: str
     instance: PanelRenderable
     visible: bool
+    title: str = ""
+    category: str = "general"
+    hotkey: str = ""
     icon: str = ""
     color: tuple = (1, 1, 1, 1)
     show_in_toggle_bar: bool = True
@@ -39,6 +45,9 @@ class PanelManager:
         self,
         pid: str,
         panel: PanelRenderable,
+        title: str = "",
+        category: str = "general",
+        hotkey: str = "",
         icon: str = "",
         color: tuple | None = None,
         visible: bool = False,
@@ -48,6 +57,9 @@ class PanelManager:
             id=pid,
             instance=panel,
             visible=visible,
+            title=title or pid,
+            category=category,
+            hotkey=hotkey,
             icon=icon,
             color=color or (1, 1, 1, 1),
             show_in_toggle_bar=show_in_toggle_bar,
@@ -57,6 +69,9 @@ class PanelManager:
         self.register(
             spec.id,
             spec.factory(),
+            title=spec.title,
+            category=spec.category,
+            hotkey=spec.hotkey,
             icon=spec.icon,
             color=spec.color,
             visible=spec.default_visible,
