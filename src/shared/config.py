@@ -15,6 +15,7 @@ class GameConfig:
         # Standard directory structure definitions
         self.modules_dir = self.project_root / "modules"
         self.cache_dir = self.project_root / ".cache"
+        self.user_data_dir = self.project_root / "user_data"
         
         # Default load order.
         # This will be populated/overwritten by ModManager in GameSession.

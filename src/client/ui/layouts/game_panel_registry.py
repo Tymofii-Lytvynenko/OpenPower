@@ -30,11 +30,12 @@ from src.client.ui.panels.service.console_panel import ConsolePanel
 from src.client.ui.panels.service.mail_panel import MailPanel
 from src.client.ui.panels.service.news_panel import NewsPanel
 from src.client.ui.panels.service.objectives_panel import ObjectivesPanel
+from src.client.ui.panels.service.settings_panel import SettingsPanel
 from src.client.ui.panels.service.tooltip_help_panel import TooltipHelpPanel
 from src.client.ui.panels.trade_panel import TradePanel
 
 
-def build_game_panel_specs(panel_manager: PanelManager) -> list[PanelSpec]:
+def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, window=None) -> list[PanelSpec]:
     """Builds the declarative panel registry for the in-game HUD."""
 
     def open_panel(panel_id: str) -> None:
@@ -259,6 +260,13 @@ def build_game_panel_specs(panel_manager: PanelManager) -> list[PanelSpec]:
             category="service",
             hotkey="F1",
             factory=TooltipHelpPanel,
+            show_in_toggle_bar=False,
+        ),
+        PanelSpec(
+            id="SETTINGS",
+            title="Settings",
+            category="service",
+            factory=lambda: SettingsPanel(settings_service, window),
             show_in_toggle_bar=False,
         ),
     ]

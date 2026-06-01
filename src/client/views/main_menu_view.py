@@ -1,11 +1,14 @@
 import arcade
 import sys
+from dataclasses import dataclass
+from typing import Callable
 from typing import TYPE_CHECKING
 
 from src.client.views.base_view import BaseImGuiView
 from src.client.services.imgui_service import ImGuiService
 from src.client.ui.core.composer import UIComposer
 from src.client.ui.core.theme import GAMETHEME
+from src.client.ui.components.settings_content import GameSettingsContent
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.controllers.camera_controller import CameraController
 
@@ -13,12 +16,22 @@ if TYPE_CHECKING:
     from src.shared.config import GameConfig
     from src.server.session import GameSession
 
+
+@dataclass(frozen=True, slots=True)
+class MenuAction:
+    label: str
+    callback: Callable[[], None]
+    spacer_after: float = 0.0
+
+
 class MainMenuView(BaseImGuiView):
     def __init__(self, session: "GameSession", config: "GameConfig"):
         super().__init__()
         self.session = session
         self.config = config
         self.ui = UIComposer(GAMETHEME)
+        self._show_settings = False
+        self._settings_content = GameSettingsContent(self.window.settings, self.window)
 
         # --- SHARED RENDERER LOGIC ---
         if self.window.shared_renderer is None:
@@ -91,28 +104,46 @@ class MainMenuView(BaseImGuiView):
         screen_w, screen_h = self.window.get_size()
         
         if self.ui.begin_centered_panel("Main Menu", screen_w, screen_h, w=350, h=450):
-            self.ui.draw_title("OPENPOWER")
-            
-            if self.ui.draw_menu_button("SINGLEPLAYER"):
-                self.nav.show_new_game_screen(self.session, self.config)
-            
-            if self.ui.draw_menu_button("LOAD GAME"):
-                self.nav.show_load_game_screen(self.config)
-            
-            if self.ui.draw_menu_button("MAP EDITOR"):
-                self.nav.show_editor_loading(self.session, self.config)
-            
-            if self.ui.draw_menu_button("SETTINGS"):
-                pass
-            
-            from imgui_bundle import imgui
-            imgui.dummy((0, 50)) 
-            
-            if self.ui.draw_menu_button("EXIT TO DESKTOP"):
-                arcade.exit()
-                sys.exit()
+            if self._show_settings:
+                self._render_settings_menu()
+            else:
+                self._render_main_menu()
 
             self.ui.end_panel()
+
+    def _render_main_menu(self):
+        self.ui.draw_title("OPENPOWER")
+
+        for action in self._build_menu_actions():
+            if self.ui.draw_menu_button(action.label):
+                action.callback()
+            if action.spacer_after:
+                self.ui.dummy((0, action.spacer_after))
+
+    def _build_menu_actions(self) -> tuple[MenuAction, ...]:
+        return (
+            MenuAction("SINGLEPLAYER", lambda: self.nav.show_new_game_screen(self.session, self.config)),
+            MenuAction("LOAD GAME", lambda: self.nav.show_load_game_screen(self.config)),
+            MenuAction("MAP EDITOR", lambda: self.nav.show_editor_loading(self.session, self.config)),
+            MenuAction("SETTINGS", self._open_settings, spacer_after=50.0),
+            MenuAction("EXIT TO DESKTOP", self._exit_to_desktop),
+        )
+
+    def _render_settings_menu(self):
+        self.ui.draw_title("SETTINGS")
+        self._settings_content.render()
+
+        from imgui_bundle import imgui
+        imgui.dummy((0, 42))
+        if self.ui.draw_menu_button("BACK"):
+            self._show_settings = False
+
+    def _open_settings(self) -> None:
+        self._show_settings = True
+
+    def _exit_to_desktop(self) -> None:
+        arcade.exit()
+        sys.exit()
 
     def on_game_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
         if buttons == arcade.MOUSE_BUTTON_LEFT:

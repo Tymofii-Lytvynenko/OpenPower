@@ -24,6 +24,8 @@ class GameLayout:
         net_client: NetworkClient,
         player_tag: str,
         viewport_ctrl,
+        settings_service=None,
+        window=None,
         has_selected_units=None,
         on_move_selected_units=None,
     ):
@@ -33,7 +35,7 @@ class GameLayout:
 
         self.composer = UIComposer(GAMETHEME)
         self.panel_manager = PanelManager()
-        for spec in build_game_panel_specs(self.panel_manager):
+        for spec in build_game_panel_specs(self.panel_manager, settings_service, window):
             self.panel_manager.register_spec(spec)
 
         self.feed_presenter = FeedPresenter()
@@ -49,6 +51,7 @@ class GameLayout:
             open_console_cb=lambda: self.panel_manager.set_visible("CONSOLE", True),
             open_mail_cb=lambda: self.panel_manager.set_visible("MAIL", True),
             open_news_cb=lambda: self.panel_manager.set_visible("NEWS_LOG", True),
+            open_settings_cb=lambda: self.panel_manager.set_visible("SETTINGS", True),
         )
         self.toggle_bar = ToggleBar(self.panel_manager)
         self.context_menu = ContextMenu(

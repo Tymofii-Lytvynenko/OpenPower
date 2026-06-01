@@ -97,6 +97,34 @@ class BaseImGuiView(arcade.View):
             return
         self.on_game_mouse_scroll(x, y, scroll_x, scroll_y)
 
+    def on_key_press(self, symbol, modifiers):
+        captured = self.imgui.on_key_press(symbol, modifiers) if self.imgui else False
+        if self._handle_global_shortcut(symbol):
+            return
+        if not captured:
+            self.on_game_key_press(symbol, modifiers)
+
+    def on_key_release(self, symbol, modifiers):
+        captured = self.imgui.on_key_release(symbol, modifiers) if self.imgui else False
+        if not captured:
+            self.on_game_key_release(symbol, modifiers)
+
+    def on_text(self, text: str):
+        if self.imgui and self.imgui.on_text(text):
+            return
+        self.on_game_text(text)
+
+    def _handle_global_shortcut(self, symbol) -> bool:
+        if symbol != arcade.key.F11:
+            return False
+
+        settings = getattr(self.window, "settings", None)
+        if settings is None:
+            return False
+
+        settings.toggle_fullscreen(self.window)
+        return True
+
     # --- ABSTRACT HOOKS ---
     def on_game_mouse_motion(self, x, y, dx, dy): pass
     def on_game_resize(self, w, h): pass
@@ -105,3 +133,6 @@ class BaseImGuiView(arcade.View):
     def on_game_mouse_release(self, x, y, btn, mod): pass
     def on_game_mouse_drag(self, x, y, dx, dy, btn, mod): pass
     def on_game_mouse_scroll(self, x, y, sx, sy): pass
+    def on_game_key_press(self, symbol, modifiers): pass
+    def on_game_key_release(self, symbol, modifiers): pass
+    def on_game_text(self, text: str): pass

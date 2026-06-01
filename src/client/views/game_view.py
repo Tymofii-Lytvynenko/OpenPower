@@ -83,6 +83,8 @@ class GameView(BaseImGuiView):
             self.net,
             player_tag,
             self.viewport_ctrl,
+            settings_service=getattr(self.window, "settings", None),
+            window=self.window,
             has_selected_units=self.unit_interactions.has_selection,
             on_move_selected_units=self._move_selected_units_from_context,
         )

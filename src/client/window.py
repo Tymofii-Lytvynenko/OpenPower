@@ -4,6 +4,7 @@ from typing import Optional, TYPE_CHECKING
 from src.shared.config import GameConfig
 from src.client.services.navigation_service import NavigationService
 from src.client.services.imgui_service import ImGuiService
+from src.client.services.game_settings_service import GameSettingsService
 
 # UPDATED: Import the new Client Proxy instead of the heavy local session
 from src.client.client_session import ClientSessionProxy
@@ -19,6 +20,8 @@ class MainWindow(arcade.Window):
         self.game_config = config
         self.center_window()
         self.set_minimum_size(800, 600)
+        self.settings = GameSettingsService.from_path(config.user_data_dir / "settings.json")
+        self.settings.apply_display(self)
 
         font_path = config.get_asset_path("fonts/main_font.ttf")
         if not font_path or not font_path.exists():
@@ -89,6 +92,8 @@ class MainWindow(arcade.Window):
         super().on_resize(width, height)
         self.ctx.viewport = (0, 0, width, height)
         self.ctx.scissor = None
+        if hasattr(self, "settings"):
+            self.settings.remember_windowed_size(width, height)
         if self.current_view and hasattr(self.current_view, "on_resize"):
             self.current_view.on_resize(width, height)
 
