@@ -1,0 +1,130 @@
+import io
+import polars as pl
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Dict, List
+
+if TYPE_CHECKING:
+    from src.shared.actions import GameAction
+    from src.shared.events import GameEvent
+
+# The fixed epoch from which all in-game dates are calculated.
+# All systems derive the current date by adding 'total_minutes' to this constant.
+GAME_EPOCH = datetime(2001, 1, 1, 0, 0)
+
+
+@dataclass
+class TimeData:
+    """
+    A highly optimized data component for time tracking.
+
+    Why separate this from 'globals'?
+    1. Performance: Attribute access (.hour) is faster than dict lookup (['hour']).
+    2. Type Safety: Provides strict typing for IDEs and static analysis.
+    3. Caching: We store pre-calculated integers (year, month, day) so other
+       systems don't have to perform expensive datetime math every tick.
+    """
+
+    # Source of Truth: Total minutes elapsed since GAME_EPOCH.
+    # We use an integer because floating point time eventually loses precision.
+    total_minutes: int = 0
+
+    # Cached Human-Readable fields (Updated only when total_minutes changes)
+    year: int = 2001
+    month: int = 1
+    day: int = 1
+    hour: int = 0
+    minute: int = 0
+
+    # Formatted String (e.g., "2001-01-01 14:30") for UI rendering.
+    date_str: str = "2001-01-01 00:00"
+
+    # Simulation State
+    speed_level: int = 1
+    is_paused: bool = False
+
+    # Internal accumulator for fractional time updates.
+    # Not intended for use by other systems.
+    _accumulator: float = 0.0
+
+
+@dataclass
+class GameState:
+    """
+    The central data store for the entire simulation.
+
+    Strictly adheres to Data-Oriented Design: it is a passive container
+    that holds the world's state as typed Polars DataFrames. All mutation
+    is performed by ECS Systems during a tick; this class has no logic.
+
+    IPC methods (to_ipc / from_ipc) are the only transport boundary.
+    """
+
+    # Stores the primary game data (DataFrames).
+    # Keys are table names (e.g., 'regions', 'countries').
+    tables: Dict[str, pl.DataFrame] = field(default_factory=dict)
+
+    # Dedicated component for Time state.
+    time: TimeData = field(default_factory=TimeData)
+
+    # Holds other global simulation variables that don't fit into tables.
+    globals: Dict[str, Any] = field(default_factory=lambda: {
+        "tick": 0,
+        "game_speed": 1.0,
+    })
+
+    # The Event Bus.
+    # Systems append events here during their update.
+    # The Engine clears this list at the start of every tick.
+    events: List["GameEvent"] = field(default_factory=list)
+
+    # Actions received this specific tick.
+    # The Engine populates this before systems update.
+    current_actions: List["GameAction"] = field(default_factory=list)
+
+    def get_table(self, name: str) -> pl.DataFrame:
+        """Retrieves a reference to a simulation table by name."""
+        if name not in self.tables:
+            raise KeyError(f"Table '{name}' not found in GameState.")
+        return self.tables[name]
+
+    def update_table(self, name: str, df: pl.DataFrame) -> None:
+        """Replaces a table in the state (Copy-on-Write semantics)."""
+        self.tables[name] = df
+
+    # --- MULTIPROCESSING IPC METHODS ---
+
+    def to_ipc(self) -> dict:
+        """
+        Packs the state into raw bytes using Zero-Copy Arrow IPC.
+        Called by the Simulation Process before sending state to the UI.
+        """
+        ipc_tables = {}
+        for name, df in self.tables.items():
+            # Skip tables that cannot be serialized (e.g., graph objects)
+            if name in ["trade_network"]:
+                continue
+
+            f = io.BytesIO()
+            df.write_ipc(f)
+            ipc_tables[name] = f.getvalue()
+
+        return {
+            "tables": ipc_tables,
+            "time": self.time,
+            "globals": self.globals,
+        }
+
+    @classmethod
+    def from_ipc(cls, data: dict) -> "GameState":
+        """
+        Unpacks the bytes back into Polars DataFrames.
+        Executes on the Client Process (Window) after receiving from the server.
+        """
+        state = cls()
+        for name, b_data in data["tables"].items():
+            state.tables[name] = pl.read_ipc(io.BytesIO(b_data))
+
+        state.time = data["time"]
+        state.globals = data["globals"]
+        return state

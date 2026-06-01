@@ -1,6 +1,6 @@
 from typing import Dict, Tuple, Optional, Set
 
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.client.visualization.map_modes.base_map_mode import BaseMapMode
 from src.client.utils.diplomacy_utils import get_military_allies, get_military_enemies
 

@@ -2,7 +2,7 @@ from datetime import timedelta
 from typing import List, Dict
 
 from src.engine.interfaces import ISystem
-from src.server.state import GameState, GAME_EPOCH
+from src.shared.state import GameState, GAME_EPOCH
 from src.shared.actions import ActionSetGameSpeed, ActionSetPaused
 from src.shared.events import EventNewDay, EventNewHour, EventRealSecond
 

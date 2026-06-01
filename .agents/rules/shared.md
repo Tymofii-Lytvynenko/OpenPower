@@ -1,6 +1,4 @@
----
-trigger: always_on
----
+
 
 # Shared Layer (Data Contracts & Constants)
 
@@ -8,6 +6,7 @@ The Shared layer is the **Passive Data Dictionary** of the project. It contains 
 
 ## 🎯 Responsibilities
 * **Data Contracts:** Defining the structure of `GameAction` (commands) and `GameEvent` (signals) used across the IPC boundary.
+* **Simulation State Container:** `GameState`, `TimeData`, and `GAME_EPOCH` live here so all layers (engine, modules, client, server) can reference the type without circular dependencies.
 * **Configuration:** `GameConfig` schemas and path resolution logic (abstracts paths, but doesn't load files).
 * **Type Definitions:** Python `Protocols` and `Dataclasses` used for type hinting across the project.
 * **Metadata Dictionaries:** Mapping keys to human-readable info (e.g., `RESOURCE_MAPPING` in `economy_meta.py`).
@@ -15,19 +14,21 @@ The Shared layer is the **Passive Data Dictionary** of the project. It contains 
 
 ## 🛡️ The Golden Rule
 **No Logic allowed.** `shared` must remain a "leaf node" in the dependency tree.
-If it calculates something, move it to `src/core`. If it holds state, move it to `src/server`.
+If it calculates something, move it to `src/core`. If it holds state at runtime, note that `GameState` is a *container definition*, not runtime state (the instance lives in `src/server`).
 
 | ✅ Correct Usage | ❌ Incorrect Usage |
 | :--- | :--- |
 | Defining `class ActionMove(GameAction): ...` | Implementing `SimulationTimer` (Move to `src/core`). |
-| Defining `const MAX_TAX_RATE = 1.0` | Calculating actual taxes (Move to `modules`). |
-| Defining a Protocol `class IUnit(Protocol): ...` | Importing `Engine` to type-hint a function. |
+| Defining `class GameState(dataclass): ...` | Calculating actual taxes (Move to `modules`). |
+| Defining `const GAME_EPOCH = datetime(2001, 1, 1)` | Importing `Engine` to type-hint a function. |
+| Defining a Protocol `class IUnit(Protocol): ...` | Storing the live game instance (Move to `src/server`). |
 
 ## 🔗 Relationships
 * **Imports from:**
-    * Python Standard Library (`typing`, `dataclasses`, `pathlib`).
+    * Python Standard Library (`typing`, `dataclasses`, `pathlib`, `datetime`).
+    * `polars` for DataFrame type annotations inside `GameState`.
     * **ABSOLUTELY NOTHING** from `core`, `client`, `server`, `engine`, or `modules`.
 * **Used by:**
-    * **EVERYONE:** `client`, `server`, `engine`, `core`, and `modules` all depend on `shared` to speak the same language. It is the bridge between the **Main Process** (Client) and **Simulation Process** (Server).
+    * **EVERYONE:** `client`, `server`, `engine`, `core`, and `modules` all depend on `shared` to speak the same language.
 * **NEVER imports:**
     * Any other layer. Importing anything else here will cause immediate **Circular Dependency** errors.

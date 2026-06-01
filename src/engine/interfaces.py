@@ -1,5 +1,5 @@
 from typing import Protocol, List, runtime_checkable
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.shared.actions import GameAction
 
 @runtime_checkable

@@ -3,7 +3,7 @@ from src.shared.actions import GameAction
 
 if TYPE_CHECKING:
     from src.server.session import GameSession
-    from src.server.state import GameState
+    from src.shared.state import GameState
 
 class NetworkClient:
     """

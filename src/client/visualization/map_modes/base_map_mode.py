@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Tuple
-from src.server.state import GameState
+from src.shared.state import GameState
 
 class BaseMapMode(ABC):
     """

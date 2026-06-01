@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from PIL import Image
 from src.shared.config import GameConfig
-from src.server.state import GameState
+from src.shared.state import GameState
 
 class StaticAssetLoader:
     """

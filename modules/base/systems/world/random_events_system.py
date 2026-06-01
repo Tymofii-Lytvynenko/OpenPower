@@ -3,7 +3,7 @@ import uuid
 from typing import List, Dict, Any
 
 from src.engine.interfaces import ISystem
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.shared.events import EventNewDay, EventRandomEventTriggered
 
 

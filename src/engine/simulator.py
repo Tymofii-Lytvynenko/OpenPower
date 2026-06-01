@@ -1,6 +1,6 @@
 from typing import List, Dict
 from graphlib import TopologicalSorter, CycleError
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.shared.actions import GameAction
 from src.engine.interfaces import ISystem
 

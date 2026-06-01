@@ -1,5 +1,5 @@
 import polars as pl
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.shared.config import GameConfig
 
 class DataExporter:

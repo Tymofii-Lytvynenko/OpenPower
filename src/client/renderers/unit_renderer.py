@@ -19,7 +19,7 @@ from src.client.ui.core.theme import GAMETHEME
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 
 if TYPE_CHECKING:
-    from src.server.state import GameState
+    from src.shared.state import GameState
 
 
 UNIT_DRAG_PREVIEW_WIDTH = 22.0

@@ -3,7 +3,7 @@ from typing import List
 
 from src.engine.interfaces import ISystem
 from src.engine.ai_framework import DeclarativeAIFramework
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.shared.actions import ActionBuildUnit, ActionUpdateBudget, GameAction
 from src.shared.events import EventRealSecond
 

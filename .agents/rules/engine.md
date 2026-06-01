@@ -1,6 +1,4 @@
----
-trigger: always_on
----
+
 
 # Engine Layer (Simulation Runner)
 
@@ -24,11 +22,11 @@ The Engine must remain **content-agnostic**. It knows *how* to run a system, but
 
 ## 🔗 Relationships
 * **Imports from:**
-    * `src/shared`: To handle Actions and Events.
+    * `src/shared`: To handle Actions, Events, and `GameState` (now lives in `src.shared.state`).
     * `src/core`: To use `SimulationTimer`, generic Algorithms, and Logging.
-    * `src/server`: To manipulate the `GameState` object during the tick.
 * **Used by:**
     * `src/server`: The Session instantiates and owns the Engine within the background process.
 * **NEVER imports:**
     * `src/client`: The Engine must run even on a headless server.
+    * `src/server`: `GameState` has been relocated to `src/shared` — no server import is needed.
     * `modules`: No hard dependencies on specific content (e.g., "base" mod).

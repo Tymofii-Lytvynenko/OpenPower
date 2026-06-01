@@ -5,7 +5,7 @@ from typing import Any
 import polars as pl
 
 from src.engine.interfaces import ISystem
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.shared.actions import ActionBuildUnit, ActionMoveUnit
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 

@@ -1,6 +1,6 @@
 import polars as pl
 from src.engine.interfaces import ISystem
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.shared.actions import ActionUpdateBudget
 from src.shared.events import EventRealSecond
 

@@ -6,8 +6,9 @@ from src.client.services.navigation_service import NavigationService
 from src.client.services.imgui_service import ImGuiService
 from src.client.services.game_settings_service import GameSettingsService
 
-# UPDATED: Import the new Client Proxy instead of the heavy local session
-from src.client.client_session import ClientSessionProxy
+# The launcher lives in the server layer and handles process spawning;
+# the window only needs to call it and hold the resulting proxy.
+from src.server.launcher import spawn_local_server
 
 if TYPE_CHECKING:
     from src.client.renderers.map_renderer import MapRenderer
@@ -29,7 +30,7 @@ class MainWindow(arcade.Window):
         self.imgui = ImGuiService(self, font_path=font_path)
 
         self.nav = NavigationService(self)
-        self.session: Optional[ClientSessionProxy] = None
+        self.session: Optional["ClientSessionProxy"] = None
         self.shared_renderer: Optional["MapRenderer"] = None
 
     def setup(self):
@@ -76,8 +77,9 @@ class MainWindow(arcade.Window):
             self.boot_status = "Loading map index..."
 
             try:
-                # Instantiate the Proxy (This spawns the background CPU core)
-                self.session = ClientSessionProxy(self.game_config)
+                # spawn_local_server creates the IPC channels, boots the
+                # background process, and loads map data — all in one call.
+                self.session = spawn_local_server(self.game_config)
             except Exception as exc:
                 self.boot_error = str(exc)
                 self.boot_status = "Client proxy failed."

@@ -4,7 +4,7 @@ from typing import Any
 
 import polars as pl
 
-from src.server.state import GameState
+from src.shared.state import GameState
 
 
 TableSpec = dict[str, tuple[pl.DataType, Any]]

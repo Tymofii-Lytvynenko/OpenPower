@@ -1,6 +1,4 @@
----
-trigger: always_on
----
+
 
 # Client Layer (Frontend)
 
@@ -23,13 +21,15 @@ The Client is a **passive observer**. It must never modify the `GameState` direc
 | Reading `state.get_table("regions")` for map coloring. | Writing `state.tables["regions"][id] = value`. |
 | Dispatching an `ActionSetTax` command. | Calculating tax revenue logic inside a UI button. |
 | Using `core.math` to interpolate unit movement. | Implementing pathfinding logic (belongs in Engine/Modules). |
+| Calling `spawn_local_server(config)` from `MainWindow` or a loading task. | Constructing `ClientSessionProxy` directly or importing `run_server_process`. |
 
 ## 🔗 Relationships
 * **Imports from:**
-    * `src/shared`: To use Actions, Events, and Config.
-    * `src/core`: To use universal math utils or color generators.
-    * `src/server`: **Strictly for Type Hinting** (to know what `GameState` looks like) and calling `from_ipc`.
+    * `src/shared`: To use Actions, Events, Config, and `GameState` (for type hints and `from_ipc`).
+    * `src/core`: To use universal math utils, color generators, or `list_available_saves`.
+    * `src/server` (**Launcher only**): `MainWindow` and loading tasks may call `spawn_local_server` from `src.server.launcher`. This is the **only** permitted server import in the client layer.
 * **Used by:** The entry point (`main.py`).
 * **NEVER imports:**
     * `src/engine`: The Client should not know how the simulation loop works.
-    * `modules`: The Client should not depend on specific game content code (temporary ignored for now cause its difficult to implement).
+    * `src/server` (internals): No imports of `GameSession`, `DataLoader`, `SaveWriter`, `DataExporter`, `server_process`, `state_bootstrap`, or any `src/server/io` module.
+    * `modules`: The Client must not depend on specific game content code.

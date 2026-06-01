@@ -1,67 +1,75 @@
+"""
+Client-side IPC proxy for the background simulation process.
+
+This class lives in the main UI thread. It holds the multiprocessing queues
+and the process handle, but it knows nothing about how the process was started.
+All spawning logic lives in src.server.launcher.spawn_local_server.
+"""
+
 import multiprocessing as mp
 from typing import Optional
-from pathlib import Path
 
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.shared.actions import GameAction
-from src.server.server_process import run_server_process
-
 from src.core.map_data import RegionMapData
-from src.shared.config import GameConfig
+
 
 class ClientSessionProxy:
     """
     A proxy object that lives in the main UI thread.
-    It handles communication with the background Simulation Process.
+
+    Responsibilities:
+    - Forwarding GameAction objects to the background Simulation Process.
+    - Polling the state queue for the latest GameState snapshot.
+    - Providing access to the pre-loaded map data for the renderer.
+    - Gracefully shutting down the background process on request.
+
+    Construction is intentionally lightweight — all heavy setup (process
+    spawning, map loading) is handled by src.server.launcher.spawn_local_server.
     """
-    
-    def __init__(self, config: GameConfig, save_name: Optional[str] = None):
-        # Create Communication Pipes
-        self.action_queue = mp.Queue()
-        self.state_queue = mp.Queue()
-        self.progress_queue = mp.Queue()
-        
+
+    def __init__(
+        self,
+        map_data: RegionMapData,
+        action_queue: mp.Queue,
+        state_queue: mp.Queue,
+        progress_queue: mp.Queue,
+        process: mp.Process,
+    ) -> None:
+        self.map_data = map_data
+        self.action_queue = action_queue
+        self.state_queue = state_queue
+        self.progress_queue = progress_queue
+        self.process = process
+
         self.state: Optional[GameState] = None
         self._state_poll_accumulator = 0.0
+        # Target 30 state updates per second to keep UI smooth without
+        # overwhelming the IPC queue with deserialization work.
         self._state_poll_interval = 1.0 / 30.0
-        
-        map_path = None
-        for data_dir in config.get_data_dirs():
-            candidate = data_dir / "regions" / "regions.png"
-            if candidate.exists():
-                map_path = candidate
-                break
-        if not map_path:
-            map_path = config.get_asset_path("map/regions.png")
-            
-        print(f"[ClientProxy] Loading UI map data from: {map_path}")
-        self.map_data = RegionMapData(str(map_path))
-        # ----------------------------------------------------
 
-        # Spawn the Background Process
-        self.process = mp.Process(
-            target=run_server_process,
-            args=(str(config.project_root), self.action_queue, self.state_queue, self.progress_queue, save_name),
-            daemon=True # Ensures process dies if window is closed abruptly
-        )
-        self.process.start()
-
-    def save_map_changes(self):
-        """Request the server process to save regions data."""
+    def save_map_changes(self) -> None:
+        """Request the server process to persist the current regions data."""
         self.action_queue.put("SAVE_MAP_CHANGES")
 
-    def receive_action(self, action: GameAction):
-        """Sends an action to the background server."""
+    def receive_action(self, action: GameAction) -> None:
+        """Sends an action intent to the background simulation process."""
         self.action_queue.put(action)
 
-    def tick(self, delta_time: float):
+    def tick(self, delta_time: float) -> None:
         """
-        Called by the Window. Grabs the latest pre-calculated state from the server.
+        Called by the Window on every frame to drain the latest state snapshot.
+
+        We intentionally drain the entire queue and keep only the most recent
+        frame to avoid the UI rendering stale data when the simulation is
+        running faster than the UI frame rate.
         """
         if delta_time > 0.0:
             self._state_poll_accumulator += delta_time
             if self._state_poll_accumulator < self._state_poll_interval:
                 return
+            # Clamp the accumulator to prevent an unbounded backlog of skipped
+            # polls from firing all at once after a hitch.
             self._state_poll_accumulator = min(
                 self._state_poll_accumulator - self._state_poll_interval,
                 self._state_poll_interval,
@@ -71,10 +79,12 @@ class ClientSessionProxy:
             latest_ipc = None
             while not self.state_queue.empty():
                 latest_ipc = self.state_queue.get_nowait()
-                
+
             if latest_ipc:
                 old_tables = self.state.tables if self.state else {}
                 self.state = GameState.from_ipc(latest_ipc)
+                # Preserve any tables that the server did not include in this
+                # snapshot (e.g., tables excluded from IPC serialization).
                 for name, df in old_tables.items():
                     if name not in self.state.tables:
                         self.state.tables[name] = df
@@ -82,9 +92,11 @@ class ClientSessionProxy:
             pass
 
     def get_state_snapshot(self) -> Optional[GameState]:
+        """Returns the most recently received game state, or None if not ready."""
         return self.state
 
-    def shutdown(self):
+    def shutdown(self) -> None:
+        """Requests a graceful shutdown and waits briefly before force-terminating."""
         self.action_queue.put("SHUTDOWN")
         self.process.join(timeout=2.0)
         if self.process.is_alive():

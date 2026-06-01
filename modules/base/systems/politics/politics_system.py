@@ -1,7 +1,7 @@
 import polars as pl
 import random
 from src.engine.interfaces import ISystem
-from src.server.state import GameState
+from src.shared.state import GameState
 
 class PoliticsSystem(ISystem):
     def __init__(self):

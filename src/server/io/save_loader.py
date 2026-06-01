@@ -3,7 +3,7 @@ import polars as pl
 import orjson
 from pathlib import Path
 from typing import get_type_hints, Any
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.shared.config import GameConfig
 
 class SaveStateLoader:

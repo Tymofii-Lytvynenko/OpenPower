@@ -10,7 +10,7 @@ from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.theme import GAMETHEME
 
 if TYPE_CHECKING:
-    from src.server.state import GameState
+    from src.shared.state import GameState
 
 
 @dataclass(frozen=True, slots=True)

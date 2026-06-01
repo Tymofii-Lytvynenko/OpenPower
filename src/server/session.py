@@ -16,7 +16,7 @@ from src.engine.simulator import Engine
 from src.core.map_data import RegionMapData
 
 if TYPE_CHECKING:
-    from src.server.state import GameState
+    from src.shared.state import GameState
 
 class GameSession:
     """
