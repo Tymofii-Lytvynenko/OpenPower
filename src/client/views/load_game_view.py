@@ -96,7 +96,15 @@ class LoadGameView(BaseImGuiView):
                 self.status_text = f"Initializing load for {self.save_name}..."
                 self.progress = 0.2
                 from src.server.launcher import spawn_local_server
-                new_session = spawn_local_server(self.config, save_name=self.save_name)
+                from src.client.client_session import ClientSessionProxy
+                bundle = spawn_local_server(self.config, save_name=self.save_name)
+                new_session = ClientSessionProxy(
+                    map_data=bundle.map_data,
+                    action_queue=bundle.action_queue,
+                    state_queue=bundle.state_queue,
+                    progress_queue=bundle.progress_queue,
+                    process=bundle.process,
+                )
 
                 # 3. Read progress from new_session.progress_queue
                 while True:

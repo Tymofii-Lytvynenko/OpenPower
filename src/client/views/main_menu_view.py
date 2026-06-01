@@ -14,7 +14,7 @@ from src.client.controllers.camera_controller import CameraController
 
 if TYPE_CHECKING:
     from src.shared.config import GameConfig
-    from src.server.session import GameSession
+    from src.shared.protocols import SessionPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +25,7 @@ class MenuAction:
 
 
 class MainMenuView(BaseImGuiView):
-    def __init__(self, session: "GameSession", config: "GameConfig"):
+    def __init__(self, session: "SessionPort", config: "GameConfig"):
         super().__init__()
         self.session = session
         self.config = config

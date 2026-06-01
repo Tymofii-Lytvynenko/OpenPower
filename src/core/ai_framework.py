@@ -2,8 +2,6 @@ import polars as pl
 from typing import Callable, List, Dict
 from src.shared.actions import GameAction
 
-# Using structural typing protocols or type aliases for functional composition.
-# This avoids rigid inheritance chains and keeps the framework highly reusable.
 ScorerFunc = Callable[[pl.LazyFrame], pl.LazyFrame]
 ActionResolverFunc = Callable[[dict], GameAction | None]
 
@@ -38,20 +36,14 @@ class DeclarativeAIFramework:
         if not self._scorers:
             return []
 
-        # Functional composition pattern eliminates nested state mutations and loops.
-        # Polars optimizes this chained graph into a single execution sweep.
         for scorer in self._scorers:
             state_lf = state_lf.pipe(scorer)
 
-        # Triggering a single materialize compute pass to completely avoid GIL bottlenecks.
         decision_df = state_lf.collect()
         generated_actions: List[GameAction] = []
 
-        # Single-pass loop over the resulting small batch of materialized actor rows.
-        # Microsecond overhead on typical strategy game agent counts (e.g., 200 states).
         for row in decision_df.iter_rows(named=True):
             for column_id, resolver in self._action_resolvers.items():
-                # Strict optimization: omit checking values if the flag wasn't even calculated.
                 if column_id in row and row[column_id] > 0.0:
                     action = resolver(row)
                     if action:

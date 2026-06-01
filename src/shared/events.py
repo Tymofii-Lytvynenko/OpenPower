@@ -159,3 +159,14 @@ class EventRandomEventTriggered(GameEvent):
     event_type: str
     region_id: int
     severity: float  # 0.0–1.0 scale for future effect magnitude
+
+
+@dataclass
+class EventSystemError(GameEvent):
+    """
+    Fired when a simulation system encounters a runtime error.
+    Used for centralized error tracking and telemetry in the client.
+    """
+    system_id: str
+    error_message: str
+    traceback_text: str

@@ -15,6 +15,7 @@ from typing import Optional
 from src.shared.config import GameConfig
 from src.core.map_data import RegionMapData
 from src.server.server_process import run_server_process
+from src.shared.protocols import ServerProcessBundle
 
 
 def _resolve_map_path(config: GameConfig):
@@ -31,29 +32,12 @@ def _resolve_map_path(config: GameConfig):
 def spawn_local_server(
     config: GameConfig,
     save_name: Optional[str] = None,
-) -> "ClientSessionProxy":
+) -> ServerProcessBundle:
     """
-    Spawns a background simulation process and returns a ready-to-use proxy.
+    Spawns a background simulation process and returns a bundle with IPC channels.
 
     This is the canonical entry point for starting or loading a local game.
-    Both MainWindow and all loading tasks must call this function instead of
-    constructing ClientSessionProxy directly.
-
-    Args:
-        config:    Active game configuration (used for path resolution and
-                   forwarding to the server process).
-        save_name: Name of an existing save slot to load, or None to start
-                   a fresh game from the initial static data.
-
-    Returns:
-        A ClientSessionProxy wired to the new process via IPC queues.
-        The caller is responsible for polling progress_queue until 'READY'.
     """
-    # Lazy import to keep circular-import risk zero — ClientSessionProxy
-    # lives in client but we return it here for convenience; it holds no
-    # server knowledge itself after this refactor.
-    from src.client.client_session import ClientSessionProxy
-
     # Create IPC communication channels
     action_queue: mp.Queue = mp.Queue()
     state_queue: mp.Queue = mp.Queue()
@@ -74,7 +58,7 @@ def spawn_local_server(
     print(f"[Launcher] Loading UI map data from: {map_path}")
     map_data = RegionMapData(str(map_path))
 
-    return ClientSessionProxy(
+    return ServerProcessBundle(
         map_data=map_data,
         action_queue=action_queue,
         state_queue=state_queue,

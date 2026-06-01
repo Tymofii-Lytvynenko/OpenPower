@@ -101,10 +101,6 @@ class GameState:
         """
         ipc_tables = {}
         for name, df in self.tables.items():
-            # Skip tables that cannot be serialized (e.g., graph objects)
-            if name in ["trade_network"]:
-                continue
-
             f = io.BytesIO()
             df.write_ipc(f)
             ipc_tables[name] = f.getvalue()

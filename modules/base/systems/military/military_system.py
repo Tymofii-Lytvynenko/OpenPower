@@ -146,8 +146,9 @@ class MilitarySystem(ISystem):
         units = self._update_unit_movements(units, state.time.total_minutes)
         state.update_table(UNIT_TABLE, units)
 
-        tick = state.globals.get("tick", 0)
-        if tick % 7 == 0:
+        from src.shared.events import EventNewDay
+        has_new_day = any(isinstance(e, EventNewDay) for e in state.events)
+        if has_new_day and not state.time.is_paused and state.time.day % 7 == 1:
             self._update_manpower(state)
 
     def _ensure_units_table(self, state: GameState) -> pl.DataFrame:

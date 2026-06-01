@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from src.shared.config import GameConfig
-    from src.server.session import GameSession
+    from src.shared.protocols import SessionPort
     from src.client.tasks.editor_loading_task import EditorContext
 
 class NavigationService:
@@ -12,7 +12,7 @@ class NavigationService:
 
     # --- MAIN MENU & INFRASTRUCTURE ---
 
-    def show_main_menu(self, session: "GameSession", config: "GameConfig"):
+    def show_main_menu(self, session: "SessionPort", config: "GameConfig"):
         from src.client.views.main_menu_view import MainMenuView
         print("[Nav] Switching to Main Menu")
         self.window.show_view(MainMenuView(session, config))
@@ -24,7 +24,7 @@ class NavigationService:
 
     # --- GAMEPLAY FLOW ---
 
-    def show_new_game_screen(self, session: "GameSession", config: "GameConfig"):
+    def show_new_game_screen(self, session: "SessionPort", config: "GameConfig"):
         from src.client.views.new_game_view import NewGameView
         print("[Nav] Switching to New Game Selection")
         self.window.show_view(NewGameView(session, config))
@@ -34,14 +34,14 @@ class NavigationService:
         print("[Nav] Switching to Load Game Screen")
         self.window.show_view(LoadGameView(config))
 
-    def show_game_view(self, session: "GameSession", config: "GameConfig", player_tag: str, initial_pos=None):
+    def show_game_view(self, session: "SessionPort", config: "GameConfig", player_tag: str, initial_pos=None):
         from src.client.views.game_view import GameView
         print(f"[Nav] Starting Game as {player_tag}")
         self.window.show_view(GameView(session, config, player_tag, initial_pos))
 
     # --- TOOLS ---
 
-    def show_editor_loading(self, session: "GameSession", config: "GameConfig"):
+    def show_editor_loading(self, session: "SessionPort", config: "GameConfig"):
         """
         Handles the complex sequence of Loading Task -> Editor View
         """

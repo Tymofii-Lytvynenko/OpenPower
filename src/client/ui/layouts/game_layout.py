@@ -1,5 +1,4 @@
 from typing import Optional
-
 import polars as pl
 from imgui_bundle import imgui
 
@@ -89,6 +88,12 @@ class GameLayout:
         )
         self.panel_manager.render_all(state, context)
         self.context_menu.render()
+
+        # Render system errors warning banner if any are collected
+        errors = self.net.get_system_errors()
+        if errors:
+            self._render_system_errors_banner(errors)
+
         self._render_fps(fps)
 
     def show_context_menu(self, region_id: int):
@@ -109,6 +114,29 @@ class GameLayout:
         if imgui.begin("##FPS", True, flags):
             imgui.text_colored((1, 1, 1, 1), f"{fps:.0f}")
         imgui.end()
+
+    def _render_system_errors_banner(self, errors: list):
+        imgui.set_next_window_pos((imgui.get_io().display_size.x * 0.5 - 250, 40))
+        imgui.set_next_window_size((500, 0))
+        flags = (
+            imgui.WindowFlags_.no_collapse
+            | imgui.WindowFlags_.always_auto_resize
+        )
+        imgui.push_style_color(imgui.Col_.window_bg, (0.6, 0.1, 0.1, 0.95))
+        imgui.push_style_color(imgui.Col_.title_bg, (0.8, 0.1, 0.1, 1.0))
+        imgui.push_style_color(imgui.Col_.title_bg_active, (0.9, 0.1, 0.1, 1.0))
+        
+        if imgui.begin("SIMULATION ERRORS DETECTED", True, flags):
+            imgui.text_wrapped("One or more simulation systems crashed! Check console logs for full tracebacks.")
+            imgui.separator()
+            for err in errors[-2:]:
+                imgui.text_colored((1, 1, 0, 1), f"[{err['system_id']}] {err['message']}")
+            imgui.separator()
+            if imgui.button("Clear errors"):
+                self.net.clear_system_errors()
+        imgui.end()
+        
+        imgui.pop_style_color(3)
 
     def _resolve_active_context(self, state, region_id: Optional[int]) -> tuple[str, bool]:
         if region_id != self._last_selected_id:

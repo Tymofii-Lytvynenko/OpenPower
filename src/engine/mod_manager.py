@@ -42,11 +42,27 @@ class ModManager:
             print(f"[ModManager] Warning: No mods found in {self.modules_dir}")
             return []
 
+        # Filter to only active mods and their transitive dependencies
+        required_ids = set()
+        to_visit = list(self.config.active_mods)
+        while to_visit:
+            mid = to_visit.pop(0)
+            if mid not in required_ids:
+                required_ids.add(mid)
+                if mid in available_mods:
+                    to_visit.extend(available_mods[mid].dependencies)
+                else:
+                    print(f"[ModManager] Warning: Mod '{mid}' is active or required but not found in modules/ directory.")
+
+        # Filter available mods to only the required ones
+        active_available = {mid: available_mods[mid] for mid in required_ids if mid in available_mods}
+
         # 2. Topological Sort (Base -> Dependent Mods)
-        sorted_mods = self._sort_mods(available_mods)
+        sorted_mods = self._sort_mods(active_available)
         
         self.loaded_mods = sorted_mods
-        print(f"[ModManager] Resolved Load Order: {[m.id for m in sorted_mods]}")
+        self.config.active_mods = [m.id for m in sorted_mods]
+        print(f"[ModManager] Resolved Load Order: {self.config.active_mods}")
         return sorted_mods
 
     def load_systems(self) -> List[ISystem]:
@@ -101,6 +117,7 @@ class ModManager:
             if not mod_dir.is_dir(): continue
             
             manifest_path = mod_dir / "mod.toml"
+            registration_path = mod_dir / "registration.py"
             if manifest_path.exists():
                 try:
                     with open(manifest_path, "r", encoding="utf-8") as f:
@@ -116,6 +133,16 @@ class ModManager:
                     found[manifest.id] = manifest
                 except Exception as e:
                     print(f"[ModManager] Failed to load manifest for {mod_dir.name}: {e}")
+            elif registration_path.exists():
+                # Fallback manifest for mods without mod.toml but with registration.py
+                manifest = ModManifest(
+                    id=mod_dir.name,
+                    name=mod_dir.name,
+                    version="0.0.1",
+                    dependencies=[],
+                    path=mod_dir
+                )
+                found[manifest.id] = manifest
         return found
 
     def _sort_mods(self, available: Dict[str, ModManifest]) -> List[ModManifest]:

@@ -2,7 +2,7 @@ import polars as pl
 from typing import List
 
 from src.engine.interfaces import ISystem
-from src.engine.ai_framework import DeclarativeAIFramework
+from src.core.ai_framework import DeclarativeAIFramework
 from src.shared.state import GameState
 from src.shared.actions import ActionBuildUnit, ActionUpdateBudget, GameAction
 from src.shared.events import EventRealSecond
@@ -196,10 +196,10 @@ class AISystem(ISystem):
         return lf
 
     def update(self, state: GameState, delta_time: float) -> None:
-        # Throttle evaluation passes to run once every real-time second.
-        # Uses the central EventRealSecond event from base.time system to keep logic synchronized.
-        has_real_second = any(isinstance(e, EventRealSecond) for e in state.events)
-        if not has_real_second or state.time.is_paused or "countries" not in state.tables:
+        # Run daily on EventNewDay to align with simulation calendar.
+        from src.shared.events import EventNewDay
+        has_new_day = any(isinstance(e, EventNewDay) for e in state.events)
+        if not has_new_day or state.time.is_paused or "countries" not in state.tables:
             return
 
         countries_lf = state.get_table("countries").lazy()

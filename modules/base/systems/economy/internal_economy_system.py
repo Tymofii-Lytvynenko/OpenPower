@@ -93,6 +93,12 @@ class InternalEconomySystem(ISystem):
     }
 
     def update(self, state: GameState, delta_time: float) -> None:
+        # 1. Process Actions
+        from src.shared.actions import ActionUpdateResourcePolicy
+        for action in state.current_actions:
+            if isinstance(action, ActionUpdateResourcePolicy):
+                self._handle_update_resource_policy(state, action)
+
         rebuild_ledger = False
         
         if "resource_ledger" not in state.tables and "domestic_production" in state.tables and "trade_network" in state.tables:
@@ -112,6 +118,43 @@ class InternalEconomySystem(ISystem):
                 
         if rebuild_ledger:
             self._build_resource_ledger(state)
+
+    def _handle_update_resource_policy(self, state: GameState, action: ActionUpdateResourcePolicy) -> None:
+        if "domestic_production" not in state.tables:
+            return
+
+        df = state.get_table("domestic_production")
+        expressions = []
+        if "is_gov_controlled" not in df.columns:
+            expressions.append(pl.lit(False).alias("is_gov_controlled"))
+        if "is_legal" not in df.columns:
+            expressions.append(pl.lit(True).alias("is_legal"))
+        if "tax_rate" not in df.columns:
+            expressions.append(pl.lit(0.0).alias("tax_rate"))
+        if expressions:
+            df = df.with_columns(expressions)
+
+        tax_rate = max(0.0, min(1.0, float(action.tax_rate)))
+        target = (
+            (pl.col("country_id") == action.country_tag)
+            & (pl.col("game_resource_id") == action.resource_id)
+        )
+
+        updated = df.with_columns([
+            pl.when(target)
+            .then(pl.lit(bool(action.is_gov_controlled)))
+            .otherwise(pl.col("is_gov_controlled"))
+            .alias("is_gov_controlled"),
+            pl.when(target)
+            .then(pl.lit(bool(action.is_legal)))
+            .otherwise(pl.col("is_legal"))
+            .alias("is_legal"),
+            pl.when(target)
+            .then(pl.lit(tax_rate))
+            .otherwise(pl.col("tax_rate"))
+            .alias("tax_rate"),
+        ])
+        state.update_table("domestic_production", updated)
 
     def _get_population(self, state: GameState) -> pl.DataFrame:
         regions = state.get_table("regions")

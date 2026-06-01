@@ -33,7 +33,15 @@ class NewGameTask:
         self.status_text = "Starting simulation server..."
         self.progress = 0.1
         from src.server.launcher import spawn_local_server
-        new_session = spawn_local_server(self.config, save_name=None)
+        from src.client.client_session import ClientSessionProxy
+        bundle = spawn_local_server(self.config, save_name=None)
+        new_session = ClientSessionProxy(
+            map_data=bundle.map_data,
+            action_queue=bundle.action_queue,
+            state_queue=bundle.state_queue,
+            progress_queue=bundle.progress_queue,
+            process=bundle.process,
+        )
         
         # 3. Monitor the progress queue until READY or ERROR
         while True:

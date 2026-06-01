@@ -79,7 +79,15 @@ class MainWindow(arcade.Window):
             try:
                 # spawn_local_server creates the IPC channels, boots the
                 # background process, and loads map data — all in one call.
-                self.session = spawn_local_server(self.game_config)
+                from src.client.client_session import ClientSessionProxy
+                bundle = spawn_local_server(self.game_config)
+                self.session = ClientSessionProxy(
+                    map_data=bundle.map_data,
+                    action_queue=bundle.action_queue,
+                    state_queue=bundle.state_queue,
+                    progress_queue=bundle.progress_queue,
+                    process=bundle.process,
+                )
             except Exception as exc:
                 self.boot_error = str(exc)
                 self.boot_status = "Client proxy failed."

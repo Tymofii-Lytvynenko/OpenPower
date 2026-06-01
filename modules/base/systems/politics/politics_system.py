@@ -16,10 +16,13 @@ class PoliticsSystem(ISystem):
         return ["base.population"] # Politics might depend on pop happiness later
 
     def update(self, state: GameState, delta_time: float) -> None:
-        tick = state.globals.get("tick", 0)
-        
-        # Run weekly
-        if tick % 7 != 0:
+        # Run weekly on EventNewDay (approx every 7 days)
+        from src.shared.events import EventNewDay
+        has_new_day = any(isinstance(e, EventNewDay) for e in state.events)
+        if not has_new_day or state.time.is_paused:
+            return
+
+        if state.time.day % 7 != 1:
             return
 
         countries = state.get_table("countries")

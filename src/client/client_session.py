@@ -43,6 +43,7 @@ class ClientSessionProxy:
         self.process = process
 
         self.state: Optional[GameState] = None
+        self.system_errors: list = []
         self._state_poll_accumulator = 0.0
         # Target 30 state updates per second to keep UI smooth without
         # overwhelming the IPC queue with deserialization work.
@@ -81,15 +82,23 @@ class ClientSessionProxy:
                 latest_ipc = self.state_queue.get_nowait()
 
             if latest_ipc:
-                old_tables = self.state.tables if self.state else {}
                 self.state = GameState.from_ipc(latest_ipc)
-                # Preserve any tables that the server did not include in this
-                # snapshot (e.g., tables excluded from IPC serialization).
-                for name, df in old_tables.items():
-                    if name not in self.state.tables:
-                        self.state.tables[name] = df
-        except Exception:
-            pass
+                
+                # Check for EventSystemError telemetry
+                from src.shared.events import EventSystemError
+                for event in self.state.events:
+                    if isinstance(event, EventSystemError):
+                        self.system_errors.append({
+                            "system_id": event.system_id,
+                            "message": event.error_message,
+                            "traceback": event.traceback_text,
+                        })
+        except Exception as e:
+            # Draining get_nowait raises queue.Empty, which is expected.
+            # Other exceptions should be printed for developer visibility.
+            import queue
+            if not isinstance(e, queue.Empty):
+                print(f"[ClientSessionProxy] IPC tick error: {e}")
 
     def get_state_snapshot(self) -> Optional[GameState]:
         """Returns the most recently received game state, or None if not ready."""

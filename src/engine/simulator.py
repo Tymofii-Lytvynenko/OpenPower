@@ -10,7 +10,8 @@ class Engine:
     Orchestrates systems using a Dependency Graph to determine execution order.
     """
     
-    def __init__(self):
+    def __init__(self, dev_mode: bool = False):
+        self.dev_mode = dev_mode
         # Map: "base.economy" -> InternalEconomySystem instance
         self.systems_map: Dict[str, ISystem] = {}
         
@@ -82,9 +83,20 @@ class Engine:
         # 3. Run All Systems in Strict Order
         # TimeSystem will likely run first (if dep graph is correct), generating events.
         # Economy/Politics systems will run later, consuming those events.
+        import traceback
+        from src.shared.events import EventSystemError
         for system in self.execution_order:
             try:
                 system.update(state, delta_time)
             except Exception as e:
-                # In production, we might want to isolate the crash so the whole server doesn't die.
-                print(f"[Engine] Error in system '{system.id}': {e}")
+                tb_text = traceback.format_exc()
+                print(f"[Engine] Error in system '{system.id}': {e}\n{tb_text}")
+                
+                state.events.append(EventSystemError(
+                    system_id=system.id,
+                    error_message=str(e),
+                    traceback_text=tb_text
+                ))
+                
+                if self.dev_mode:
+                    raise e

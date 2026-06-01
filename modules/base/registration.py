@@ -12,6 +12,7 @@ from modules.base.systems.world.random_events_system import RandomEventsSystem
 from modules.base.systems.economy.trade_system import TradeSystem
 from modules.base.systems.economy.internal_economy_system import InternalEconomySystem
 from modules.base.systems.economy.budget_system import BudgetSystem
+from modules.base.systems.world.bootstrap_system import BootstrapSystem
 
 def register() -> List[ISystem]:
     """
@@ -20,6 +21,7 @@ def register() -> List[ISystem]:
     """
     return [
         TimeSystem(),
+        BootstrapSystem(),
         PoliticsSystem(),
         PopulationSystem(),
         MilitarySystem(),
