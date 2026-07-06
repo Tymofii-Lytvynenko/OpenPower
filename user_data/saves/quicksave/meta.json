@@ -1,28 +1,22 @@
 {
   "version": 1,
-  "timestamp": "2026-07-06T18:16:06.873872",
+  "timestamp": "2026-07-07T01:52:08.690021",
   "time": {
-    "total_minutes": 163,
+    "total_minutes": 510,
     "year": 2001,
     "month": 1,
     "day": 1,
-    "hour": 2,
-    "minute": 43,
-    "date_str": "2001-01-01 02:43",
+    "hour": 8,
+    "minute": 30,
+    "date_str": "2001-01-01 08:30",
     "speed_level": 1,
     "is_paused": false,
-    "_accumulator": 0.8341579999905662
+    "_accumulator": 0.8171849999780534
   },
   "globals": {
-    "tick": 53,
+    "tick": 164,
     "game_speed": 1.0,
+    "player_tag": "ALB",
     "active_events": []
-  },
-  "events": [],
-  "current_actions": [
-    {
-      "player_id": "local_admin",
-      "save_name": "quicksave"
-    }
-  ]
+  }
 }

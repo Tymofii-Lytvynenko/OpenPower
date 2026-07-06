@@ -234,5 +234,4 @@ __marimo__/
 profile_results.html
 imgui.ini
 /DATA_SCHEMA.md
-user_data/settings.json
-user_data/simulations/
+/user_data
