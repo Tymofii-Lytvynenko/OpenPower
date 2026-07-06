@@ -145,9 +145,15 @@ class GameLayout:
                 self._cached_target_tag = self.local_player_tag
             elif "regions" in state.tables:
                 try:
-                    owner = state.tables["regions"].filter(pl.col("id") == region_id).item(0, "owner")
-                    self._cached_target_tag = owner if owner and owner != "None" else self.local_player_tag
+                    region_rows = state.tables["regions"].filter(pl.col("id") == region_id)
+                    if region_rows.is_empty():
+                        self._cached_target_tag = self.local_player_tag
+                    else:
+                        region_row = region_rows.row(0, named=True)
+                        authority = region_row.get("controller") or region_row.get("owner")
+                        self._cached_target_tag = authority if authority and authority != "None" else self.local_player_tag
                 except Exception:
                     self._cached_target_tag = self.local_player_tag
 
         return self._cached_target_tag, self._cached_target_tag == self.local_player_tag
+

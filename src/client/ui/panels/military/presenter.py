@@ -172,6 +172,53 @@ class MilitaryPresenter:
 
         return rows
 
+    def preferred_war_targets(self, state, country_tag: str, limit: int = 12) -> list[dict]:
+        countries = state.tables.get("countries")
+        if countries is None or countries.is_empty() or "id" not in countries.columns:
+            return []
+
+        active_enemies = set()
+        for war in self.wars_for_country(state, country_tag):
+            active_enemies.update(tag for tag in war["side_a"] if tag != country_tag)
+            active_enemies.update(tag for tag in war["side_b"] if tag != country_tag)
+
+        allies = self._allied_countries(state, country_tag)
+        rows: list[dict] = []
+        relations = state.tables.get("countries_relations")
+        if relations is not None and not relations.is_empty() and {"source", "target", "value"}.issubset(set(relations.columns)):
+            ranked_rows = (
+                relations.filter(pl.col("source") == country_tag)
+                .sort("value")
+                .to_dicts()
+            )
+            for row in ranked_rows:
+                target_tag = safe_text(row.get("target"))
+                if not target_tag or target_tag == country_tag or target_tag in active_enemies or target_tag in allies:
+                    continue
+                rows.append(
+                    {
+                        "country_tag": target_tag,
+                        "country_name": resolve_country_name(state, target_tag),
+                        "relation_score": safe_float(row.get("value")),
+                    }
+                )
+                if len(rows) >= limit:
+                    break
+            return rows
+
+        for row in countries.to_dicts():
+            target_tag = safe_text(row.get("id"))
+            if not target_tag or target_tag == country_tag or target_tag in active_enemies or target_tag in allies:
+                continue
+            rows.append(
+                {
+                    "country_tag": target_tag,
+                    "country_name": resolve_country_name(state, target_tag),
+                    "relation_score": 0.0,
+                }
+            )
+        return rows[:limit]
+
     def battles_for_country(self, state, country_tag: str) -> list[dict]:
         battles = state.tables.get("battles")
         if battles is None or battles.is_empty():
@@ -207,6 +254,28 @@ class MilitaryPresenter:
         if units is None or units.is_empty() or "owner" not in units.columns:
             return []
         return units.filter(pl.col("owner") == country_tag).to_dicts()
+
+    def _allied_countries(self, state, country_tag: str) -> set[str]:
+        treaties = state.tables.get("countries_treaties")
+        if treaties is None or treaties.is_empty():
+            return set()
+
+        allied_types = {"alliance", "defensive_alliance", "military_alliance", "defensive_pact", "military_pact"}
+        allies: set[str] = set()
+        for row in treaties.to_dicts():
+            treaty_type = safe_text(row.get("type")).lower()
+            if treaty_type not in allied_types:
+                continue
+
+            members = set(normalize_side(row.get("members")))
+            if not members:
+                members = set(normalize_side(row.get("side_a"))) | set(normalize_side(row.get("side_b")))
+            if country_tag not in members:
+                continue
+            allies.update(members)
+
+        allies.discard(country_tag)
+        return allies
 
     def _classify_branch(self, unit_type: str) -> str:
         lower = unit_type.lower()

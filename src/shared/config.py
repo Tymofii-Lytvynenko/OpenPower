@@ -1,37 +1,48 @@
-import json
 from pathlib import Path
 from typing import List
+
+from src.shared.mods import load_requested_mods, resolve_project_mods
+
 
 class GameConfig:
     """
     Central configuration handler for the OpenPower engine.
-    
+
     Responsibilities:
     1. Resolve file paths dynamically (removing hardcoded strings).
     2. Provide access to Data and Asset directories.
     """
+
     def __init__(self, project_root: Path):
         self.project_root = project_root.resolve()
-        
+
         # Standard directory structure definitions
         self.modules_dir = self.project_root / "modules"
         self.cache_dir = self.project_root / ".cache"
         self.user_data_dir = self.project_root / "user_data"
-        
+
         self.dev_mode: bool = True  # Default to True for dev-mode fail-fast testing
-        
-        # Default load order.
-        # This will be populated/overwritten by ModManager in GameSession.
+
+        # Keep both the user-requested list and the resolved dependency stack.
+        # The client needs the same mod order as the server so layered data and
+        # assets resolve consistently during startup.
+        self.requested_mods: List[str] = ["base"]
         self.active_mods: List[str] = ["base"]
-        
-        mods_json_path = self.project_root / "mods.json"
-        if mods_json_path.exists():
+
+        try:
+            self.requested_mods = load_requested_mods(self.project_root)
+            self.active_mods = [manifest.id for manifest in resolve_project_mods(self.project_root)]
+            if not self.active_mods:
+                self.active_mods = self.requested_mods
+        except Exception as e:
+            # Fall back to the raw mods.json order so tooling can still inspect
+            # project paths while the startup error is surfaced elsewhere.
+            print(f"[GameConfig] Failed to resolve active mods: {e}")
             try:
-                with open(mods_json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    self.active_mods = data.get("active_mods", ["base"])
-            except Exception as e:
-                print(f"[GameConfig] Failed to load mods.json: {e}")
+                self.requested_mods = load_requested_mods(self.project_root)
+                self.active_mods = self.requested_mods
+            except Exception as load_error:
+                print(f"[GameConfig] Failed to load mods.json: {load_error}")
 
     def get_data_dirs(self) -> List[Path]:
         """

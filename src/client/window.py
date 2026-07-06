@@ -13,13 +13,12 @@ from src.server.launcher import spawn_local_server
 if TYPE_CHECKING:
     from src.client.renderers.map_renderer import MapRenderer
 
-class MainWindow(arcade.Window):
 
+class MainWindow(arcade.Window):
     def __init__(self, config: GameConfig):
         super().__init__(1280, 720, "OpenPower Engine", resizable=True)
         self.switch_to()
         self.game_config = config
-        self.center_window()
         self.set_minimum_size(800, 600)
         self.settings = GameSettingsService.from_path(config.user_data_dir / "settings.json")
         self.settings.apply_display(self)
@@ -48,22 +47,22 @@ class MainWindow(arcade.Window):
             # Poll the progress queue from the background process
             while not self.session.progress_queue.empty():
                 msg_type, progress, text = self.session.progress_queue.get_nowait()
-                
+
                 if msg_type == "PROGRESS":
                     self.boot_progress = float(progress)
                     self.boot_status = text
                     print(f"[Loading] {text} ({progress*100}%)")
-                    
+
                 elif msg_type == "READY":
                     print("[Window] Engine Ready! Server connected.")
                     arcade.unschedule(check_server_boot)
                     self.boot_progress = 1.0
                     self.boot_status = "Engine ready."
-                    
+
                     # Fetch initial state
-                    self.session.tick(0) 
+                    self.session.tick(0)
                     self.nav.show_main_menu(self.session, self.game_config)
-                    
+
                 elif msg_type == "ERROR":
                     print(f"[Window] FATAL SERVER ERROR: {text}")
                     self.boot_error = text
@@ -78,7 +77,7 @@ class MainWindow(arcade.Window):
 
             try:
                 # spawn_local_server creates the IPC channels, boots the
-                # background process, and loads map data — all in one call.
+                # background process, and loads map data - all in one call.
                 from src.client.client_session import ClientSessionProxy
                 bundle = spawn_local_server(self.game_config)
                 self.session = ClientSessionProxy(
@@ -102,6 +101,8 @@ class MainWindow(arcade.Window):
         super().on_resize(width, height)
         self.ctx.viewport = (0, 0, width, height)
         self.ctx.scissor = None
+        if hasattr(self, "imgui"):
+            self.imgui.resize(width, height)
         if hasattr(self, "settings"):
             self.settings.remember_windowed_size(width, height)
         if self.current_view and hasattr(self.current_view, "on_resize"):
@@ -111,7 +112,7 @@ class MainWindow(arcade.Window):
         if self.session:
             # Grabs the latest IPC payload (Takes < 0.001 seconds!)
             self.session.tick(delta_time)
-            
+
     def on_close(self):
         if self.session:
             print("[Window] Shutting down Server Process...")

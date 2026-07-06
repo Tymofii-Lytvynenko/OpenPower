@@ -1,5 +1,7 @@
 import dataclasses
 import shutil
+
+import orjson
 import polars as pl
 from pathlib import Path
 from datetime import datetime

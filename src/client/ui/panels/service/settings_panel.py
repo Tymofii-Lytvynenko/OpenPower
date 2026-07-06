@@ -17,7 +17,7 @@ class SettingsPanel:
         )
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        with WindowManager.window("SETTINGS", x=860, y=90, w=420, h=240) as is_open:
+        with WindowManager.window("SETTINGS", x=800, y=90, w=460, h=400) as is_open:
             if not is_open:
                 return False
             if self._content is None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from imgui_bundle import imgui
 
@@ -535,7 +535,7 @@ class UnitRenderer:
 
     def _classify_unit_strength(self, unit: ProjectedUnit) -> tuple[int, int, int, int]:
         unit_type = unit.unit_type.casefold()
-        strength = max(0, int(unit.strength))
+        strength = max(0, unit.strength)
 
         if any(token in unit_type for token in ("naval", "ship", "fleet")):
             return 0, 0, strength, 0

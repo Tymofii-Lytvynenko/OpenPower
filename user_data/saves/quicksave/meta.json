@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "timestamp": "2026-07-06T18:16:06.873872",
+  "time": {
+    "total_minutes": 163,
+    "year": 2001,
+    "month": 1,
+    "day": 1,
+    "hour": 2,
+    "minute": 43,
+    "date_str": "2001-01-01 02:43",
+    "speed_level": 1,
+    "is_paused": false,
+    "_accumulator": 0.8341579999905662
+  },
+  "globals": {
+    "tick": 53,
+    "game_speed": 1.0,
+    "active_events": []
+  },
+  "events": [],
+  "current_actions": [
+    {
+      "player_id": "local_admin",
+      "save_name": "quicksave"
+    }
+  ]
+}

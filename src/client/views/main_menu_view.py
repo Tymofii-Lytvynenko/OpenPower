@@ -36,28 +36,28 @@ class MainMenuView(BaseImGuiView):
         # --- SHARED RENDERER LOGIC ---
         if self.window.shared_renderer is None:
             print("[MainMenuView] Initializing Shared Renderer...")
-            
+
             # BIGGER GLOBE: Set default distance closer (was 4.5, now 2.3)
             self.cam_ctrl = CameraController(distance=2.3)
-            
+
             self.cam_ctrl.look_at_pixel_coords(
                 12000, 2400,
                 16000, 8000 # TODO: Replace with dynamic map size
             )
-            
+
             map_path = None
-            
+
             # 1. Search in data directories (mods first)
             for data_dir in config.get_data_dirs():
                 candidate = data_dir / "regions" / "regions.png"
                 if candidate.exists():
                     map_path = candidate
                     break
-            
+
             # 2. Hard fallback to base module if not found
             if map_path is None:
                 map_path = config.project_root / "modules" / "base" / "data" / "regions" / "regions.png"
-                
+
             terrain_path = config.get_asset_path("map/terrain.png")
 
             self.window.shared_renderer = MapRenderer(
@@ -67,12 +67,12 @@ class MainMenuView(BaseImGuiView):
                 terrain_img_path=terrain_path
             )
         else:
-            # SYNC: Just grab the existing controller. 
+            # SYNC: Just grab the existing controller.
             # DO NOT reset distance or pitch here, so it persists from other screens.
             self.cam_ctrl = self.window.shared_renderer.camera
 
         self.renderer = self.window.shared_renderer
-        
+
         # We still toggle the visual style (Terrain only for main menu)
         self.renderer.set_overlay_style(enabled=False, opacity=0.0)
 
@@ -93,8 +93,8 @@ class MainMenuView(BaseImGuiView):
         ctx = self.window.ctx
         ctx.scissor = None
         ctx.viewport = (0, 0, self.window.width, self.window.height)
-        ctx.enable_only((ctx.DEPTH_TEST, ctx.BLEND)) 
-        
+        ctx.enable_only((ctx.DEPTH_TEST, ctx.BLEND))
+
         self.renderer.draw()
 
         self._render_menu_window()
@@ -102,8 +102,9 @@ class MainMenuView(BaseImGuiView):
 
     def _render_menu_window(self):
         screen_w, screen_h = self.window.get_size()
-        
-        if self.ui.begin_centered_panel("Main Menu", screen_w, screen_h, w=350, h=450):
+        panel_w, panel_h = (470, 500) if self._show_settings else (350, 450)
+
+        if self.ui.begin_centered_panel("Main Menu", screen_w, screen_h, w=panel_w, h=panel_h):
             if self._show_settings:
                 self._render_settings_menu()
             else:

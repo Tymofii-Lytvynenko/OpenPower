@@ -223,14 +223,13 @@ class ViewportController:
             state = self.net.get_state()
             if "regions" in state.tables:
                 df = state.tables["regions"]
-                # Find owner of clicked region
-                owner_rows = df.filter(pl.col("id") == region_id)
-                if not owner_rows.is_empty():
-                    owner = owner_rows["owner"][0]
-                    if owner and owner != "None":
-                        selected_owner = owner
-                        # Get ALL regions by this owner for multi-select
-                        highlight_ids = df.filter(pl.col("owner") == owner)["id"].to_list()
+                authority_col = "controller" if "controller" in df.columns else "owner"
+                authority_rows = df.filter(pl.col("id") == region_id)
+                if not authority_rows.is_empty():
+                    authority = authority_rows[authority_col][0]
+                    if authority and authority != "None":
+                        selected_owner = authority
+                        highlight_ids = df.filter(pl.col(authority_col) == authority)["id"].to_list()
 
         self.selected_country_tag = selected_owner
         self._sync_empire_focus()
@@ -253,3 +252,5 @@ class ViewportController:
         mode = self.map_modes.get("empire")
         if hasattr(mode, "set_selected_country"):
             mode.set_selected_country(self.selected_country_tag)
+
+

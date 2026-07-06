@@ -162,12 +162,29 @@ class SystemBar:
         return 42.0 + (8.0 * max(0, len(str(action.badge)) - 1))
 
     def _show_load(self, nav_service, net_client) -> None:
-        if hasattr(net_client, "session"):
-            nav_service.show_load_game_screen(net_client.session.config)
+        session, config = self._resolve_session_and_config(nav_service, net_client)
+        if session is None or config is None:
+            return
+
+        nav_service.show_load_game_screen(config)
 
     def _show_menu(self, nav_service, net_client) -> None:
-        if hasattr(net_client, "session"):
-            nav_service.show_main_menu(net_client.session, net_client.session.config)
+        session, config = self._resolve_session_and_config(nav_service, net_client)
+        if session is None or config is None:
+            return
+
+        nav_service.show_main_menu(session, config)
+
+    def _resolve_session_and_config(self, nav_service, net_client):
+        # The live GameConfig belongs to the window, not the client session
+        # proxy. Resolving it here keeps menu navigation aligned with startup
+        # configuration and avoids dereferencing a missing session field.
+        session = getattr(net_client, "session", None)
+        window = getattr(nav_service, "window", None)
+        config = getattr(window, "game_config", None)
+        if session is None or config is None:
+            return None, None
+        return session, config
 
     def _safe_call(self, callback) -> None:
         if callback is not None:

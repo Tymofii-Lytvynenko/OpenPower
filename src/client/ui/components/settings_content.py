@@ -36,6 +36,50 @@ class GameSettingsContent:
         imgui.same_line()
         imgui.text_colored(GAMETHEME.colors.accent, current_icon)
 
+        imgui.dummy((0, 6))
+        self._render_windowed_resolution_row()
+        imgui.dummy((0, 4))
+        self._render_fullscreen_screen_row()
+        imgui.dummy((0, 4))
+        self._render_fullscreen_mode_row()
+
+    def _render_windowed_resolution_row(self) -> None:
+        settings = self._settings_service.settings
+        imgui.set_next_item_width(min(220.0, imgui.get_content_region_avail().x))
+        changed, values = imgui.input_int2(
+            "Windowed resolution",
+            [settings.windowed_width, settings.windowed_height],
+        )
+        if changed and len(values) == 2:
+            self._settings_service.set_windowed_resolution(values[0], values[1], self._window)
+
+    def _render_fullscreen_screen_row(self) -> None:
+        screens = self._settings_service.fullscreen_screen_options()
+        if not screens:
+            imgui.text_disabled("Fullscreen displays are unavailable.")
+            return
+
+        screen_labels = [screen.label for screen in screens]
+        selected_index = self._settings_service.selected_fullscreen_screen_index
+        imgui.set_next_item_width(min(260.0, imgui.get_content_region_avail().x))
+        changed, selected_index = imgui.combo("Fullscreen display", selected_index, screen_labels)
+        if changed:
+            self._settings_service.set_fullscreen_screen_index(selected_index, self._window)
+
+    def _render_fullscreen_mode_row(self) -> None:
+        screen_index = self._settings_service.selected_fullscreen_screen_index
+        modes = self._settings_service.fullscreen_mode_options(screen_index)
+        if not modes:
+            imgui.text_disabled("Fullscreen modes are unavailable for the selected display.")
+            return
+
+        mode_labels = [mode.label for mode in modes]
+        selected_index = self._settings_service.selected_fullscreen_mode_index(screen_index)
+        imgui.set_next_item_width(min(260.0, imgui.get_content_region_avail().x))
+        changed, selected_index = imgui.combo("Fullscreen mode", selected_index, mode_labels)
+        if changed:
+            self._settings_service.set_fullscreen_mode_by_index(selected_index, self._window)
+
     def _render_language_section(self) -> None:
         Prims.header("LOCALIZATION")
 

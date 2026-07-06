@@ -1,7 +1,9 @@
 from typing import Dict, Tuple
-from src.shared.state import GameState
-from src.client.visualization.map_modes.base_map_mode import BaseMapMode
+
 from src.client.utils.color_generator import generate_political_colors
+from src.client.visualization.map_modes.base_map_mode import BaseMapMode
+from src.shared.state import GameState
+
 
 class PoliticalMapMode(BaseMapMode):
     @property
@@ -13,28 +15,25 @@ class PoliticalMapMode(BaseMapMode):
             return {}
 
         df = state.get_table("regions")
-        if "owner" not in df.columns:
+        authority_col = self._authority_column(df)
+        if authority_col is None:
             return {}
 
-        # 1. Get unique owners to generate consistent palette
-        unique_owners = df["owner"].unique().to_list()
-
-        # 2. Generate Palette: {CountryTag: RGB}
+        unique_owners = df[authority_col].unique().to_list()
         palette = generate_political_colors(unique_owners)
-
-        # 3. Map Regions to Colors
-        # Using Polars to map implies creating a join, but for simplicity/speed
-        # with dictionaries in Python:
-
-        # Pull only necessary columns
-        rows = df.select(["id", "owner"]).to_dicts()
+        rows = df.select(["id", authority_col]).to_dicts()
 
         result = {}
         for row in rows:
             rid = row["id"]
-            owner = row["owner"]
-            # Default to dark grey for unowned/None
-            color = palette.get(owner, (50, 50, 50))
-            result[rid] = color
+            authority_tag = row[authority_col]
+            result[rid] = palette.get(authority_tag, (50, 50, 50))
 
         return result
+
+    def _authority_column(self, df):
+        if "controller" in df.columns:
+            return "controller"
+        if "owner" in df.columns:
+            return "owner"
+        return None
