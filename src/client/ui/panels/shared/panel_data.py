@@ -4,6 +4,7 @@ from typing import Any, Iterable
 
 import polars as pl
 
+from src.shared.geo_names import DEFAULT_GEO_LANGUAGE_CODE, get_geo_name_resolver, normalize_geo_language_code
 
 def safe_float(value: Any, default: float = 0.0) -> float:
     if value is None:
@@ -30,6 +31,15 @@ def safe_text(value: Any, default: str = "") -> str:
     return text or default
 
 
+def _geo_language_code(state) -> str:
+    state_globals = getattr(state, "globals", None)
+    if isinstance(state_globals, dict):
+        return normalize_geo_language_code(
+            safe_text(state_globals.get("geo_language_code"), DEFAULT_GEO_LANGUAGE_CODE)
+        )
+    return DEFAULT_GEO_LANGUAGE_CODE
+
+
 def as_ratio(value: Any, default: float = 0.0) -> float:
     ratio = safe_float(value, default)
     if ratio > 1.0:
@@ -54,7 +64,12 @@ def get_country_row(state, country_tag: str) -> dict[str, Any]:
 
 def resolve_country_name(state, owner_tag: str) -> str:
     owner_tag = safe_text(owner_tag, "Unknown")
-    countries = state.tables.get("countries")
+    resolver = get_geo_name_resolver(_geo_language_code(state))
+    translated = resolver.country_name(owner_tag)
+    if translated:
+        return translated
+
+    countries = getattr(state, "tables", {}).get("countries")
     if countries is None or countries.is_empty() or "id" not in countries.columns:
         return owner_tag
 
@@ -70,16 +85,26 @@ def resolve_region_name(state, region_id: int) -> str:
     if region_id <= 0:
         return "Unknown"
 
-    regions = state.tables.get("regions")
+    regions = getattr(state, "tables", {}).get("regions")
+    fallback = f"Region {region_id}"
     if regions is None or regions.is_empty() or "id" not in regions.columns:
-        return f"Region {region_id}"
+        return fallback
 
-    if "name" in regions.columns:
-        match = regions.filter(pl.col("id") == region_id).select("name")
-        if not match.is_empty():
-            return safe_text(match.item(0, 0), f"Region {region_id}")
+    region_rows = regions.filter(pl.col("id") == region_id)
+    if region_rows.is_empty():
+        return fallback
 
-    return f"Region {region_id}"
+    region_row = region_rows.to_dicts()[0]
+    resolver = get_geo_name_resolver(_geo_language_code(state))
+    iso_region = safe_text(region_row.get("iso_region"), "")
+    translated = resolver.region_name(iso_region, fallback=None)
+    if translated:
+        return translated
+
+    if "name" in region_row:
+        return safe_text(region_row.get("name"), fallback)
+
+    return fallback
 
 
 def normalize_side(value: Any) -> tuple[str, ...]:

@@ -14,7 +14,11 @@ from src.client.services.display_modes import (
     choose_best_mode,
     clamp_index,
 )
-
+from src.shared.geo_names import (
+    DEFAULT_GEO_LANGUAGE_CODE,
+    GEO_LANGUAGE_CHOICES,
+    normalize_geo_language_code,
+)
 
 @dataclass(frozen=True, slots=True)
 class LanguageOption:
@@ -27,6 +31,7 @@ class LanguageOption:
 class GameSettings:
     fullscreen: bool = False
     language_code: str = "en"
+    geo_language_code: str = DEFAULT_GEO_LANGUAGE_CODE
     windowed_width: int = 1280
     windowed_height: int = 720
     fullscreen_screen_index: int = 0
@@ -54,6 +59,7 @@ class GameSettingsRepository:
         return GameSettings(
             fullscreen=self._read_bool(payload, "fullscreen", False),
             language_code=self._read_str(payload, "language_code", "en"),
+            geo_language_code=self._read_str(payload, "geo_language_code", DEFAULT_GEO_LANGUAGE_CODE),
             windowed_width=self._read_int(payload, "windowed_width", 1280, minimum=800),
             windowed_height=self._read_int(payload, "windowed_height", 720, minimum=600),
             fullscreen_screen_index=self._read_int(
@@ -107,6 +113,10 @@ class GameSettingsService:
         LanguageOption("en", "English", is_stub=False),
         LanguageOption("uk", "Ukrainian (stub)"),
     )
+    GEO_LANGUAGE_OPTIONS = tuple(
+        LanguageOption(code, label, is_stub=False)
+        for code, label in GEO_LANGUAGE_CHOICES
+    )
 
     def __init__(
         self,
@@ -137,6 +147,10 @@ class GameSettingsService:
     def language_options(self) -> tuple[LanguageOption, ...]:
         return self.LANGUAGE_OPTIONS
 
+    @property
+    def geo_language_options(self) -> tuple[LanguageOption, ...]:
+        return self.GEO_LANGUAGE_OPTIONS
+
     def fullscreen_screen_options(self) -> tuple[DisplayScreenOption, ...]:
         # Display enumeration can be expensive on some systems, and the
         # settings UI queries it every frame while open. Cache the catalog so
@@ -163,6 +177,17 @@ class GameSettingsService:
     @property
     def selected_language(self) -> LanguageOption:
         return self.LANGUAGE_OPTIONS[self.selected_language_index]
+
+    @property
+    def selected_geo_language_index(self) -> int:
+        for index, option in enumerate(self.GEO_LANGUAGE_OPTIONS):
+            if option.code == self._settings.geo_language_code:
+                return index
+        return 0
+
+    @property
+    def selected_geo_language(self) -> LanguageOption:
+        return self.GEO_LANGUAGE_OPTIONS[self.selected_geo_language_index]
 
     @property
     def selected_fullscreen_screen_index(self) -> int:
@@ -192,6 +217,18 @@ class GameSettingsService:
             return
 
         self._settings = replace(self._settings, language_code=option.code)
+        self._save()
+
+    def set_geo_language_by_index(self, index: int) -> None:
+        if not 0 <= index < len(self.GEO_LANGUAGE_OPTIONS):
+            return
+
+        option = self.GEO_LANGUAGE_OPTIONS[index]
+        normalized_code = normalize_geo_language_code(option.code)
+        if normalized_code == self._settings.geo_language_code:
+            return
+
+        self._settings = replace(self._settings, geo_language_code=normalized_code)
         self._save()
 
     def set_windowed_resolution(self, width: int, height: int, window=None) -> None:
@@ -276,7 +313,7 @@ class GameSettingsService:
         height = self._settings.windowed_height
 
         if getattr(window, "fullscreen", False):
-            window.set_fullscreen(False, width=float(width), height=float(height))
+            window.set_fullscreen(False, width=width, height=height)
         else:
             current_size = tuple(window.get_size()) if hasattr(window, "get_size") else None
             if current_size != (width, height) and hasattr(window, "set_size"):
@@ -298,6 +335,7 @@ class GameSettingsService:
 
     def _normalize(self, settings: GameSettings) -> GameSettings:
         settings = self._normalize_language(settings)
+        settings = self._normalize_geo_language(settings)
         settings = self._with_windowed_resolution(settings, settings.windowed_width, settings.windowed_height)
         return self._normalize_fullscreen_preferences(settings)
 
@@ -306,6 +344,12 @@ class GameSettingsService:
         if settings.language_code in known_codes:
             return settings
         return replace(settings, language_code="en")
+
+    def _normalize_geo_language(self, settings: GameSettings) -> GameSettings:
+        normalized_code = normalize_geo_language_code(settings.geo_language_code)
+        if normalized_code == settings.geo_language_code:
+            return settings
+        return replace(settings, geo_language_code=normalized_code)
 
     def _normalize_fullscreen_preferences(self, settings: GameSettings) -> GameSettings:
         screens = self.fullscreen_screen_options()

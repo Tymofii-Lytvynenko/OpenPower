@@ -137,22 +137,73 @@ class DummySettingsService:
         screen_index: int = 1,
         mode_index: int = 0,
         language_index: int = 1,
+        geo_language_index: int = 1,
     ):
-        self.settings = GameSettings(
-            fullscreen=fullscreen,
-            language_code=("en", "uk")[language_index],
-            windowed_width=windowed_width,
-            windowed_height=windowed_height,
-            fullscreen_screen_index=screen_index,
-            fullscreen_mode_width=build_catalog()[screen_index].modes[mode_index].width,
-            fullscreen_mode_height=build_catalog()[screen_index].modes[mode_index].height,
-            fullscreen_mode_rate=build_catalog()[screen_index].modes[mode_index].rate,
-        )
         self._screens = build_catalog()
         self._screen_index = screen_index
         self._mode_index = mode_index
         self._language_index = language_index
+        self._geo_language_index = geo_language_index
         self.calls: list[tuple] = []
+        self.settings = self._build_settings(
+            fullscreen=fullscreen,
+            windowed_width=windowed_width,
+            windowed_height=windowed_height,
+            screen_index=screen_index,
+            mode_index=mode_index,
+            language_index=language_index,
+            geo_language_index=geo_language_index,
+        )
+
+    def _build_settings(
+        self,
+        *,
+        fullscreen: bool,
+        windowed_width: int,
+        windowed_height: int,
+        screen_index: int,
+        mode_index: int,
+        language_index: int,
+        geo_language_index: int,
+    ) -> GameSettings:
+        selected_mode = self._screens[screen_index].modes[mode_index]
+        return GameSettings(
+            fullscreen=fullscreen,
+            language_code=self.language_options[language_index].code,
+            geo_language_code=self.geo_language_options[geo_language_index].code,
+            windowed_width=windowed_width,
+            windowed_height=windowed_height,
+            fullscreen_screen_index=screen_index,
+            fullscreen_mode_width=selected_mode.width,
+            fullscreen_mode_height=selected_mode.height,
+            fullscreen_mode_rate=selected_mode.rate,
+        )
+
+    def _clone_settings(self, **overrides) -> GameSettings:
+        base = self.settings
+        return GameSettings(
+            fullscreen=overrides.get("fullscreen", base.fullscreen),
+            language_code=overrides.get("language_code", base.language_code),
+            geo_language_code=overrides.get("geo_language_code", base.geo_language_code),
+            windowed_width=overrides.get("windowed_width", base.windowed_width),
+            windowed_height=overrides.get("windowed_height", base.windowed_height),
+            fullscreen_screen_index=overrides.get(
+                "fullscreen_screen_index",
+                base.fullscreen_screen_index,
+            ),
+            fullscreen_mode_width=overrides.get(
+                "fullscreen_mode_width",
+                base.fullscreen_mode_width,
+            ),
+            fullscreen_mode_height=overrides.get(
+                "fullscreen_mode_height",
+                base.fullscreen_mode_height,
+            ),
+            fullscreen_mode_rate=overrides.get(
+                "fullscreen_mode_rate",
+                base.fullscreen_mode_rate,
+            ),
+        )
 
     @property
     def language_options(self) -> tuple[LanguageOption, ...]:
@@ -162,12 +213,28 @@ class DummySettingsService:
         )
 
     @property
+    def geo_language_options(self) -> tuple[LanguageOption, ...]:
+        return (
+            LanguageOption("en", "English", is_stub=False),
+            LanguageOption("uk", "Ukrainian", is_stub=False),
+            LanguageOption("de", "German", is_stub=False),
+        )
+
+    @property
     def selected_language_index(self) -> int:
         return self._language_index
 
     @property
+    def selected_geo_language_index(self) -> int:
+        return self._geo_language_index
+
+    @property
     def selected_language(self) -> LanguageOption:
         return self.language_options[self._language_index]
+
+    @property
+    def selected_geo_language(self) -> LanguageOption:
+        return self.geo_language_options[self._geo_language_index]
 
     def fullscreen_screen_options(self) -> tuple[DisplayScreenOption, ...]:
         return self._screens
@@ -185,39 +252,17 @@ class DummySettingsService:
 
     def set_fullscreen(self, enabled: bool, window=None) -> None:
         self.calls.append(("fullscreen", enabled, window))
-        self.settings = GameSettings(
-            fullscreen=enabled,
-            language_code=self.settings.language_code,
-            windowed_width=self.settings.windowed_width,
-            windowed_height=self.settings.windowed_height,
-            fullscreen_screen_index=self.settings.fullscreen_screen_index,
-            fullscreen_mode_width=self.settings.fullscreen_mode_width,
-            fullscreen_mode_height=self.settings.fullscreen_mode_height,
-            fullscreen_mode_rate=self.settings.fullscreen_mode_rate,
-        )
+        self.settings = self._clone_settings(fullscreen=enabled)
 
     def set_windowed_resolution(self, width: int, height: int, window=None) -> None:
         self.calls.append(("windowed", width, height, window))
-        self.settings = GameSettings(
-            fullscreen=self.settings.fullscreen,
-            language_code=self.settings.language_code,
-            windowed_width=width,
-            windowed_height=height,
-            fullscreen_screen_index=self.settings.fullscreen_screen_index,
-            fullscreen_mode_width=self.settings.fullscreen_mode_width,
-            fullscreen_mode_height=self.settings.fullscreen_mode_height,
-            fullscreen_mode_rate=self.settings.fullscreen_mode_rate,
-        )
+        self.settings = self._clone_settings(windowed_width=width, windowed_height=height)
 
     def set_fullscreen_screen_index(self, index: int, window=None) -> None:
         self.calls.append(("screen", index, window))
         self._screen_index = index
         selected = self.fullscreen_mode_options(index)[self._mode_index]
-        self.settings = GameSettings(
-            fullscreen=self.settings.fullscreen,
-            language_code=self.settings.language_code,
-            windowed_width=self.settings.windowed_width,
-            windowed_height=self.settings.windowed_height,
+        self.settings = self._clone_settings(
             fullscreen_screen_index=index,
             fullscreen_mode_width=selected.width,
             fullscreen_mode_height=selected.height,
@@ -228,12 +273,7 @@ class DummySettingsService:
         self.calls.append(("mode", index, window))
         self._mode_index = index
         selected = self.fullscreen_mode_options()[index]
-        self.settings = GameSettings(
-            fullscreen=self.settings.fullscreen,
-            language_code=self.settings.language_code,
-            windowed_width=self.settings.windowed_width,
-            windowed_height=self.settings.windowed_height,
-            fullscreen_screen_index=self._screen_index,
+        self.settings = self._clone_settings(
             fullscreen_mode_width=selected.width,
             fullscreen_mode_height=selected.height,
             fullscreen_mode_rate=selected.rate,
@@ -242,17 +282,12 @@ class DummySettingsService:
     def set_language_by_index(self, index: int) -> None:
         self.calls.append(("language", index))
         self._language_index = index
-        self.settings = GameSettings(
-            fullscreen=self.settings.fullscreen,
-            language_code=self.language_options[index].code,
-            windowed_width=self.settings.windowed_width,
-            windowed_height=self.settings.windowed_height,
-            fullscreen_screen_index=self.settings.fullscreen_screen_index,
-            fullscreen_mode_width=self.settings.fullscreen_mode_width,
-            fullscreen_mode_height=self.settings.fullscreen_mode_height,
-            fullscreen_mode_rate=self.settings.fullscreen_mode_rate,
-        )
+        self.settings = self._clone_settings(language_code=self.language_options[index].code)
 
+    def set_geo_language_by_index(self, index: int) -> None:
+        self.calls.append(("geo_language", index))
+        self._geo_language_index = index
+        self.settings = self._clone_settings(geo_language_code=self.geo_language_options[index].code)
 
 class TestGameSettingsRepositoryCompatibility(unittest.TestCase):
     def setUp(self):
@@ -286,6 +321,7 @@ class TestGameSettingsRepositoryCompatibility(unittest.TestCase):
         self.assertEqual(settings.fullscreen_mode_width, 1280)
         self.assertEqual(settings.fullscreen_mode_height, 720)
         self.assertEqual(settings.fullscreen_mode_rate, 60)
+        self.assertEqual(settings.geo_language_code, "en")
 
         repo.save(settings)
         saved_payload = json.loads(path.read_text(encoding="utf-8"))
@@ -293,6 +329,7 @@ class TestGameSettingsRepositoryCompatibility(unittest.TestCase):
         self.assertIn("fullscreen_mode_width", saved_payload)
         self.assertIn("fullscreen_mode_height", saved_payload)
         self.assertIn("fullscreen_mode_rate", saved_payload)
+        self.assertIn("geo_language_code", saved_payload)
 
     def test_handles_malformed_json_and_missing_fields(self):
         path = self.temp_root / "settings.json"
@@ -313,6 +350,7 @@ class TestGameSettingsRepositoryCompatibility(unittest.TestCase):
                     "fullscreen_mode_rate": 0,
                     "windowed_width": 320,
                     "windowed_height": 240,
+                    "geo_language_code": "zz",
                 }
             ),
             encoding="utf-8",
@@ -324,6 +362,7 @@ class TestGameSettingsRepositoryCompatibility(unittest.TestCase):
         self.assertEqual(settings.fullscreen_mode_width, 640)
         self.assertEqual(settings.fullscreen_mode_height, 480)
         self.assertEqual(settings.fullscreen_mode_rate, 1)
+        self.assertEqual(settings.geo_language_code, "zz")
         self.assertEqual(settings.windowed_width, 800)
         self.assertEqual(settings.windowed_height, 600)
 
@@ -463,6 +502,27 @@ class TestGameSettingsServiceDisplayFlow(unittest.TestCase):
         self.assertEqual(window.get_size(), (1600, 900))
         self.assertEqual(window.set_fullscreen_calls[-1]["fullscreen"], False)
 
+    def test_normalizes_invalid_geo_language_on_load(self):
+        repository = RecordingRepository(
+            GameSettings(
+                fullscreen=False,
+                language_code="en",
+                geo_language_code="zz",
+                windowed_width=1280,
+                windowed_height=720,
+                fullscreen_screen_index=0,
+                fullscreen_mode_width=1280,
+                fullscreen_mode_height=720,
+                fullscreen_mode_rate=60,
+            )
+        )
+
+        service = GameSettingsService(repository, self.catalog)
+
+        self.assertEqual(service.settings.geo_language_code, "en")
+        self.assertTrue(repository.saved_settings)
+        self.assertEqual(repository.saved_settings[-1].geo_language_code, "en")
+
     def test_noop_when_values_do_not_change(self):
         repository = RecordingRepository(
             GameSettings(
@@ -479,6 +539,7 @@ class TestGameSettingsServiceDisplayFlow(unittest.TestCase):
         service = GameSettingsService(repository, self.catalog)
 
         service.set_language_by_index(0)
+        service.set_geo_language_by_index(0)
         service.set_windowed_resolution(1280, 720)
         service.set_fullscreen(False)
         service.set_fullscreen_screen_index(0)
@@ -508,13 +569,15 @@ class TestGameSettingsContentWiring(unittest.TestCase):
 
         checkbox_mock = MagicMock(return_value=(False, False))
         input_int2_mock = MagicMock(return_value=(False, [1600, 900]))
-        combo_mock = MagicMock(side_effect=[(False, 1), (False, 0), (False, 1)])
+        combo_mock = MagicMock(side_effect=[(False, 1), (False, 0), (False, 1), (False, 1)])
 
         with patch.object(settings_content_module.Prims, "header", return_value=None), patch.multiple(
             settings_content_module.imgui,
             checkbox=checkbox_mock,
             input_int2=input_int2_mock,
             combo=combo_mock,
+            begin_child=MagicMock(return_value=True),
+            end_child=MagicMock(),
             dummy=MagicMock(),
             same_line=MagicMock(),
             text=MagicMock(),
@@ -530,6 +593,7 @@ class TestGameSettingsContentWiring(unittest.TestCase):
         self.assertEqual(combo_calls[0].args[1], 1)
         self.assertEqual(combo_calls[1].args[1], 0)
         self.assertEqual(combo_calls[2].args[1], 1)
+        self.assertEqual(combo_calls[3].args[1], 1)
         self.assertEqual(input_int2_mock.call_args.args[1], [1600, 900])
 
     def test_routes_display_and_language_changes_to_service(self):
@@ -547,7 +611,9 @@ class TestGameSettingsContentWiring(unittest.TestCase):
             settings_content_module.imgui,
             checkbox=MagicMock(return_value=(True, True)),
             input_int2=MagicMock(return_value=(True, [1920, 1080])),
-            combo=MagicMock(side_effect=[(True, 1), (True, 1), (True, 1)]),
+            combo=MagicMock(side_effect=[(True, 1), (True, 1), (True, 1), (True, 1)]),
+            begin_child=MagicMock(return_value=True),
+            end_child=MagicMock(),
             dummy=MagicMock(),
             same_line=MagicMock(),
             text=MagicMock(),
@@ -567,6 +633,7 @@ class TestGameSettingsContentWiring(unittest.TestCase):
                 ("screen", 1, self.window),
                 ("mode", 1, self.window),
                 ("language", 1),
+                ("geo_language", 1),
             ],
         )
 

@@ -32,6 +32,15 @@ class MainWindow(arcade.Window):
         self.session: Optional["ClientSessionProxy"] = None
         self.shared_renderer: Optional["MapRenderer"] = None
 
+    def _sync_geo_language_to_session(self) -> None:
+        session = self.session
+        if session is None or getattr(session, "state", None) is None:
+            return
+
+        globals_dict = getattr(session.state, "globals", None)
+        if isinstance(globals_dict, dict):
+            globals_dict["geo_language_code"] = self.settings.settings.geo_language_code
+
     def setup(self):
         self.boot_progress = 0.0
         self.boot_status = "Preparing client..."
@@ -61,6 +70,7 @@ class MainWindow(arcade.Window):
 
                     # Fetch initial state
                     self.session.tick(0)
+                    self._sync_geo_language_to_session()
                     self.nav.show_main_menu(self.session, self.game_config)
 
                 elif msg_type == "ERROR":
@@ -112,6 +122,7 @@ class MainWindow(arcade.Window):
         if self.session:
             # Grabs the latest IPC payload (Takes < 0.001 seconds!)
             self.session.tick(delta_time)
+            self._sync_geo_language_to_session()
 
     def on_close(self):
         if self.session:

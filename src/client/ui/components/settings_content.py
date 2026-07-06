@@ -13,9 +13,13 @@ class GameSettingsContent:
         self._window = window
 
     def render(self) -> None:
-        self._render_display_section()
-        imgui.dummy((0, 8))
-        self._render_language_section()
+        imgui.begin_child("SettingsScroll", (0, 0), False)
+        try:
+            self._render_display_section()
+            imgui.dummy((0, 8))
+            self._render_language_section()
+        finally:
+            imgui.end_child()
 
     def _render_display_section(self) -> None:
         Prims.header("DISPLAY")
@@ -100,3 +104,28 @@ class GameSettingsContent:
         if selected.is_stub:
             imgui.same_line()
             imgui.text_disabled("STUB")
+
+        imgui.dummy((0, 4))
+        imgui.align_text_to_frame_padding()
+        imgui.text("Geo names")
+        imgui.same_line()
+        geo_combo_width = max(110.0, min(220.0, imgui.get_content_region_avail().x - 68.0))
+        imgui.set_next_item_width(geo_combo_width)
+
+        geo_options = self._settings_service.geo_language_options
+        geo_labels = [option.label for option in geo_options]
+        selected_geo_index = self._settings_service.selected_geo_language_index
+        changed, selected_geo_index = imgui.combo("##GeoLanguage", selected_geo_index, geo_labels)
+        if changed:
+            self._settings_service.set_geo_language_by_index(selected_geo_index)
+            self._sync_geo_language_runtime()
+
+    def _sync_geo_language_runtime(self) -> None:
+        session = getattr(self._window, "session", None)
+        state = getattr(session, "state", None)
+        if state is None:
+            return
+
+        globals_dict = getattr(state, "globals", None)
+        if isinstance(globals_dict, dict):
+            globals_dict["geo_language_code"] = self._settings_service.settings.geo_language_code

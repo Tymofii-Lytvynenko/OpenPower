@@ -27,6 +27,7 @@ dependencies = [
     "PyOpenGL",
     "imgui-bundle",
     "polars==1.36.1",
+    "pycountry",
     "numpy",
     "opencv-python",
     "rtoml",
