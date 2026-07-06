@@ -2,11 +2,11 @@ import io
 import polars as pl
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import Any, Dict, List
 
-if TYPE_CHECKING:
-    from src.shared.actions import GameAction
-    from src.shared.events import GameEvent
+from src.shared.actions import GameAction
+from src.shared.events import GameEvent
+
 
 # The fixed epoch from which all in-game dates are calculated.
 # All systems derive the current date by adding 'total_minutes' to this constant.
