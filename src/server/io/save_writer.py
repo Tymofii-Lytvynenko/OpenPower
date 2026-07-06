@@ -11,6 +11,9 @@ from src.shared.config import GameConfig
 from src.shared.state import GameState
 from src.core.saves import list_available_saves
 
+TRANSIENT_STATE_FIELDS = {"events", "current_actions"}
+
+
 class SaveWriter:
     """
     Manages the persistence of GameState to disk.
@@ -78,6 +81,9 @@ class SaveWriter:
 
         for field in dataclasses.fields(state):
             key = field.name
+            if key in TRANSIENT_STATE_FIELDS:
+                continue
+
             value = getattr(state, key)
 
             # Strategy A: Polars DataFrames -> Parquet

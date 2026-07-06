@@ -28,6 +28,7 @@ class GameSession:
         engine: Engine,
         map_data: RegionMapData | None,
         initial_state: 'GameState',
+        player_tag: str | None = None,
     ):
         self.config = config
         self.root_dir = config.project_root
@@ -40,6 +41,9 @@ class GameSession:
 
         # Game Data
         self.state = initial_state
+        if player_tag:
+            self.state.globals["player_tag"] = player_tag
+        self.player_tag = self.state.globals.get("player_tag")
         ensure_ui_support_tables(self.state)
         self.action_queue: List[GameAction] = []
 
@@ -52,6 +56,7 @@ class GameSession:
         progress_cb: Optional[Callable[[float, str], None]] = None,
         save_name: Optional[str] = None,
         load_map_data: bool = True,
+        player_tag: str | None = None,
     ) -> 'GameSession':
         """
         Factory Method: Orchestrates the full startup sequence for a Local Game.
@@ -92,7 +97,7 @@ class GameSession:
 
             # --- Step 6: Final Assembly (100%) ---
             report(1.0, "Server: Ready.")
-            return cls(config, loader, exporter, engine, map_data, initial_state)
+            return cls(config, loader, exporter, engine, map_data, initial_state, player_tag=player_tag)
 
         except Exception as exc:
             print(f"[GameSession] Critical Startup Error: {exc}")
@@ -104,6 +109,7 @@ class GameSession:
         config: GameConfig,
         progress_cb: Optional[Callable[[float, str], None]] = None,
         save_name: Optional[str] = None,
+        player_tag: str | None = None,
     ) -> 'GameSession':
         """
         Boots a simulation session without loading client-side map raster data.
@@ -116,6 +122,7 @@ class GameSession:
             progress_cb=progress_cb,
             save_name=save_name,
             load_map_data=False,
+            player_tag=player_tag,
         )
 
     @staticmethod

@@ -109,6 +109,7 @@ class GameState:
             "tables": ipc_tables,
             "time": self.time,
             "globals": self.globals,
+            "events": self.events,
         }
 
     @classmethod
@@ -123,4 +124,5 @@ class GameState:
 
         state.time = data["time"]
         state.globals = data["globals"]
+        state.events = data.get("events", [])
         return state

@@ -32,6 +32,7 @@ def _resolve_map_path(config: GameConfig):
 def spawn_local_server(
     config: GameConfig,
     save_name: Optional[str] = None,
+    player_tag: Optional[str] = None,
 ) -> ServerProcessBundle:
     """
     Spawns a background simulation process and returns a bundle with IPC channels.
@@ -47,6 +48,7 @@ def spawn_local_server(
     process = mp.Process(
         target=run_server_process,
         args=(str(config.project_root), action_queue, state_queue, progress_queue, save_name),
+        kwargs={"player_tag": player_tag},
         daemon=True,  # Ensures process dies if the window is closed abruptly
     )
     process.start()

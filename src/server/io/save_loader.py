@@ -6,6 +6,9 @@ from typing import get_type_hints, Any
 from src.shared.state import GameState
 from src.shared.config import GameConfig
 
+TRANSIENT_STATE_FIELDS = {"events", "current_actions"}
+
+
 class SaveStateLoader:
     """
     Responsible strictly for reconstructing GameState from user save files (Parquet/JSON).
@@ -42,6 +45,9 @@ class SaveStateLoader:
 
         for field in dataclasses.fields(GameState):
             key = field.name
+            if key in TRANSIENT_STATE_FIELDS:
+                continue
+
             target_type = type_hints.get(key)
 
             # Strategy A: The 'tables' dictionary (Dynamic collection of DataFrames)

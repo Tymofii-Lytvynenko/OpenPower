@@ -34,7 +34,7 @@ class NewGameTask:
         self.progress = 0.1
         from src.server.launcher import spawn_local_server
         from src.client.client_session import ClientSessionProxy
-        bundle = spawn_local_server(self.config, save_name=None)
+        bundle = spawn_local_server(self.config, save_name=None, player_tag=self.player_tag)
         new_session = ClientSessionProxy(
             map_data=bundle.map_data,
             action_queue=bundle.action_queue,

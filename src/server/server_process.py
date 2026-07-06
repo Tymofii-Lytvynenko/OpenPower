@@ -23,6 +23,7 @@ def run_server_process(
     progress_queue: mp.Queue,
     save_name: Optional[str] = None,
     shutdown_event: Optional[mp.Event] = None,
+    player_tag: Optional[str] = None,
 ):
     """
     The infinite loop that lives on a separate CPU core.
@@ -38,7 +39,12 @@ def run_server_process(
 
     try:
         # Load heavy data without touching client-side graphics state.
-        session = GameSession.create_headless(config, progress_cb=progress_cb, save_name=save_name)
+        session = GameSession.create_headless(
+            config,
+            progress_cb=progress_cb,
+            save_name=save_name,
+            player_tag=player_tag,
+        )
         progress_queue.put(("READY", 1.0, "Engine Started"))
     except Exception as e:
         progress_queue.put(("ERROR", 0.0, str(e)))

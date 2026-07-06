@@ -10,6 +10,8 @@ from PIL import Image
 from src.shared.config import GameConfig
 from src.shared.state import GameState
 
+TRANSIENT_STATE_FIELDS = {"events", "current_actions"}
+
 
 class DataLoader:
     """
@@ -49,6 +51,9 @@ class DataLoader:
 
         for field in dataclasses.fields(GameState):
             key = field.name
+            if key in TRANSIENT_STATE_FIELDS:
+                continue
+
             target_type = type_hints.get(key)
 
             if key == "tables":
