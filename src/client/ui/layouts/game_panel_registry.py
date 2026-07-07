@@ -5,6 +5,7 @@ from imgui_bundle import icons_fontawesome_6
 from src.client.ui.components.hud.panel_manager import PanelManager, PanelSpec
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.panels.budget_panel import BudgetPanel
+from src.client.ui.panels.country_more_info import CountryMoreInfoPanel
 from src.client.ui.panels.data_insp_panel import DataInspectorPanel
 from src.client.ui.panels.demographics_panel import DemographicsPanel
 from src.client.ui.panels.economic_health_panel import EconomicHealthPanel
@@ -189,6 +190,15 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             title="Inspector",
             category="tools",
             factory=RegionInspectorPanel,
+            show_in_toggle_bar=False,
+        ),
+        PanelSpec(
+            id="COUNTRY_MORE_INFO",
+            title="Country More Info",
+            category="tools",
+            factory=lambda: CountryMoreInfoPanel(
+                lambda: getattr(getattr(window, "session", None), "map_data", None)
+            ),
             show_in_toggle_bar=False,
         ),
         PanelSpec(

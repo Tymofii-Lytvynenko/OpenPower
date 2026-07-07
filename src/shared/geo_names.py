@@ -18,7 +18,6 @@ GEO_LANGUAGE_CHOICES: Final[tuple[tuple[str, str], ...]] = (
     ("pl", "Polish"),
     ("it", "Italian"),
     ("pt", "Portuguese"),
-    ("ru", "Russian"),
     ("tr", "Turkish"),
 )
 SUPPORTED_GEO_LANGUAGE_CODES: Final[tuple[str, ...]] = tuple(code for code, _ in GEO_LANGUAGE_CHOICES)

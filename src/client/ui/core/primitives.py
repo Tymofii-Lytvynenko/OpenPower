@@ -73,6 +73,58 @@ class UIPrimitives:
         imgui.dummy((0, height + 5))
 
     @staticmethod
+    def meter_row(
+        label: str,
+        value_pct: float,
+        color: tuple,
+        value_text: str | None = None,
+        label_width: float = 130.0,
+        height: float = 12.0,
+    ):
+        """Draws a compact label/bar/value row for dense info panels."""
+        imgui.text_disabled(label)
+        imgui.same_line(label_width)
+
+        value_text = value_text if value_text is not None else f"{value_pct:.1f} %"
+        value_width = imgui.calc_text_size(value_text).x
+        available_width = imgui.get_content_region_avail().x
+        bar_width = max(24.0, available_width - value_width - 8.0)
+
+        p = imgui.get_cursor_screen_pos()
+        draw_list = imgui.get_window_draw_list()
+        draw_list.add_rect_filled(
+            p,
+            (p.x + bar_width, p.y + height),
+            imgui.get_color_u32(GAMETHEME.colors.bg_input),
+            height / 2,
+        )
+
+        fraction = max(0.0, min(value_pct, 100.0)) / 100.0
+        if fraction > 0.01:
+            draw_list.add_rect_filled(
+                p,
+                (p.x + bar_width * fraction, p.y + height),
+                imgui.get_color_u32(color),
+                height / 2,
+            )
+
+        imgui.dummy((bar_width, height))
+        imgui.same_line()
+        imgui.text_colored(color, value_text)
+
+    @staticmethod
+    def value_row(
+        label: str,
+        value: str,
+        color: tuple | None = None,
+        label_width: float = 150.0,
+    ):
+        """Draws a compact left-label, right-value row."""
+        imgui.text_disabled(label)
+        imgui.same_line(label_width)
+        UIPrimitives.right_align_text(value, color or GAMETHEME.colors.text_main)
+
+    @staticmethod
     def currency_row(label: str, value: float, color: tuple | None = None):
         """Aligned row: Label ...... $Value."""
         imgui.text(label)
