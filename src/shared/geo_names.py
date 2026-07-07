@@ -73,7 +73,9 @@ class GeoNameResolver:
             return fallback
 
         subdivision = pycountry.subdivisions.get(code=iso_region.strip().upper())
-        if subdivision is None:
+        # pycountry's Subdivisions.get may return a list of subdivisions (e.g. if querying by country_code).
+        # We explicitly check for list to satisfy static type checkers that subdivision is a SubdivisionHierarchy object.
+        if subdivision is None or isinstance(subdivision, list):
             return fallback
 
         return self._region_translation.gettext(subdivision.name)
