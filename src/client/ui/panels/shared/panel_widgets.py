@@ -19,17 +19,7 @@ def draw_key_value_rows(rows: Iterable[tuple[str, str]], *, dim_labels: bool = T
 
 
 def draw_required_tables(state, required_tables: tuple[str, ...]) -> None:
-    if not required_tables:
-        return
-
-    Prims.header("DATA COVERAGE", show_bg=False)
-    for table_name in required_tables:
-        is_ready = table_name in state.tables and not state.tables[table_name].is_empty()
-        label = "READY" if is_ready else "EMPTY"
-        color = GAMETHEME.colors.positive if is_ready else GAMETHEME.colors.warning
-        imgui.text_disabled(table_name)
-        imgui.same_line()
-        Prims.right_align_text(label, color)
+    pass
 
 
 def draw_empty_state(message: str) -> None:

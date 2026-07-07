@@ -53,6 +53,10 @@ WAR_SCHEMA: dict[str, pl.DataType] = {
     "status": pl.Utf8,
     "casus_belli": pl.Utf8,
     "created_at": pl.Utf8,
+    "leader_a": pl.Utf8,
+    "leader_b": pl.Utf8,
+    "intent_a": pl.Utf8,
+    "intent_b": pl.Utf8,
 }
 
 RELATIONS_SCHEMA: dict[str, pl.DataType] = {
@@ -451,6 +455,10 @@ class DiplomacySystem(ISystem):
                     "status": "active",
                     "casus_belli": str(action.casus_belli or ""),
                     "created_at": self._timestamp(state),
+                    "leader_a": attacker,
+                    "leader_b": defender,
+                    "intent_a": "war",
+                    "intent_b": "war",
                 }
             ],
         )
@@ -500,34 +508,69 @@ class DiplomacySystem(ISystem):
         side_a = self._normalize_side(war.get("side_a"))
         side_b = self._normalize_side(war.get("side_b"))
         source = self._normalize_country_tag(action.source_country_tag)
-        if source not in side_a and source not in side_b:
+
+        leader_a = war.get("leader_a")
+        leader_b = war.get("leader_b")
+
+        # Only the two initial countries (leaders) can declare peace/war intentions
+        if source != leader_a and source != leader_b:
             return wars, relations, messages, news
 
-        wars = wars.filter(pl.col("id") != action.war_id)
-        for left in side_a:
-            for right in side_b:
-                relations = self._adjust_relation_pair(relations, left, right, 15.0)
+        # Intention is determined by action.terms ("peace" or "war")
+        new_intent = "war" if action.terms == "war" else "peace"
+        intent_col = "intent_a" if source == leader_a else "intent_b"
 
-        all_participants = sorted(side_a | side_b)
-        for country_id in all_participants:
-            messages = self._append_message(
-                state,
-                messages,
-                country_id=country_id,
-                category="war",
-                subject=f"Peace offer accepted for {action.war_id}",
-                body=action.terms or "Combat operations have been halted and the war entry was closed.",
-            )
-
-        news = self._append_news(
-            state,
-            news,
-            headline=f"Peace declared in {action.war_id}",
-            body=action.terms or "The active war record has been removed from the operations board.",
-            category="war",
-            related_country_id=source,
-            severity="info",
+        # Update the intention in the dataframe
+        wars = wars.with_columns(
+            pl.when(pl.col("id") == action.war_id)
+            .then(pl.lit(new_intent))
+            .otherwise(pl.col(intent_col))
+            .alias(intent_col)
         )
+
+        # Retrieve the updated row to check if BOTH leaders agree on peace
+        updated_match = wars.filter(pl.col("id") == action.war_id)
+        if not updated_match.is_empty():
+            updated_war = updated_match.to_dicts()[0]
+            if updated_war.get("intent_a") == "peace" and updated_war.get("intent_b") == "peace":
+                # BOTH AGREE -> END THE WAR FOR EVERYONE
+                wars = wars.filter(pl.col("id") != action.war_id)
+                for left in side_a:
+                    for right in side_b:
+                        relations = self._adjust_relation_pair(relations, left, right, 15.0)
+
+                all_participants = sorted(side_a | side_b)
+                for country_id in all_participants:
+                    messages = self._append_message(
+                        state,
+                        messages,
+                        country_id=country_id,
+                        category="war",
+                        subject=f"Peace treaty signed for {action.war_id}",
+                        body=f"Both {leader_a} and {leader_b} have agreed to cease hostilities. The war has ended.",
+                    )
+
+                news = self._append_news(
+                    state,
+                    news,
+                    headline=f"Peace treaty signed: {leader_a} & {leader_b}",
+                    body=f"Hostilities in {action.war_id} have ceased after mutual agreement.",
+                    category="war",
+                    related_country_id=source,
+                    severity="info",
+                )
+            else:
+                # Intentions updated, but war not ended yet. Send inbox messages to leaders.
+                opposing_leader = leader_b if source == leader_a else leader_a
+                messages = self._append_message(
+                    state,
+                    messages,
+                    country_id=opposing_leader,
+                    category="war",
+                    subject=f"Peace terms proposed in {action.war_id}",
+                    body=f"{source} has declared its intention: {new_intent.upper()}. It awaits your decision.",
+                )
+
         return wars, relations, messages, news
 
     def _normalize_treaties_table(self, df: pl.DataFrame | None) -> pl.DataFrame:
@@ -573,15 +616,25 @@ class DiplomacySystem(ISystem):
         rows = [] if df is None or df.is_empty() else df.to_dicts()
         normalized_rows = []
         for index, row in enumerate(rows, start=1):
+            raw_a = list(row.get("side_a") or [])
+            raw_b = list(row.get("side_b") or [])
+            
+            leader_a = str(row.get("leader_a") or (raw_a[0] if raw_a else "UNK"))
+            leader_b = str(row.get("leader_b") or (raw_b[0] if raw_b else "UNK"))
+            
             normalized_rows.append(
                 {
                     "id": str(row.get("id") or f"war-{index:03d}"),
                     "name": str(row.get("name") or row.get("id") or f"War {index}"),
-                    "side_a": sorted(self._normalize_side(row.get("side_a"))),
-                    "side_b": sorted(self._normalize_side(row.get("side_b"))),
+                    "side_a": sorted(self._normalize_side(raw_a)),
+                    "side_b": sorted(self._normalize_side(raw_b)),
                     "status": str(row.get("status") or "active"),
                     "casus_belli": str(row.get("casus_belli") or ""),
                     "created_at": str(row.get("created_at") or ""),
+                    "leader_a": leader_a,
+                    "leader_b": leader_b,
+                    "intent_a": str(row.get("intent_a") or "war"),
+                    "intent_b": str(row.get("intent_b") or "war"),
                 }
             )
         return self._frame_from_rows(WAR_SCHEMA, normalized_rows)

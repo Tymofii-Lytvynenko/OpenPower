@@ -149,6 +149,31 @@ class MilitaryPresenter:
             return cells.to_dicts()
         return cells.filter(pl.col("country_id") == country_tag).to_dicts()
 
+    def all_wars(self, state) -> list[dict]:
+        wars = state.tables.get("countries_wars")
+        if wars is None or wars.is_empty():
+            return []
+
+        rows: list[dict] = []
+        for index, row in enumerate(wars.to_dicts(), start=1):
+            side_a = normalize_side(row.get("side_a"))
+            side_b = normalize_side(row.get("side_b"))
+            rows.append(
+                {
+                    "id": safe_text(row.get("id"), f"war-{index:03d}"),
+                    "side_a": side_a,
+                    "side_b": side_b,
+                    "status": safe_text(row.get("status"), "Active"),
+                    "front": f"{format_side_names(state, side_a)} vs {format_side_names(state, side_b)}",
+                    "leader_a": safe_text(row.get("leader_a"), side_a[0] if side_a else "UNK"),
+                    "leader_b": safe_text(row.get("leader_b"), side_b[0] if side_b else "UNK"),
+                    "intent_a": safe_text(row.get("intent_a"), "war"),
+                    "intent_b": safe_text(row.get("intent_b"), "war"),
+                }
+            )
+
+        return rows
+
     def wars_for_country(self, state, country_tag: str) -> list[dict]:
         wars = state.tables.get("countries_wars")
         if wars is None or wars.is_empty():

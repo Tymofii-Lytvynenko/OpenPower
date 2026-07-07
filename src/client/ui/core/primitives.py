@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -248,3 +249,23 @@ class UIPrimitives:
                 imgui.get_color_u32(GAMETHEME.colors.text_main),
                 value_text,
             )
+
+    @staticmethod
+    @contextlib.contextmanager
+    def dark_child_box(id: str, width: float = -1.0, height: float = 0.0, border: bool = True):
+        imgui.push_style_color(imgui.Col_.child_bg, GAMETHEME.colors.panel_bg_dark)
+        imgui.push_style_var(imgui.StyleVar_.child_rounding, 0.0)
+        if imgui.begin_child(id, (width, height), border, imgui.WindowFlags_.none):
+            yield
+        imgui.end_child()
+        imgui.pop_style_var()
+        imgui.pop_style_color()
+
+    @staticmethod
+    def combo_row(label: str, selected_idx: int, items: list[str], label_width: float = 80.0) -> int:
+        imgui.align_text_to_frame_padding()
+        imgui.text_disabled(label)
+        imgui.same_line(label_width)
+        imgui.set_next_item_width(-1)
+        _, new_idx = imgui.combo(f"##{label}", selected_idx, items)
+        return new_idx

@@ -21,6 +21,7 @@ class UIColors:
     bg_child: tuple      = (0.00, 0.00, 0.00, 0.00) # Transparent (letting window bg show)
     bg_popup: tuple      = (0.05, 0.05, 0.05, 0.85)
     bg_input: tuple      = (0.16, 0.18, 0.21, 0.60) # Dark neutral for inputs
+    panel_bg_dark: tuple = (0.04, 0.04, 0.05, 0.90) # Very dark background for list boxes
 
     # --- 3. Main Accent (Used sparingly) ---
     # Desaturated Steel Blue - Professional, not neon.
