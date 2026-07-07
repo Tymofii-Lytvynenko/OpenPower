@@ -276,15 +276,25 @@ class CountryMoreInfoPanel:
             return True
 
     def _render_content(self, model: CountryMoreInfoModel) -> None:
-        imgui.columns(2, "country_more_info_columns", False)
-        imgui.set_column_width(0, 365.0)
+        table_flags = imgui.TableFlags_.sizing_stretch_prop | imgui.TableFlags_.borders_inner_v
+        if not imgui.begin_table("country_more_info_columns", 2, table_flags):
+            self._render_map_column(model)
+            imgui.separator()
+            self._render_stats_column(model)
+            return
 
-        self._render_map_column(model)
+        try:
+            imgui.table_setup_column("Map", imgui.TableColumnFlags_.width_fixed, 365.0)
+            imgui.table_setup_column("Stats", imgui.TableColumnFlags_.width_stretch)
+            imgui.table_next_row()
 
-        imgui.next_column()
-        self._render_stats_column(model)
+            imgui.table_next_column()
+            self._render_map_column(model)
 
-        imgui.columns(1)
+            imgui.table_next_column()
+            self._render_stats_column(model)
+        finally:
+            imgui.end_table()
 
     def _render_map_column(self, model: CountryMoreInfoModel) -> None:
         Prims.header("REGION MAP")
