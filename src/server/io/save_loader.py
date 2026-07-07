@@ -3,10 +3,8 @@ import polars as pl
 import orjson
 from pathlib import Path
 from typing import get_type_hints, Any
-from src.shared.state import GameState
+from src.shared.state import GameState, persistent_state_fields
 from src.shared.config import GameConfig
-
-TRANSIENT_STATE_FIELDS = {"events", "current_actions"}
 
 
 class SaveStateLoader:
@@ -43,11 +41,8 @@ class SaveStateLoader:
         constructor_args = {}
         type_hints = get_type_hints(GameState)
 
-        for field in dataclasses.fields(GameState):
+        for field in persistent_state_fields():
             key = field.name
-            if key in TRANSIENT_STATE_FIELDS:
-                continue
-
             target_type = type_hints.get(key)
 
             # Strategy A: The 'tables' dictionary (Dynamic collection of DataFrames)

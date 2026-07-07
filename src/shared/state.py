@@ -1,3 +1,4 @@
+import dataclasses
 import io
 import polars as pl
 from dataclasses import dataclass, field
@@ -11,6 +12,12 @@ from src.shared.events import GameEvent
 # The fixed epoch from which all in-game dates are calculated.
 # All systems derive the current date by adding 'total_minutes' to this constant.
 GAME_EPOCH = datetime(2001, 1, 1, 0, 0)
+
+PERSISTENCE_METADATA_KEY = "persistence"
+PERSISTENCE_PERSISTENT = "persistent"
+PERSISTENCE_TRANSIENT = "transient"
+VALID_PERSISTENCE_POLICIES = frozenset({PERSISTENCE_PERSISTENT, PERSISTENCE_TRANSIENT})
+_GAME_STATE_PERSISTENCE_VALIDATED = False
 
 
 @dataclass
@@ -62,25 +69,46 @@ class GameState:
 
     # Stores the primary game data (DataFrames).
     # Keys are table names (e.g., 'regions', 'countries').
-    tables: Dict[str, pl.DataFrame] = field(default_factory=dict)
+    tables: Dict[str, pl.DataFrame] = field(
+        default_factory=dict,
+        metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_PERSISTENT},
+    )
 
     # Dedicated component for Time state.
-    time: TimeData = field(default_factory=TimeData)
+    time: TimeData = field(
+        default_factory=TimeData,
+        metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_PERSISTENT},
+    )
 
     # Holds other global simulation variables that don't fit into tables.
-    globals: Dict[str, Any] = field(default_factory=lambda: {
-        "tick": 0,
-        "game_speed": 1.0,
-    })
+    globals: Dict[str, Any] = field(
+        default_factory=lambda: {
+            "tick": 0,
+            "game_speed": 1.0,
+        },
+        metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_PERSISTENT},
+    )
+
+    # Stores checkpointed mutable system internals that must survive save/load.
+    system_state: Dict[str, Dict[str, Any]] = field(
+        default_factory=dict,
+        metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_PERSISTENT},
+    )
 
     # The Event Bus.
     # Systems append events here during their update.
     # The Engine clears this list at the start of every tick.
-    events: List["GameEvent"] = field(default_factory=list)
+    events: List["GameEvent"] = field(
+        default_factory=list,
+        metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_TRANSIENT},
+    )
 
     # Actions received this specific tick.
     # The Engine populates this before systems update.
-    current_actions: List["GameAction"] = field(default_factory=list)
+    current_actions: List["GameAction"] = field(
+        default_factory=list,
+        metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_TRANSIENT},
+    )
 
     def get_table(self, name: str) -> pl.DataFrame:
         """Retrieves a reference to a simulation table by name."""
@@ -109,6 +137,7 @@ class GameState:
             "tables": ipc_tables,
             "time": self.time,
             "globals": self.globals,
+            "system_state": self.system_state,
             "events": self.events,
         }
 
@@ -124,5 +153,55 @@ class GameState:
 
         state.time = data["time"]
         state.globals = data["globals"]
+        state.system_state = data.get("system_state", {})
         state.events = data.get("events", [])
         return state
+
+
+def validate_game_state_persistence_contract() -> None:
+    global _GAME_STATE_PERSISTENCE_VALIDATED
+    if _GAME_STATE_PERSISTENCE_VALIDATED:
+        return
+
+    missing_fields: list[str] = []
+    invalid_fields: dict[str, Any] = {}
+    for game_state_field in dataclasses.fields(GameState):
+        policy = game_state_field.metadata.get(PERSISTENCE_METADATA_KEY)
+        if policy is None:
+            missing_fields.append(game_state_field.name)
+        elif policy not in VALID_PERSISTENCE_POLICIES:
+            invalid_fields[game_state_field.name] = policy
+
+    if missing_fields or invalid_fields:
+        details: list[str] = []
+        if missing_fields:
+            details.append(f"missing metadata for fields: {sorted(missing_fields)}")
+        if invalid_fields:
+            details.append(f"invalid policies: {invalid_fields}")
+        raise RuntimeError("GameState persistence contract is incomplete: " + "; ".join(details))
+
+    _GAME_STATE_PERSISTENCE_VALIDATED = True
+
+
+def _state_fields_by_policy(policy: str) -> tuple[dataclasses.Field[Any], ...]:
+    validate_game_state_persistence_contract()
+    return tuple(
+        game_state_field
+        for game_state_field in dataclasses.fields(GameState)
+        if game_state_field.metadata[PERSISTENCE_METADATA_KEY] == policy
+    )
+
+
+def persistent_state_fields() -> tuple[dataclasses.Field[Any], ...]:
+    return _state_fields_by_policy(PERSISTENCE_PERSISTENT)
+
+
+def persistent_state_field_names() -> tuple[str, ...]:
+    return tuple(game_state_field.name for game_state_field in persistent_state_fields())
+
+
+def transient_state_fields() -> tuple[dataclasses.Field[Any], ...]:
+    return _state_fields_by_policy(PERSISTENCE_TRANSIENT)
+
+
+validate_game_state_persistence_contract()

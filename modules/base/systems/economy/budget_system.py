@@ -1,5 +1,6 @@
 import polars as pl
 from src.engine.interfaces import ISystem
+from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
 from src.shared.actions import ActionUpdateBudget
 from src.shared.events import EventRealSecond
@@ -13,6 +14,10 @@ class BudgetSystem(ISystem):
     inflows (exports of tourism services), providing additional revenue beyond 
     standard internal taxation.
     """
+
+    runtime_state_contract = {
+        "_missing_columns": SYSTEM_STATE_CACHE,
+    }
 
     # Constants for revenue and interest
     PERSONAL_INCOME_TAX_CONSTANT = 3.0 

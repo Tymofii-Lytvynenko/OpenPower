@@ -12,6 +12,7 @@ from modules.base.systems.world.ai_strategic import (
 )
 from src.core.ai_framework import DeclarativeAIFramework
 from src.engine.interfaces import ISystem
+from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_HELPER
 from src.shared.actions import ActionBuildUnit, ActionUpdateBudget
 from src.shared.state import GameState
 
@@ -137,6 +138,12 @@ class AISystem(ISystem):
     System boundary exposing the data-driven framework to the simulation scheduler loop.
     Acts as a pluggable driver node in the engine graph.
     """
+
+    runtime_state_contract = {
+        "_missing_columns": SYSTEM_STATE_CACHE,
+        "_framework": SYSTEM_STATE_HELPER,
+        "_diplomacy_snapshot_builder": SYSTEM_STATE_HELPER,
+    }
 
     def __init__(self):
         self._missing_columns = set()

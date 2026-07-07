@@ -1,9 +1,14 @@
 import polars as pl
 from src.engine.interfaces import ISystem
+from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
 from src.shared.actions import ActionAnnexRegion, ActionOccupyRegion, ActionSetRegionOwner
 
 class TerritorySystem(ISystem):
+    runtime_state_contract = {
+        "_missing_columns": SYSTEM_STATE_CACHE,
+    }
+
     def __init__(self):
         self._missing_columns = set()
 

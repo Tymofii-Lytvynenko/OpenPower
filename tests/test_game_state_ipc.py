@@ -18,6 +18,7 @@ class TestGameStateIPC(unittest.TestCase):
         state.update_table("trade_network", df_trade)
         state.time.total_minutes = 300
         state.globals["tick"] = 5
+        state.system_state["base.time"] = {"real_sec_timer": 0.4, "last_event_total_minutes": 240}
         state.events.append(EventSystemError("test.system", "boom", "traceback"))
         
         # 1. Roundtrip serialization
@@ -28,6 +29,7 @@ class TestGameStateIPC(unittest.TestCase):
         restored = GameState.from_ipc(ipc_data)
         self.assertEqual(restored.time.total_minutes, 300)
         self.assertEqual(restored.globals["tick"], 5)
+        self.assertEqual(restored.system_state, {"base.time": {"real_sec_timer": 0.4, "last_event_total_minutes": 240}})
         self.assertEqual(len(restored.events), 1)
         self.assertIsInstance(restored.events[0], EventSystemError)
         self.assertEqual(restored.events[0].system_id, "test.system")

@@ -1,8 +1,14 @@
 import unittest
 from src.engine.simulator import Engine
 from src.engine.interfaces import ISystem
+from src.shared.system_state import SYSTEM_STATE_HELPER
 
 class DummySystem(ISystem):
+    runtime_state_contract = {
+        "_id": SYSTEM_STATE_HELPER,
+        "_deps": SYSTEM_STATE_HELPER,
+    }
+
     def __init__(self, sys_id, deps):
         self._id = sys_id
         self._deps = deps

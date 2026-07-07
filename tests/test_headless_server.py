@@ -35,6 +35,7 @@ class TestHeadlessServer(unittest.TestCase):
         self.assertIn("countries", round_tripped_state.tables)
         self.assertFalse(round_tripped_state.get_table("regions").is_empty())
         self.assertFalse(round_tripped_state.get_table("countries").is_empty())
+        self.assertIn("base.time", round_tripped_state.system_state)
 
     def test_run_server_process_boots_in_a_separate_process(self):
         project_root = Path(__file__).resolve().parent.parent

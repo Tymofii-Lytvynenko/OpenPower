@@ -5,6 +5,7 @@ from typing import Any
 import polars as pl
 
 from src.engine.interfaces import ISystem
+from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_HELPER
 from src.shared.state import GameState
 from src.shared.actions import ActionBuildUnit, ActionMoveUnit
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
@@ -126,6 +127,12 @@ class UnitFactory:
 
 
 class MilitarySystem(ISystem):
+    runtime_state_contract = {
+        "_missing_columns": SYSTEM_STATE_CACHE,
+        "_duration_policy": SYSTEM_STATE_HELPER,
+        "_unit_factory": SYSTEM_STATE_HELPER,
+    }
+
     def __init__(self):
         self._missing_columns = set()
         self._duration_policy = MovementDurationPolicy()

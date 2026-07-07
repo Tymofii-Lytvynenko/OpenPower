@@ -8,9 +8,7 @@ import rtoml
 from PIL import Image
 
 from src.shared.config import GameConfig
-from src.shared.state import GameState
-
-TRANSIENT_STATE_FIELDS = {"events", "current_actions"}
+from src.shared.state import GameState, persistent_state_fields
 
 
 class DataLoader:
@@ -49,11 +47,8 @@ class DataLoader:
         constructor_args = {}
         type_hints = get_type_hints(GameState)
 
-        for field in dataclasses.fields(GameState):
+        for field in persistent_state_fields():
             key = field.name
-            if key in TRANSIENT_STATE_FIELDS:
-                continue
-
             target_type = type_hints.get(key)
 
             if key == "tables":

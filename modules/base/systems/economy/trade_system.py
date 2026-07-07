@@ -1,5 +1,6 @@
 import polars as pl
 from src.engine.interfaces import ISystem
+from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
 from src.shared.events import EventRealSecond
 
@@ -8,6 +9,10 @@ class TradeSystem(ISystem):
     Simulates Global Market Clearing with Physical Constraints.
     Features: Service Evaporation, Asset Depreciation, and Organic Market Pressure.
     """
+
+    runtime_state_contract = {
+        "_missing_columns": SYSTEM_STATE_CACHE,
+    }
 
     TRADE_PRIORITY_MATRIX = {
         "cereals": 10, "vegetables_and_fruits": 11, "meat_and_fish": 12, "dairy": 13, 

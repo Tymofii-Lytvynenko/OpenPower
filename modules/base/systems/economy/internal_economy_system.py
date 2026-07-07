@@ -1,5 +1,6 @@
 import polars as pl
 from src.engine.interfaces import ISystem
+from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
 from src.shared.events import EventRealSecond
 from src.shared.economy_meta import RESOURCE_MAPPING
@@ -11,6 +12,10 @@ class InternalEconomySystem(ISystem):
     Now features Dynamic Wealth Anchoring, Propensity to Consume, and Income Elasticity.
     """
     
+    runtime_state_contract = {
+        "_missing_columns": SYSTEM_STATE_CACHE,
+    }
+
     def __init__(self):
         self._missing_columns = set()
 

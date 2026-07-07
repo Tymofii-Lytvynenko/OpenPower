@@ -44,6 +44,8 @@ class GameSession:
         if player_tag:
             self.state.globals["player_tag"] = player_tag
         self.player_tag = self.state.globals.get("player_tag")
+        self.engine.restore_system_state(self.state)
+        self.engine.snapshot_system_state(self.state)
         ensure_ui_support_tables(self.state)
         self.action_queue: List[GameAction] = []
 
@@ -145,12 +147,14 @@ class GameSession:
             from src.server.io.save_writer import SaveWriter
 
             writer = SaveWriter(self.config)
+            self.engine.snapshot_system_state(self.state)
             for action in save_actions:
                 writer.save_game(self.state, action.save_name)
             self.action_queue = [action for action in self.action_queue if not isinstance(action, ActionSaveGame)]
 
         # Pass the instance method of the engine
         self.engine.step(self.state, self.action_queue, delta_time)
+        self.engine.snapshot_system_state(self.state)
         self.action_queue.clear()
 
     def receive_action(self, action: GameAction):

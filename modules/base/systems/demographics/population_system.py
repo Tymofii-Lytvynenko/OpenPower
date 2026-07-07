@@ -1,9 +1,14 @@
 import polars as pl
 from src.engine.interfaces import ISystem
+from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
 from src.shared.events import EventRealSecond
 
 class PopulationSystem(ISystem):
+    runtime_state_contract = {
+        "_missing_columns": SYSTEM_STATE_CACHE,
+    }
+
     def __init__(self):
         self._missing_columns = set()
 
@@ -95,4 +100,4 @@ class PopulationSystem(ISystem):
             (pl.col("pop_65") + pl.col("_aging_to_retirement") - pl.col("_deaths")).cast(pl.Int64).alias("pop_65")
         ])
 
-        state.update_table("regions", upd.select(regions.columns))
+        state.update_table("regions", upd.select(regions.columns))

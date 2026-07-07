@@ -6,6 +6,7 @@ from typing import Any, Iterable
 import polars as pl
 
 from src.engine.interfaces import ISystem
+from src.shared.system_state import SYSTEM_STATE_HELPER
 from src.shared.events import EventBattleEnded, EventBattleStarted, EventNewHour
 from src.shared.state import GameState
 
@@ -164,6 +165,10 @@ class CombatResolutionPolicy:
 
 
 class CombatSystem(ISystem):
+    runtime_state_contract = {
+        "_policy": SYSTEM_STATE_HELPER,
+    }
+
     def __init__(self):
         self._policy = CombatResolutionPolicy()
 

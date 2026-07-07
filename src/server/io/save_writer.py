@@ -8,10 +8,8 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from src.shared.config import GameConfig
-from src.shared.state import GameState
+from src.shared.state import GameState, persistent_state_field_names, persistent_state_fields
 from src.core.saves import list_available_saves
-
-TRANSIENT_STATE_FIELDS = {"events", "current_actions"}
 
 
 class SaveWriter:
@@ -77,13 +75,12 @@ class SaveWriter:
         meta_data = {
             "version": 1,
             "timestamp": datetime.now().isoformat(),
+            "persistent_fields": list(persistent_state_field_names()),
+            "checkpointed_systems": sorted(state.system_state.keys()),
         }
 
-        for field in dataclasses.fields(state):
+        for field in persistent_state_fields():
             key = field.name
-            if key in TRANSIENT_STATE_FIELDS:
-                continue
-
             value = getattr(state, key)
 
             # Strategy A: Polars DataFrames -> Parquet
