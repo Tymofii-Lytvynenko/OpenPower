@@ -176,6 +176,14 @@ class WarListPanel:
             
             # Left side buttons
             imgui.set_cursor_pos_x(half_w - (btn_w * 2 + 8))
+            
+            # Side A PEACE Button Style
+            is_peace_active_a = (intent_a == "peace")
+            if is_peace_active_a:
+                imgui.push_style_color(imgui.Col_.button, (0.30, 0.95, 0.60, 0.40)) # Green-ish
+                imgui.push_style_color(imgui.Col_.button_hovered, (0.30, 0.95, 0.60, 0.60))
+                imgui.push_style_color(imgui.Col_.button_active, (0.30, 0.95, 0.60, 0.80))
+                
             if imgui.button("PEACE##1", (btn_w, 24)):
                 if can_act_a:
                     net_client.send_action(ActionOfferPeace(
@@ -184,7 +192,18 @@ class WarListPanel:
                         source_country_tag=country_tag,
                         terms="peace"
                     ))
+            if is_peace_active_a:
+                imgui.pop_style_color(3)
+                
             imgui.same_line()
+            
+            # Side A WAR Button Style
+            is_war_active_a = (intent_a == "war")
+            if is_war_active_a:
+                imgui.push_style_color(imgui.Col_.button, (1.00, 0.40, 0.40, 0.40)) # Red-ish
+                imgui.push_style_color(imgui.Col_.button_hovered, (1.00, 0.40, 0.40, 0.60))
+                imgui.push_style_color(imgui.Col_.button_active, (1.00, 0.40, 0.40, 0.80))
+                
             if imgui.button("WAR##1", (btn_w, 24)):
                 if can_act_a:
                     net_client.send_action(ActionOfferPeace(
@@ -193,6 +212,9 @@ class WarListPanel:
                         source_country_tag=country_tag,
                         terms="war"
                     ))
+            if is_war_active_a:
+                imgui.pop_style_color(3)
+                
             imgui.end_disabled()
                 
             # Action handles for Side B (Defender Leader)
@@ -202,6 +224,14 @@ class WarListPanel:
             # Right side buttons
             imgui.same_line()
             imgui.set_cursor_pos_x(half_w + 40 + half_w - (btn_w * 2 + 8))
+            
+            # Side B PEACE Button Style
+            is_peace_active_b = (intent_b == "peace")
+            if is_peace_active_b:
+                imgui.push_style_color(imgui.Col_.button, (0.30, 0.95, 0.60, 0.40))
+                imgui.push_style_color(imgui.Col_.button_hovered, (0.30, 0.95, 0.60, 0.60))
+                imgui.push_style_color(imgui.Col_.button_active, (0.30, 0.95, 0.60, 0.80))
+                
             if imgui.button("PEACE##2", (btn_w, 24)):
                 if can_act_b:
                     net_client.send_action(ActionOfferPeace(
@@ -210,7 +240,18 @@ class WarListPanel:
                         source_country_tag=country_tag,
                         terms="peace"
                     ))
+            if is_peace_active_b:
+                imgui.pop_style_color(3)
+                
             imgui.same_line()
+            
+            # Side B WAR Button Style
+            is_war_active_b = (intent_b == "war")
+            if is_war_active_b:
+                imgui.push_style_color(imgui.Col_.button, (1.00, 0.40, 0.40, 0.40))
+                imgui.push_style_color(imgui.Col_.button_hovered, (1.00, 0.40, 0.40, 0.60))
+                imgui.push_style_color(imgui.Col_.button_active, (1.00, 0.40, 0.40, 0.80))
+                
             if imgui.button("WAR##2", (btn_w, 24)):
                 if can_act_b:
                     net_client.send_action(ActionOfferPeace(
@@ -219,6 +260,9 @@ class WarListPanel:
                         source_country_tag=country_tag,
                         terms="war"
                     ))
+            if is_war_active_b:
+                imgui.pop_style_color(3)
+                
             imgui.end_disabled()
                 
         imgui.end_child()
