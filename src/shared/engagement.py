@@ -25,20 +25,30 @@ def engagement_radius_km(unit_row: dict[str, Any]) -> float:
         return ENGAGEMENT_RADIUS_KM
 
 
+def hostile_country_pairs(war_rows: Iterable[dict[str, Any]]) -> set[frozenset[str]]:
+    """Builds a reusable index of countries on opposite sides of active wars."""
+    pairs: set[frozenset[str]] = set()
+    for war in war_rows:
+        status = str(war.get("status") or "active").strip().lower()
+        if status not in {"", "active", "ongoing"}:
+            continue
+        side_a = normalize_country_tags(war.get("side_a"))
+        side_b = normalize_country_tags(war.get("side_b"))
+        pairs.update(
+            frozenset((left, right))
+            for left in side_a
+            for right in side_b
+            if left != right
+        )
+    return pairs
+
+
 def countries_are_hostile(war_rows: Iterable[dict[str, Any]], left: str, right: str) -> bool:
     """Checks whether two country tags occupy opposite sides of an active war."""
     left_tag, right_tag = _tag(left), _tag(right)
     if not left_tag or left_tag == right_tag:
         return False
-    for war in war_rows:
-        status = str(war.get("status") or "active").strip().lower()
-        if status not in {"", "active", "ongoing"}:
-            continue
-        side_a = set(normalize_country_tags(war.get("side_a")))
-        side_b = set(normalize_country_tags(war.get("side_b")))
-        if (left_tag in side_a and right_tag in side_b) or (left_tag in side_b and right_tag in side_a):
-            return True
-    return False
+    return frozenset((left_tag, right_tag)) in hostile_country_pairs(war_rows)
 
 
 def first_zone_contact_fraction(

@@ -11,7 +11,7 @@ from src.shared.actions import ActionAttackUnit, ActionBuildUnit, ActionBuyMarke
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 from modules.base.systems.military.movement_access import MovementAccessPolicy
 from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
-from src.shared.engagement import countries_are_hostile, engagement_radius_km, first_zone_contact_fraction, interpolate_geo
+from src.shared.engagement import engagement_radius_km, first_zone_contact_fraction, hostile_country_pairs, interpolate_geo
 
 
 UNIT_TABLE = "units"
@@ -447,6 +447,7 @@ class MilitarySystem(ISystem):
 
         war_rows = state.tables.get("countries_wars")
         wars = [] if war_rows is None else war_rows.to_dicts()
+        hostile_pairs = hostile_country_pairs(wars)
         rows = units.to_dicts()
         units_by_id = {str(row.get("id") or ""): row for row in rows}
         now = int(state.time.total_minutes)
@@ -459,7 +460,9 @@ class MilitarySystem(ISystem):
                 continue
             if int(attacker.get("strength") or 0) <= 0 or int(defender.get("strength") or 0) <= 0:
                 continue
-            if not countries_are_hostile(wars, str(attacker.get("owner") or ""), str(defender.get("owner") or "")):
+            attacker_owner = str(attacker.get("owner") or "").strip().upper()
+            defender_owner = str(defender.get("owner") or "").strip().upper()
+            if frozenset((attacker_owner, defender_owner)) not in hostile_pairs:
                 continue
 
             defender_geo = self._unit_geo_at(defender, now)
@@ -559,7 +562,31 @@ class MilitarySystem(ISystem):
 
         war_table = state.tables.get("countries_wars")
         war_rows = [] if war_table is None else war_table.to_dicts()
+        hostile_owners_by_country: dict[str, set[str]] = {}
+        for pair in hostile_country_pairs(war_rows):
+            tags = tuple(pair)
+            if len(tags) != 2:
+                continue
+            left, right = tags
+            hostile_owners_by_country.setdefault(left, set()).add(right)
+            hostile_owners_by_country.setdefault(right, set()).add(left)
+
         rows = units.to_dicts()
+        ordered_rows = sorted(rows, key=lambda candidate: str(candidate.get("id") or ""))
+        moving_owners = {
+            str(row.get("owner") or "").strip().upper()
+            for row in rows
+            if bool(row.get("is_moving"))
+        }
+        contact_candidates = {
+            owner: [
+                candidate
+                for candidate in ordered_rows
+                if str(candidate.get("owner") or "").strip().upper()
+                in hostile_owners_by_country.get(owner, set())
+            ]
+            for owner in moving_owners
+        }
         for row in rows:
             target_region_id = int(row.get("target_region_id") or NO_TARGET_REGION)
             if target_region_id <= 0 or not bool(row.get("is_moving")):
@@ -582,7 +609,14 @@ class MilitarySystem(ISystem):
             )
             previous_geo = interpolate_geo(source_geo, target_geo, previous_progress)
             next_geo = interpolate_geo(source_geo, target_geo, progress)
-            contact = self._first_hostile_contact(row, rows, previous_geo, next_geo, war_rows, current_minute)
+            owner = str(row.get("owner") or "").strip().upper()
+            contact = self._first_hostile_contact(
+                row,
+                contact_candidates.get(owner, ()),
+                previous_geo,
+                next_geo,
+                current_minute,
+            )
 
             if contact is not None:
                 defender, fraction = contact
@@ -608,19 +642,15 @@ class MilitarySystem(ISystem):
     def _first_hostile_contact(
         self,
         moving_unit: dict[str, Any],
-        unit_rows: list[dict[str, Any]],
+        unit_rows: Iterable[dict[str, Any]],
         start: GeoCoordinate,
         end: GeoCoordinate,
-        war_rows: list[dict[str, Any]],
         current_minute: int,
     ) -> tuple[dict[str, Any], float] | None:
         best_contact: tuple[dict[str, Any], float] | None = None
-        moving_owner = str(moving_unit.get("owner") or "")
         moving_id = str(moving_unit.get("id") or "")
-        for defender in sorted(unit_rows, key=lambda row: str(row.get("id") or "")):
+        for defender in unit_rows:
             if str(defender.get("id") or "") == moving_id or int(defender.get("strength") or 0) <= 0:
-                continue
-            if not countries_are_hostile(war_rows, moving_owner, str(defender.get("owner") or "")):
                 continue
             fraction = first_zone_contact_fraction(
                 start,

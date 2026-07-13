@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import heapq
 import json
 from collections import defaultdict
 from typing import Any
@@ -59,30 +60,129 @@ class TreatyTradePolicy:
         *,
         common_only: bool,
     ) -> None:
+        if common_only:
+            self._allocate_common_market(
+                flows,
+                resource,
+                supplies,
+                demands,
+                common_peers,
+                embargoes,
+            )
+            return
+        self._allocate_general_market(
+            flows,
+            resource,
+            supplies,
+            demands,
+            common_peers,
+            embargoes,
+        )
+
+    def _allocate_common_market(
+        self,
+        flows: list[dict[str, Any]],
+        resource: str,
+        supplies: dict[str, float],
+        demands: dict[str, float],
+        common_peers: dict[str, set[str]],
+        embargoes: set[frozenset[str]],
+    ) -> None:
         for importer in sorted(demands):
             demand = demands[importer]
-            if demand <= 0:
+            if demand <= 0.0:
                 continue
-            for exporter in sorted(supplies, key=lambda tag: (-supplies[tag], tag)):
-                if exporter == importer or supplies[exporter] <= 0 or frozenset((exporter, importer)) in embargoes:
+            exporters = sorted(
+                common_peers.get(importer, ()),
+                key=lambda tag: (-supplies.get(tag, 0.0), tag),
+            )
+            for exporter in exporters:
+                if (
+                    exporter == importer
+                    or supplies.get(exporter, 0.0) <= 0.0
+                    or frozenset((exporter, importer)) in embargoes
+                ):
                     continue
-                is_common_pair = exporter in common_peers.get(importer, set())
-                if common_only != is_common_pair:
-                    continue
-                amount = min(demand, supplies[exporter])
-                if amount <= 0:
-                    continue
-                flows.append({
-                    "exporter_id": exporter,
-                    "importer_id": importer,
-                    "game_resource_id": resource,
-                    "trade_value_usd": amount,
-                })
-                supplies[exporter] -= amount
-                demands[importer] -= amount
-                demand -= amount
-                if demand <= 0:
+                demand = self._record_flow(
+                    flows,
+                    resource,
+                    exporter,
+                    importer,
+                    demand,
+                    supplies,
+                    demands,
+                )
+                if demand <= 0.0:
                     break
+
+    def _allocate_general_market(
+        self,
+        flows: list[dict[str, Any]],
+        resource: str,
+        supplies: dict[str, float],
+        demands: dict[str, float],
+        common_peers: dict[str, set[str]],
+        embargoes: set[frozenset[str]],
+    ) -> None:
+        supply_heap = [
+            (-amount, exporter)
+            for exporter, amount in supplies.items()
+            if amount > 0.0
+        ]
+        heapq.heapify(supply_heap)
+        for importer in sorted(demands):
+            demand = demands[importer]
+            if demand <= 0.0:
+                continue
+            deferred: list[tuple[float, str]] = []
+            while demand > 0.0 and supply_heap:
+                _, exporter = heapq.heappop(supply_heap)
+                supply = supplies.get(exporter, 0.0)
+                if supply <= 0.0:
+                    continue
+                if (
+                    exporter == importer
+                    or exporter in common_peers.get(importer, set())
+                    or frozenset((exporter, importer)) in embargoes
+                ):
+                    deferred.append((-supply, exporter))
+                    continue
+                demand = self._record_flow(
+                    flows,
+                    resource,
+                    exporter,
+                    importer,
+                    demand,
+                    supplies,
+                    demands,
+                )
+                if supplies[exporter] > 0.0:
+                    deferred.append((-supplies[exporter], exporter))
+            for entry in deferred:
+                heapq.heappush(supply_heap, entry)
+
+    def _record_flow(
+        self,
+        flows: list[dict[str, Any]],
+        resource: str,
+        exporter: str,
+        importer: str,
+        demand: float,
+        supplies: dict[str, float],
+        demands: dict[str, float],
+    ) -> float:
+        amount = min(demand, supplies[exporter])
+        if amount <= 0.0:
+            return demand
+        flows.append({
+            "exporter_id": exporter,
+            "importer_id": importer,
+            "game_resource_id": resource,
+            "trade_value_usd": amount,
+        })
+        supplies[exporter] -= amount
+        demands[importer] -= amount
+        return demand - amount
 
     def _constraints(self, effects: pl.DataFrame) -> tuple[dict[str, set[str]], set[frozenset[str]]]:
         common_peers: dict[str, set[str]] = defaultdict(set)

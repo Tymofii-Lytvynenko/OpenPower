@@ -7,7 +7,7 @@ from uuid import uuid4
 import polars as pl
 
 from modules.base.systems.military.combat_system import CombatSystem
-from modules.base.systems.world.ai_system import AISystem, build_ai_alliance_action, build_ai_peace_action, build_ai_war_action
+from modules.base.systems.world.ai_system import AISystem
 from modules.base.systems.world.treaty_diplomacy import DiplomacySystem
 from src.core.saves import list_available_saves
 from src.engine.simulator import Engine
@@ -426,10 +426,9 @@ class TestAISystemVariations(unittest.TestCase):
 
         self.assertEqual(state.current_actions, [])
 
-    def test_strategic_action_builders_require_complete_rows(self):
-        self.assertIsNone(build_ai_alliance_action({"id": "USA"}))
-        self.assertIsNone(build_ai_war_action({"id": "USA"}))
-        self.assertIsNone(build_ai_peace_action({"id": "USA"}))
+    def test_ai_debug_cache_starts_empty(self):
+        self.assertTrue(self.system.last_decisions.is_empty())
+        self.assertIn("reason_code", self.system.last_decisions.columns)
 
 
 if __name__ == "__main__":

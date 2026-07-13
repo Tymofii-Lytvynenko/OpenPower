@@ -10,6 +10,7 @@ from __future__ import annotations
 import calendar
 import json
 import math
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Iterable, Mapping
 
@@ -97,6 +98,14 @@ LONG_TERM_RELATION_DELTAS = {
     "weapons_trade": 5.0,
     "economic_aid": 8.0,
 }
+
+
+@dataclass(frozen=True)
+class _TreatyEligibilityIndex:
+    countries: Mapping[str, Mapping[str, Any]]
+    relations: Mapping[tuple[str, str], float]
+    governments: Mapping[str, str]
+    war_pairs: set[frozenset[str]]
 
 
 class DiplomacySystem(ISystem):
@@ -499,14 +508,26 @@ class DiplomacySystem(ISystem):
         }
         wars = self._append(wars, WAR_SCHEMA, row)
         state.events.append(EventWarStarted(war_id, attacker, defender))
-        for left in side_a:
-            for right in side_b:
-                relations = self._set_relation_pair(relations, left, right, -100.0)
-        for member in sorted(side_a | side_b):
-            messages = self._append_message(
-                state, messages, member, "war", f"War: {attacker} vs {defender}",
-                f"Casus belli: {casus_belli or 'Unspecified'}.",
-            )
+        hostile_pairs = {
+            (left, right)
+            for left in side_a
+            for right in side_b
+            if left != right
+        }
+        relations = self._set_relation_pairs(relations, hostile_pairs, -100.0)
+        messages = self._append_messages(
+            state,
+            messages,
+            [
+                {
+                    "country_id": member,
+                    "category": "war",
+                    "subject": f"War: {attacker} vs {defender}",
+                    "body": f"Casus belli: {casus_belli or 'Unspecified'}.",
+                }
+                for member in sorted(side_a | side_b)
+            ],
+        )
         news = self._append_news(
             state, news, f"War breaks out: {attacker} vs {defender}",
             "Alliance obligations and hostile relations have been updated.", "war", attacker, "warning",
@@ -541,9 +562,14 @@ class DiplomacySystem(ISystem):
             )
             return wars, relations, messages, news
         wars = wars.filter(pl.col("id") != str(action.war_id))
-        for left in self._tags(row.get("side_a")):
-            for right in self._tags(row.get("side_b")):
-                relations = self._adjust_relation_pair(relations, left, right, 15.0)
+        relation_deltas = {
+            pair: 15.0
+            for left in self._tags(row.get("side_a"))
+            for right in self._tags(row.get("side_b"))
+            if left != right
+            for pair in ((left, right), (right, left))
+        }
+        relations = self._apply_relation_deltas(relations, relation_deltas)
         news = self._append_news(
             state, news, f"Peace agreed: {leader_a} vs {leader_b}",
             "Both war leaders accepted peace and the conflict was closed.", "war", source,
@@ -604,6 +630,7 @@ class DiplomacySystem(ISystem):
         all_country_tags = tuple(sorted(country_by_id))
 
         updated_rows: list[dict[str, Any]] = []
+        daily_relation_deltas: dict[tuple[str, str], float] = {}
         for treaty in treaties.to_dicts():
             definition = treaty_definition(treaty.get("type"))
             members = tuple(
@@ -619,14 +646,19 @@ class DiplomacySystem(ISystem):
                 maintenance_by_country[country_id] = maintenance_by_country.get(country_id, 0.0) + amount
             effects.extend(self._effect_rows(treaty, members, country_by_id))
             if is_new_day:
-                relations = self._apply_daily_relations(
-                    relations, definition.key, members, all_country_tags, country_by_id
-                )
+                for pair, delta in self._daily_relation_deltas(
+                    definition.key,
+                    members,
+                    all_country_tags,
+                    country_by_id,
+                ).items():
+                    daily_relation_deltas[pair] = daily_relation_deltas.get(pair, 0.0) + delta
             if is_new_month and definition.key == "human_development_collaboration":
                 countries = self._apply_human_development_convergence(countries, members)
                 country_by_id = {self._tag(row.get("id")): row for row in countries}
             updated_rows.append(treaty)
 
+        relations = self._apply_relation_deltas(relations, daily_relation_deltas)
         treaties = self._frame(TREATY_SCHEMA, updated_rows)
         if countries and (effects or maintenance_by_country):
             countries = self._set_treaty_maintenance(countries, maintenance_by_country)
@@ -679,8 +711,22 @@ class DiplomacySystem(ISystem):
         wars: pl.DataFrame,
     ) -> pl.DataFrame:
         rows: list[dict[str, Any]] = []
-        war_pairs = self._war_pair_index(wars)
-        for row in treaties.to_dicts():
+        treaty_rows = treaties.to_dicts()
+        relation_pairs: set[tuple[str, str]] = set()
+        for treaty in treaty_rows:
+            conditions = decode_conditions(treaty.get("conditions_json"))
+            if self._number(conditions.get("minimum_relation"), -100.0) <= -100.0:
+                continue
+            members = treaty_members(treaty)
+            relation_pairs.update(
+                (member, peer)
+                for member in members
+                for peer in members
+                if member != peer
+            )
+        eligibility = self._eligibility_index(state, wars, relation_pairs)
+        war_pairs = eligibility.war_pairs
+        for row in treaty_rows:
             definition = treaty_definition(row.get("type"))
             members = treaty_members(row)
             if definition is None or not definition.long_term or not members:
@@ -690,7 +736,14 @@ class DiplomacySystem(ISystem):
             if self._has_profile_conditions(conditions):
                 suspended = [
                     member for member in members
-                    if not self._eligible_for_treaty(state, row, member, tuple(tag for tag in members if tag != member), wars)
+                    if not self._eligible_for_treaty(
+                        state,
+                        row,
+                        member,
+                        tuple(tag for tag in members if tag != member),
+                        wars,
+                        eligibility,
+                    )
                 ]
             elif bool(conditions.get("allow_members_at_war")):
                 suspended = []
@@ -719,6 +772,48 @@ class DiplomacySystem(ISystem):
             pairs.update(frozenset((left, right)) for left in side_a for right in side_b if left != right)
         return pairs
 
+    def _eligibility_index(
+        self,
+        state: GameState,
+        wars: pl.DataFrame,
+        relation_pairs: Iterable[tuple[str, str]] = (),
+    ) -> _TreatyEligibilityIndex:
+        countries = {
+            self._tag(row.get("id")): row
+            for row in self._country_rows(state)
+            if self._tag(row.get("id"))
+        }
+        relations_table = state.tables.get("countries_relations")
+        requested_pairs = sorted(set(relation_pairs))
+        if relations_table is None or not requested_pairs:
+            relations: dict[tuple[str, str], float] = {}
+        else:
+            requested = pl.DataFrame(
+                requested_pairs,
+                schema={"source": pl.Utf8, "target": pl.Utf8},
+                orient="row",
+            )
+            selected = requested.join(
+                relations_table.select("source", "target", "value"),
+                on=["source", "target"],
+                how="left",
+            ).with_columns(pl.col("value").fill_null(0.0))
+            relations = {
+                (str(source), str(target)): self._number(value)
+                for source, target, value in selected.iter_rows()
+            }
+        government_table = state.tables.get("country_governments")
+        governments = {
+            self._tag(row.get("country_id")): str(row.get("government_type") or "")
+            for row in (() if government_table is None else government_table.to_dicts())
+        }
+        return _TreatyEligibilityIndex(
+            countries=countries,
+            relations=relations,
+            governments=governments,
+            war_pairs=self._war_pair_index(wars),
+        )
+
     def _eligible_for_treaty(
         self,
         state: GameState,
@@ -726,22 +821,45 @@ class DiplomacySystem(ISystem):
         candidate: str,
         peers: Iterable[str],
         wars: pl.DataFrame | None = None,
+        index: _TreatyEligibilityIndex | None = None,
     ) -> bool:
         conditions = decode_conditions(treaty.get("conditions_json"))
-        candidate_row = self._country_row(state, candidate)
+        candidate_tag = self._tag(candidate)
+        candidate_row = (
+            index.countries.get(candidate_tag, {})
+            if index is not None
+            else self._country_row(state, candidate_tag)
+        )
         if not candidate_row:
             return False
         government_type = str(conditions.get("government_type") or "").strip().lower()
-        if government_type and self._government_type(state, candidate).lower() != government_type:
+        candidate_government = (
+            index.governments.get(candidate_tag, "")
+            if index is not None
+            else self._government_type(state, candidate_tag)
+        )
+        if government_type and candidate_government.lower() != government_type:
             return False
+
         minimum_relation = self._number(conditions.get("minimum_relation"), -100.0)
+        maximum_distance = self._number(conditions.get("maximum_geographic_distance_km"))
         for peer in peers:
-            peer_row = self._country_row(state, peer)
+            peer_tag = self._tag(peer)
+            peer_row = (
+                index.countries.get(peer_tag, {})
+                if index is not None
+                else self._country_row(state, peer_tag)
+            )
             if not peer_row:
                 return False
-            if minimum_relation > -100.0 and self._relation_value(state.tables.get("countries_relations"), candidate, peer) < minimum_relation:
+            relation = (
+                index.relations.get((candidate_tag, peer_tag), 0.0)
+                if index is not None
+                else self._relation_value(state.tables.get("countries_relations"), candidate_tag, peer_tag)
+            )
+            if minimum_relation > -100.0 and relation < minimum_relation:
                 return False
-            if not TreatyGeography.within_limit(state, candidate, peer, conditions.get("maximum_geographic_distance_km")):
+            if maximum_distance > 0.0 and not TreatyGeography.within_limit(state, candidate_tag, peer_tag, maximum_distance):
                 return False
             if not self._similar(self._number(candidate_row.get("military_count")), self._number(peer_row.get("military_count")), conditions.get("max_military_strength_ratio")):
                 return False
@@ -749,8 +867,18 @@ class DiplomacySystem(ISystem):
                 return False
             if not self._similar(self._research_capacity(candidate_row), self._research_capacity(peer_row), conditions.get("max_research_ratio")):
                 return False
-            if not bool(conditions.get("allow_members_at_war")) and self._countries_at_war(wars if wars is not None else self._wars(state.tables.get("countries_wars")), candidate, peer):
-                return False
+            if not bool(conditions.get("allow_members_at_war")):
+                at_war = (
+                    frozenset((candidate_tag, peer_tag)) in index.war_pairs
+                    if index is not None
+                    else self._countries_at_war(
+                        wars if wars is not None else self._wars(state.tables.get("countries_wars")),
+                        candidate_tag,
+                        peer_tag,
+                    )
+                )
+                if at_war:
+                    return False
         return True
 
     def _resolve_annexation_claims(
@@ -907,6 +1035,23 @@ class DiplomacySystem(ISystem):
         all_countries: Iterable[str],
         country_by_id: Mapping[str, Mapping[str, Any]],
     ) -> pl.DataFrame:
+        return self._apply_relation_deltas(
+            relations,
+            self._daily_relation_deltas(
+                treaty_type,
+                members,
+                all_countries,
+                country_by_id,
+            ),
+        )
+
+    def _daily_relation_deltas(
+        self,
+        treaty_type: str,
+        members: Iterable[str],
+        all_countries: Iterable[str],
+        country_by_id: Mapping[str, Mapping[str, Any]],
+    ) -> dict[tuple[str, str], float]:
         members = tuple(members)
         deltas: dict[tuple[str, str], float] = {}
         if treaty_type in {"cultural_exchanges", "noble_cause"}:
@@ -923,7 +1068,7 @@ class DiplomacySystem(ISystem):
                         pressure = -0.02 * max(1.0, self._number(country_by_id[outsider].get("gdp"), 1.0)) / total_gdp
                         deltas[(member, outsider)] = deltas.get((member, outsider), 0.0) + pressure
                         deltas[(outsider, member)] = deltas.get((outsider, member), 0.0) + pressure
-        return self._apply_relation_deltas(relations, deltas)
+        return deltas
 
     def _apply_human_development_convergence(
         self, countries: list[dict[str, Any]], members: Iterable[str]
@@ -951,10 +1096,13 @@ class DiplomacySystem(ISystem):
         if not delta:
             return relations
         member_list = tuple(members)
-        for index, left in enumerate(member_list):
-            for right in member_list[index + 1:]:
-                relations = self._adjust_relation_pair(relations, left, right, delta)
-        return relations
+        deltas = {
+            pair: delta
+            for index, left in enumerate(member_list)
+            for right in member_list[index + 1:]
+            for pair in ((left, right), (right, left))
+        }
+        return self._apply_relation_deltas(relations, deltas)
 
     def _relation_delta(self, treaty_type: Any) -> float:
         return LONG_TERM_RELATION_DELTAS.get(normalize_treaty_type(treaty_type), 0.0)
@@ -1044,11 +1192,17 @@ class DiplomacySystem(ISystem):
         unit["is_moving"] = False
 
     def _relations(self, frame: pl.DataFrame | None) -> pl.DataFrame:
-        rows = [] if frame is None else frame.to_dicts()
-        return self._frame(RELATIONS_SCHEMA, [{
-            "source": self._tag(row.get("source")), "target": self._tag(row.get("target")),
-            "value": self._number(row.get("value")),
-        } for row in rows if self._tag(row.get("source")) and self._tag(row.get("target"))])
+        if frame is None or frame.is_empty():
+            return pl.DataFrame(schema=RELATIONS_SCHEMA)
+        normalized = frame.select(
+            pl.col("source").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase(),
+            pl.col("target").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase(),
+            pl.col("value").cast(pl.Float64, strict=False).fill_null(0.0),
+        )
+        return normalized.filter(
+            (pl.col("source") != "")
+            & (pl.col("target") != "")
+        )
 
     def _wars(self, frame: pl.DataFrame | None) -> pl.DataFrame:
         rows = [] if frame is None else frame.to_dicts()
@@ -1115,10 +1269,48 @@ class DiplomacySystem(ISystem):
         } for row in rows])
 
     def _messages(self, frame: pl.DataFrame | None) -> pl.DataFrame:
-        return self._frame(MESSAGE_SCHEMA, [] if frame is None else frame.to_dicts())
+        return self._owned_frame(frame, MESSAGE_SCHEMA)
 
     def _news(self, frame: pl.DataFrame | None) -> pl.DataFrame:
-        return self._frame(NEWS_SCHEMA, [] if frame is None else frame.to_dicts())
+        return self._owned_frame(frame, NEWS_SCHEMA)
+
+    def _owned_frame(
+        self,
+        frame: pl.DataFrame | None,
+        schema: Mapping[str, pl.DataType],
+    ) -> pl.DataFrame:
+        if frame is None or frame.is_empty():
+            return pl.DataFrame(schema=dict(schema))
+        if frame.schema == dict(schema):
+            return frame
+        return self._frame(schema, frame.to_dicts())
+
+    def _append_messages(
+        self,
+        state: GameState,
+        messages: pl.DataFrame,
+        payloads: Iterable[Mapping[str, Any]],
+    ) -> pl.DataFrame:
+        existing_ids = set(messages["id"].to_list())
+        rows: list[dict[str, Any]] = []
+        for payload in payloads:
+            message_id = self._next_identifier("message", existing_ids, state)
+            existing_ids.add(message_id)
+            country_id = self._tag(payload.get("country_id"))
+            category = str(payload.get("category") or "")
+            state.events.append(EventMessageCreated(message_id, country_id, category))
+            rows.append({
+                "id": message_id,
+                "country_id": country_id,
+                "category": category,
+                "subject": str(payload.get("subject") or ""),
+                "body": str(payload.get("body") or ""),
+                "is_read": False,
+                "created_at": self._timestamp(state),
+            })
+        if not rows:
+            return messages
+        return messages.vstack(self._frame(MESSAGE_SCHEMA, rows))
 
     def _append_message(self, state: GameState, messages: pl.DataFrame, country_id: str, category: str, subject: str, body: str) -> pl.DataFrame:
         message_id = self._next_identifier("message", messages["id"].to_list(), state)
@@ -1139,11 +1331,68 @@ class DiplomacySystem(ISystem):
     def _apply_relation_deltas(self, relations: pl.DataFrame, deltas: Mapping[tuple[str, str], float]) -> pl.DataFrame:
         if not deltas:
             return relations
-        values = {(self._tag(row.get("source")), self._tag(row.get("target"))): self._number(row.get("value")) for row in relations.to_dicts()}
-        for key, delta in deltas.items():
-            values[key] = max(-100.0, min(100.0, values.get(key, 0.0) + delta))
-        rows = [{"source": source, "target": target, "value": value} for (source, target), value in sorted(values.items())]
-        return self._frame(RELATIONS_SCHEMA, rows)
+        updates = pl.DataFrame(
+            [
+                {"source": source, "target": target, "_delta": float(delta)}
+                for (source, target), delta in sorted(deltas.items())
+            ],
+            schema={"source": pl.Utf8, "target": pl.Utf8, "_delta": pl.Float64},
+        )
+        return (
+            relations.join(
+                updates,
+                on=["source", "target"],
+                how="full",
+                coalesce=True,
+            )
+            .with_columns(
+                (
+                    pl.col("value").fill_null(0.0)
+                    + pl.col("_delta").fill_null(0.0)
+                ).clip(-100.0, 100.0).alias("value")
+            )
+            .select("source", "target", "value")
+            .sort(["source", "target"])
+        )
+
+    def _set_relation_pairs(
+        self,
+        relations: pl.DataFrame,
+        pairs: Iterable[tuple[str, str]],
+        value: float,
+    ) -> pl.DataFrame:
+        normalized_value = float(max(-100.0, min(100.0, value)))
+        replacements = {
+            (self._tag(left), self._tag(right)): normalized_value
+            for left, right in pairs
+            if self._tag(left) and self._tag(right) and self._tag(left) != self._tag(right)
+        }
+        replacements.update({
+            (right, left): pair_value
+            for (left, right), pair_value in tuple(replacements.items())
+        })
+        if not replacements:
+            return relations
+        updates = pl.DataFrame(
+            [
+                {"source": source, "target": target, "_value": pair_value}
+                for (source, target), pair_value in sorted(replacements.items())
+            ],
+            schema={"source": pl.Utf8, "target": pl.Utf8, "_value": pl.Float64},
+        )
+        return (
+            relations.join(
+                updates,
+                on=["source", "target"],
+                how="full",
+                coalesce=True,
+            )
+            .with_columns(
+                pl.coalesce("_value", "value").alias("value")
+            )
+            .select("source", "target", "value")
+            .sort(["source", "target"])
+        )
 
     def _adjust_relation_pair(self, relations: pl.DataFrame, left: str, right: str, delta: float) -> pl.DataFrame:
         return self._set_relation_pair(
@@ -1161,18 +1410,19 @@ class DiplomacySystem(ISystem):
     def _relation_value(self, relations: pl.DataFrame | None, source: str, target: str) -> float:
         if relations is None or relations.is_empty():
             return 0.0
-        for row in relations.to_dicts():
-            if self._tag(row.get("source")) == self._tag(source) and self._tag(row.get("target")) == self._tag(target):
-                return self._number(row.get("value"))
-        return 0.0
+        source_tag, target_tag = self._tag(source), self._tag(target)
+        matches = relations.filter(
+            (pl.col("source") == source_tag)
+            & (pl.col("target") == target_tag)
+        ).select("value").head(1)
+        return 0.0 if matches.is_empty() else self._number(matches.item())
 
     def _replace_row(self, frame: pl.DataFrame, schema: Mapping[str, pl.DataType], identifier: str, updated: Mapping[str, Any]) -> pl.DataFrame:
-        rows = [row for row in frame.to_dicts() if str(row.get("id")) != identifier]
-        rows.append(dict(updated))
-        return self._frame(schema, rows)
+        remaining = frame.filter(pl.col("id").cast(pl.Utf8) != str(identifier))
+        return remaining.vstack(self._frame(schema, [dict(updated)]))
 
     def _append(self, frame: pl.DataFrame, schema: Mapping[str, pl.DataType], row: Mapping[str, Any]) -> pl.DataFrame:
-        return self._frame(schema, [*frame.to_dicts(), dict(row)])
+        return frame.vstack(self._frame(schema, [dict(row)]))
 
     def _frame(self, schema: Mapping[str, pl.DataType], rows: list[Mapping[str, Any]]) -> pl.DataFrame:
         if not rows:
@@ -1183,7 +1433,8 @@ class DiplomacySystem(ISystem):
     def _frame_like(self, original: pl.DataFrame, rows: list[Mapping[str, Any]]) -> pl.DataFrame:
         if not rows:
             return pl.DataFrame(schema=original.schema)
-        return pl.DataFrame(rows, strict=False)
+        # Sparse region columns must not let row order redefine the runtime schema.
+        return pl.DataFrame(rows, schema=original.schema, strict=False)
 
     def _next_identifier(self, prefix: str, existing: Iterable[Any], state: GameState) -> str:
         known = {str(value) for value in existing}
