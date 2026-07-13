@@ -1,0 +1,16 @@
+[
+  {
+    "day": 1,
+    "type": "modules.energy_crisis.actions.ActionSetEnergyPolicy",
+    "country_tag": "UKR",
+    "policy": "rationing",
+    "response_level": 0.85
+  },
+  {
+    "day": 3,
+    "type": "modules.energy_crisis.actions.ActionSetEnergyPolicy",
+    "country_tag": "DEU",
+    "policy": "conservation",
+    "response_level": 0.70
+  }
+]

@@ -14,6 +14,8 @@ never mutates the authoritative world.
 4. `GameSession` validates command envelopes and executes one atomic tick.
 5. Successful domain signals are appended to the persistent journal.
 6. `StateSnapshotEncoder` sends only changes since the latest client acknowledgement.
+7. Headless tooling fingerprints complete persistent state for deterministic
+   run comparison and writes machine-readable artifacts.
 
 ## Adding a gameplay feature
 
@@ -41,6 +43,10 @@ never mutates the authoritative world.
   state back to the start of the tick.
 - Command rejections, command failures, system errors, RNG state, and domain
   events are available in simulation artifacts and the in-game console.
+- `openpower mod validate` exercises manifest resolution, contribution import,
+  layered data, schemas, system ordering, action routes, and one startup tick.
+- `openpower sim run` and `openpower sim compare` expose the same runtime path
+  for scripted regression scenarios and full-state determinism checks.
 - The simulation process advances with a fixed wall-clock step. Headless tools
   may use a different explicit fixed step, but must never feed measured execution
   duration into gameplay logic.

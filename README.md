@@ -22,6 +22,13 @@
 
 See [Modding API](docs/MODDING.md) for concise module registration and
 [Runtime Architecture](docs/ARCHITECTURE.md) for extension and debugging contracts.
+The executable reference module lives in `modules/energy_crisis`.
+
+```powershell
+openpower mod validate energy_crisis
+openpower sim run --mods energy_crisis --days 30 --seed 42 --player UKR --actions modules/energy_crisis/scenarios/policy_response.json
+openpower sim compare --mods energy_crisis --days 30 --seed 42 --player UKR --actions modules/energy_crisis/scenarios/policy_response.json
+```
 
 ## 🛠️ In Progress & Roadmap
 

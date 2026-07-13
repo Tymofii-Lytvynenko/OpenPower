@@ -3,6 +3,27 @@
 The public authoring API is intentionally small. The engine still normalizes
 everything into `ModContribution`, but most mods only need the `mod()` helper.
 
+## CLI quickstart
+
+Create and validate an immediately loadable module from the project root:
+
+```powershell
+openpower mod create weather_pack
+openpower mod validate weather_pack
+```
+
+Run and compare deterministic simulations without opening the client:
+
+```powershell
+openpower sim run --mods weather_pack --days 365 --seed 42
+openpower sim compare --mods weather_pack --days 365 --seed 42 --runs 2
+```
+
+`mod validate` resolves dependencies, imports contributions, loads layered
+data, validates schemas and the system graph, and executes a startup tick.
+`sim compare` hashes every persistent field and table rather than comparing
+summary metrics.
+
 ## Minimal mod
 
 `mod.toml`:
@@ -131,3 +152,18 @@ def contribute():
 Use schemas for tables owned or extended by the mod. Add one sequential save
 migration whenever persisted structure changes. The same declarations work at
 the root mod level or inside a feature pack.
+
+## Reference mod
+
+`modules/energy_crisis` is an executable reference covering the complete
+extension path: feature composition, a custom action and domain event, schema
+extension, layered data, save migration, and an action-script scenario.
+
+```powershell
+openpower mod validate energy_crisis
+openpower sim run --mods energy_crisis --days 30 --seed 42 --player UKR --actions modules/energy_crisis/scenarios/policy_response.json
+```
+
+Action scripts may use a short action class name when it is unique. Qualified
+names such as `modules.energy_crisis.actions.ActionSetEnergyPolicy` remain
+collision-safe when multiple mods define similarly named actions.

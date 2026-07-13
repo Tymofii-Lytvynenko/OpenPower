@@ -13,6 +13,7 @@ from src.shared.config import GameConfig
 from src.simulation.actions import ActionScript
 from src.simulation.artifacts import SimulationArtifactWriter
 from src.simulation.diagnostics import DiagnosticIssue, SimulationDiagnostics
+from src.simulation.fingerprint import state_fingerprint
 from src.simulation.serialization import to_plain_data
 from src.simulation.snapshots import StateSnapshotBuilder
 
@@ -24,6 +25,7 @@ def _default_run_id() -> str:
 @dataclass(frozen=True)
 class SimulationRunConfig:
     project_root: Path
+    active_mods: tuple[str, ...] = ()
     save_name: str | None = None
     player_tag: str | None = None
     output_dir: Path | None = None
@@ -56,6 +58,7 @@ class SimulationRunConfig:
     def to_payload(self) -> dict[str, Any]:
         return to_plain_data({
             "project_root": self.project_root.resolve(),
+            "active_mods": self.active_mods,
             "save_name": self.save_name,
             "player_tag": self.player_tag,
             "output_dir": self.resolved_output_dir,
@@ -89,7 +92,9 @@ class SimulationRunReport:
     failed: bool
     failure_reasons: list[str]
     issue_counts: dict[str, int]
+    state_fingerprint: str
     final_snapshot: dict[str, Any]
+
 
 class HeadlessSimulationRunner:
     def __init__(self, config: SimulationRunConfig):
@@ -99,6 +104,10 @@ class HeadlessSimulationRunner:
 
     def run(self) -> SimulationRunReport:
         game_config = GameConfig(self.config.project_root)
+        if self.config.active_mods:
+            requested_mods = list(dict.fromkeys(self.config.active_mods))
+            game_config.requested_mods = requested_mods
+            game_config.active_mods = requested_mods
         game_config.dev_mode = self.config.engine_dev_mode
         session = GameSession.create_headless(
             game_config,
@@ -110,7 +119,14 @@ class HeadlessSimulationRunner:
         session.state.globals["game_speed"] = self.config.speed_level
 
         expected_player_tag = self.config.player_tag or session.state.globals.get("player_tag")
-        action_script = ActionScript.from_path(self.config.action_script_path) if self.config.action_script_path else ActionScript.empty()
+        action_script = (
+            ActionScript.from_path(
+                self.config.action_script_path,
+                action_types=session.engine.handled_action_types,
+            )
+            if self.config.action_script_path
+            else ActionScript.empty()
+        )
         writer = SimulationArtifactWriter(self.config.resolved_output_dir)
         writer.write_run_config(self.config.to_payload())
 
@@ -160,6 +176,7 @@ class HeadlessSimulationRunner:
         snapshots_written.append(writer.write_snapshot(final_snapshot, "final"))
         if self.config.export_final_tables:
             table_exports.append(writer.write_state_tables(session.state, "final"))
+        fingerprint = state_fingerprint(session.state)
 
         failure_reasons.extend(self._failure_reasons(issue_totals))
         final_report_payload = {
@@ -168,6 +185,7 @@ class HeadlessSimulationRunner:
             "failed": bool(failure_reasons),
             "failure_reasons": failure_reasons,
             "issue_counts": dict(issue_totals),
+            "state_fingerprint": fingerprint,
             "issue_examples": {code: to_plain_data(issue) for code, issue in issue_examples.items()},
             "snapshots_written": snapshots_written,
             "table_exports": table_exports,
@@ -186,8 +204,10 @@ class HeadlessSimulationRunner:
             failed=bool(failure_reasons),
             failure_reasons=failure_reasons,
             issue_counts=dict(issue_totals),
+            state_fingerprint=fingerprint,
             final_snapshot=final_snapshot,
         )
+
     def _inspect_if_due(
         self,
         session: GameSession,

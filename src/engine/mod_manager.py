@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import sys
 from dataclasses import dataclass
 from typing import Dict, List
 
@@ -60,7 +61,17 @@ class ModManager:
             if not registration_path.exists():
                 continue
 
-            registration_module = importlib.import_module(f"modules.{manifest.id}.registration")
+            project_root = str(self.config.project_root)
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
+            package_name = manifest.path.name
+            if not package_name.isidentifier():
+                raise RuntimeError(
+                    f"Module directory '{package_name}' must be a valid Python identifier."
+                )
+            registration_module = importlib.import_module(
+                f"modules.{package_name}.registration"
+            )
             contributor = getattr(registration_module, "contribute", None)
             if not callable(contributor):
                 raise RuntimeError(

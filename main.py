@@ -1,23 +1,32 @@
-import arcade
+from __future__ import annotations
+
 import sys
 import os
 import multiprocessing as mp
 from pathlib import Path
-from pyinstrument import Profiler
+from typing import Sequence
 
 # 1. Setup Python Path
 ROOT_DIR = Path(__file__).parent.resolve()
 sys.path.append(str(ROOT_DIR))
 
-# 2. Imports
-from src.shared.config import GameConfig
-from src.client.window import MainWindow
+def main(argv: Sequence[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments:
+        from src.cli import main as cli_main
+        return cli_main(arguments)
 
+    import arcade
+    from src.shared.config import GameConfig
+    from src.client.window import MainWindow
 
-def main():
-    # Performance Profiling (Optional: Can be toggleable via args)
-    profiler = Profiler()
-    profiler.start()
+    try:
+        from pyinstrument import Profiler
+    except ImportError:
+        profiler = None
+    else:
+        profiler = Profiler()
+        profiler.start()
 
     print("--- OpenPower Engine Initializing ---")
     print(f"Process ID (PID): {os.getpid()}")
@@ -39,17 +48,16 @@ def main():
     try:
         arcade.run()
     finally:
-        profiler.stop()
-
-        # Save profile only if meaningful data exists
-        if profiler.last_session:
-            output_path = "profile_results.html"
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(profiler.output_html())
-            print(f"✅ Saved {output_path}")
+        if profiler is not None:
+            profiler.stop()
+            if profiler.last_session:
+                output_path = ROOT_DIR / "profile_results.html"
+                output_path.write_text(profiler.output_html(), encoding="utf-8")
+                print(f"Saved {output_path}")
+    return 0
 
 
 if __name__ == "__main__":
     mp.freeze_support()
-    mp.set_start_method('spawn', force=True)
-    main()
+    mp.set_start_method("spawn", force=True)
+    raise SystemExit(main())

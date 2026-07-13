@@ -47,10 +47,12 @@ openpower = "main:main"
 
 [tool.setuptools]
 py-modules = ["main"]
-packages = ["src"]
+include-package-data = true
 
-[tool.setuptools.package-dir]
-src = "src"
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+namespaces = true
 
 [tool.setuptools.package-data]
 "*" = ["*.toml", "*.tsv", "*.json", "*.png", "*.jpg", "*.jpeg", "*.glsl"]
