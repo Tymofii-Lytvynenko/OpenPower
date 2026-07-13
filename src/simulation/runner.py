@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import random
 import time
 from collections import Counter
 from dataclasses import dataclass, field
@@ -99,15 +98,13 @@ class HeadlessSimulationRunner:
         self.snapshot_builder = StateSnapshotBuilder(config.table_sample_limit)
 
     def run(self) -> SimulationRunReport:
-        if self.config.random_seed is not None:
-            random.seed(self.config.random_seed)
-
         game_config = GameConfig(self.config.project_root)
         game_config.dev_mode = self.config.engine_dev_mode
         session = GameSession.create_headless(
             game_config,
             save_name=self.config.save_name,
             player_tag=self.config.player_tag,
+            random_seed=self.config.random_seed,
         )
         session.state.time.speed_level = self.config.speed_level
         session.state.globals["game_speed"] = self.config.speed_level

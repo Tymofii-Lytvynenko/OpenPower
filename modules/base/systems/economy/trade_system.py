@@ -1,7 +1,8 @@
 import polars as pl
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_HELPER
 from src.shared.state import GameState
+from src.shared.numeric import stable_sum
 from src.shared.events import EventRealSecond
 from modules.base.systems.economy.treaty_trade_policy import TreatyTradePolicy
 
@@ -10,6 +11,12 @@ class TradeSystem(ISystem):
     Simulates Global Market Clearing with Physical Constraints.
     Features: Service Evaporation, Asset Depreciation, and Organic Market Pressure.
     """
+
+    access = SystemAccess(
+        reads=frozenset({'countries', 'domestic_production', 'countries_treaties'}),
+        writes=frozenset({'countries', 'resource_ledger'}),
+        phase=SystemPhase.TRADE,
+    )
 
     runtime_state_contract = {
         "_missing_columns": SYSTEM_STATE_CACHE,
@@ -167,9 +174,9 @@ class TradeSystem(ISystem):
         # ---------------------------------------------------------
         # Global Market Clearing
         # ---------------------------------------------------------
-        world_market_lf = market_lf.group_by("game_resource_id").agg(
-            pl.col("export_desired").sum().alias("global_supply"),
-            pl.col("affordable_import").sum().alias("global_demand")
+        world_market_lf = market_lf.group_by("game_resource_id", maintain_order=True).agg(
+            stable_sum("export_desired").alias("global_supply"),
+            stable_sum("affordable_import").alias("global_demand")
         )
 
         market_lf = market_lf.join(world_market_lf, on="game_resource_id", how="left")
@@ -230,9 +237,9 @@ class TradeSystem(ISystem):
             .otherwise(0.0).alias("gov_tax_revenue")
         )
 
-        budget_updates_lf = market_lf.group_by("country_id").agg(
-            pl.col("gov_tax_revenue").sum().alias("trade_income"),
-            pl.col("gov_import_expense").sum().alias("trade_expense")
+        budget_updates_lf = market_lf.group_by("country_id", maintain_order=True).agg(
+            stable_sum("gov_tax_revenue").alias("trade_income"),
+            stable_sum("gov_import_expense").alias("trade_expense")
         )
 
         # Drop old trade columns before join to avoid _right suffix clashes
@@ -245,7 +252,7 @@ class TradeSystem(ISystem):
         # BudgetSystem handles the annual rates we just stored in countries_lf.
 
         # EXECUTE
-        market_df = market_lf.collect()
+        market_df = market_lf.collect().sort(["country_id", "game_resource_id"])
         treaty_effects = state.tables.get("treaty_effects")
         constrained_flows = None
         if self._treaty_trade_policy.has_constraints(treaty_effects):
@@ -256,7 +263,14 @@ class TradeSystem(ISystem):
             countries_df = countries_lf.collect()
 
         # Update State
-        state.update_table("stockpiles", market_df.select(["country_id", "game_resource_id", pl.col("new_stock_amount").alias("stock_amount")]))
+        state.update_table(
+            "stockpiles",
+            market_df.select([
+                "country_id",
+                "game_resource_id",
+                pl.col("new_stock_amount").alias("stock_amount"),
+            ]).sort(["country_id", "game_resource_id"]),
+        )
         
         # Create trade_network table for InternalEconomySystem ledger
         # In a global pool model, we represent this as flows between countries and the "WORLD"
@@ -273,9 +287,19 @@ class TradeSystem(ISystem):
             pl.col("import_actual").alias("trade_value_usd")
         ])
         if constrained_flows is not None:
-            state.update_table("trade_network", constrained_flows)
+            state.update_table(
+                "trade_network",
+                constrained_flows.sort(
+                    ["exporter_id", "importer_id", "game_resource_id"]
+                ),
+            )
         else:
-            state.update_table("trade_network", pl.concat([exports_df, imports_df]))
+            state.update_table(
+                "trade_network",
+                pl.concat([exports_df, imports_df]).sort(
+                    ["exporter_id", "importer_id", "game_resource_id"]
+                ),
+            )
 
         final_prod_cols = [c for c in market_df.columns if c not in [
             "demand", "stock_amount", "local_supply", "export_desired", "import_desired", "priority", 
@@ -283,8 +307,11 @@ class TradeSystem(ISystem):
             "import_actual", "export_actual", "unsold_amount", "new_stock_amount", "stock_to_prod_ratio", 
             "production_penalty_pct", "total_tax", "gov_import_expense", "gov_tax_revenue", "is_storable", "decay_rate"
         ]]
-        state.update_table("domestic_production", market_df.select(final_prod_cols))
-        state.update_table("countries", countries_df)
+        state.update_table(
+            "domestic_production",
+            market_df.select(final_prod_cols).sort(["country_id", "game_resource_id"]),
+        )
+        state.update_table("countries", countries_df.sort("id"))
 
     def _apply_treaty_production_bonus(self, state: GameState, production: pl.LazyFrame) -> pl.LazyFrame:
         effects = state.tables.get("treaty_effects")
@@ -292,8 +319,8 @@ class TradeSystem(ISystem):
             return production
         bonuses = (
             effects.filter(pl.col("effect") == "resource_production_bonus")
-            .group_by("country_id")
-            .agg(pl.col("value").sum().clip(0.0, 0.25).alias("treaty_production_bonus"))
+            .group_by("country_id", maintain_order=True)
+            .agg(stable_sum("value").clip(0.0, 0.25).alias("treaty_production_bonus"))
         )
         return (
             production
@@ -304,11 +331,11 @@ class TradeSystem(ISystem):
 
     def _apply_constrained_flows(self, market: pl.DataFrame, flows: pl.DataFrame, fraction: float) -> pl.DataFrame:
         """Reconcile market balances, stockpiles, and public revenue with bilateral flows."""
-        exports = flows.group_by(["exporter_id", "game_resource_id"]).agg(
-            pl.col("trade_value_usd").sum().alias("export_actual")
+        exports = flows.group_by(["exporter_id", "game_resource_id"], maintain_order=True).agg(
+            stable_sum("trade_value_usd").alias("export_actual")
         ).rename({"exporter_id": "country_id"})
-        imports = flows.group_by(["importer_id", "game_resource_id"]).agg(
-            pl.col("trade_value_usd").sum().alias("import_actual")
+        imports = flows.group_by(["importer_id", "game_resource_id"], maintain_order=True).agg(
+            stable_sum("trade_value_usd").alias("import_actual")
         ).rename({"importer_id": "country_id"})
         reconciled = (
             market.drop(["import_actual", "export_actual"], strict=False)
@@ -347,9 +374,9 @@ class TradeSystem(ISystem):
         return reconciled.drop("base_domestic_production")
 
     def _countries_from_constrained_market(self, state: GameState, market: pl.DataFrame) -> pl.DataFrame:
-        updates = market.group_by("country_id").agg([
-            pl.col("gov_tax_revenue").sum().alias("trade_income"),
-            pl.col("gov_import_expense").sum().alias("trade_expense"),
+        updates = market.group_by("country_id", maintain_order=True).agg([
+            stable_sum("gov_tax_revenue").alias("trade_income"),
+            stable_sum("gov_import_expense").alias("trade_expense"),
         ])
         return (
             state.get_table("countries")

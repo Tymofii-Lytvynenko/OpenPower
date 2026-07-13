@@ -1,6 +1,7 @@
 id = "base"
 name = "OpenPower Core"
 version = "0.0.1 Prototype"
+api_version = 1
 dependencies = []
 
 [metadata]

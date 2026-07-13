@@ -8,7 +8,7 @@ import polars as pl
 
 from modules.base.systems.military.combat_system import CombatSystem
 from modules.base.systems.world.ai_system import AISystem, build_ai_alliance_action, build_ai_peace_action, build_ai_war_action
-from modules.base.systems.world.diplomacy_system import DiplomacySystem
+from modules.base.systems.world.treaty_diplomacy import DiplomacySystem
 from src.core.saves import list_available_saves
 from src.engine.simulator import Engine
 from src.server.io.save_writer import SaveWriter
@@ -74,7 +74,8 @@ class TestSaveActionAndWriter(unittest.TestCase):
 
         save_dir = self.project_root / "user_data" / "saves" / "autosave_1"
         self.assertEqual(session.state.globals["tick"], 1)
-        self.assertEqual(session.action_queue, [])
+        self.assertEqual(session.state.current_actions, [])
+        self.assertEqual(session.state.journal.command_results[-1]["status"], "executed")
         self.assertTrue(save_dir.exists())
         self.assertTrue((save_dir / "meta.json").exists())
         self.assertTrue((save_dir / "tables" / "regions.parquet").exists())

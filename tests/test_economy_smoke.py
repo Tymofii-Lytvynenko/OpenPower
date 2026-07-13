@@ -4,7 +4,7 @@ from src.shared.config import GameConfig
 from src.engine.mod_manager import ModManager
 from src.engine.simulator import Engine
 from src.server.io.data_load_manager import DataLoader
-from src.server.state_bootstrap import ensure_ui_support_tables
+from modules.base.schema import ensure_base_tables
 
 class TestEconomySmoke(unittest.TestCase):
     def test_one_cycle_simulation(self):
@@ -19,11 +19,11 @@ class TestEconomySmoke(unittest.TestCase):
         # 2. Load Real Initial Database
         loader = DataLoader(config)
         state = loader.load_initial_state()
-        ensure_ui_support_tables(state)
+        ensure_base_tables(state)
         
         # 3. Register systems
         engine = Engine(dev_mode=True)
-        systems = mod_manager.load_systems()
+        systems = mod_manager.load_runtime().systems
         engine.register_systems(systems)
         
         # 4. Step Engine (simulating 1.0 real-time second to trigger EventRealSecond updates)

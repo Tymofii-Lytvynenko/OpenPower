@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from src.shared.config import GameConfig
+from src.shared.migrations import SAVE_FORMAT_VERSION
 from src.shared.state import GameState, persistent_state_field_names, persistent_state_fields
 from src.core.saves import list_available_saves
 
@@ -73,8 +74,11 @@ class SaveWriter:
         Internal serialization logic using Reflection.
         """
         meta_data = {
-            "version": 1,
+            "version": SAVE_FORMAT_VERSION,
             "timestamp": datetime.now().isoformat(),
+            "schema_versions": (
+                state.schema_registry.versions() if state.schema_registry is not None else {}
+            ),
             "persistent_fields": list(persistent_state_field_names()),
             "checkpointed_systems": sorted(state.system_state.keys()),
         }

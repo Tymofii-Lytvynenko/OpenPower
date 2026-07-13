@@ -22,6 +22,8 @@ class SimulationDiagnostics:
     def inspect(self, state: GameState, expected_player_tag: str | None = None) -> list[DiagnosticIssue]:
         issues: list[DiagnosticIssue] = []
         issues.extend(self._system_errors(state))
+        issues.extend(self._schema_contract(state))
+        issues.extend(self._command_failures(state))
         issues.extend(self._required_tables(state))
         issues.extend(self._player_country(state, expected_player_tag))
         issues.extend(self._country_ids(state))
@@ -29,6 +31,32 @@ class SimulationDiagnostics:
         issues.extend(self._unit_references(state))
         issues.extend(self._finite_country_numbers(state))
         return issues
+
+    def _schema_contract(self, state: GameState) -> Iterable[DiagnosticIssue]:
+        if state.schema_registry is None:
+            return
+        for issue in state.schema_registry.validate_state(state):
+            yield DiagnosticIssue(
+                severity="error",
+                code=f"schema_{issue.code}",
+                message=issue.message,
+                table=issue.table,
+            )
+
+    def _command_failures(self, state: GameState) -> Iterable[DiagnosticIssue]:
+        tick = int(state.globals.get("tick", 0))
+        for result in state.journal.command_results:
+            if int(result.get("tick", -1)) != tick:
+                continue
+            status = str(result.get("status", ""))
+            if status not in {"failed", "rejected"}:
+                continue
+            yield DiagnosticIssue(
+                severity="error" if status == "failed" else "warning",
+                code=f"command_{status}",
+                message=str(result.get("message") or result.get("code") or status),
+                details={"command_id": result.get("command_id")},
+            )
 
     def _system_errors(self, state: GameState) -> Iterable[DiagnosticIssue]:
         for event in state.events:

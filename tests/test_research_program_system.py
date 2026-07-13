@@ -5,7 +5,7 @@ import unittest
 import polars as pl
 
 from modules.base.systems.military.research_program_system import ResearchProgramSystem
-from src.server.state_bootstrap import ensure_ui_support_tables
+from modules.base.schema import ensure_base_tables
 from modules.base.systems.military.military_system import MilitarySystem
 from src.shared.actions import ActionCancelProductionOrder, ActionCreateUnitDesign, ActionQueueUnitProduction, ActionUpdateResearchFunding
 from src.shared.events import EventRealSecond
@@ -84,7 +84,7 @@ class ResearchProgramSystemTest(unittest.TestCase):
                 "value": [10.0], "detail": ['["USA"]'],
             }),
         })
-        ensure_ui_support_tables(state)
+        ensure_base_tables(state)
         return state
 
 

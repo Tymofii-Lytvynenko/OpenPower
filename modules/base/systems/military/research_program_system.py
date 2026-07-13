@@ -6,7 +6,7 @@ from typing import Any
 
 import polars as pl
 
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.actions import (
     ActionCancelProductionOrder,
     ActionCreateUnitDesign,
@@ -22,6 +22,20 @@ _SECONDS_PER_YEAR = 365.25 * 24 * 60 * 60
 
 class ResearchProgramSystem(ISystem):
     """Keeps player research and procurement choices in authoritative state tables."""
+
+    access = SystemAccess(
+        reads=frozenset({'countries', 'research_tracks', 'unit_designs', 'production_orders'}),
+        writes=frozenset({'countries', 'research_tracks', 'unit_designs', 'production_orders'}),
+        handles=frozenset(
+            {
+                ActionCancelProductionOrder,
+                ActionCreateUnitDesign,
+                ActionQueueUnitProduction,
+                ActionUpdateResearchFunding,
+            }
+        ),
+        phase=SystemPhase.RESEARCH,
+    )
 
     @property
     def id(self) -> str:

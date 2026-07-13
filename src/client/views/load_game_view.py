@@ -103,6 +103,7 @@ class LoadGameView(BaseImGuiView):
                     action_queue=bundle.action_queue,
                     state_queue=bundle.state_queue,
                     progress_queue=bundle.progress_queue,
+                    snapshot_ack_queue=bundle.snapshot_ack_queue,
                     process=bundle.process,
                 )
 

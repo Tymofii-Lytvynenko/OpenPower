@@ -1,10 +1,15 @@
 import polars as pl
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
 from src.shared.events import EventRealSecond
 
 class PopulationSystem(ISystem):
+    access = SystemAccess(
+        reads=frozenset({'countries', 'regions'}),
+        writes=frozenset({'countries', 'regions'}),
+        phase=SystemPhase.POPULATION,
+    )
     runtime_state_contract = {
         "_missing_columns": SYSTEM_STATE_CACHE,
     }

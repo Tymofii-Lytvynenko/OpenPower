@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Protocol, runtime_checkable
 
-from src.engine.interfaces import ICheckpointedSystem
+from src.shared.system_interfaces import ICheckpointedSystem
 
 SYSTEM_STATE_CHECKPOINT = "checkpoint"
 SYSTEM_STATE_CACHE = "cache"

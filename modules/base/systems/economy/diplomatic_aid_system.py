@@ -7,7 +7,7 @@ from typing import Any
 
 import polars as pl
 
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.events import EventRealSecond
 from src.shared.state import GameState
 
@@ -22,6 +22,12 @@ TRANSFER_SCHEMA = {
 
 class DiplomaticAidSystem(ISystem):
     """Limits aid by both recipient needs and each donor's annual budget."""
+
+    access = SystemAccess(
+        reads=frozenset({'countries', 'countries_relations'}),
+        writes=frozenset({'countries'}),
+        phase=SystemPhase.POST_PROCESS,
+    )
 
     @property
     def id(self) -> str:

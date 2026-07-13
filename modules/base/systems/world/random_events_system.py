@@ -1,8 +1,7 @@
-import random
-import uuid
 from typing import List, Dict, Any
 
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
+from src.shared.determinism import DeterministicRuntime
 from src.shared.state import GameState
 from src.shared.events import EventNewDay, EventRandomEventTriggered
 
@@ -66,6 +65,12 @@ class RandomEventsSystem(ISystem):
         ]
     """
 
+    access = SystemAccess(
+        reads=frozenset({'regions'}),
+        writes=frozenset(),
+        phase=SystemPhase.RANDOM_EVENTS,
+    )
+
     @property
     def id(self) -> str:
         return "base.random_events"
@@ -82,6 +87,7 @@ class RandomEventsSystem(ISystem):
 
         active: list[dict] = state.globals["active_events"]
         now = state.time.total_minutes
+        runtime = DeterministicRuntime(state.determinism)
 
         # 1. React to EventNewDay — roll for events & prune expired
         for event in state.events:
@@ -95,10 +101,10 @@ class RandomEventsSystem(ISystem):
             if len(active) >= MAX_ACTIVE_EVENTS:
                 continue
 
-            if random.random() > BASE_DAILY_CHANCE:
+            if runtime.random() > BASE_DAILY_CHANCE:
                 continue
 
-            new_event = self._generate_event(state, now)
+            new_event = self._generate_event(state, now, runtime)
             if new_event is not None:
                 active.append(new_event)
 
@@ -111,7 +117,12 @@ class RandomEventsSystem(ISystem):
 
     # ── Private helpers ──────────────────────────────────────
 
-    def _generate_event(self, state: GameState, now_minutes: int) -> dict | None:
+    def _generate_event(
+        self,
+        state: GameState,
+        now_minutes: int,
+        runtime: DeterministicRuntime,
+    ) -> dict | None:
         """Pick a random event type and a random region."""
         if "regions" not in state.tables:
             return None
@@ -121,17 +132,17 @@ class RandomEventsSystem(ISystem):
             return None
 
         # Pick a weighted-random event template
-        template = self._weighted_choice()
+        template = self._weighted_choice(runtime)
 
         # Pick a random region
         region_ids = regions["id"].to_list()
-        region_id = random.choice(region_ids)
+        region_id = runtime.choice(region_ids)
 
-        severity = round(random.uniform(0.2, 1.0), 2)
+        severity = round(runtime.uniform(0.2, 1.0), 2)
         duration_minutes = template["duration_days"] * _MINUTES_PER_DAY
 
         return {
-            "id": uuid.uuid4().hex[:12],
+            "id": runtime.next_id("random-event", int(state.globals.get("tick", 0))),
             "event_type": template["type"],
             "label": template["label"],
             "region_id": int(region_id),
@@ -141,9 +152,9 @@ class RandomEventsSystem(ISystem):
         }
 
     @staticmethod
-    def _weighted_choice() -> dict:
+    def _weighted_choice(runtime: DeterministicRuntime) -> dict:
         """Select a catalog entry proportional to its weight."""
-        r = random.uniform(0, _TOTAL_WEIGHT)
+        r = runtime.uniform(0, _TOTAL_WEIGHT)
         cumulative = 0.0
         for entry in EVENT_CATALOG:
             cumulative += entry["weight"]

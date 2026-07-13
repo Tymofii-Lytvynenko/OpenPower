@@ -17,7 +17,7 @@ import polars as pl
 
 from modules.base.systems.world.treaty_geography import TreatyGeography
 from modules.base.systems.world.annexation_policy import AnnexationPolicy
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.actions import (
     ActionCreateTreaty,
     ActionDeclareWar,
@@ -99,8 +99,25 @@ LONG_TERM_RELATION_DELTAS = {
 }
 
 
-class TreatyDiplomacySystem(ISystem):
+class DiplomacySystem(ISystem):
     """Processes treaty commands and publishes deterministic gameplay effects."""
+
+    access = SystemAccess(
+        reads=frozenset({'countries', 'regions', 'units', 'countries_relations', 'countries_treaties', 'countries_wars', 'pending_treaties', 'treaty_effects', 'annexation_claims'}),
+        writes=frozenset({'countries_relations', 'countries_treaties', 'countries_wars', 'pending_treaties', 'treaty_effects', 'annexation_claims', 'messages', 'news_items', 'regions'}),
+        handles=frozenset(
+            {
+                ActionCreateTreaty,
+                ActionDeclareWar,
+                ActionExpelTreatyMember,
+                ActionJoinTreaty,
+                ActionLeaveTreaty,
+                ActionOfferPeace,
+                ActionRespondTreaty,
+            }
+        ),
+        phase=SystemPhase.DIPLOMACY,
+    )
 
     @property
     def id(self) -> str:

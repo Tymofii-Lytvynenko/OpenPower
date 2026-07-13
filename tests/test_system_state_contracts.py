@@ -1,12 +1,13 @@
 import unittest
 
-from src.engine.interfaces import ICheckpointedSystem, ISystem
+from src.shared.system_interfaces import ICheckpointedSystem, ISystem, SystemAccess
 from src.engine.simulator import Engine
 from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_CHECKPOINT
 from src.shared.state import GameState
 
 
 class UndeclaredStateSystem(ISystem):
+    access = SystemAccess()
     def __init__(self):
         self._buffer = []
 
@@ -23,6 +24,7 @@ class UndeclaredStateSystem(ISystem):
 
 
 class BrokenCheckpointContractSystem(ISystem):
+    access = SystemAccess()
     runtime_state_contract = {
         "counter": SYSTEM_STATE_CHECKPOINT,
     }
@@ -43,6 +45,7 @@ class BrokenCheckpointContractSystem(ISystem):
 
 
 class CounterCheckpointSystem(ISystem, ICheckpointedSystem):
+    access = SystemAccess()
     runtime_state_contract = {
         "counter": SYSTEM_STATE_CHECKPOINT,
     }
@@ -69,6 +72,7 @@ class CounterCheckpointSystem(ISystem, ICheckpointedSystem):
 
 
 class LateRuntimeStateSystem(ISystem):
+    access = SystemAccess()
     runtime_state_contract = {
         "_buffer": SYSTEM_STATE_CACHE,
     }

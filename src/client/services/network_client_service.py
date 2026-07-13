@@ -1,3 +1,4 @@
+from dataclasses import replace
 from typing import TYPE_CHECKING
 from src.shared.actions import GameAction
 
@@ -26,14 +27,14 @@ class NetworkClient:
         if hasattr(self.session, "system_errors"):
             self.session.system_errors.clear() 
 
-    def send_action(self, action: GameAction):
+    def send_action(self, action: GameAction) -> str:
         """
         Sends an intent to the server.
         The client NEVER applies this action locally. It waits for the 
         server to process it and send back a new State.
         """
-        action.player_id = self.player_id
-        self.session.receive_action(action)
+        authoritative_action = replace(action, player_id=self.player_id)
+        return self.session.receive_action(authoritative_action)
 
     def get_state(self) -> "GameState":
         """

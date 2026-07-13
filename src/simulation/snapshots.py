@@ -41,6 +41,17 @@ class StateSnapshotBuilder:
             "globals": to_plain_data(state.globals),
             "player": self._player_summary(state),
             "events": self._event_summary(state),
+            "journal": {
+                "domain_event_count": len(state.journal.domain_events),
+                "command_result_count": len(state.journal.command_results),
+                "recent_domain_events": to_plain_data(state.journal.domain_events[-20:]),
+                "recent_command_results": to_plain_data(state.journal.command_results[-20:]),
+            },
+            "determinism": {
+                "seed": state.determinism.seed,
+                "rng_state": state.determinism.rng_state,
+                "id_sequence": state.determinism.id_sequence,
+            },
             "diagnostics": {
                 "counts": issue_counts(diagnostics),
                 "issues": [to_plain_data(issue) for issue in diagnostics],

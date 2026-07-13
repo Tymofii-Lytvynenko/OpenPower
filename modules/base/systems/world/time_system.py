@@ -1,7 +1,7 @@
 from datetime import timedelta
 from typing import Any, Dict, List, Mapping
 
-from src.engine.interfaces import ICheckpointedSystem, ISystem
+from src.shared.system_interfaces import ICheckpointedSystem, ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CHECKPOINT, export_declared_checkpoint_state
 from src.shared.state import GameState, GAME_EPOCH
 from src.shared.actions import ActionSetGameSpeed, ActionSetPaused
@@ -18,6 +18,13 @@ class TimeSystem(ISystem, ICheckpointedSystem):
     - Updates 'state.time' (Year, Month, Day)
     - Emits 'EventNewDay', 'EventNewHour', and 'EventRealSecond'
     """
+
+    access = SystemAccess(
+        reads=frozenset(),
+        writes=frozenset(),
+        handles=frozenset({ActionSetGameSpeed, ActionSetPaused}),
+        phase=SystemPhase.CLOCK,
+    )
 
     runtime_state_contract = {
         "real_sec_timer": SYSTEM_STATE_CHECKPOINT,

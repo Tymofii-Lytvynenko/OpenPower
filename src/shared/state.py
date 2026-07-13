@@ -1,12 +1,16 @@
+import copy
 import dataclasses
-import io
 import polars as pl
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping, TYPE_CHECKING
 
 from src.shared.actions import GameAction
-from src.shared.events import GameEvent
+from src.shared.determinism import DeterminismState
+from src.shared.events import GameEvent, JournalState
+
+if TYPE_CHECKING:
+    from src.shared.schema import WorldSchemaRegistry
 
 
 # The fixed epoch from which all in-game dates are calculated.
@@ -56,6 +60,19 @@ class TimeData:
 
 
 @dataclass
+class GameStateCheckpoint:
+    tables: Dict[str, pl.DataFrame]
+    time: TimeData
+    globals: Dict[str, Any]
+    system_state: Dict[str, Dict[str, Any]]
+    determinism: DeterminismState
+    journal: JournalState
+    events: List["GameEvent"]
+    current_actions: List["GameAction"]
+    table_revisions: Dict[str, int]
+
+
+@dataclass
 class GameState:
     """
     The central data store for the entire simulation.
@@ -95,8 +112,18 @@ class GameState:
         metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_PERSISTENT},
     )
 
-    # The Event Bus.
-    # Systems append events here during their update.
+    determinism: DeterminismState = field(
+        default_factory=DeterminismState,
+        metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_PERSISTENT},
+    )
+
+    journal: JournalState = field(
+        default_factory=JournalState,
+        metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_PERSISTENT},
+    )
+
+    # The transient intra-tick signal bus. Durable gameplay facts are promoted
+    # to journal entries by the session after a successful engine step.
     # The Engine clears this list at the start of every tick.
     events: List["GameEvent"] = field(
         default_factory=list,
@@ -110,52 +137,88 @@ class GameState:
         metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_TRANSIENT},
     )
 
+    _schema_registry: Any = field(
+        default=None,
+        init=False,
+        repr=False,
+        metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_TRANSIENT},
+    )
+    _table_revisions: Dict[str, int] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+        metadata={PERSISTENCE_METADATA_KEY: PERSISTENCE_TRANSIENT},
+    )
+
+    def __post_init__(self) -> None:
+        self._table_revisions = {name: 1 for name in self.tables}
+
+    def bind_schema_registry(self, registry: "WorldSchemaRegistry") -> None:
+        self._schema_registry = registry
+
+    @property
+    def schema_registry(self) -> "WorldSchemaRegistry | None":
+        return self._schema_registry
+
+    @property
+    def table_revisions(self) -> Mapping[str, int]:
+        return self._table_revisions
+
     def get_table(self, name: str) -> pl.DataFrame:
-        """Retrieves a reference to a simulation table by name."""
         if name not in self.tables:
             raise KeyError(f"Table '{name}' not found in GameState.")
         return self.tables[name]
 
     def update_table(self, name: str, df: pl.DataFrame) -> None:
-        """Replaces a table in the state (Copy-on-Write semantics)."""
+        if not isinstance(df, pl.DataFrame):
+            raise TypeError(f"Table '{name}' must be a Polars DataFrame.")
+        if self._schema_registry is not None:
+            df = self._schema_registry.normalize(name, df)
         self.tables[name] = df
+        self._table_revisions[name] = self._table_revisions.get(name, 0) + 1
+
+    def remove_table(self, name: str) -> None:
+        self.tables.pop(name, None)
+        self._table_revisions[name] = self._table_revisions.get(name, 0) + 1
+
+    def create_checkpoint(self) -> GameStateCheckpoint:
+        # Polars frames are immutable and copy-on-write, so retaining frame
+        # references is sufficient while mutable Python containers are copied.
+        return GameStateCheckpoint(
+            tables=dict(self.tables),
+            time=copy.deepcopy(self.time),
+            globals=copy.deepcopy(self.globals),
+            system_state=copy.deepcopy(self.system_state),
+            determinism=copy.deepcopy(self.determinism),
+            journal=copy.deepcopy(self.journal),
+            events=copy.deepcopy(self.events),
+            current_actions=list(self.current_actions),
+            table_revisions=dict(self._table_revisions),
+        )
+
+    def restore_checkpoint(self, checkpoint: GameStateCheckpoint) -> None:
+        self.tables = dict(checkpoint.tables)
+        self.time = checkpoint.time
+        self.globals = checkpoint.globals
+        self.system_state = checkpoint.system_state
+        self.determinism = checkpoint.determinism
+        self.journal = checkpoint.journal
+        self.events = checkpoint.events
+        self.current_actions = checkpoint.current_actions
+        self._table_revisions = checkpoint.table_revisions
 
     # --- MULTIPROCESSING IPC METHODS ---
 
-    def to_ipc(self) -> dict:
-        """
-        Packs the state into raw bytes using Zero-Copy Arrow IPC.
-        Called by the Simulation Process before sending state to the UI.
-        """
-        ipc_tables = {}
-        for name, df in self.tables.items():
-            f = io.BytesIO()
-            df.write_ipc(f)
-            ipc_tables[name] = f.getvalue()
+    def to_ipc(self) -> dict[str, Any]:
+        from src.shared.snapshots import StateSnapshotEncoder
 
-        return {
-            "tables": ipc_tables,
-            "time": self.time,
-            "globals": self.globals,
-            "system_state": self.system_state,
-            "events": self.events,
-        }
+        return StateSnapshotEncoder().encode(self, force_full=True)
 
     @classmethod
-    def from_ipc(cls, data: dict) -> "GameState":
-        """
-        Unpacks the bytes back into Polars DataFrames.
-        Executes on the Client Process (Window) after receiving from the server.
-        """
-        state = cls()
-        for name, b_data in data["tables"].items():
-            state.tables[name] = pl.read_ipc(io.BytesIO(b_data))
+    def from_ipc(cls, data: dict[str, Any]) -> "GameState":
+        from src.shared.snapshots import StateSnapshotDecoder
 
-        state.time = data["time"]
-        state.globals = data["globals"]
-        state.system_state = data.get("system_state", {})
-        state.events = data.get("events", [])
-        return state
+        return StateSnapshotDecoder().decode(data)
 
 
 def validate_game_state_persistence_contract() -> None:

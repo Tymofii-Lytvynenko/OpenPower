@@ -11,6 +11,7 @@ class ModManifest:
     id: str
     name: str
     version: str
+    api_version: int = 1
     dependencies: List[str] = field(default_factory=list)
     path: Path = field(default_factory=Path)
 
@@ -72,6 +73,7 @@ def discover_mods(modules_dir: Path) -> Dict[str, ModManifest]:
                 id=data.get("id", mod_dir.name),
                 name=data.get("name", mod_dir.name),
                 version=data.get("version", "0.0.1"),
+                api_version=int(data.get("api_version", 1)),
                 dependencies=data.get("dependencies", []),
                 path=mod_dir,
             )
@@ -83,6 +85,7 @@ def discover_mods(modules_dir: Path) -> Dict[str, ModManifest]:
                 id=mod_dir.name,
                 name=mod_dir.name,
                 version="0.0.1",
+                api_version=1,
                 dependencies=[],
                 path=mod_dir,
             )

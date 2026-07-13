@@ -32,7 +32,9 @@ class TreatyTradePolicy:
     def allocate(self, market: pl.DataFrame, effects: pl.DataFrame) -> pl.DataFrame:
         common_peers, embargoes = self._constraints(effects)
         flows: list[dict[str, Any]] = []
-        for resource_id, resource_market in market.group_by("game_resource_id", maintain_order=True):
+        for resource_id, resource_market in market.sort(
+            ["game_resource_id", "country_id"]
+        ).group_by("game_resource_id", maintain_order=True):
             resource = str(resource_id[0] if isinstance(resource_id, tuple) else resource_id)
             supplies = {
                 self._tag(row["country_id"]): max(0.0, self._number(row.get("export_desired")))

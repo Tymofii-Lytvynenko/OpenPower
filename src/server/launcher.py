@@ -15,7 +15,7 @@ from typing import Optional
 from src.shared.config import GameConfig
 from src.core.map_data import RegionMapData
 from src.server.server_process import run_server_process
-from src.shared.protocols import ServerProcessBundle
+from src.server.process_bundle import ServerProcessBundle
 
 
 def _resolve_map_path(config: GameConfig):
@@ -41,14 +41,18 @@ def spawn_local_server(
     """
     # Create IPC communication channels
     action_queue: mp.Queue = mp.Queue()
-    state_queue: mp.Queue = mp.Queue()
+    state_queue: mp.Queue = mp.Queue(maxsize=2)
     progress_queue: mp.Queue = mp.Queue()
+    snapshot_ack_queue: mp.Queue = mp.Queue()
 
     # Spawn the background CPU core (headless, no OpenGL context)
     process = mp.Process(
         target=run_server_process,
         args=(str(config.project_root), action_queue, state_queue, progress_queue, save_name),
-        kwargs={"player_tag": player_tag},
+        kwargs={
+            "player_tag": player_tag,
+            "snapshot_ack_queue": snapshot_ack_queue,
+        },
         daemon=True,  # Ensures process dies if the window is closed abruptly
     )
     process.start()
@@ -65,5 +69,6 @@ def spawn_local_server(
         action_queue=action_queue,
         state_queue=state_queue,
         progress_queue=progress_queue,
+        snapshot_ack_queue=snapshot_ack_queue,
         process=process,
     )

@@ -50,8 +50,9 @@ class TestLayerBoundaries(unittest.TestCase):
                 self.fail(f"Layer Boundary Violation: Client file '{file_path}' imports forbidden server module '{module_name}'")
 
     def assert_module_import(self, module_name, file_path):
-        # Modules cannot import src.engine internals (except engine.interfaces)
-        if "src.engine" in module_name or "engine." in module_name:
-            allowed = "src.engine.interfaces"
-            if "src.engine" in module_name and not module_name.startswith(allowed):
-                self.fail(f"Layer Boundary Violation: Module file '{file_path}' imports forbidden engine module '{module_name}'")
+        # Gameplay modules depend only on shared contracts, never engine internals.
+        if module_name.startswith("src.engine"):
+            self.fail(
+                f"Layer Boundary Violation: Module file '{file_path}' "
+                f"imports forbidden engine module '{module_name}'"
+            )

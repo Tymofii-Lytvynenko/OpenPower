@@ -4,8 +4,8 @@ import unittest
 
 import polars as pl
 
-from modules.base.systems.world.diplomacy_system import DiplomacySystem
-from src.server.state_bootstrap import ensure_ui_support_tables
+from modules.base.systems.world.treaty_diplomacy import DiplomacySystem
+from modules.base.schema import ensure_base_tables
 from src.shared.actions import ActionCreateTreaty, ActionJoinTreaty, ActionRespondTreaty
 from src.shared.state import GameState
 
@@ -95,7 +95,7 @@ class TreatyRulesTest(unittest.TestCase):
                 "longitude": [0.0, 0.5, 1.0, 60.0],
             }),
         })
-        ensure_ui_support_tables(state)
+        ensure_base_tables(state)
         return state
 
 

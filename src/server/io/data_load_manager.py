@@ -8,7 +8,10 @@ import rtoml
 from PIL import Image
 
 from src.core.region_adjacency_source import load_region_adjacency
+from src.server.io.migrations import CORE_SAVE_MIGRATIONS
 from src.shared.config import GameConfig
+from src.shared.migrations import MigrationRegistry
+from src.shared.schema import WorldSchemaRegistry
 from src.shared.state import GameState, persistent_state_fields
 
 
@@ -19,9 +22,16 @@ class DataLoader:
     2. User Saves (Parquet/JSON) -> For loading a saved session (load_save).
     """
 
-    def __init__(self, config: GameConfig):
+    def __init__(
+        self,
+        config: GameConfig,
+        migrations: MigrationRegistry | None = None,
+        schema_registry: WorldSchemaRegistry | None = None,
+    ):
         self.config = config
         self.save_root = config.project_root / "user_data" / "saves"
+        self.migrations = migrations or MigrationRegistry(CORE_SAVE_MIGRATIONS)
+        self.schema_registry = schema_registry
 
     # =========================================================================
     #  PART 1: SAVE GAME LOADING (Reflection Based)
@@ -45,6 +55,13 @@ class DataLoader:
             print(f"[DataLoader] Warning: meta.json not found for {save_name}. Using defaults.")
             meta_data = {}
 
+        loaded_tables = {}
+        tables_dir = save_dir / "tables"
+        if tables_dir.exists():
+            for p_file in tables_dir.glob("*.parquet"):
+                loaded_tables[p_file.stem] = pl.read_parquet(p_file)
+
+        self.migrations.migrate(meta_data, loaded_tables)
         constructor_args = {}
         type_hints = get_type_hints(GameState)
 
@@ -53,12 +70,7 @@ class DataLoader:
             target_type = type_hints.get(key)
 
             if key == "tables":
-                tables = {}
-                sub_dir = save_dir / key
-                if sub_dir.exists():
-                    for p_file in sub_dir.glob("*.parquet"):
-                        tables[p_file.stem] = pl.read_parquet(p_file)
-                constructor_args[key] = tables
+                constructor_args[key] = loaded_tables
 
             elif target_type == pl.DataFrame:
                 p_file = save_dir / f"{key}.parquet"
@@ -76,6 +88,7 @@ class DataLoader:
                     constructor_args[key] = meta_data[key]
 
         state = GameState(**constructor_args)
+        self._apply_schema_registry(state)
         print(f"[DataLoader] Save loaded successfully. Tick: {state.globals.get('tick', 0)}")
         return state
 
@@ -115,7 +128,18 @@ class DataLoader:
         prod_df = self._load_domestic_production()
         state.update_table("domestic_production", prod_df)
 
+        self._apply_schema_registry(state)
         return state
+
+    def _apply_schema_registry(self, state: GameState) -> None:
+        if self.schema_registry is None:
+            return
+        self.schema_registry.capture_state(state)
+        self.schema_registry.ensure_state(state)
+        issues = self.schema_registry.validate_state(state)
+        if issues:
+            details = "; ".join(f"{issue.table}:{issue.code}" for issue in issues)
+            raise RuntimeError(f"World schema validation failed: {details}")
 
     def _read_clean_tsv(self, path: Path) -> pl.DataFrame:
         """Reads TSV, forcing 'hex' to string, and ignoring '_' columns."""

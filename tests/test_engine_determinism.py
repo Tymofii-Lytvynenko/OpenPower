@@ -1,9 +1,10 @@
 import unittest
 from src.engine.simulator import Engine
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess
 from src.shared.system_state import SYSTEM_STATE_HELPER
 
 class DummySystem(ISystem):
+    access = SystemAccess()
     runtime_state_contract = {
         "_id": SYSTEM_STATE_HELPER,
         "_deps": SYSTEM_STATE_HELPER,

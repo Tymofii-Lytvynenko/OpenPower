@@ -9,15 +9,19 @@
 
 ## 🚀 What Works Today
 
-* **Asynchronous Multi-Process Core:** The main graphics engine/UI and the simulation runner (`Engine`) run in isolated processes, communicating via zero-copy Arrow IPC state transfers.
-* **Declarative Polars AI Framework:** A data-oriented AI orchestration engine (`src/engine/ai_framework.py`) powered by Polars lazy execution graphs. Implements functional scorers for financial survival auditing (burn rates, months to bankruptcy) and vectorized military ROI scoring.
+* **Asynchronous Multi-Process Core:** The UI and authoritative simulation run in isolated processes, exchanging acknowledged Arrow IPC snapshots with table-level deltas.
+* **Declarative Polars AI Framework:** A data-oriented AI orchestration engine (`src/core/ai_framework.py`) powered by Polars lazy execution graphs. Implements functional scorers for financial survival auditing (burn rates, months to bankruptcy) and vectorized military ROI scoring.
 * **Geo-Coordinated Military Movement:** Active military system supporting real-time unit movements across the globe. Calculates equirectangular-to-spherical coordinates, tracking path distances and interpolating movement progress smoothly via SLERP (Spherical Linear Interpolation).
 * **Interactive Unit Renderer & Atlas:** Billboard-based unit projection batching (`src/client/renderers/unit_batch_renderer.py`) and texture atlas optimization (`src/client/renderers/unit_flag_atlas.py`) that clusters overlapping units into stacks and supports interactive mouse drags to order troop movements.
 * **Treaty & Alliance Systems:** Authorization database for military alliances, defensive pacts, and ongoing conflicts (`countries_wars.toml`, `countries_treaties.toml`).
 * **Empire Mode Map Overlay:** A political map overlay representing diplomatic alliances, defensive treaties, and wars with highly polished, dynamic hues (selected country in green, allies in blue, enemies in red, and neutral states in charcoal).
-* **Dynamic Mod Loader:** Scans `modules/` for dynamic system registration, loading world datasets (regions, countries, demographics, resources) from TSV and TOML files on startup.
+* **Versioned Mod Runtime:** Resolves `modules/` manifests and composes systems, table schemas, layered data, and sequential save migrations through a strict Mod API.
+* **Deterministic Simulation Contracts:** Fixed-step ticks, persisted RNG/ID state, command sequencing, atomic rollback, and a durable domain-event journal support replayable debugging.
 
 ---
+
+See [Modding API](docs/MODDING.md) for concise module registration and
+[Runtime Architecture](docs/ARCHITECTURE.md) for extension and debugging contracts.
 
 ## 🛠️ In Progress & Roadmap
 

@@ -4,7 +4,7 @@ from typing import Any
 
 import polars as pl
 
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_HELPER
 from src.shared.state import GameState
 from src.shared.actions import ActionAttackUnit, ActionBuildUnit, ActionBuyMarketUnit, ActionMoveUnit
@@ -132,6 +132,19 @@ class UnitFactory:
 
 
 class MilitarySystem(ISystem):
+    access = SystemAccess(
+        reads=frozenset({'countries', 'regions', 'units', 'production_orders', 'unit_designs', 'countries_wars'}),
+        writes=frozenset({'countries', 'units', 'production_orders', 'unit_market_listings'}),
+        handles=frozenset(
+            {
+                ActionAttackUnit,
+                ActionBuildUnit,
+                ActionBuyMarketUnit,
+                ActionMoveUnit,
+            }
+        ),
+        phase=SystemPhase.MILITARY,
+    )
     runtime_state_contract = {
         "_missing_columns": SYSTEM_STATE_CACHE,
         "_duration_policy": SYSTEM_STATE_HELPER,
@@ -747,7 +760,7 @@ class MilitarySystem(ISystem):
             return
 
         manpower_df = (
-            regions.group_by("owner")
+            regions.group_by("owner", maintain_order=True)
             .agg(pl.col("pop_15_64").sum().alias("total_core_manpower"))
             .rename({"owner": "id"})
         )

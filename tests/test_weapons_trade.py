@@ -5,7 +5,7 @@ import unittest
 import polars as pl
 
 from modules.base.systems.military.military_system import MilitarySystem
-from src.server.state_bootstrap import ensure_ui_support_tables
+from modules.base.schema import ensure_base_tables
 from src.shared.actions import ActionBuyMarketUnit
 from src.shared.state import GameState
 
@@ -56,7 +56,7 @@ class WeaponsTradeTest(unittest.TestCase):
             }),
             "treaty_effects": pl.DataFrame(effects),
         })
-        ensure_ui_support_tables(state)
+        ensure_base_tables(state)
         state.update_table("unit_designs", pl.DataFrame({
             "id": ["tank-v1"], "country_id": ["CAN"], "branch": ["land"], "class_name": ["tank"],
             "display_name": ["Tank"], "quality": [1.0], "cost": [100.0], "speed": [1.0], "firepower": [1.0],

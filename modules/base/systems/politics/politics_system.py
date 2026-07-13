@@ -1,10 +1,15 @@
 import polars as pl
-import random
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
+from src.shared.events import EventNewDay
 
 class PoliticsSystem(ISystem):
+    access = SystemAccess(
+        reads=frozenset({'countries'}),
+        writes=frozenset({'countries'}),
+        phase=SystemPhase.POLITICS,
+    )
     runtime_state_contract = {
         "_missing_columns": SYSTEM_STATE_CACHE,
     }
@@ -22,7 +27,6 @@ class PoliticsSystem(ISystem):
 
     def update(self, state: GameState, delta_time: float) -> None:
         # Run weekly on EventNewDay (approx every 7 days)
-        from src.shared.events import EventNewDay
         has_new_day = any(isinstance(e, EventNewDay) for e in state.events)
         if not has_new_day or state.time.is_paused:
             return

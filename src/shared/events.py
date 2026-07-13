@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -17,6 +18,42 @@ class GameEvent:
     """
 
     pass
+
+
+@dataclass
+class DomainGameEvent(GameEvent):
+    """Marker for gameplay facts that belong in the persistent journal."""
+
+    pass
+
+
+@dataclass
+class JournalState:
+    """Persistent append-only records used for debugging, replay, and UI delivery."""
+
+    domain_events: list[dict[str, Any]] = field(default_factory=list)
+    command_results: list[dict[str, Any]] = field(default_factory=list)
+
+    def append_domain_event(
+        self,
+        event: DomainGameEvent,
+        *,
+        event_id: str,
+        tick: int,
+        source: str,
+    ) -> dict[str, Any]:
+        record = {
+            "event_id": event_id,
+            "tick": int(tick),
+            "source": source,
+            "event_type": type(event).__name__,
+            "payload": asdict(event),
+        }
+        self.domain_events.append(record)
+        return record
+
+    def append_command_result(self, record: dict[str, Any]) -> None:
+        self.command_results.append(dict(record))
 
 
 @dataclass
@@ -55,7 +92,7 @@ class EventRealSecond(GameEvent):
 
 
 @dataclass
-class EventMessageCreated(GameEvent):
+class EventMessageCreated(DomainGameEvent):
     """
     Fired when a new inbox message is appended to the world state.
     """
@@ -66,7 +103,7 @@ class EventMessageCreated(GameEvent):
 
 
 @dataclass
-class EventTreatyProposed(GameEvent):
+class EventTreatyProposed(DomainGameEvent):
     """
     Fired when a treaty proposal is queued for review.
     """
@@ -77,7 +114,7 @@ class EventTreatyProposed(GameEvent):
 
 
 @dataclass
-class EventTreatyRefused(GameEvent):
+class EventTreatyRefused(DomainGameEvent):
     """
     Fired when a country rejects a treaty proposal.
     """
@@ -87,7 +124,7 @@ class EventTreatyRefused(GameEvent):
 
 
 @dataclass
-class EventWarStarted(GameEvent):
+class EventWarStarted(DomainGameEvent):
     """
     Fired when a new war entry becomes active.
     """
@@ -98,7 +135,7 @@ class EventWarStarted(GameEvent):
 
 
 @dataclass
-class EventBattleStarted(GameEvent):
+class EventBattleStarted(DomainGameEvent):
     """
     Fired when combat begins in a region.
     """
@@ -108,7 +145,7 @@ class EventBattleStarted(GameEvent):
 
 
 @dataclass
-class EventBattleEnded(GameEvent):
+class EventBattleEnded(DomainGameEvent):
     """
     Fired when an active battle resolves.
     """
@@ -118,7 +155,7 @@ class EventBattleEnded(GameEvent):
 
 
 @dataclass
-class EventProductionCompleted(GameEvent):
+class EventProductionCompleted(DomainGameEvent):
     """
     Fired when a production order finishes.
     """
@@ -128,7 +165,7 @@ class EventProductionCompleted(GameEvent):
 
 
 @dataclass
-class EventResearchCompleted(GameEvent):
+class EventResearchCompleted(DomainGameEvent):
     """
     Fired when a research branch reaches completion.
     """
@@ -139,7 +176,7 @@ class EventResearchCompleted(GameEvent):
 
 
 @dataclass
-class EventBudgetChanged(GameEvent):
+class EventBudgetChanged(DomainGameEvent):
     """
     Fired when a country's budget allocations are updated.
     """
@@ -148,7 +185,7 @@ class EventBudgetChanged(GameEvent):
 
 
 @dataclass
-class EventRandomEventTriggered(GameEvent):
+class EventRandomEventTriggered(DomainGameEvent):
     """
     Fired when a new random event (disaster, boom, etc.) activates in a region.
     Other systems can subscribe to apply gameplay effects (economy penalties,
@@ -162,7 +199,7 @@ class EventRandomEventTriggered(GameEvent):
 
 
 @dataclass
-class EventSystemError(GameEvent):
+class EventSystemError(DomainGameEvent):
     """
     Fired when a simulation system encounters a runtime error.
     Used for centralized error tracking and telemetry in the client.

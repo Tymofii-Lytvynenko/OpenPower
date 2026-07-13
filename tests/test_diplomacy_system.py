@@ -2,8 +2,8 @@ import unittest
 
 import polars as pl
 
-from modules.base.systems.world.diplomacy_system import DiplomacySystem
-from src.server.state_bootstrap import ensure_ui_support_tables
+from modules.base.systems.world.treaty_diplomacy import DiplomacySystem
+from modules.base.schema import ensure_base_tables
 from src.shared.actions import (
     ActionCreateTreaty,
     ActionDeclareWar,
@@ -205,7 +205,7 @@ class TestDiplomacySystem(unittest.TestCase):
                 ),
             }
         )
-        ensure_ui_support_tables(state)
+        ensure_base_tables(state)
         return state
 
     def _relation_value(self, relations: pl.DataFrame, source: str, target: str) -> float:

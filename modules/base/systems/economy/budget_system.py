@@ -1,7 +1,8 @@
 import polars as pl
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
+from src.shared.numeric import stable_sum
 from src.shared.actions import ActionUpdateBudget
 from src.shared.events import EventRealSecond
 
@@ -14,6 +15,13 @@ class BudgetSystem(ISystem):
     inflows (exports of tourism services), providing additional revenue beyond 
     standard internal taxation.
     """
+
+    access = SystemAccess(
+        reads=frozenset({'countries', 'resource_ledger'}),
+        writes=frozenset({'countries'}),
+        handles=frozenset({ActionUpdateBudget}),
+        phase=SystemPhase.BUDGET,
+    )
 
     runtime_state_contract = {
         "_missing_columns": SYSTEM_STATE_CACHE,
@@ -88,9 +96,9 @@ class BudgetSystem(ISystem):
                 (pl.col("game_resource_id") == "tourism_services") & 
                 (pl.col("exporter_id") != "WORLD")
             )
-            .group_by("exporter_id")
+            .group_by("exporter_id", maintain_order=True)
             .agg(
-                (pl.col("trade_value_usd").sum() * self.TOURISM_FOREIGN_LEVY_RATE)
+                (stable_sum("trade_value_usd") * self.TOURISM_FOREIGN_LEVY_RATE)
                 .alias("tourism_income")
             )
             .rename({"exporter_id": "id"})
@@ -103,8 +111,8 @@ class BudgetSystem(ISystem):
         # Prepare Total Demand per country from resource ledger
         if "resource_ledger" in state.tables:
             ledger_lf = state.get_table("resource_ledger").lazy()
-            demand_lf = ledger_lf.group_by("country_id").agg(
-                pl.col("consumption_usd").sum().alias("total_demand")
+            demand_lf = ledger_lf.group_by("country_id", maintain_order=True).agg(
+                stable_sum("consumption_usd").alias("total_demand")
             )
         else:
             demand_lf = pl.DataFrame(schema={"country_id": pl.Utf8, "total_demand": pl.Float64}).lazy()
@@ -228,7 +236,7 @@ class BudgetSystem(ISystem):
         # Cleanup internal calculation columns
         lf = lf.drop(["_avg_social_spending", "_expected_spending"])
 
-        state.update_table("countries", lf.collect())
+        state.update_table("countries", lf.collect().sort("id"))
 
     def _handle_update_budget(self, state: GameState, action: ActionUpdateBudget) -> None:
         if "countries" not in state.tables:

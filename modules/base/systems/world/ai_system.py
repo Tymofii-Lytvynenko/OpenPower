@@ -11,7 +11,7 @@ from modules.base.systems.world.ai_strategic import (
     evaluate_war_opportunities,
 )
 from src.core.ai_framework import DeclarativeAIFramework
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_HELPER
 from src.shared.actions import ActionBuildUnit, ActionUpdateBudget
 from src.shared.state import GameState
@@ -69,10 +69,10 @@ def summarize_unit_snapshot(lf: pl.LazyFrame) -> pl.LazyFrame:
         ).lazy()
 
     return (
-        lf.group_by("owner")
+        lf.group_by("owner", maintain_order=True)
         .agg(
             pl.col("strength").sum().cast(pl.Int64).alias("active_military_strength"),
-            pl.count().cast(pl.Int64).alias("active_unit_count"),
+            pl.len().cast(pl.Int64).alias("active_unit_count"),
         )
         .rename({"owner": "id"})
     )
@@ -138,6 +138,12 @@ class AISystem(ISystem):
     System boundary exposing the data-driven framework to the simulation scheduler loop.
     Acts as a pluggable driver node in the engine graph.
     """
+
+    access = SystemAccess(
+        reads=frozenset({'countries', 'units', 'countries_relations', 'countries_treaties', 'countries_wars'}),
+        writes=frozenset(),
+        phase=SystemPhase.STRATEGY,
+    )
 
     runtime_state_contract = {
         "_missing_columns": SYSTEM_STATE_CACHE,

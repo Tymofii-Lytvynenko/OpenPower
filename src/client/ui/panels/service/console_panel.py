@@ -23,6 +23,8 @@ class ConsolePanel:
                 ("TABLES", str(len(state.tables))),
                 ("EVENTS", str(len(state.events))),
                 ("ACTIONS", str(len(state.current_actions))),
+                ("DOMAIN LOG", str(len(state.journal.domain_events))),
+                ("COMMAND LOG", str(len(state.journal.command_results))),
             )
         )
         imgui.separator()

@@ -1,6 +1,10 @@
 from __future__ import annotations
+
 from typing import Any
+
 import polars as pl
+
+from src.shared.schema import ColumnSpec, TableSchema, WorldSchemaRegistry
 from src.shared.state import GameState
 
 TableSpec = dict[str, tuple[pl.DataType, Any]]
@@ -156,26 +160,85 @@ SUPPORT_TABLE_SPECS: dict[str, TableSpec] = {
     },
 }
 
-def ensure_ui_support_tables(state: GameState) -> None:
-    """Creates compatibility tables expected by the expanded client panels, with normalized schema."""
-    for table_name, spec in SUPPORT_TABLE_SPECS.items():
-        existing = state.tables.get(table_name)
-        if existing is None or existing.is_empty():
-            state.update_table(table_name, _frame_from_rows(spec, []))
-            continue
+TABLE_KEYS: dict[str, tuple[str, ...]] = {
+    "country_governments": ("country_id",),
+    "country_laws": ("country_id", "law_id"),
+    "pending_treaties": ("id",),
+    "treaty_effects": ("treaty_id", "country_id", "effect"),
+    "annexation_claims": ("id",),
+    "messages": ("id",),
+    "news_items": ("id",),
+    "objectives": ("id",),
+    "research_tracks": ("id",),
+    "unit_designs": ("id",),
+    "production_orders": ("id",),
+    "unit_market_listings": ("id",),
+    "covert_cells": ("id",),
+    "battles": ("id",),
+    "battle_units": ("battle_id", "unit_id"),
+    "strategic_weapons": ("id",),
+}
 
-        state.update_table(table_name, _normalize_table(existing, spec))
+COUNTRY_RUNTIME_SCHEMA = TableSchema(
+    name="countries",
+    columns={
+        "id": ColumnSpec(pl.Utf8, ""),
+        "gdp": ColumnSpec(pl.Float64, 10_000_000.0),
+        "human_dev": ColumnSpec(pl.Float64, 0.5),
+        "personal_income_tax_rate": ColumnSpec(pl.Float64, 0.2),
+        "money_reserves": ColumnSpec(pl.Float64, 0.0),
+        "total_annual_revenue": ColumnSpec(pl.Float64, 0.0),
+        "total_annual_expense": ColumnSpec(pl.Float64, 0.0),
+        "trait_threat_perception": ColumnSpec(pl.Float64, 1.0),
+        "military_count": ColumnSpec(pl.Int64, 0),
+        "trade_income": ColumnSpec(pl.Float64, 0.0),
+        "trade_expense": ColumnSpec(pl.Float64, 0.0),
+        "budget_imf_ratio": ColumnSpec(pl.Float64, 0.0),
+        "budget_edu_ratio": ColumnSpec(pl.Float64, 0.5),
+        "budget_health_ratio": ColumnSpec(pl.Float64, 0.5),
+        "budget_social_ratio": ColumnSpec(pl.Float64, 0.5),
+        "budget_env_ratio": ColumnSpec(pl.Float64, 0.5),
+        "budget_infra_ratio": ColumnSpec(pl.Float64, 0.5),
+        "budget_telecom_ratio": ColumnSpec(pl.Float64, 0.5),
+        "budget_gov_ratio": ColumnSpec(pl.Float64, 0.5),
+        "budget_propaganda_ratio": ColumnSpec(pl.Float64, 0.5),
+        "budget_tourism_promo_ratio": ColumnSpec(pl.Float64, 0.5),
+        "budget_research_ratio": ColumnSpec(pl.Float64, 0.5),
+        "security_upkeep": ColumnSpec(pl.Float64, 0.0),
+        "diplomacy_upkeep": ColumnSpec(pl.Float64, 0.0),
+        "treaty_maintenance": ColumnSpec(pl.Float64, 0.0),
+        "diplomatic_aid_expense": ColumnSpec(pl.Float64, 0.0),
+        "corruption_index": ColumnSpec(pl.Float64, 0.1),
+    },
+    key_columns=("id",),
+    owner="base",
+    preserve_extra_columns=True,
+)
 
-def _frame_from_rows(spec: TableSpec, rows: list[dict[str, Any]] | None) -> pl.DataFrame:
-    if not rows:
-        schema = {column: dtype for column, (dtype, _) in spec.items()}
-        return pl.DataFrame(schema=schema)
 
-    return _normalize_table(pl.DataFrame(rows), spec)
+BASE_TABLE_SCHEMAS: tuple[TableSchema, ...] = (COUNTRY_RUNTIME_SCHEMA,) + tuple(
+    TableSchema(
+        name=table_name,
+        columns={
+            column_name: ColumnSpec(dtype=dtype, default=default)
+            for column_name, (dtype, default) in columns.items()
+        },
+        key_columns=TABLE_KEYS.get(table_name, ()),
+        owner="base",
+        preserve_extra_columns=False,
+    )
+    for table_name, columns in SUPPORT_TABLE_SPECS.items()
+)
 
-def _normalize_table(df: pl.DataFrame, spec: TableSpec) -> pl.DataFrame:
-    for column, (_, default_value) in spec.items():
-        if column not in df.columns:
-            df = df.with_columns(pl.lit(default_value).alias(column))
 
-    return df.select([pl.col(column).cast(dtype).alias(column) for column, (dtype, _) in spec.items()])
+def build_base_schema_registry() -> WorldSchemaRegistry:
+    return WorldSchemaRegistry(BASE_TABLE_SCHEMAS)
+
+
+def ensure_base_tables(
+    state: GameState,
+    registry: WorldSchemaRegistry | None = None,
+) -> WorldSchemaRegistry:
+    resolved = registry or build_base_schema_registry()
+    resolved.ensure_state(state)
+    return resolved

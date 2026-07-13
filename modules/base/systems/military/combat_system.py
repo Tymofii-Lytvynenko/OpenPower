@@ -5,7 +5,7 @@ from typing import Any, Iterable
 
 import polars as pl
 
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_HELPER
 from src.shared.events import EventBattleEnded, EventBattleStarted, EventNewHour
 from src.shared.actions import ActionAttackUnit, ActionMoveUnit
@@ -169,6 +169,12 @@ class CombatResolutionPolicy:
 
 
 class CombatSystem(ISystem):
+    access = SystemAccess(
+        reads=frozenset({'countries', 'regions', 'units', 'countries_wars', 'battles'}),
+        writes=frozenset({'regions', 'units', 'battles'}),
+        handles=frozenset({ActionAttackUnit, ActionMoveUnit}),
+        phase=SystemPhase.COMBAT,
+    )
     runtime_state_contract = {
         "_policy": SYSTEM_STATE_HELPER,
     }

@@ -1,6 +1,6 @@
 import polars as pl
 from typing import Any
-from src.engine.interfaces import ISystem
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.state import GameState
 
 class BootstrapSystem(ISystem):
@@ -8,6 +8,12 @@ class BootstrapSystem(ISystem):
     Seeds initial gameplay content (laws, default objective tracks, designs)
     inside the base module. This separates content policy from the server engine.
     """
+
+    access = SystemAccess(
+        reads=frozenset({'countries', 'regions', 'countries_treaties', 'countries_wars'}),
+        writes=frozenset({'country_governments', 'country_laws', 'messages', 'news_items', 'objectives', 'research_tracks', 'unit_designs', 'strategic_weapons'}),
+        phase=SystemPhase.BOOTSTRAP,
+    )
 
     @property
     def id(self) -> str:
