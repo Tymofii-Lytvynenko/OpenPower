@@ -877,3 +877,9 @@ class DiplomacySystem(ISystem):
             candidate = f"{prefix}-{tick:07d}-{counter:03d}"
         return candidate
 
+
+# The public import path predates the richer treaty lifecycle implementation.
+# Keeping it stable avoids coupling clients and mods to an internal module move.
+from modules.base.systems.world.treaty_diplomacy import TreatyDiplomacySystem
+
+DiplomacySystem = TreatyDiplomacySystem

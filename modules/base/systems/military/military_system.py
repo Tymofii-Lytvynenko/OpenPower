@@ -7,8 +7,11 @@ import polars as pl
 from src.engine.interfaces import ISystem
 from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_HELPER
 from src.shared.state import GameState
-from src.shared.actions import ActionBuildUnit, ActionMoveUnit
+from src.shared.actions import ActionAttackUnit, ActionBuildUnit, ActionBuyMarketUnit, ActionMoveUnit
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
+from modules.base.systems.military.movement_access import MovementAccessPolicy
+from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
+from src.shared.engagement import countries_are_hostile, engagement_radius_km, first_zone_contact_fraction, interpolate_geo
 
 
 UNIT_TABLE = "units"
@@ -34,6 +37,7 @@ UNIT_SCHEMA: dict[str, pl.DataType] = {
     "arrival_at_minute": pl.Int64,
     "movement_progress": pl.Float64,
     "is_moving": pl.Boolean,
+    "engagement_mode": pl.Utf8,
 }
 
 
@@ -123,6 +127,7 @@ class UnitFactory:
             "arrival_at_minute": int(current_minute),
             "movement_progress": 0.0,
             "is_moving": False,
+            "engagement_mode": "",
         }
 
 
@@ -131,12 +136,16 @@ class MilitarySystem(ISystem):
         "_missing_columns": SYSTEM_STATE_CACHE,
         "_duration_policy": SYSTEM_STATE_HELPER,
         "_unit_factory": SYSTEM_STATE_HELPER,
+        "_access_policy": SYSTEM_STATE_HELPER,
+        "_weapons_trade_policy": SYSTEM_STATE_HELPER,
     }
 
     def __init__(self):
         self._missing_columns = set()
         self._duration_policy = MovementDurationPolicy()
         self._unit_factory = UnitFactory()
+        self._access_policy = MovementAccessPolicy()
+        self._weapons_trade_policy = WeaponsTradePolicy()
 
     @property
     def id(self) -> str:
@@ -144,13 +153,16 @@ class MilitarySystem(ISystem):
 
     @property
     def dependencies(self) -> list[str]:
-        return ["base.time", "base.population", "base.economy"]
+        return ["base.time", "base.population", "base.economy", "base.diplomacy", "base.military_programs"]
 
     def update(self, state: GameState, delta_time: float) -> None:
         units = self._ensure_units_table(state)
+        units = self._process_completed_production_orders(state, units)
         units = self._process_build_actions(state, units)
+        units = self._process_market_buy_actions(state, units)
         units = self._process_move_actions(state, units)
-        units = self._update_unit_movements(units, state.time.total_minutes)
+        units = self._process_attack_actions(state, units)
+        units = self._update_unit_movements(state, units, state.time.total_minutes)
         state.update_table(UNIT_TABLE, units)
 
         from src.shared.events import EventNewDay
@@ -239,6 +251,68 @@ class MilitarySystem(ISystem):
             if row["id"] is not None
         }
 
+    def _process_completed_production_orders(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
+        required_tables = {"countries", "regions", "unit_designs", "production_orders"}
+        if not required_tables.issubset(state.tables):
+            return units
+
+        orders_table = state.get_table("production_orders")
+        if orders_table.is_empty():
+            return units
+        countries = self._ensure_country_columns(state.get_table("countries"))
+        regions = state.get_table("regions")
+        home_regions = self._home_regions_by_country(regions)
+        region_locations = self._duration_policy.region_locations(regions)
+        country_rows = countries.to_dicts()
+        countries_by_tag = {str(row.get("id") or "").strip().upper(): row for row in country_rows}
+        designs_by_id = {
+            str(row.get("id") or ""): row
+            for row in state.get_table("unit_designs").to_dicts()
+        }
+        order_rows = orders_table.to_dicts()
+        unit_rows = units.to_dicts()
+        changed = False
+
+        for order in order_rows:
+            if str(order.get("status") or "").lower() != "completed":
+                continue
+            country_tag = str(order.get("country_id") or "").strip().upper()
+            country = countries_by_tag.get(country_tag)
+            design = designs_by_id.get(str(order.get("design_id") or ""))
+            quantity = max(0, int(order.get("quantity") or 0))
+            if country is None or design is None or quantity <= 0:
+                continue
+            if str(design.get("country_id") or "").strip().upper() != country_tag:
+                continue
+            home_region_id = home_regions.get(str(country.get("id") or ""))
+            if home_region_id is None:
+                continue
+
+            unit_type = str(design.get("class_name") or DEFAULT_UNIT_TYPE).strip().lower().replace(" ", "_")
+            unit_type = unit_type or DEFAULT_UNIT_TYPE
+            owner = str(country.get("id") or country_tag)
+            unit_rows.append(
+                self._unit_factory.create(
+                    unit_id=self._next_unit_id(unit_rows, owner, unit_type),
+                    owner=owner,
+                    unit_type=unit_type,
+                    strength=quantity,
+                    region_id=home_region_id,
+                    geo=region_locations.get(home_region_id, GeoCoordinate(0.0, 0.0)),
+                    current_minute=state.time.total_minutes,
+                )
+            )
+            country["military_count"] = int(country.get("military_count") or 0) + quantity
+            order["status"] = "delivered"
+            order["eta_days"] = 0
+            changed = True
+
+        if not changed:
+            return units
+        state.update_table("countries", pl.DataFrame(country_rows, schema=countries.schema))
+        state.update_table("production_orders", pl.DataFrame(order_rows, schema=orders_table.schema))
+        return self._units_from_rows(unit_rows)
+
     def _process_build_actions(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
         actions_to_process = [a for a in state.current_actions if isinstance(a, ActionBuildUnit)]
         if not actions_to_process:
@@ -283,6 +357,108 @@ class MilitarySystem(ISystem):
         state.update_table("countries", countries)
         return self._units_from_rows(rows)
 
+    def _process_market_buy_actions(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
+        actions = [action for action in state.current_actions if isinstance(action, ActionBuyMarketUnit)]
+        required_tables = {"countries", "regions", "unit_market_listings"}
+        if not actions or not required_tables.issubset(state.tables):
+            return units
+
+        listings_table = state.get_table("unit_market_listings")
+        if listings_table.is_empty():
+            return units
+        countries = self._ensure_country_columns(state.get_table("countries"))
+        regions = state.get_table("regions")
+        home_regions = self._home_regions_by_country(regions)
+        region_locations = self._duration_policy.region_locations(regions)
+        listing_rows = listings_table.to_dicts()
+        listings_by_id = {str(row.get("id") or ""): row for row in listing_rows}
+        country_rows = countries.to_dicts()
+        countries_by_tag = {str(row.get("id") or "").strip().upper(): row for row in country_rows}
+        design_rows = state.tables.get("unit_designs")
+        designs_by_id = {} if design_rows is None else {
+            str(row.get("id") or ""): str(row.get("class_name") or DEFAULT_UNIT_TYPE)
+            for row in design_rows.to_dicts()
+        }
+        unit_rows = units.to_dicts()
+        changed = False
+
+        for action in actions:
+            listing = listings_by_id.get(str(action.listing_id))
+            buyer_tag = str(action.buyer_country_tag or "").strip().upper()
+            seller_tag = str(listing.get("seller_country_id") or "").strip().upper() if listing else ""
+            buyer, seller = countries_by_tag.get(buyer_tag), countries_by_tag.get(seller_tag)
+            if listing is None or buyer is None or seller is None:
+                continue
+            quantity = max(0, min(int(action.quantity), int(listing.get("quantity") or 0)))
+            price = max(0.0, float(listing.get("price") or 0.0))
+            if quantity <= 0 or not self._weapons_trade_policy.can_order(
+                state.tables.get("treaty_effects"), buyer_tag, seller_tag, str(listing.get("eligibility") or "open"),
+            ):
+                continue
+            total_cost = price * quantity
+            if float(buyer.get("money_reserves") or 0.0) < total_cost:
+                continue
+            home_region_id = home_regions.get(str(buyer.get("id") or ""))
+            if home_region_id is None:
+                continue
+            buyer["money_reserves"] = float(buyer.get("money_reserves") or 0.0) - total_cost
+            buyer["military_count"] = int(buyer.get("military_count") or 0) + quantity
+            seller["money_reserves"] = float(seller.get("money_reserves") or 0.0) + total_cost
+            listing["quantity"] = int(listing.get("quantity") or 0) - quantity
+            unit_type = designs_by_id.get(str(listing.get("design_id") or ""), DEFAULT_UNIT_TYPE)
+            unit_type = unit_type.strip().lower().replace(" ", "_") or DEFAULT_UNIT_TYPE
+            unit_rows.append(
+                self._unit_factory.create(
+                    unit_id=self._next_unit_id(unit_rows, str(buyer.get("id") or buyer_tag), unit_type),
+                    owner=str(buyer.get("id") or buyer_tag),
+                    unit_type=unit_type,
+                    strength=quantity,
+                    region_id=home_region_id,
+                    geo=region_locations.get(home_region_id, GeoCoordinate(0.0, 0.0)),
+                    current_minute=state.time.total_minutes,
+                )
+            )
+            changed = True
+
+        if not changed:
+            return units
+        state.update_table("countries", pl.DataFrame(country_rows, schema=countries.schema))
+        remaining_listings = [row for row in listing_rows if int(row.get("quantity") or 0) > 0]
+        state.update_table("unit_market_listings", pl.DataFrame(remaining_listings, schema=listings_table.schema))
+        return self._units_from_rows(unit_rows)
+
+    def _process_attack_actions(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
+        actions = [action for action in state.current_actions if isinstance(action, ActionAttackUnit)]
+        if not actions or units.is_empty():
+            return units
+
+        war_rows = state.tables.get("countries_wars")
+        wars = [] if war_rows is None else war_rows.to_dicts()
+        rows = units.to_dicts()
+        units_by_id = {str(row.get("id") or ""): row for row in rows}
+        now = int(state.time.total_minutes)
+        changed = False
+
+        for action in actions:
+            attacker = units_by_id.get(str(action.attacker_unit_id or ""))
+            defender = units_by_id.get(str(action.defender_unit_id or ""))
+            if attacker is None or defender is None or attacker is defender:
+                continue
+            if int(attacker.get("strength") or 0) <= 0 or int(defender.get("strength") or 0) <= 0:
+                continue
+            if not countries_are_hostile(wars, str(attacker.get("owner") or ""), str(defender.get("owner") or "")):
+                continue
+
+            defender_geo = self._unit_geo_at(defender, now)
+            self._stop_unit_at(attacker, defender_geo, now)
+            self._stop_unit_at(defender, defender_geo, now)
+            attacker["current_region_id"] = int(defender.get("current_region_id") or 0)
+            attacker["engagement_mode"] = "assault"
+            defender["engagement_mode"] = "assault"
+            changed = True
+
+        return self._units_from_rows(rows) if changed else units
+
     def _process_move_actions(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
         move_actions = [a for a in state.current_actions if isinstance(a, ActionMoveUnit)]
         if not move_actions or units.is_empty() or "regions" not in state.tables:
@@ -301,15 +477,31 @@ class MilitarySystem(ISystem):
         now = int(state.time.total_minutes)
         regions = state.get_table("regions")
         region_locations = self._duration_policy.region_locations(regions)
+        region_by_id = {int(region["id"]): region for region in regions.to_dicts()}
 
         for row in units.to_dicts():
             action = action_by_unit.get(str(row["id"]))
             if action is None:
                 rows.append(row)
                 continue
+            if str(row.get("engagement_mode") or "").lower() == "positional":
+                row["engagement_mode"] = "assault"
+                rows.append(row)
+                continue
+
 
             source_region_id = int(row["current_region_id"])
             target_region_id = int(action.target_region_id)
+            via_regions = [
+                region_by_id.get(int(region_id))
+                for region_id in action.via_region_ids
+            ]
+            if (
+                not self._access_policy.can_station(state, str(row["owner"]), region_by_id[target_region_id])
+                or any(region is None or not self._access_policy.can_transit(state, str(row["owner"]), region) for region in via_regions)
+            ):
+                rows.append(row)
+                continue
             source_geo = GeoCoordinate(
                 latitude=float(row["latitude"]),
                 longitude=float(row["longitude"]),
@@ -348,45 +540,121 @@ class MilitarySystem(ISystem):
 
         return region_locations.get(target_region_id)
 
-    def _update_unit_movements(self, units: pl.DataFrame, current_minute: int) -> pl.DataFrame:
+    def _update_unit_movements(self, state: GameState, units: pl.DataFrame, current_minute: int) -> pl.DataFrame:
         if units.is_empty():
             return units
 
-        rows = []
-        for row in units.to_dicts():
-            target_region_id = int(row["target_region_id"])
-            if target_region_id <= 0 or not bool(row["is_moving"]):
+        war_table = state.tables.get("countries_wars")
+        war_rows = [] if war_table is None else war_table.to_dicts()
+        rows = units.to_dicts()
+        for row in rows:
+            target_region_id = int(row.get("target_region_id") or NO_TARGET_REGION)
+            if target_region_id <= 0 or not bool(row.get("is_moving")):
                 row["movement_progress"] = 0.0
                 row["is_moving"] = False
-                rows.append(row)
                 continue
 
-            departed_at = int(row["departed_at_minute"])
-            arrival_at = int(row["arrival_at_minute"])
+            departed_at = int(row.get("departed_at_minute") or current_minute)
+            arrival_at = int(row.get("arrival_at_minute") or current_minute)
             duration = max(1, arrival_at - departed_at)
+            previous_progress = max(0.0, min(1.0, float(row.get("movement_progress") or 0.0)))
             progress = max(0.0, min(1.0, (current_minute - departed_at) / duration))
+            source_geo = GeoCoordinate(
+                latitude=float(row.get("source_latitude") or row.get("latitude") or 0.0),
+                longitude=float(row.get("source_longitude") or row.get("longitude") or 0.0),
+            )
+            target_geo = GeoCoordinate(
+                latitude=float(row.get("target_latitude") or row.get("latitude") or 0.0),
+                longitude=float(row.get("target_longitude") or row.get("longitude") or 0.0),
+            )
+            previous_geo = interpolate_geo(source_geo, target_geo, previous_progress)
+            next_geo = interpolate_geo(source_geo, target_geo, progress)
+            contact = self._first_hostile_contact(row, rows, previous_geo, next_geo, war_rows, current_minute)
+
+            if contact is not None:
+                defender, fraction = contact
+                contact_geo = interpolate_geo(previous_geo, next_geo, fraction)
+                row["current_region_id"] = int(defender.get("current_region_id") or 0)
+                self._stop_unit_at(row, contact_geo, current_minute)
+                row["engagement_mode"] = "positional"
+                defender_geo = self._unit_geo_at(defender, current_minute)
+                self._stop_unit_at(defender, defender_geo, current_minute)
+                defender["engagement_mode"] = "positional"
+                continue
 
             if progress >= 1.0:
                 row["current_region_id"] = target_region_id
-                row["latitude"] = float(row["target_latitude"])
-                row["longitude"] = float(row["target_longitude"])
-                row["source_region_id"] = target_region_id
-                row["source_latitude"] = float(row["target_latitude"])
-                row["source_longitude"] = float(row["target_longitude"])
-                row["target_region_id"] = NO_TARGET_REGION
-                row["target_latitude"] = float(row["latitude"])
-                row["target_longitude"] = float(row["longitude"])
-                row["departed_at_minute"] = current_minute
-                row["arrival_at_minute"] = current_minute
-                row["movement_progress"] = 0.0
-                row["is_moving"] = False
+                self._stop_unit_at(row, target_geo, current_minute)
+                row["engagement_mode"] = ""
             else:
                 row["movement_progress"] = progress
                 row["is_moving"] = True
 
-            rows.append(row)
-
         return self._units_from_rows(rows)
+
+    def _first_hostile_contact(
+        self,
+        moving_unit: dict[str, Any],
+        unit_rows: list[dict[str, Any]],
+        start: GeoCoordinate,
+        end: GeoCoordinate,
+        war_rows: list[dict[str, Any]],
+        current_minute: int,
+    ) -> tuple[dict[str, Any], float] | None:
+        best_contact: tuple[dict[str, Any], float] | None = None
+        moving_owner = str(moving_unit.get("owner") or "")
+        moving_id = str(moving_unit.get("id") or "")
+        for defender in sorted(unit_rows, key=lambda row: str(row.get("id") or "")):
+            if str(defender.get("id") or "") == moving_id or int(defender.get("strength") or 0) <= 0:
+                continue
+            if not countries_are_hostile(war_rows, moving_owner, str(defender.get("owner") or "")):
+                continue
+            fraction = first_zone_contact_fraction(
+                start,
+                end,
+                self._unit_geo_at(defender, current_minute),
+                engagement_radius_km(defender),
+            )
+            if fraction is None:
+                continue
+            if best_contact is None or fraction < best_contact[1]:
+                best_contact = (defender, fraction)
+        return best_contact
+
+    def _unit_geo_at(self, row: dict[str, Any], current_minute: int) -> GeoCoordinate:
+        current_geo = GeoCoordinate(
+            latitude=float(row.get("latitude") or 0.0),
+            longitude=float(row.get("longitude") or 0.0),
+        )
+        if not bool(row.get("is_moving")) or int(row.get("target_region_id") or NO_TARGET_REGION) <= 0:
+            return current_geo
+        source_geo = GeoCoordinate(
+            latitude=float(row.get("source_latitude") or current_geo.latitude),
+            longitude=float(row.get("source_longitude") or current_geo.longitude),
+        )
+        target_geo = GeoCoordinate(
+            latitude=float(row.get("target_latitude") or current_geo.latitude),
+            longitude=float(row.get("target_longitude") or current_geo.longitude),
+        )
+        departed_at = int(row.get("departed_at_minute") or current_minute)
+        arrival_at = int(row.get("arrival_at_minute") or current_minute)
+        progress = max(0.0, min(1.0, (current_minute - departed_at) / max(1, arrival_at - departed_at)))
+        return interpolate_geo(source_geo, target_geo, progress)
+
+    def _stop_unit_at(self, row: dict[str, Any], geo: GeoCoordinate, current_minute: int) -> None:
+        region_id = int(row.get("current_region_id") or 0)
+        row["latitude"] = float(geo.latitude)
+        row["longitude"] = float(geo.longitude)
+        row["source_region_id"] = region_id
+        row["source_latitude"] = float(geo.latitude)
+        row["source_longitude"] = float(geo.longitude)
+        row["target_region_id"] = NO_TARGET_REGION
+        row["target_latitude"] = float(geo.latitude)
+        row["target_longitude"] = float(geo.longitude)
+        row["departed_at_minute"] = current_minute
+        row["arrival_at_minute"] = current_minute
+        row["movement_progress"] = 0.0
+        row["is_moving"] = False
 
     def _ensure_country_columns(self, countries: pl.DataFrame) -> pl.DataFrame:
         if "military_count" not in countries.columns:
@@ -434,6 +702,7 @@ class MilitarySystem(ISystem):
             "arrival_at_minute": 0,
             "movement_progress": 0.0,
             "is_moving": False,
+            "engagement_mode": "",
         }
 
         had_latitude = "latitude" in units.columns

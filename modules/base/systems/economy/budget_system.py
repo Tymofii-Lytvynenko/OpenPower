@@ -132,7 +132,8 @@ class BudgetSystem(ISystem):
             "budget_infra_ratio": 0.5, "budget_telecom_ratio": 0.5, "budget_gov_ratio": 0.5,
             "budget_propaganda_ratio": 0.5, "budget_tourism_promo_ratio": 0.5,
             "budget_research_ratio": 0.5, "budget_imf_ratio": 0.0,
-            "security_upkeep": 0.0, "diplomacy_upkeep": 0.0,
+            "security_upkeep": 0.0, "diplomacy_upkeep": 0.0, "treaty_maintenance": 0.0,
+            "diplomatic_aid_expense": 0.0,
             "corruption_index": 0.1, "military_count": 0, "money_reserves": 0.0
         }
 
@@ -195,6 +196,8 @@ class BudgetSystem(ISystem):
                 pl.col("expense_debt_interest") +
                 pl.col("security_upkeep") +
                 pl.col("diplomacy_upkeep") +
+                pl.col("treaty_maintenance") +
+                pl.col("diplomatic_aid_expense") +
                 pl.col("trade_expense")
             ).alias("total_annual_expense")
         )

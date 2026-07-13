@@ -7,6 +7,7 @@ from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.primitives import UIPrimitives as Prims
 from src.client.ui.panels.military.presenter import MilitaryPresenter
 from src.client.ui.panels.shared.panel_widgets import draw_empty_state, draw_required_tables
+from src.shared.actions import ActionCancelProductionOrder, ActionQueueUnitProduction
 
 
 class UnitProductionPanel:
@@ -17,10 +18,11 @@ class UnitProductionPanel:
         with WindowManager.window("UNIT PRODUCTION", x=560, y=140, w=560, h=420) as is_open:
             if not is_open:
                 return False
-            self._render_content(state, context.target_tag)
+            self._render_content(state, context)
             return True
 
-    def _render_content(self, state, country_tag: str) -> None:
+    def _render_content(self, state, context: PanelRenderContext) -> None:
+        country_tag = str(context.target_tag or "").upper()
         draw_required_tables(state, ("unit_designs", "production_orders"))
         imgui.separator()
 
@@ -40,6 +42,12 @@ class UnitProductionPanel:
                 Prims.right_align_text(
                     f"${float(row.get('cost') or 0.0):,.0f}".replace(",", " ")
                 )
+                if context.is_own_country and context.net_client is not None:
+                    imgui.same_line()
+                    if imgui.button(f"BUILD ONE##{row.get('id') or ''}"):
+                        context.net_client.send_action(ActionQueueUnitProduction(
+                            context.net_client.player_id, country_tag, str(row.get("id") or ""), 1,
+                        ))
 
         imgui.dummy((0.0, 12.0))
         Prims.header("QUEUE", show_bg=False)
@@ -53,3 +61,12 @@ class UnitProductionPanel:
             imgui.same_line()
             Prims.right_align_text(f"x{int(row.get('quantity') or 0)}")
             Prims.meter("", progress, (0.35, 0.65, 0.35, 1.0))
+            if (
+                context.is_own_country
+                and context.net_client is not None
+                and str(row.get("status") or "").lower() == "queued"
+                and imgui.button(f"CANCEL##{row.get('id') or ''}")
+            ):
+                context.net_client.send_action(ActionCancelProductionOrder(
+                    context.net_client.player_id, str(row.get("id") or ""),
+                ))

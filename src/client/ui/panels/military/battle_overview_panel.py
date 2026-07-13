@@ -35,5 +35,6 @@ class BattleOverviewPanel:
             imgui.text(str(row.get("id") or "Battle"))
             imgui.same_line()
             imgui.text_disabled(region_name)
-            imgui.text(f"Balance {balance:.0f}% | Status {str(row.get('status') or 'inactive')}")
+            mode = str(row.get("mode") or "positional").title()
+            imgui.text(f"{mode} | Balance {balance:.0f}% | Status {str(row.get('status') or 'inactive')}")
             imgui.separator()

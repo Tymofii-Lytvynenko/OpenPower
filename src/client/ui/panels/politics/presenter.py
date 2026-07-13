@@ -73,6 +73,8 @@ class PoliticsPresenter:
 
         rows: list[dict] = []
         for row in treaties.to_dicts():
+            if str(row.get("status") or "active").lower() != "active":
+                continue
             members = normalize_side(row.get("members"))
             side_a = normalize_side(row.get("side_a"))
             side_b = normalize_side(row.get("side_b"))
@@ -87,6 +89,7 @@ class PoliticsPresenter:
                     "name": safe_text(row.get("name"), safe_text(row.get("id"), "Treaty")),
                     "type": safe_text(row.get("type"), "agreement"),
                     "members": all_members,
+                    "open_to_new_members": bool(row.get("open_to_new_members", False)),
                     "members_count": format_members_count(all_members),
                     "relation_score": relation_score,
                 }
@@ -99,10 +102,8 @@ class PoliticsPresenter:
         if pending is None or pending.is_empty():
             return []
 
-        rows = pending.filter(
-            (pl.col("source_country_id") == country_tag) | (pl.col("target_country_id") == country_tag)
-        )
-        return rows.sort("created_at", descending=True).to_dicts()
+        rows = [row for row in pending.to_dicts() if country_tag == safe_text(row.get("source_country_id")) or country_tag in normalize_side(row.get("required_responses"))]
+        return sorted(rows, key=lambda row: safe_text(row.get("created_at")), reverse=True)
 
     def preferred_treaty_partners(self, state, country_tag: str, limit: int = 12) -> list[dict]:
         relations = state.tables.get("countries_relations")

@@ -1,7 +1,7 @@
 # 🪐 OpenPower Engine
 
 > **Status: Alpha / Active Prototype**
-> Asynchronous simulation runner, multi-process IPC, GPU-backed map rendering, declarative AI framework, geo-coordinate military unit movement, and alliance treaty systems are fully functional. Tactical combat, headless server, and multiplayer are in progress.
+> The project includes an asynchronous simulation runner, headless execution, tactical combat, geo-coordinate movement, mod-layered data loading, and a server-authoritative diplomacy system. Multiplayer remains future work.
 
 **OpenPower** is a high-performance, open-source grand strategy game engine built in Python. It utilizes a data-oriented design powered by **Polars** and a multi-process architecture to run intensive world simulation loops asynchronously in a background thread while keeping the **Dear ImGui / Arcade** frontend running at fluid, stutter-free framerates.
 
@@ -21,10 +21,9 @@
 
 ## 🛠️ In Progress & Roadmap
 
-1. **Tactical Combat Resolution:** Active unit combat algorithms, frontline dynamics, and occupation resolution.
-2. **Headless Server & Multiplayer:** Headless execution drivers and network communication protocols.
-3. **Advanced Diplomacy Systems:** Action vectors for negotiating peace, demanding territory, and forming coalitions.
-4. **Mod Data Chaining:** Configuration logic for multi-mod dependency chaining (`mods.json`).
+1. **Multiplayer transport:** Dedicated remote-session hosting, authentication, and reconnection.
+2. **Combat depth:** More unit roles, logistics, frontlines, and battle strategy controls.
+3. **Diplomacy balancing:** UI feedback and data balancing for treaty maintenance, market effects, and AI choices.
 
 ---
 

@@ -6,6 +6,7 @@ from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.panels.military.presenter import MilitaryPresenter
 from src.client.ui.panels.shared.panel_widgets import draw_empty_state, draw_required_tables
+from src.shared.actions import ActionBuyMarketUnit
 
 
 class UnitMarketPanel:
@@ -16,10 +17,11 @@ class UnitMarketPanel:
         with WindowManager.window("UNIT MARKET", x=690, y=150, w=500, h=360) as is_open:
             if not is_open:
                 return False
-            self._render_content(state, context.target_tag)
+            self._render_content(state, context)
             return True
 
-    def _render_content(self, state, country_tag: str) -> None:
+    def _render_content(self, state, context: PanelRenderContext) -> None:
+        country_tag = str(context.target_tag or "").upper()
         draw_required_tables(state, ("unit_market_listings", "unit_designs"))
         imgui.separator()
 
@@ -35,4 +37,8 @@ class UnitMarketPanel:
             imgui.text(
                 f"Qty {int(row.get('quantity') or 0)} | Price ${float(row.get('price') or 0.0):,.0f}".replace(",", " ")
             )
+            if context.is_own_country and context.net_client is not None and imgui.button(f"BUY ONE##{row.get('id') or ''}"):
+                context.net_client.send_action(ActionBuyMarketUnit(
+                    context.net_client.player_id, str(row.get("id") or ""), country_tag, 1,
+                ))
             imgui.separator()

@@ -8,6 +8,7 @@ import polars as pl
 from src.engine.interfaces import ISystem
 from src.shared.system_state import SYSTEM_STATE_HELPER
 from src.shared.events import EventBattleEnded, EventBattleStarted, EventNewHour
+from src.shared.actions import ActionAttackUnit, ActionMoveUnit
 from src.shared.state import GameState
 
 
@@ -22,6 +23,7 @@ BATTLE_SCHEMA: dict[str, pl.DataType] = {
     "id": pl.Utf8,
     "region_id": pl.Int32,
     "attacker_side": pl.Utf8,
+    "mode": pl.Utf8,
     "defender_side": pl.Utf8,
     "balance": pl.Float64,
     "status": pl.Utf8,
@@ -38,6 +40,7 @@ UNIT_REQUIRED_COLUMNS: dict[str, tuple[pl.DataType, Any]] = {
     "id": (pl.Utf8, ""),
     "owner": (pl.Utf8, ""),
     "strength": (pl.Int64, 0),
+    "engagement_mode": (pl.Utf8, ""),
     "current_region_id": (pl.Int32, 0),
     "is_moving": (pl.Boolean, False),
 }
@@ -138,29 +141,30 @@ class WarIndex:
 class CombatResolutionPolicy:
     """Keeps combat deterministic and easy to tune independently from system flow."""
 
-    def resolve(self, attacker_strength: int, defender_strength: int) -> CombatOutcome:
+    def resolve(self, attacker_strength: int, defender_strength: int, mode: str = "positional") -> CombatOutcome:
         if attacker_strength <= 0 or defender_strength <= 0:
             return CombatOutcome(0, 0)
 
+        intensity = 1.35 if mode == "assault" else 1.0
         stronger = max(attacker_strength, defender_strength)
         weaker = min(attacker_strength, defender_strength)
         if weaker > 0 and stronger / weaker >= 2.5:
             if attacker_strength >= defender_strength:
                 return CombatOutcome(
-                    attacker_losses=max(1, int(round(attacker_strength * 0.08))),
+                    attacker_losses=max(1, int(round(attacker_strength * 0.08 * intensity))),
                     defender_losses=defender_strength,
                 )
             return CombatOutcome(
                 attacker_losses=attacker_strength,
-                defender_losses=max(1, int(round(defender_strength * 0.08))),
+                defender_losses=max(1, int(round(defender_strength * 0.08 * intensity))),
             )
 
         total = attacker_strength + defender_strength
         attacker_share = attacker_strength / total
         defender_share = defender_strength / total
 
-        attacker_losses = max(1, int(round(attacker_strength * (0.10 + (defender_share * 0.18)))))
-        defender_losses = max(1, int(round(defender_strength * (0.12 + (attacker_share * 0.22)))))
+        attacker_losses = max(1, int(round(attacker_strength * (0.10 + (defender_share * 0.18)) * intensity)))
+        defender_losses = max(1, int(round(defender_strength * (0.12 + (attacker_share * 0.22)) * intensity)))
         return CombatOutcome(attacker_losses=attacker_losses, defender_losses=defender_losses)
 
 
@@ -190,6 +194,11 @@ class CombatSystem(ISystem):
         wars = WarIndex.from_table(state.tables.get(COUNTRIES_WARS_TABLE))
         existing_battles = self._existing_active_battle_ids(state.tables.get(BATTLE_TABLE))
         should_resolve = (not state.time.is_paused) and any(isinstance(event, EventNewHour) for event in state.events)
+        assaulting_unit_ids = {
+            action.attacker_unit_id if isinstance(action, ActionAttackUnit) else action.unit_id
+            for action in state.current_actions
+            if isinstance(action, (ActionAttackUnit, ActionMoveUnit))
+        }
 
         region_rows = regions.to_dicts()
         unit_rows = units.to_dicts()
@@ -215,13 +224,17 @@ class CombatSystem(ISystem):
 
             conflict = wars.active_battle_for_region(present_owners)
             if conflict is not None:
+                battle_mode = self._battle_mode(local_units)
                 battle_id = self._battle_id(region_id, conflict.war_id)
                 active_battle_ids.add(battle_id)
                 if battle_id not in existing_battles:
                     state.events.append(EventBattleStarted(battle_id=battle_id, region_id=region_id))
 
-                if should_resolve:
-                    victor = self._apply_combat_round(local_units, conflict)
+                if should_resolve or (
+                    battle_mode == "assault"
+                    and any(str(row.get("id") or "") in assaulting_unit_ids for row in local_units)
+                ):
+                    victor = self._apply_combat_round(local_units, conflict, battle_mode)
                     if victor is not None:
                         victorious_battles[battle_id] = victor
 
@@ -231,6 +244,7 @@ class CombatSystem(ISystem):
                     battle_rows.append(
                         self._build_battle_row(
                             battle_id=battle_id,
+                            mode=battle_mode,
                             region_id=region_id,
                             side_a_tags=conflict.side_a_tags,
                             side_b_tags=conflict.side_b_tags,
@@ -251,6 +265,8 @@ class CombatSystem(ISystem):
                     if winner:
                         victorious_battles[battle_id] = winner
             else:
+                for unit in local_units:
+                    unit["engagement_mode"] = ""
                 occupier = self._occupation_candidate(
                     local_units=local_units,
                     current_controller=self._clean_tag(region_row.get("controller")),
@@ -303,11 +319,19 @@ class CombatSystem(ISystem):
                 continue
             grouped.setdefault(region_id, []).append(row)
         return grouped
+    def _battle_mode(self, local_units: list[dict[str, Any]]) -> str:
+        return "assault" if any(str(row.get("engagement_mode") or "").lower() == "assault" for row in local_units) else "positional"
 
-    def _apply_combat_round(self, local_units: list[dict[str, Any]], conflict: ConflictContext) -> str | None:
+
+    def _apply_combat_round(
+        self,
+        local_units: list[dict[str, Any]],
+        conflict: ConflictContext,
+        mode: str,
+    ) -> str | None:
         side_a_strength = self._total_strength(local_units, conflict.side_a_members)
         side_b_strength = self._total_strength(local_units, conflict.side_b_members)
-        outcome = self._policy.resolve(side_a_strength, side_b_strength)
+        outcome = self._policy.resolve(side_a_strength, side_b_strength, mode)
         self._distribute_losses(local_units, conflict.side_a_members, outcome.attacker_losses)
         self._distribute_losses(local_units, conflict.side_b_members, outcome.defender_losses)
 
@@ -324,6 +348,7 @@ class CombatSystem(ISystem):
     def _build_battle_row(
         self,
         battle_id: str,
+        mode: str,
         region_id: int,
         side_a_tags: frozenset[str],
         side_b_tags: frozenset[str],
@@ -336,6 +361,7 @@ class CombatSystem(ISystem):
             "region_id": region_id,
             "attacker_side": ",".join(sorted(side_a_tags)),
             "defender_side": ",".join(sorted(side_b_tags)),
+            "mode": mode,
             "balance": float(side_a_strength / total_strength),
             "status": "active",
         }

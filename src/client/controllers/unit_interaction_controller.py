@@ -10,7 +10,7 @@ from src.client.renderers.map_renderer import MapRenderer
 from src.client.renderers.unit_projection import ProjectedUnit
 from src.client.renderers.unit_renderer import UnitDragPreview, UnitRenderer
 from src.client.services.network_client_service import NetworkClient
-from src.shared.actions import ActionMoveUnit
+from src.shared.actions import ActionAttackUnit, ActionMoveUnit
 
 
 class UnitInteractionController:
@@ -225,6 +225,30 @@ class UnitInteractionController:
                     target_longitude=target_longitude,
                 )
             )
+
+    def attack_selected_units(self, defender_unit_id: str) -> bool:
+        defender = self._unit_renderer.get_unit(defender_unit_id)
+        if defender is None or not self.selected_unit_ids:
+            return False
+
+        attackers = [
+            self._unit_renderer.get_unit(unit_id)
+            for unit_id in sorted(self.selected_unit_ids)
+        ]
+        valid_attackers = [
+            unit for unit in attackers
+            if unit is not None and unit.unit_id != defender.unit_id and unit.owner != defender.owner
+        ]
+        if not valid_attackers:
+            return False
+
+        for attacker in valid_attackers:
+            self._net.send_action(ActionAttackUnit(
+                player_id=self._net.player_id,
+                attacker_unit_id=attacker.unit_id,
+                defender_unit_id=defender.unit_id,
+            ))
+        return True
 
     def _unit_intersects_rect(
         self,

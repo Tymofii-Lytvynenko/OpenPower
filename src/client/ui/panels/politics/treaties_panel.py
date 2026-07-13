@@ -140,3 +140,7 @@ class TreatiesPanel:
                 self._open_editor_cb()
         imgui.end_disabled()
 
+
+# Preserve panel registration while using state-backed treaty controls.
+from src.client.ui.panels.politics.treaties_live import LiveTreatiesPanel
+TreatiesPanel = LiveTreatiesPanel

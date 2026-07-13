@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 @dataclass
@@ -88,6 +88,15 @@ class ActionMoveUnit(GameAction):
     target_region_id: int
     target_latitude: Optional[float] = None
     target_longitude: Optional[float] = None
+    via_region_ids: list[int] = field(default_factory=list)
+
+@dataclass
+class ActionAttackUnit(GameAction):
+    """
+    Orders one unit to initiate an assault against a hostile unit.
+    """
+    attacker_unit_id: str
+    defender_unit_id: str
 
 @dataclass
 class ActionAnnexRegion(GameAction):
@@ -173,6 +182,11 @@ class ActionCreateTreaty(GameAction):
     title: str
     terms: str
 
+    side_a_country_tags: list[str] = field(default_factory=list)
+    side_b_country_tags: list[str] = field(default_factory=list)
+    member_country_tags: list[str] = field(default_factory=list)
+    conditions: dict[str, Any] = field(default_factory=dict)
+    open_to_new_members: bool = False
 
 @dataclass
 class ActionRespondTreaty(GameAction):
@@ -189,6 +203,22 @@ class ActionLeaveTreaty(GameAction):
     """
     Removes a country from an existing treaty.
     """
+    treaty_id: str
+    country_tag: str
+
+
+@dataclass
+class ActionJoinTreaty(GameAction):
+    """Requests admission to an active treaty that accepts eligible members."""
+
+    treaty_id: str
+    country_tag: str
+
+
+@dataclass
+class ActionExpelTreatyMember(GameAction):
+    """Removes a member when the treaty sponsor needs to enforce its terms."""
+
     treaty_id: str
     country_tag: str
 

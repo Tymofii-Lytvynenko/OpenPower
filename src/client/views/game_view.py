@@ -168,6 +168,7 @@ class GameView(BaseImGuiView):
             drag_preview=self.unit_interactions.drag_preview,
             selection_rect=self._active_selection_rect(),
             visible_owners=visible_owners,
+            show_engagement_zones=self.viewport_ctrl.show_engagement_zones,
         )
 
         # Draw random event placards above affected regions
@@ -233,6 +234,8 @@ class GameView(BaseImGuiView):
     def _open_right_click_context(self, x: float, y: float) -> None:
         self._context_click_pos = (x, y)
         if self._right_context_unit_id:
+            if self.unit_interactions.attack_selected_units(self._right_context_unit_id):
+                return
             self.unit_interactions.select_unit_by_id(self._right_context_unit_id)
             self.unit_context_menu.show(self._right_context_unit_id)
             return

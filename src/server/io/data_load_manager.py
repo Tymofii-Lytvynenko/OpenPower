@@ -7,6 +7,7 @@ import polars as pl
 import rtoml
 from PIL import Image
 
+from src.core.region_adjacency_source import load_region_adjacency
 from src.shared.config import GameConfig
 from src.shared.state import GameState, persistent_state_fields
 
@@ -98,6 +99,7 @@ class DataLoader:
                 regions_df = regions_df.with_columns(pl.col(num_cols).fill_null(0))
 
             state.update_table("regions", regions_df)
+            state.update_table("region_adjacency", load_region_adjacency(self.config, regions_df["id"].to_list()))
             print(f"[DataLoader] Regions loaded: {len(regions_df)}")
         else:
             print("[DataLoader] CRITICAL: No regions found!")

@@ -190,3 +190,8 @@ class TreatyEditorPanel:
         
         imgui.end_child()
 
+
+# Preserve the existing panel registration while replacing mock-only behavior.
+from src.client.ui.panels.politics.treaty_editor_live import LiveTreatyEditorPanel
+
+TreatyEditorPanel = LiveTreatyEditorPanel

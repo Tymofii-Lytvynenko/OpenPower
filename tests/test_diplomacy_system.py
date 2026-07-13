@@ -37,7 +37,7 @@ class TestDiplomacySystem(unittest.TestCase):
         pending = state.get_table("pending_treaties")
         self.assertEqual(len(pending), 1)
         self.assertTrue(any(isinstance(event, EventTreatyProposed) for event in state.events))
-        self.assertEqual(pending["treaty_type"][0], "trade_accord")
+        self.assertEqual(pending["treaty_type"][0], "economic_partnership")
 
         proposal_id = pending["id"][0]
         state.events.clear()
@@ -174,6 +174,17 @@ class TestDiplomacySystem(unittest.TestCase):
             )
         ]
 
+        self.system.update(state, 0.1)
+
+        self.assertEqual(len(state.get_table("countries_wars")), 1)
+        state.current_actions = [
+            ActionOfferPeace(
+                player_id="tester",
+                war_id=war_id,
+                source_country_tag="GBR",
+                terms="peace",
+            )
+        ]
         self.system.update(state, 0.1)
 
         self.assertEqual(len(state.get_table("countries_wars")), 0)

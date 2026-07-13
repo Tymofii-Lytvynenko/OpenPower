@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import radians, sin, tan
 from dataclasses import dataclass
 from typing import Any, Optional, TYPE_CHECKING
 
@@ -17,6 +18,7 @@ from src.client.renderers.unit_projection import (
 from src.client.ui.core.primitives import UIPrimitives, UnitCompositionRow
 from src.client.ui.core.theme import GAMETHEME
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
+from src.shared.engagement import EARTH_RADIUS_KM, ENGAGEMENT_RADIUS_KM
 
 if TYPE_CHECKING:
     from src.shared.state import GameState
@@ -97,6 +99,7 @@ class UnitRenderer:
         drag_preview: Optional[UnitDragPreview],
         selection_rect: Optional[tuple[float, float, float, float]] = None,
         visible_owners: Optional[set[str]] = None,
+        show_engagement_zones: bool = True,
     ) -> None:
         window = imgui.get_io().display_size
         width = int(window.x)
@@ -109,6 +112,7 @@ class UnitRenderer:
         batch_drawn = self._batch.render(self._billboards, self._flags, width, height)
         needs_imgui_overlay = (
             not batch_drawn
+            or show_engagement_zones
             or drag_preview is not None
             or selection_rect is not None
             or any(
@@ -131,6 +135,14 @@ class UnitRenderer:
 
         if imgui.begin("##UnitOverlay", None, flags)[0]:
             draw_list = imgui.get_window_draw_list()
+            if show_engagement_zones:
+                self._draw_engagement_zones(
+                    draw_list,
+                    height,
+                    selected_unit_id,
+                    selected_unit_ids,
+                )
+
             for unit in self._billboards:
                 if batch_drawn:
                     self._draw_unit_overlay(
@@ -304,6 +316,31 @@ class UnitRenderer:
             owners.add(drag_preview.owner)
 
         self._flags.ensure_owners(owners)
+
+    def _draw_engagement_zones(
+        self,
+        draw_list: Any,
+        window_height: int,
+        selected_unit_id: Optional[str],
+        selected_unit_ids: Optional[set[str]],
+    ) -> None:
+        for unit in self._billboards:
+            is_selected = unit.unit_id == selected_unit_id or (
+                selected_unit_ids is not None and unit.unit_id in selected_unit_ids
+            )
+            fill_color = (0.95, 0.50, 0.16, 0.18) if is_selected else (0.30, 0.64, 0.96, 0.12)
+            outline_color = (1.0, 0.68, 0.24, 0.92) if is_selected else (0.43, 0.76, 1.0, 0.72)
+            center = (unit.screen_x, window_height - unit.screen_y)
+            radius = self._engagement_zone_radius_pixels(unit, window_height)
+            draw_list.add_circle_filled(center, radius, imgui.get_color_u32(fill_color), 48)
+            draw_list.add_circle(center, radius, imgui.get_color_u32(outline_color), 48, 1.25)
+
+    def _engagement_zone_radius_pixels(self, unit: ProjectedUnit, window_height: int) -> float:
+        half_fov_radians = radians(max(1.0, self._camera.fov_deg)) * 0.5
+        focal_length = window_height / (2.0 * tan(half_fov_radians))
+        angular_radius = ENGAGEMENT_RADIUS_KM / EARTH_RADIUS_KM
+        world_radius = self._projection.globe_radius * sin(angular_radius)
+        return max(12.0, min(90.0, focal_length * world_radius / max(unit.distance_to_camera, 0.1)))
 
     def _unit_needs_imgui_overlay(
         self,

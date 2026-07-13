@@ -101,6 +101,9 @@ class ContextMenu:
             if self.composer.begin_menu("Units Visibility"):
                 if imgui.menu_item("Show All Units Globally", "", self.viewport.show_all_units)[0]:
                     self.viewport.show_all_units = not self.viewport.show_all_units
+                if hasattr(self.viewport, "show_engagement_zones"):
+                    if imgui.menu_item("Show Engagement Zones", "", self.viewport.show_engagement_zones)[0]:
+                        self.viewport.show_engagement_zones = not self.viewport.show_engagement_zones
                 self.composer.end_menu()
 
         # 4. Tools Menu (Conditional)

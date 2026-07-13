@@ -56,3 +56,7 @@ class MailPanel:
         imgui.text(str(selected.get("body") or ""))
         imgui.pop_text_wrap_pos()
         imgui.columns(1)
+
+# The original mail renderer remains import-compatible while proposals become actionable.
+from src.client.ui.panels.service.mail_live import LiveMailPanel
+MailPanel = LiveMailPanel
