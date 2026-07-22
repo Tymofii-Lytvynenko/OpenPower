@@ -1,7 +1,7 @@
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from src.server.session import GameSession
+from src.shared.protocols import SessionPort
 from src.shared.config import GameConfig
 from src.core.paths import ProjectPaths
 # UPDATED: Import Core Data class instead of Shared Atlas
@@ -29,7 +29,7 @@ class EditorLoadingTask:
         main thread would freeze the UI. 
     """
 
-    def __init__(self, session: GameSession, config: GameConfig):
+    def __init__(self, session: SessionPort, config: GameConfig):
         self.session = session
         self.config = config
         

@@ -29,9 +29,9 @@ This document tracks the progress of the Minimum Viable Product (MVP) features f
     - [x] **Politics:** Basic stability drift from approval/corruption metrics.
     - [x] **Population:** Basic population tracking per region.
     - [x] **Territory:** System entry point exists, but the mechanic is not yet substantively implemented.
-    - [ ] **AI:** Present only as a stub; no real strategic decision-making yet.
-    - [ ] **Military:** Partial build/manpower scaffolding exists; combat and movement are not implemented.
-    - [ ] **Diplomacy:** No treaty, war, or peace system implemented yet.
+    - [x] **AI:** Functional `DeclarativeAIFramework` using Polars lazy evaluation. Implements financial survival scoring and military ROI scoring. Produces `ActionUpdateBudget` and `ActionBuildUnit` intents every real second.
+    - [x] **Military:** Unit spawning and geo-coordinated movement are implemented. Combat resolution and occupation logic are not yet implemented.
+    - [ ] **Diplomacy:** Treaty and war data (`countries_treaties.toml`, `countries_wars.toml`) are loaded into state and displayed in UI panels. No simulation system processes diplomatic actions yet.
 
 - [ ] **Upcoming Features (In Progress)**
     - [ ] **AI System:** Country-level strategic agents using a decision-making framework.

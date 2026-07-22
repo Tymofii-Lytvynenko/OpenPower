@@ -1,5 +1,18 @@
+import contextlib
+from collections.abc import Callable
+from dataclasses import dataclass
+
 from imgui_bundle import imgui
 from src.client.ui.core.theme import GAMETHEME
+
+
+@dataclass(frozen=True, slots=True)
+class UnitCompositionRow:
+    """Small value object for compact unit composition overlays."""
+
+    label: str
+    value: int
+    color: tuple
 
 
 class UIPrimitives:
@@ -61,6 +74,58 @@ class UIPrimitives:
         imgui.dummy((0, height + 5))
 
     @staticmethod
+    def meter_row(
+        label: str,
+        value_pct: float,
+        color: tuple,
+        value_text: str | None = None,
+        label_width: float = 130.0,
+        height: float = 12.0,
+    ):
+        """Draws a compact label/bar/value row for dense info panels."""
+        imgui.text_disabled(label)
+        imgui.same_line(label_width)
+
+        value_text = value_text if value_text is not None else f"{value_pct:.1f} %"
+        value_width = imgui.calc_text_size(value_text).x
+        available_width = imgui.get_content_region_avail().x
+        bar_width = max(24.0, available_width - value_width - 8.0)
+
+        p = imgui.get_cursor_screen_pos()
+        draw_list = imgui.get_window_draw_list()
+        draw_list.add_rect_filled(
+            p,
+            (p.x + bar_width, p.y + height),
+            imgui.get_color_u32(GAMETHEME.colors.bg_input),
+            height / 2,
+        )
+
+        fraction = max(0.0, min(value_pct, 100.0)) / 100.0
+        if fraction > 0.01:
+            draw_list.add_rect_filled(
+                p,
+                (p.x + bar_width * fraction, p.y + height),
+                imgui.get_color_u32(color),
+                height / 2,
+            )
+
+        imgui.dummy((bar_width, height))
+        imgui.same_line()
+        imgui.text_colored(color, value_text)
+
+    @staticmethod
+    def value_row(
+        label: str,
+        value: str,
+        color: tuple | None = None,
+        label_width: float = 150.0,
+    ):
+        """Draws a compact left-label, right-value row."""
+        imgui.text_disabled(label)
+        imgui.same_line(label_width)
+        UIPrimitives.right_align_text(value, color or GAMETHEME.colors.text_main)
+
+    @staticmethod
     def currency_row(label: str, value: float, color: tuple | None = None):
         """Aligned row: Label ...... $Value."""
         imgui.text(label)
@@ -116,3 +181,91 @@ class UIPrimitives:
             )
 
         return clicked
+
+    @staticmethod
+    def unit_composition_plate(
+        draw_list: imgui.ImDrawList,
+        x: float,
+        y: float,
+        rows: tuple[UnitCompositionRow, ...],
+        max_value: int | None = None,
+    ) -> None:
+        """Draws the compact selected-unit troop composition plate."""
+        plate_w = 118.0
+        plate_h = 58.0
+        row_h = 11.0
+        rows_top = y + 7.0
+        label_x = x + 7.0
+        bar_x = label_x + 11.0
+        bar_w = 31.0
+        value_x = bar_x + bar_w + 7.0
+
+        draw_list.add_rect_filled(
+            (x, y),
+            (x + plate_w, y + plate_h),
+            imgui.get_color_u32((0.03, 0.04, 0.045, 0.88)),
+        )
+        draw_list.add_rect(
+            (x, y),
+            (x + plate_w, y + plate_h),
+            imgui.get_color_u32((0.50, 0.62, 0.72, 0.75)),
+        )
+
+        if max_value is None:
+            max_value = max((max(0, int(row.value)) for row in rows), default=1)
+        max_value = max(1, int(max_value))
+
+        for index, row in enumerate(rows):
+            row_y = rows_top + index * row_h
+            value = max(0, int(row.value))
+            value_text = f"{value:,}".replace(",", " ")
+
+            draw_list.add_text(
+                (label_x, row_y - 1.0),
+                imgui.get_color_u32(GAMETHEME.colors.text_main),
+                row.label,
+            )
+            draw_list.add_rect_filled(
+                (bar_x, row_y + 2.0),
+                (bar_x + bar_w, row_y + 6.0),
+                imgui.get_color_u32((0.05, 0.06, 0.065, 1.0)),
+            )
+
+            fill_w = bar_w * min(1.0, value / max_value)
+            if fill_w > 0:
+                draw_list.add_rect_filled(
+                    (bar_x, row_y + 2.0),
+                    (bar_x + max(2.0, fill_w), row_y + 6.0),
+                    imgui.get_color_u32(row.color),
+                )
+
+            draw_list.add_rect(
+                (bar_x, row_y + 2.0),
+                (bar_x + bar_w, row_y + 6.0),
+                imgui.get_color_u32((0.42, 0.45, 0.44, 0.95)),
+            )
+            draw_list.add_text(
+                (value_x, row_y - 1.0),
+                imgui.get_color_u32(GAMETHEME.colors.text_main),
+                value_text,
+            )
+
+    @staticmethod
+    @contextlib.contextmanager
+    def dark_child_box(id: str, width: float = -1.0, height: float = 0.0, border: bool = True):
+        imgui.push_style_color(imgui.Col_.child_bg, GAMETHEME.colors.panel_bg_dark)
+        imgui.push_style_var(imgui.StyleVar_.child_rounding, 0.0)
+        if imgui.begin_child(id, (width, height), border, imgui.WindowFlags_.none):
+            yield
+        imgui.end_child()
+        imgui.pop_style_var()
+        imgui.pop_style_color()
+
+    @staticmethod
+    def combo_row(label: str, selected_idx: int, items: list[str], label_width: float = 80.0) -> int:
+        imgui.align_text_to_frame_padding()
+        imgui.text_disabled(label)
+        imgui.same_line(label_width)
+        imgui.set_next_item_width(-1)
+        _, new_idx = imgui.combo(f"##{label}", selected_idx, items)
+        return new_idx

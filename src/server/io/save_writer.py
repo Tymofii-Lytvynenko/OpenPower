@@ -1,13 +1,17 @@
 import dataclasses
 import shutil
-import polars as pl
+
 import orjson
+import polars as pl
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-from src.server.state import GameState
 from src.shared.config import GameConfig
+from src.shared.migrations import SAVE_FORMAT_VERSION
+from src.shared.state import GameState, persistent_state_field_names, persistent_state_fields
+from src.core.saves import list_available_saves
+
 
 class SaveWriter:
     """
@@ -70,11 +74,16 @@ class SaveWriter:
         Internal serialization logic using Reflection.
         """
         meta_data = {
-            "version": 1,
+            "version": SAVE_FORMAT_VERSION,
             "timestamp": datetime.now().isoformat(),
+            "schema_versions": (
+                state.schema_registry.versions() if state.schema_registry is not None else {}
+            ),
+            "persistent_fields": list(persistent_state_field_names()),
+            "checkpointed_systems": sorted(state.system_state.keys()),
         }
 
-        for field in dataclasses.fields(state):
+        for field in persistent_state_fields():
             key = field.name
             value = getattr(state, key)
 
@@ -117,28 +126,5 @@ class SaveWriter:
         return False
 
     def get_available_saves(self) -> List[Dict[str, Any]]:
-        """
-        Scans the save directory and returns metadata for UI lists.
-        Sorted by timestamp (newest first).
-        """
-        saves = []
-        for p in self.save_root.iterdir():
-            if not p.is_dir(): continue
-                
-            meta_file = p / "meta.json"
-            if meta_file.exists():
-                try:
-                    # Quick read of just the JSON for listing
-                    with open(meta_file, "rb") as f:
-                        data = orjson.loads(f.read())
-                        saves.append({
-                            "name": p.name,
-                            "timestamp": data.get("timestamp", ""),
-                            # Robustly handle potential missing keys in globals
-                            "tick": data.get("globals", {}).get("tick", 0)
-                        })
-                except Exception:
-                    # Corrupt save or locked file, skip
-                    continue
-                    
-        return sorted(saves, key=lambda x: x["timestamp"], reverse=True)
+        """Delegates to the shared core helper so the listing logic lives in one place."""
+        return list_available_saves(self.config)

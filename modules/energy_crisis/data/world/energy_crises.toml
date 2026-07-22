@@ -1,0 +1,29 @@
+[[energy_crises]]
+country_id = "UKR"
+policy = "market"
+reserve_days = 45.0
+import_dependency = 0.68
+shock_intensity = 0.55
+response_level = 0.20
+stress_index = 0.0
+economic_drag = 0.0
+
+[[energy_crises]]
+country_id = "DEU"
+policy = "conservation"
+reserve_days = 75.0
+import_dependency = 0.52
+shock_intensity = 0.35
+response_level = 0.45
+stress_index = 0.0
+economic_drag = 0.0
+
+[[energy_crises]]
+country_id = "POL"
+policy = "subsidies"
+reserve_days = 60.0
+import_dependency = 0.44
+shock_intensity = 0.28
+response_level = 0.35
+stress_index = 0.0
+economic_drag = 0.0

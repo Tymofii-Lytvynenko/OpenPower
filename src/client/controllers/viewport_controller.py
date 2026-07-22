@@ -41,6 +41,7 @@ class ViewportController:
         self.selection_mode = SelectionMode.COUNTRY
         self.selected_country_tag: Optional[str] = None
         self.show_all_units: bool = False
+        self.show_engagement_zones: bool = True
 
         # --- MAP MODES (Composition) ---
         self.map_modes: Dict[str, BaseMapMode] = {
@@ -73,6 +74,41 @@ class ViewportController:
                 fallback_to_country=True,
                 use_percentile=True,
                 steps=10
+            ),
+            "human_dev": GradientMapMode(
+                mode_name="Human Development",
+                column_name="human_dev",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10,
+            ),
+            "poverty_rate": GradientMapMode(
+                mode_name="Poverty Rate",
+                column_name="poverty_rate",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10,
+            ),
+            "military_count": GradientMapMode(
+                mode_name="Military Strength",
+                column_name="military_count",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10,
+            ),
+            "corruption_index": GradientMapMode(
+                mode_name="Corruption Index",
+                column_name="corruption_index",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10,
+            ),
+            "life_expectancy": GradientMapMode(
+                mode_name="Life Expectancy",
+                column_name="life_expectancy",
+                fallback_to_country=True,
+                use_percentile=True,
+                steps=10,
             ),
         }
         self.current_mode_key = "political"
@@ -157,7 +193,7 @@ class ViewportController:
 
     def on_mouse_drag(self, x: float, y: float, dx: float, dy: float, buttons: int):
         # Handle 3D rotation via the controller
-        if buttons & arcade.MOUSE_BUTTON_LEFT:
+        if buttons & arcade.MOUSE_BUTTON_RIGHT:
             self.cam.drag(dx, dy)
 
     def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int):
@@ -188,14 +224,13 @@ class ViewportController:
             state = self.net.get_state()
             if "regions" in state.tables:
                 df = state.tables["regions"]
-                # Find owner of clicked region
-                owner_rows = df.filter(pl.col("id") == region_id)
-                if not owner_rows.is_empty():
-                    owner = owner_rows["owner"][0]
-                    if owner and owner != "None":
-                        selected_owner = owner
-                        # Get ALL regions by this owner for multi-select
-                        highlight_ids = df.filter(pl.col("owner") == owner)["id"].to_list()
+                authority_col = "controller" if "controller" in df.columns else "owner"
+                authority_rows = df.filter(pl.col("id") == region_id)
+                if not authority_rows.is_empty():
+                    authority = authority_rows[authority_col][0]
+                    if authority and authority != "None":
+                        selected_owner = authority
+                        highlight_ids = df.filter(pl.col(authority_col) == authority)["id"].to_list()
 
         self.selected_country_tag = selected_owner
         self._sync_empire_focus()
@@ -218,3 +253,5 @@ class ViewportController:
         mode = self.map_modes.get("empire")
         if hasattr(mode, "set_selected_country"):
             mode.set_selected_country(self.selected_country_tag)
+
+

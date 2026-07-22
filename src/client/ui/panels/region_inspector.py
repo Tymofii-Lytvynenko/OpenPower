@@ -1,8 +1,9 @@
 import polars as pl
 from imgui_bundle import imgui
-from src.client.ui.core.theme import GAMETHEME
+
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.panel_context import PanelRenderContext
+from src.client.ui.core.theme import GAMETHEME
 
 
 class RegionInspectorPanel:
@@ -19,20 +20,23 @@ class RegionInspectorPanel:
             return True
 
     def _render_details(self, state, region_id, on_focus):
-        if "regions" not in state.tables: return
-        
+        if "regions" not in state.tables:
+            return
+
         row_df = state.tables["regions"].filter(pl.col("id") == region_id)
         if row_df.is_empty():
             imgui.text_colored(GAMETHEME.colors.error, "Invalid Region ID")
             return
 
         row = row_df.row(0, named=True)
-        imgui.text_colored(GAMETHEME.colors.accent, row.get('name', 'Unknown'))
-        
+        imgui.text_colored(GAMETHEME.colors.accent, row.get("name", "Unknown"))
+
         imgui.separator()
         imgui.text(f"ID: {region_id}")
         imgui.text(f"Owner: {row.get('owner', 'N/A')}")
+        if "controller" in row:
+            imgui.text(f"Controller: {row.get('controller', row.get('owner', 'N/A'))}")
         imgui.text(f"Biome: {row.get('biome', 'N/A')}")
-        
+
         if on_focus and imgui.button("Center Camera"):
             on_focus(region_id)

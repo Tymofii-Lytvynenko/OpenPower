@@ -1,7 +1,7 @@
 import polars as pl
 import math
 from typing import Dict, Tuple
-from src.server.state import GameState
+from src.shared.state import GameState
 from src.client.visualization.map_modes.base_map_mode import BaseMapMode
 from src.client.utils.gradient import get_heatmap_color, lerp_color
 

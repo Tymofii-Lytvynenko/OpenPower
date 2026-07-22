@@ -1,5 +1,5 @@
 from typing import Set, Optional
-from src.server.state import GameState
+from src.shared.state import GameState
 
 def normalize_side(value) -> Set[str]:
     if value is None:

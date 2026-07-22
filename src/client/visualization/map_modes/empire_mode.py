@@ -1,8 +1,8 @@
-from typing import Dict, Tuple, Optional, Set
+from typing import Dict, Optional, Set, Tuple
 
-from src.server.state import GameState
-from src.client.visualization.map_modes.base_map_mode import BaseMapMode
 from src.client.utils.diplomacy_utils import get_military_allies, get_military_enemies
+from src.client.visualization.map_modes.base_map_mode import BaseMapMode
+from src.shared.state import GameState
 
 
 class EmpireMapMode(BaseMapMode):
@@ -38,18 +38,19 @@ class EmpireMapMode(BaseMapMode):
             return {}
 
         regions = state.get_table("regions")
-        if "id" not in regions.columns or "owner" not in regions.columns:
+        authority_col = self._authority_column(regions)
+        if "id" not in regions.columns or authority_col is None:
             return {}
 
         military_allies = get_military_allies(state, self.selected_country)
         military_enemies = get_military_enemies(state, self.selected_country)
         result: Dict[int, Tuple[int, ...]] = {}
 
-        for row in regions.select(["id", "owner"]).iter_rows(named=True):
+        for row in regions.select(["id", authority_col]).iter_rows(named=True):
             region_id = row["id"]
-            owner = row["owner"]
+            authority_tag = row[authority_col]
 
-            if not owner or owner == "None":
+            if not authority_tag or authority_tag == "None":
                 result[region_id] = self.UNKNOWN
                 continue
 
@@ -57,17 +58,22 @@ class EmpireMapMode(BaseMapMode):
                 result[region_id] = self.NEUTRAL
                 continue
 
-            if owner == self.selected_country:
+            if authority_tag == self.selected_country:
                 result[region_id] = self.SELECTED
                 continue
 
-            if owner in military_enemies:
+            if authority_tag in military_enemies:
                 result[region_id] = self.ENEMY
-            elif owner in military_allies:
+            elif authority_tag in military_allies:
                 result[region_id] = self.ALLY
             else:
                 result[region_id] = self.NEUTRAL
 
         return result
 
-
+    def _authority_column(self, regions) -> str | None:
+        if "controller" in regions.columns:
+            return "controller"
+        if "owner" in regions.columns:
+            return "owner"
+        return None

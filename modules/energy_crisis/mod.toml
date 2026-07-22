@@ -1,0 +1,9 @@
+id = "energy_crisis"
+name = "Energy Crisis Reference Mod"
+version = "0.1.0"
+api_version = 1
+dependencies = ["base"]
+
+[metadata]
+author = "OpenPower"
+description = "Reference module demonstrating scalable gameplay extension contracts."

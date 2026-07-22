@@ -1,9 +1,19 @@
 import polars as pl
-import random
-from src.engine.interfaces import ISystem
-from src.server.state import GameState
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
+from src.shared.system_state import SYSTEM_STATE_CACHE
+from src.shared.state import GameState
+from src.shared.events import EventNewDay
 
 class PoliticsSystem(ISystem):
+    access = SystemAccess(
+        reads=frozenset({'countries'}),
+        writes=frozenset({'countries'}),
+        phase=SystemPhase.POLITICS,
+    )
+    runtime_state_contract = {
+        "_missing_columns": SYSTEM_STATE_CACHE,
+    }
+
     def __init__(self):
         self._missing_columns = set()
 
@@ -16,10 +26,12 @@ class PoliticsSystem(ISystem):
         return ["base.population"] # Politics might depend on pop happiness later
 
     def update(self, state: GameState, delta_time: float) -> None:
-        tick = state.globals.get("tick", 0)
-        
-        # Run weekly
-        if tick % 7 != 0:
+        # Run weekly on EventNewDay (approx every 7 days)
+        has_new_day = any(isinstance(e, EventNewDay) for e in state.events)
+        if not has_new_day or state.time.is_paused:
+            return
+
+        if state.time.day % 7 != 1:
             return
 
         countries = state.get_table("countries")

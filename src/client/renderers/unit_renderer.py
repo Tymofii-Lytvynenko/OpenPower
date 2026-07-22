@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from math import radians, sin, tan
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from imgui_bundle import imgui
 
@@ -14,15 +15,19 @@ from src.client.renderers.unit_projection import (
     RegionAnchor,
     UnitProjectionService,
 )
+from src.client.ui.core.primitives import UIPrimitives, UnitCompositionRow
 from src.client.ui.core.theme import GAMETHEME
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
+from src.shared.engagement import EARTH_RADIUS_KM, ENGAGEMENT_RADIUS_KM
 
 if TYPE_CHECKING:
-    from src.server.state import GameState
+    from src.shared.state import GameState
 
 
 UNIT_DRAG_PREVIEW_WIDTH = 22.0
 UNIT_DRAG_PREVIEW_HEIGHT = 15.0
+UNIT_COMPOSITION_PLATE_WIDTH = 118.0
+UNIT_COMPOSITION_PLATE_HEIGHT = 58.0
 UNIT_SIGNATURE_COLUMNS = (
     "id",
     "owner",
@@ -89,9 +94,12 @@ class UnitRenderer:
         self,
         state: Optional["GameState"],
         selected_unit_id: Optional[str],
+        selected_unit_ids: Optional[set[str]],
         hovered_unit_id: Optional[str],
         drag_preview: Optional[UnitDragPreview],
+        selection_rect: Optional[tuple[float, float, float, float]] = None,
         visible_owners: Optional[set[str]] = None,
+        show_engagement_zones: bool = True,
     ) -> None:
         window = imgui.get_io().display_size
         width = int(window.x)
@@ -104,9 +112,11 @@ class UnitRenderer:
         batch_drawn = self._batch.render(self._billboards, self._flags, width, height)
         needs_imgui_overlay = (
             not batch_drawn
+            or show_engagement_zones
             or drag_preview is not None
+            or selection_rect is not None
             or any(
-                self._unit_needs_imgui_overlay(unit, selected_unit_id, hovered_unit_id)
+                self._unit_needs_imgui_overlay(unit, selected_unit_id, selected_unit_ids, hovered_unit_id)
                 for unit in self._billboards
             )
         )
@@ -125,14 +135,41 @@ class UnitRenderer:
 
         if imgui.begin("##UnitOverlay", None, flags)[0]:
             draw_list = imgui.get_window_draw_list()
+            if show_engagement_zones:
+                self._draw_engagement_zones(
+                    draw_list,
+                    height,
+                    selected_unit_id,
+                    selected_unit_ids,
+                )
+
             for unit in self._billboards:
                 if batch_drawn:
-                    self._draw_unit_overlay(draw_list, unit, height, selected_unit_id, hovered_unit_id)
+                    self._draw_unit_overlay(
+                        draw_list,
+                        unit,
+                        width,
+                        height,
+                        selected_unit_id,
+                        selected_unit_ids,
+                        hovered_unit_id,
+                    )
                 else:
-                    self._draw_unit(draw_list, unit, height, selected_unit_id, hovered_unit_id)
+                    self._draw_unit(
+                        draw_list,
+                        unit,
+                        width,
+                        height,
+                        selected_unit_id,
+                        selected_unit_ids,
+                        hovered_unit_id,
+                    )
 
             if drag_preview is not None:
                 self._draw_drag_preview(draw_list, drag_preview, height)
+
+            if selection_rect is not None:
+                self._draw_selection_rect(draw_list, selection_rect, height)
 
         imgui.end()
 
@@ -280,14 +317,41 @@ class UnitRenderer:
 
         self._flags.ensure_owners(owners)
 
+    def _draw_engagement_zones(
+        self,
+        draw_list: Any,
+        window_height: int,
+        selected_unit_id: Optional[str],
+        selected_unit_ids: Optional[set[str]],
+    ) -> None:
+        for unit in self._billboards:
+            is_selected = unit.unit_id == selected_unit_id or (
+                selected_unit_ids is not None and unit.unit_id in selected_unit_ids
+            )
+            fill_color = (0.95, 0.50, 0.16, 0.18) if is_selected else (0.30, 0.64, 0.96, 0.12)
+            outline_color = (1.0, 0.68, 0.24, 0.92) if is_selected else (0.43, 0.76, 1.0, 0.72)
+            center = (unit.screen_x, window_height - unit.screen_y)
+            radius = self._engagement_zone_radius_pixels(unit, window_height)
+            draw_list.add_circle_filled(center, radius, imgui.get_color_u32(fill_color), 48)
+            draw_list.add_circle(center, radius, imgui.get_color_u32(outline_color), 48, 1.25)
+
+    def _engagement_zone_radius_pixels(self, unit: ProjectedUnit, window_height: int) -> float:
+        half_fov_radians = radians(max(1.0, self._camera.fov_deg)) * 0.5
+        focal_length = window_height / (2.0 * tan(half_fov_radians))
+        angular_radius = ENGAGEMENT_RADIUS_KM / EARTH_RADIUS_KM
+        world_radius = self._projection.globe_radius * sin(angular_radius)
+        return max(12.0, min(90.0, focal_length * world_radius / max(unit.distance_to_camera, 0.1)))
+
     def _unit_needs_imgui_overlay(
         self,
         unit: ProjectedUnit,
         selected_unit_id: Optional[str],
+        selected_unit_ids: Optional[set[str]],
         hovered_unit_id: Optional[str],
     ) -> bool:
         return (
             unit.unit_id == selected_unit_id
+            or (selected_unit_ids is not None and unit.unit_id in selected_unit_ids)
             or unit.unit_id == hovered_unit_id
             or unit.is_moving
             or (unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1)
@@ -351,8 +415,10 @@ class UnitRenderer:
         self,
         draw_list: imgui.ImDrawList,
         unit: ProjectedUnit,
+        window_width: int,
         window_height: int,
         selected_unit_id: Optional[str],
+        selected_unit_ids: Optional[set[str]],
         hovered_unit_id: Optional[str],
     ) -> None:
         image_w = unit.width
@@ -362,7 +428,8 @@ class UnitRenderer:
         right = left + image_w
         bottom = top + image_h
 
-        is_selected = unit.unit_id == selected_unit_id
+        is_primary_selected = unit.unit_id == selected_unit_id
+        is_selected = is_primary_selected or (selected_unit_ids is not None and unit.unit_id in selected_unit_ids)
         is_hovered = unit.unit_id == hovered_unit_id
         border_color = GAMETHEME.colors.warning if is_selected else GAMETHEME.colors.text_main
         if is_hovered and not is_selected:
@@ -398,15 +465,20 @@ class UnitRenderer:
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
 
+        if is_primary_selected:
+            self._draw_unit_composition_plate(draw_list, unit, right, top, window_width, window_height)
+
     def _draw_unit_overlay(
         self,
         draw_list: imgui.ImDrawList,
         unit: ProjectedUnit,
+        window_width: int,
         window_height: int,
         selected_unit_id: Optional[str],
+        selected_unit_ids: Optional[set[str]],
         hovered_unit_id: Optional[str],
     ) -> None:
-        if not self._unit_needs_imgui_overlay(unit, selected_unit_id, hovered_unit_id):
+        if not self._unit_needs_imgui_overlay(unit, selected_unit_id, selected_unit_ids, hovered_unit_id):
             return
 
         image_w = unit.width
@@ -416,7 +488,8 @@ class UnitRenderer:
         right = left + image_w
         bottom = top + image_h
 
-        is_selected = unit.unit_id == selected_unit_id
+        is_primary_selected = unit.unit_id == selected_unit_id
+        is_selected = is_primary_selected or (selected_unit_ids is not None and unit.unit_id in selected_unit_ids)
         is_hovered = unit.unit_id == hovered_unit_id
         if is_selected or is_hovered:
             border_color = GAMETHEME.colors.warning if is_selected else GAMETHEME.colors.info
@@ -434,6 +507,80 @@ class UnitRenderer:
 
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
+
+        if is_primary_selected:
+            self._draw_unit_composition_plate(draw_list, unit, right, top, window_width, window_height)
+
+    def _draw_selection_rect(
+        self,
+        draw_list: imgui.ImDrawList,
+        rect: tuple[float, float, float, float],
+        window_height: int,
+    ) -> None:
+        x1, y1, x2, y2 = rect
+        left, right = sorted((x1, x2))
+        bottom, top = sorted((y1, y2))
+        draw_top = window_height - top
+        draw_bottom = window_height - bottom
+
+        draw_list.add_rect_filled(
+            (left, draw_top),
+            (right, draw_bottom),
+            imgui.get_color_u32((0.25, 0.55, 0.95, 0.14)),
+        )
+        draw_list.add_rect(
+            (left, draw_top),
+            (right, draw_bottom),
+            imgui.get_color_u32((0.45, 0.70, 1.00, 0.85)),
+            0.0,
+            0,
+            1.2,
+        )
+
+    def _draw_unit_composition_plate(
+        self,
+        draw_list: imgui.ImDrawList,
+        unit: ProjectedUnit,
+        unit_right: float,
+        unit_top: float,
+        window_width: int,
+        window_height: int,
+    ) -> None:
+        plate_x = unit_right + 7.0
+        if plate_x + UNIT_COMPOSITION_PLATE_WIDTH > window_width - 4.0:
+            plate_x = unit.screen_x - unit.width * 0.5 - UNIT_COMPOSITION_PLATE_WIDTH - 7.0
+
+        plate_y = unit_top - 18.0
+        plate_y = max(4.0, min(plate_y, window_height - UNIT_COMPOSITION_PLATE_HEIGHT - 4.0))
+
+        UIPrimitives.unit_composition_plate(
+            draw_list=draw_list,
+            x=plate_x,
+            y=plate_y,
+            rows=self._unit_composition_rows(unit),
+            max_value=unit.strength,
+        )
+
+    def _unit_composition_rows(self, unit: ProjectedUnit) -> tuple[UnitCompositionRow, ...]:
+        infantry, ground, naval, air = self._classify_unit_strength(unit)
+        return (
+            UnitCompositionRow("I", infantry, (0.34, 0.78, 0.39, 1.0)),
+            UnitCompositionRow("G", ground, (0.78, 0.30, 0.25, 1.0)),
+            UnitCompositionRow("N", naval, (0.24, 0.50, 0.86, 1.0)),
+            UnitCompositionRow("A", air, (0.86, 0.70, 0.28, 1.0)),
+        )
+
+    def _classify_unit_strength(self, unit: ProjectedUnit) -> tuple[int, int, int, int]:
+        unit_type = unit.unit_type.casefold()
+        strength = max(0, unit.strength)
+
+        if any(token in unit_type for token in ("naval", "ship", "fleet")):
+            return 0, 0, strength, 0
+        if any(token in unit_type for token in ("air", "helicopter", "plane", "jet")):
+            return 0, 0, 0, strength
+        if any(token in unit_type for token in ("vehicle", "armor", "armour", "tank", "ground")):
+            return 0, strength, 0, 0
+        return strength, 0, 0, 0
 
     def _draw_progress_bar(
         self,

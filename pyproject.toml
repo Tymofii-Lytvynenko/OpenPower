@@ -27,6 +27,7 @@ dependencies = [
     "PyOpenGL",
     "imgui-bundle",
     "polars==1.36.1",
+    "pycountry",
     "numpy",
     "opencv-python",
     "rtoml",
@@ -46,10 +47,16 @@ openpower = "main:main"
 
 [tool.setuptools]
 py-modules = ["main"]
-packages = ["src"]
+include-package-data = true
 
-[tool.setuptools.package-dir]
-src = "src"
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+namespaces = true
 
 [tool.setuptools.package-data]
 "*" = ["*.toml", "*.tsv", "*.json", "*.png", "*.jpg", "*.jpeg", "*.glsl"]
+
+[tool.pyright]
+extraPaths = ["."]
+

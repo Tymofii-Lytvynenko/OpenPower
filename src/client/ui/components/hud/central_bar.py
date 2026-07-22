@@ -1,5 +1,3 @@
-import arcade
-import polars as pl
 from typing import Optional
 from imgui_bundle import imgui, icons_fontawesome_6
 
@@ -14,14 +12,23 @@ class CentralBar:
     Handles country info, time controls, quick actions, and news ticker.
     Refactored to use UIComposer and modular rendering methods.
     """
-    def __init__(self):
+    def __init__(
+        self,
+        open_objectives_cb=None,
+        open_statistics_cb=None,
+        open_mail_cb=None,
+        open_news_cb=None,
+    ):
         # Composition helpers
         self.composer = UIComposer(GAMETHEME)
         self.flag_renderer = FlagRenderer()
+        self._open_objectives_cb = open_objectives_cb
+        self._open_statistics_cb = open_statistics_cb
+        self._open_mail_cb = open_mail_cb
+        self._open_news_cb = open_news_cb
 
         # Local State
         self.show_speed_controls = False 
-        self.news_ticker_text = "Global News: Simulation initialized and running. Waiting for events..."
         self.active_tag = "" 
         self.is_own = True
         self._switch_request: Optional[str] = None
@@ -31,7 +38,7 @@ class CentralBar:
         self.top_section_h_pct = 0.65       
         self.content_scale_factor = 0.80    
 
-    def render(self, state, net, target_tag: str, is_own_country: bool) -> Optional[str]:
+    def render(self, state, net, target_tag: str, is_own_country: bool, hud_summary) -> Optional[str]:
         """
         Main render loop.
         Returns: A string (Country Tag) if the user selected a new country from the debug popup, else None.
@@ -92,11 +99,11 @@ class CentralBar:
                 
                 # We center the buttons around 'center_start_x' inside _render_quick_actions
                 imgui.set_cursor_pos((center_start_x, content_pad_y))
-                self._render_quick_actions(inner_content_h)
+                self._render_quick_actions(inner_content_h, hud_summary)
 
                 # Bottom: Ticker
                 imgui.set_cursor_pos((0, top_h))
-                self._render_ticker(w, ticker_h)
+                self._render_ticker(w, ticker_h, hud_summary.ticker_text)
 
                 # 5. Debug Popups
                 self._render_debug_selector(state)
@@ -283,7 +290,7 @@ class CentralBar:
         imgui.same_line()
         imgui.text_colored(GAMETHEME.colors.text_dim, time_part)
 
-    def _render_quick_actions(self, height: float):
+    def _render_quick_actions(self, height: float, hud_summary):
         """Renders the central action buttons."""
         if not self.is_own:
             imgui.begin_disabled()
@@ -302,25 +309,31 @@ class CentralBar:
         imgui.push_style_var(imgui.StyleVar_.item_spacing, (spacing, 0))
         
         # 1. AI Button
-        if imgui.button(f"{icons_fontawesome_6.ICON_FA_BRAIN}", btn_sz): pass
-        if imgui.is_item_hovered(): imgui.set_tooltip("AI Assistance")
+        if imgui.button(f"{icons_fontawesome_6.ICON_FA_BRAIN}", btn_sz):
+            if self._open_objectives_cb:
+                self._open_objectives_cb()
+        if imgui.is_item_hovered(): imgui.set_tooltip(f"Objectives ({hud_summary.active_objectives})")
         imgui.same_line()
         
         # 2. Statistics
-        if imgui.button(f"{icons_fontawesome_6.ICON_FA_CHART_LINE}", btn_sz): pass
+        if imgui.button(f"{icons_fontawesome_6.ICON_FA_CHART_LINE}", btn_sz):
+            if self._open_statistics_cb:
+                self._open_statistics_cb()
         if imgui.is_item_hovered(): imgui.set_tooltip("Statistics")
         imgui.same_line()
         
         # 3. Messages
-        if imgui.button(f"{icons_fontawesome_6.ICON_FA_ENVELOPE}", btn_sz): pass
-        if imgui.is_item_hovered(): imgui.set_tooltip("Messages")
+        if imgui.button(f"{icons_fontawesome_6.ICON_FA_ENVELOPE}", btn_sz):
+            if self._open_mail_cb:
+                self._open_mail_cb()
+        if imgui.is_item_hovered(): imgui.set_tooltip(f"Messages ({hud_summary.unread_messages} unread)")
         
         imgui.pop_style_var()
 
         if not self.is_own:
             imgui.end_disabled()
 
-    def _render_ticker(self, section_w: float, section_h: float):
+    def _render_ticker(self, section_w: float, section_h: float, ticker_text: str):
         """Renders the scrolling news ticker and history button."""
         padding_x = 12.0
         
@@ -330,7 +343,7 @@ class CentralBar:
         text_y = (section_h - text_line_h) / 2
         
         imgui.set_cursor_pos((padding_x, current_y + text_y))
-        imgui.text_colored(GAMETHEME.colors.text_main, self.news_ticker_text)
+        imgui.text_colored(GAMETHEME.colors.text_main, ticker_text)
         
         # 2. History Button (Far Right)
         btn_h = section_h - 4.0 
@@ -342,7 +355,8 @@ class CentralBar:
         
         imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.bg_child)
         if imgui.button(icons_fontawesome_6.ICON_FA_NEWSPAPER, (btn_w, btn_h)):
-            pass 
+            if self._open_news_cb:
+                self._open_news_cb()
         imgui.pop_style_color()
         
         if imgui.is_item_hovered(): imgui.set_tooltip("News log")

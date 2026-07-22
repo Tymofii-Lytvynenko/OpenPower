@@ -1,14 +1,19 @@
 import dataclasses
+from pathlib import Path
+from typing import Any, Dict, List, Sequence, get_type_hints
+
+import orjson
 import polars as pl
 import rtoml
-import orjson
-from pathlib import Path
-from typing import List, Dict, Any, get_type_hints
-from datetime import datetime
 from PIL import Image
 
-from src.server.state import GameState
+from src.core.region_adjacency_source import load_region_adjacency
+from src.server.io.migrations import CORE_SAVE_MIGRATIONS
 from src.shared.config import GameConfig
+from src.shared.migrations import MigrationRegistry
+from src.shared.schema import WorldSchemaRegistry
+from src.shared.state import GameState, persistent_state_fields
+
 
 class DataLoader:
     """
@@ -17,9 +22,16 @@ class DataLoader:
     2. User Saves (Parquet/JSON) -> For loading a saved session (load_save).
     """
 
-    def __init__(self, config: GameConfig):
+    def __init__(
+        self,
+        config: GameConfig,
+        migrations: MigrationRegistry | None = None,
+        schema_registry: WorldSchemaRegistry | None = None,
+    ):
         self.config = config
         self.save_root = config.project_root / "user_data" / "saves"
+        self.migrations = migrations or MigrationRegistry(CORE_SAVE_MIGRATIONS)
+        self.schema_registry = schema_registry
 
     # =========================================================================
     #  PART 1: SAVE GAME LOADING (Reflection Based)
@@ -35,8 +47,6 @@ class DataLoader:
 
         print(f"[DataLoader] Loading save '{save_name}'...")
 
-        # 1. Load Metadata (JSON)
-        # We use orjson for speed.
         meta_path = save_dir / "meta.json"
         if meta_path.exists():
             with open(meta_path, "rb") as f:
@@ -45,25 +55,23 @@ class DataLoader:
             print(f"[DataLoader] Warning: meta.json not found for {save_name}. Using defaults.")
             meta_data = {}
 
-        # 2. Reflection: Build Constructor Arguments
+        loaded_tables = {}
+        tables_dir = save_dir / "tables"
+        if tables_dir.exists():
+            for p_file in tables_dir.glob("*.parquet"):
+                loaded_tables[p_file.stem] = pl.read_parquet(p_file)
+
+        self.migrations.migrate(meta_data, loaded_tables)
         constructor_args = {}
         type_hints = get_type_hints(GameState)
 
-        for field in dataclasses.fields(GameState):
+        for field in persistent_state_fields():
             key = field.name
             target_type = type_hints.get(key)
-            
-            # Strategy A: Dynamic Table Collections (e.g., state.tables: Dict[str, DataFrame])
-            # We assume any Dict[str, DataFrame] implies a folder of parquets.
-            if key == "tables": 
-                tables = {}
-                sub_dir = save_dir / key
-                if sub_dir.exists():
-                    for p_file in sub_dir.glob("*.parquet"):
-                        tables[p_file.stem] = pl.read_parquet(p_file)
-                constructor_args[key] = tables
 
-            # Strategy B: Single DataFrame Fields
+            if key == "tables":
+                constructor_args[key] = loaded_tables
+
             elif target_type == pl.DataFrame:
                 p_file = save_dir / f"{key}.parquet"
                 if p_file.exists():
@@ -71,83 +79,77 @@ class DataLoader:
                 else:
                     constructor_args[key] = pl.DataFrame()
 
-            # Strategy C: Nested Dataclasses (e.g., state.time)
             elif dataclasses.is_dataclass(target_type):
                 data_dict = meta_data.get(key, {})
-                constructor_args[key] = target_type(**data_dict) # type: ignore
+                constructor_args[key] = target_type(**data_dict)  # type: ignore[arg-type]
 
-            # Strategy D: Primitives (globals, tick, etc.)
             else:
                 if key in meta_data:
                     constructor_args[key] = meta_data[key]
 
         state = GameState(**constructor_args)
+        self._apply_schema_registry(state)
         print(f"[DataLoader] Save loaded successfully. Tick: {state.globals.get('tick', 0)}")
         return state
 
     # =========================================================================
     #  PART 2: INITIAL STATE COMPILATION (Static Assets)
-    #  (Preserved from your original code)
     # =========================================================================
 
     def load_initial_state(self) -> GameState:
         print("[DataLoader] Compiling state (Hex-Key Mode)...")
         state = GameState()
-        
-        # --- 1. REGIONS ---
+
         regions_df = self._load_master_regions()
-        
+
         if not regions_df.is_empty():
-            # Generate Runtime ID
             regions_df = self._generate_int_id(regions_df)
-            # Enrich with pop/res data
             regions_df = self._enrich_regions_data(regions_df)
             regions_df = self._add_region_geo_columns(regions_df)
-            
-            # Safety Fill
+
             num_cols = [c for c, t in regions_df.schema.items() if t in (pl.Float64, pl.Int64, pl.Int32)]
             if num_cols:
                 regions_df = regions_df.with_columns(pl.col(num_cols).fill_null(0))
 
             state.update_table("regions", regions_df)
+            state.update_table("region_adjacency", load_region_adjacency(self.config, regions_df["id"].to_list()))
             print(f"[DataLoader] Regions loaded: {len(regions_df)}")
         else:
             print("[DataLoader] CRITICAL: No regions found!")
             state.update_table("regions", pl.DataFrame())
 
-        # --- 2. COUNTRIES ---
         countries_df = self._load_countries(regions_df)
         state.update_table("countries", countries_df if not countries_df.is_empty() else pl.DataFrame())
 
-        # --- 3. WORLD DATA (Parquet/TOML) ---
-        for data_dir in self.config.get_data_dirs():
-            world_dir = data_dir / "world"
-            if world_dir.exists():
-                for p_file in world_dir.glob("*.parquet"):
-                    print(f"[DataLoader] Loading world table: {p_file.stem}")
-                    state.update_table(p_file.stem, pl.read_parquet(p_file))
+        for table_name, world_df in self._load_world_tables().items():
+            print(f"[DataLoader] Loading world table: {table_name}")
+            state.update_table(table_name, world_df)
 
-                for t_file in world_dir.glob("*.toml"):
-                    world_df = self._load_world_toml(t_file)
-                    if not world_df.is_empty():
-                        print(f"[DataLoader] Loading world table: {t_file.stem}")
-                        state.update_table(t_file.stem, world_df)
-                    
-        # --- 4. DYNAMIC DOMESTIC PRODUCTION (TOML) ---
         prod_df = self._load_domestic_production()
         state.update_table("domestic_production", prod_df)
-             
+
+        self._apply_schema_registry(state)
         return state
+
+    def _apply_schema_registry(self, state: GameState) -> None:
+        if self.schema_registry is None:
+            return
+        self.schema_registry.capture_state(state)
+        self.schema_registry.ensure_state(state)
+        issues = self.schema_registry.validate_state(state)
+        if issues:
+            details = "; ".join(f"{issue.table}:{issue.code}" for issue in issues)
+            raise RuntimeError(f"World schema validation failed: {details}")
 
     def _read_clean_tsv(self, path: Path) -> pl.DataFrame:
         """Reads TSV, forcing 'hex' to string, and ignoring '_' columns."""
         try:
             df = pl.read_csv(
-                path, 
-                separator="\t", 
-                ignore_errors=True, 
-                infer_schema_length=1000, 
-                schema_overrides={"hex": pl.String} # 'schema_overrides' is the modern arg
+                path,
+                separator="\t",
+                ignore_errors=True,
+                infer_schema_length=1000,
+                schema_overrides={"hex": pl.String},
             )
             valid_cols = [c for c in df.columns if not c.startswith("_")]
             return df.select(valid_cols)
@@ -156,7 +158,8 @@ class DataLoader:
             return pl.DataFrame()
 
     def _load_master_regions(self) -> pl.DataFrame:
-        dfs = []
+        layers: List[pl.DataFrame] = []
+
         for data_dir in self.config.get_data_dirs():
             paths = [data_dir / "regions" / "regions.tsv", data_dir / "map" / "regions.tsv"]
             for p in paths:
@@ -164,11 +167,10 @@ class DataLoader:
                     df = self._read_clean_tsv(p)
                     if "hex" in df.columns:
                         df = df.with_columns(pl.col("hex").str.strip_prefix("#").str.to_uppercase())
-                        dfs.append(df)
-                    break 
-        
-        if not dfs: return pl.DataFrame()
-        return pl.concat(dfs, how="vertical").unique(subset=["hex"], keep="last")
+                        layers.append(df)
+                    break
+
+        return self._merge_layered_records(layers, keys=["hex"])
 
     def _generate_int_id(self, df: pl.DataFrame) -> pl.DataFrame:
         df = df.with_columns([
@@ -179,22 +181,25 @@ class DataLoader:
         df = df.with_columns(
             (pl.col("_b") + (pl.col("_g") * 256) + (pl.col("_r") * 65536)).cast(pl.Int32).alias("id")
         )
-        # Restore '#' to the hex column
         df = df.with_columns(("#" + pl.col("hex")).alias("hex"))
         return df.drop(["_r", "_g", "_b"])
 
     def _enrich_regions_data(self, main_df: pl.DataFrame) -> pl.DataFrame:
+        layered_extensions: Dict[str, List[pl.DataFrame]] = {}
+
         for data_dir in self.config.get_data_dirs():
             target_dir = data_dir / "regions"
-            if not target_dir.exists(): continue
-            
+            if not target_dir.exists():
+                continue
+
             for file_path in target_dir.glob("*.tsv"):
-                if file_path.name == "regions.tsv": continue 
-                
+                if file_path.name == "regions.tsv":
+                    continue
+
                 aux_df = self._read_clean_tsv(file_path)
-                if "hex" not in aux_df.columns: continue
-                
-                # Normalize aux hex
+                if "hex" not in aux_df.columns:
+                    continue
+
                 aux_df = aux_df.with_columns(
                     pl.when(pl.col("hex").str.starts_with("#"))
                     .then(pl.col("hex"))
@@ -202,38 +207,51 @@ class DataLoader:
                     .str.to_uppercase()
                     .alias("hex")
                 )
-                
-                print(f"[DataLoader] Merging data from: {file_path.name}")
-                main_df = main_df.join(aux_df, on="hex", how="left", suffix=f"_{file_path.stem}")
-                
+                layered_extensions.setdefault(file_path.name, []).append(aux_df)
+
+        for file_name in sorted(layered_extensions):
+            merged_extension = self._merge_layered_records(layered_extensions[file_name], keys=["hex"])
+            if merged_extension.is_empty() or merged_extension.columns == ["hex"]:
+                continue
+
+            print(f"[DataLoader] Merging data from: {file_name}")
+            main_df = main_df.join(merged_extension, on="hex", how="left")
+
         return main_df
 
     def _load_countries(self, regions_df: pl.DataFrame) -> pl.DataFrame:
         print("[DataLoader] Loading Countries...")
-        main_df = pl.DataFrame()
-        
-        # 1. Master Table
+
+        master_layers: List[pl.DataFrame] = []
         for data_dir in self.config.get_data_dirs():
             master_path = data_dir / "countries" / "countries.tsv"
             if master_path.exists():
-                main_df = self._read_clean_tsv(master_path)
-                break 
-        
+                master_layers.append(self._read_clean_tsv(master_path))
+
+        main_df = self._merge_layered_records(master_layers, keys=["id"])
         if main_df.is_empty():
             return pl.DataFrame()
 
-        # 2. Extensions
+        layered_extensions: Dict[str, List[pl.DataFrame]] = {}
         for data_dir in self.config.get_data_dirs():
             target_dir = data_dir / "countries"
-            if not target_dir.exists(): continue
+            if not target_dir.exists():
+                continue
 
             for file_path in target_dir.glob("countries_*.tsv"):
-                print(f"[DataLoader] Merging country data: {file_path.name}")
                 aux_df = self._read_clean_tsv(file_path)
-                if "id" not in aux_df.columns: continue
-                main_df = main_df.join(aux_df, on="id", how="left")
+                if "id" not in aux_df.columns:
+                    continue
+                layered_extensions.setdefault(file_path.name, []).append(aux_df)
 
-        # 3. Safety Fill
+        for file_name in sorted(layered_extensions):
+            merged_extension = self._merge_layered_records(layered_extensions[file_name], keys=["id"])
+            if merged_extension.is_empty() or merged_extension.columns == ["id"]:
+                continue
+
+            print(f"[DataLoader] Merging country data: {file_name}")
+            main_df = main_df.join(merged_extension, on="id", how="left")
+
         num_cols = [c for c, t in main_df.schema.items() if t in (pl.Float64, pl.Int64, pl.Int32)]
         if num_cols:
             main_df = main_df.with_columns(pl.col(num_cols).fill_null(0))
@@ -269,6 +287,75 @@ class DataLoader:
         Image.MAX_IMAGE_PIXELS = None
         with Image.open(path) as image:
             return image.size
+
+    def _load_world_tables(self) -> Dict[str, pl.DataFrame]:
+        layered_tables: Dict[str, List[pl.DataFrame]] = {}
+
+        for data_dir in self.config.get_data_dirs():
+            world_dir = data_dir / "world"
+            if not world_dir.exists():
+                continue
+
+            for p_file in world_dir.glob("*.parquet"):
+                layered_tables.setdefault(p_file.stem, []).append(pl.read_parquet(p_file))
+
+            for t_file in world_dir.glob("*.toml"):
+                world_df = self._load_world_toml(t_file)
+                if not world_df.is_empty():
+                    layered_tables.setdefault(t_file.stem, []).append(world_df)
+
+        merged_tables: Dict[str, pl.DataFrame] = {}
+        for table_name in sorted(layered_tables):
+            merged_tables[table_name] = self._merge_world_layers(layered_tables[table_name])
+
+        return merged_tables
+
+    def _merge_world_layers(self, layers: Sequence[pl.DataFrame]) -> pl.DataFrame:
+        valid_layers = [df for df in layers if not df.is_empty()]
+        if not valid_layers:
+            return pl.DataFrame()
+        if len(valid_layers) == 1:
+            return valid_layers[0]
+
+        merge_keys = self._infer_merge_keys(valid_layers)
+        if merge_keys:
+            return self._merge_layered_records(valid_layers, keys=merge_keys)
+
+        return pl.concat(valid_layers, how="diagonal_relaxed")
+
+    def _infer_merge_keys(self, layers: Sequence[pl.DataFrame]) -> List[str]:
+        shared_columns = set(layers[0].columns)
+        for df in layers[1:]:
+            shared_columns &= set(df.columns)
+
+        if {"source", "target"}.issubset(shared_columns):
+            return ["source", "target"]
+        if "id" in shared_columns:
+            return ["id"]
+        return []
+
+    def _merge_layered_records(self, layers: Sequence[pl.DataFrame], keys: Sequence[str]) -> pl.DataFrame:
+        valid_layers = [df for df in layers if not df.is_empty() and set(keys).issubset(df.columns)]
+        if not valid_layers:
+            return pl.DataFrame()
+        if len(valid_layers) == 1:
+            return valid_layers[0]
+
+        tagged_layers = [
+            df.with_columns(pl.lit(priority).alias("__layer_priority"))
+            for priority, df in enumerate(valid_layers)
+        ]
+        combined = pl.concat(tagged_layers, how="diagonal_relaxed")
+
+        value_cols = [column for column in combined.columns if column not in {*keys, "__layer_priority"}]
+        if not value_cols:
+            return combined.select(list(keys)).unique(maintain_order=True)
+
+        aggregated_columns = [
+            pl.col(column).sort_by("__layer_priority").drop_nulls().last().alias(column)
+            for column in value_cols
+        ]
+        return combined.group_by(list(keys), maintain_order=True).agg(aggregated_columns)
 
     def _load_world_toml(self, path: Path) -> pl.DataFrame:
         try:
@@ -321,8 +408,9 @@ class DataLoader:
         records = []
         for data_dir in self.config.get_data_dirs():
             target_dir = data_dir / "countries" / "countries_res"
-            if not target_dir.exists(): continue
-            
+            if not target_dir.exists():
+                continue
+
             for file_path in target_dir.glob("*.toml"):
                 country_id = file_path.stem
                 try:
@@ -340,16 +428,18 @@ class DataLoader:
                                     row["is_gov_controlled"] = bool(res_data.get("is_gov_controlled", False))
                                     row["tax_rate"] = float(res_data.get("tax_rate", 0.0))
                                 else:
-                                    # Fallback for legacy simple format
                                     row["domestic_production"] = float(res_data)
                                     row["is_legal"] = True
                                     row["is_gov_controlled"] = False
                                     row["tax_rate"] = 0.0
-                                
+
                                 records.append(row)
                 except Exception as e:
                     print(f"[DataLoader] Failed to parse TOML {file_path.name}: {e}")
-        
+
         if records:
             return pl.DataFrame(records)
-        return pl.DataFrame({"country_id": [], "game_resource_id": [], "domestic_production": []}, schema={"country_id": pl.Utf8, "game_resource_id": pl.Utf8, "domestic_production": pl.Float64})
+        return pl.DataFrame(
+            {"country_id": [], "game_resource_id": [], "domestic_production": []},
+            schema={"country_id": pl.Utf8, "game_resource_id": pl.Utf8, "domestic_production": pl.Float64},
+        )

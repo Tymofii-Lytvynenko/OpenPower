@@ -1,148 +1,102 @@
-import rtoml
+from __future__ import annotations
+
 import importlib
-from pathlib import Path
-from dataclasses import dataclass, field
-from typing import List, Dict, Set
+import sys
+from dataclasses import dataclass
+from typing import Dict, List
 
+from src.server.io.migrations import CORE_SAVE_MIGRATIONS
 from src.shared.config import GameConfig
-from src.engine.interfaces import ISystem
+from src.shared.migrations import MigrationRegistry
+from src.shared.mod_api import ENGINE_MOD_API_VERSION, ModContribution
+from src.shared.mods import ModManifest, discover_mods, resolve_mod_load_order
+from src.shared.schema import WorldSchemaRegistry
+from src.shared.system_interfaces import ISystem
 
-@dataclass
-class ModManifest:
-    id: str
-    name: str
-    version: str
-    dependencies: List[str] = field(default_factory=list)
-    path: Path = field(default_factory=Path)
+
+@dataclass(frozen=True)
+class ModRuntime:
+    systems: tuple[ISystem, ...]
+    schemas: WorldSchemaRegistry
+    migrations: MigrationRegistry
+
 
 class ModManager:
-    """
-    Handles the discovery, dependency resolution, and loading of game modules.
-    
-    Refactored Logic:
-    - Instead of automatically scanning folders, it looks for a 'registration.py' 
-      entry point in each module.
-    - Calls the 'register()' function to get the list of Systems.
-    """
-    
+    """Resolves modules and aggregates their versioned runtime contributions."""
+
     def __init__(self, config: GameConfig):
         self.config = config
         self.modules_dir = config.project_root / "modules"
         self.loaded_mods: List[ModManifest] = []
+        self._runtime: ModRuntime | None = None
 
     def resolve_load_order(self) -> List[ModManifest]:
-        """
-        Scans, resolves, and sorts mods based on dependencies.
-        """
         print("[ModManager] Scanning for modules...")
-        
-        # 1. Discovery
         available_mods = self._discover_mods()
         if not available_mods:
-            print(f"[ModManager] Warning: No mods found in {self.modules_dir}")
-            return []
-
-        # 2. Topological Sort (Base -> Dependent Mods)
+            raise RuntimeError(f"No modules found in {self.modules_dir}.")
         sorted_mods = self._sort_mods(available_mods)
-        
         self.loaded_mods = sorted_mods
-        print(f"[ModManager] Resolved Load Order: {[m.id for m in sorted_mods]}")
+        self.config.active_mods = [manifest.id for manifest in sorted_mods]
+        print(f"[ModManager] Resolved Load Order: {self.config.active_mods}")
         return sorted_mods
 
-    def load_systems(self) -> List[ISystem]:
-        """
-        Loads systems by calling the 'register()' function in each module's registration.py.
-        """
-        instantiated_systems: List[ISystem] = []
+    def load_runtime(self) -> ModRuntime:
+        if self._runtime is not None:
+            return self._runtime
+        if not self.loaded_mods:
+            raise RuntimeError("resolve_load_order() must run before loading mod contributions.")
 
-        for mod in self.loaded_mods:
-            # Construct the expected python module path (e.g., modules.base.registration)
-            registration_module = f"modules.{mod.id}.registration"
-            registration_path = mod.path / "registration.py"
-            
-            try:
-                # 1. Check if the file exists before trying to import
-                if registration_path.exists():
-                    # This relies on the project root being in sys.path
-                    module = importlib.import_module(registration_module)
-                    
-                    # 2. Check for 'register' function
-                    if hasattr(module, "register"):
-                        print(f"[ModManager] Loading systems from {mod.id}...")
-                        
-                        # 3. Execute logic (Allows module to instantiate classes with args)
-                        systems = module.register()
-                        
-                        if isinstance(systems, list):
-                            instantiated_systems.extend(systems)
-                        else:
-                            print(f"[ModManager] Error: {registration_module}.register() must return a list.")
-                    else:
-                        print(f"[ModManager] Warning: {registration_module} has no 'register()' function.")
-                
-            except Exception as e:
-                print(f"[ModManager] Critical Error loading {mod.id}: {e}")
-                # Print stack trace for debugging mod errors
-                import traceback
-                traceback.print_exc()
+        systems: list[ISystem] = []
+        schemas = WorldSchemaRegistry()
+        migrations = MigrationRegistry(CORE_SAVE_MIGRATIONS)
 
-        return instantiated_systems
+        for manifest in self.loaded_mods:
+            if manifest.api_version != ENGINE_MOD_API_VERSION:
+                raise RuntimeError(
+                    f"Module '{manifest.id}' targets API {manifest.api_version}; "
+                    f"engine requires {ENGINE_MOD_API_VERSION}."
+                )
+            registration_path = manifest.path / "registration.py"
+            if not registration_path.exists():
+                continue
 
-    # =========================================================================
-    # Internal Discovery & Sorting
-    # =========================================================================
+            project_root = str(self.config.project_root)
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
+            package_name = manifest.path.name
+            if not package_name.isidentifier():
+                raise RuntimeError(
+                    f"Module directory '{package_name}' must be a valid Python identifier."
+                )
+            registration_module = importlib.import_module(
+                f"modules.{package_name}.registration"
+            )
+            contributor = getattr(registration_module, "contribute", None)
+            if not callable(contributor):
+                raise RuntimeError(
+                    f"Module '{manifest.id}' must expose contribute(). "
+                    "The simplest form is: return mod(MySystem)."
+                )
+            contribution = contributor()
+            if not isinstance(contribution, ModContribution):
+                raise TypeError(
+                    f"Module '{manifest.id}' contribute() returned "
+                    f"{type(contribution).__name__}. Return mod(...) or "
+                    "an advanced ModContribution."
+                )
+
+            systems.extend(contribution.systems)
+            for schema in contribution.table_schemas:
+                schemas.register(schema)
+            for migration in contribution.save_migrations:
+                migrations.register(migration)
+
+        self._runtime = ModRuntime(tuple(systems), schemas, migrations)
+        return self._runtime
 
     def _discover_mods(self) -> Dict[str, ModManifest]:
-        found = {}
-        if not self.modules_dir.exists():
-            return found
-
-        for mod_dir in self.modules_dir.iterdir():
-            if not mod_dir.is_dir(): continue
-            
-            manifest_path = mod_dir / "mod.toml"
-            if manifest_path.exists():
-                try:
-                    with open(manifest_path, "r", encoding="utf-8") as f:
-                        data = rtoml.load(f)
-                        
-                    manifest = ModManifest(
-                        id=data.get("id", mod_dir.name),
-                        name=data.get("name", mod_dir.name),
-                        version=data.get("version", "0.0.1"),
-                        dependencies=data.get("dependencies", []),
-                        path=mod_dir
-                    )
-                    found[manifest.id] = manifest
-                except Exception as e:
-                    print(f"[ModManager] Failed to load manifest for {mod_dir.name}: {e}")
-        return found
+        return discover_mods(self.modules_dir)
 
     def _sort_mods(self, available: Dict[str, ModManifest]) -> List[ModManifest]:
-        """Topological Sort to ensure base mods load first."""
-        sorted_list = []
-        visited = set()
-        temp_mark = set()
-
-        def visit(mod_id: str):
-            if mod_id in temp_mark:
-                raise RuntimeError(f"Circular dependency: {mod_id}")
-            if mod_id in visited:
-                return
-            
-            if mod_id not in available:
-                raise RuntimeError(f"Missing dependency: '{mod_id}'")
-
-            temp_mark.add(mod_id)
-            for dep in available[mod_id].dependencies:
-                visit(dep)
-            temp_mark.remove(mod_id)
-            
-            visited.add(mod_id)
-            sorted_list.append(available[mod_id])
-
-        for mid in available:
-            if mid not in visited:
-                visit(mid)
-                    
-        return sorted_list
+        return resolve_mod_load_order(self.config.active_mods, available)

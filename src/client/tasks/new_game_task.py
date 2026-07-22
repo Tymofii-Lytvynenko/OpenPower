@@ -29,11 +29,20 @@ class NewGameTask:
         if hasattr(self.window, "session") and self.window.session:
             self.window.session.shutdown()
             
-        # 2. Spawn a new clean ClientSessionProxy
+        # 2. Spawn a new clean server process via the launcher factory
         self.status_text = "Starting simulation server..."
         self.progress = 0.1
+        from src.server.launcher import spawn_local_server
         from src.client.client_session import ClientSessionProxy
-        new_session = ClientSessionProxy(self.config, save_name=None)
+        bundle = spawn_local_server(self.config, save_name=None, player_tag=self.player_tag)
+        new_session = ClientSessionProxy(
+            map_data=bundle.map_data,
+            action_queue=bundle.action_queue,
+            state_queue=bundle.state_queue,
+            progress_queue=bundle.progress_queue,
+            snapshot_ack_queue=bundle.snapshot_ack_queue,
+            process=bundle.process,
+        )
         
         # 3. Monitor the progress queue until READY or ERROR
         while True:

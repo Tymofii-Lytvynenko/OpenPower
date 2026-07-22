@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Optional, Any
 from imgui_bundle import imgui
 
@@ -9,11 +10,20 @@ class ContextMenu:
     Manages the Global Right-Click Context Menu for the map.
     Handles the 'queued open' logic to prevent ImGui event conflicts.
     """
-    def __init__(self, composer: UIComposer, panel_manager: PanelManager, viewport_ctrl: Any):
+    def __init__(
+        self,
+        composer: UIComposer,
+        panel_manager: PanelManager,
+        viewport_ctrl: Any,
+        has_selected_units: Callable[[], bool] | None = None,
+        on_move_selected_units: Callable[[], None] | None = None,
+    ):
         self.composer = composer
         self.panels = panel_manager
         self.viewport = viewport_ctrl
-        
+        self._has_selected_units = has_selected_units
+        self._on_move_selected_units = on_move_selected_units
+
         # State
         self._target_id: Optional[int] = None
         self._queued_open: bool = False
@@ -44,21 +54,30 @@ class ContextMenu:
         # 1. Target Header
         if self._target_id is not None:
             imgui.text_disabled(f"Target: Region #{self._target_id}")
-            
+
+            if self._has_selected_units is not None and self._has_selected_units():
+                if self.composer.draw_menu_item("Move", "M") and self._on_move_selected_units is not None:
+                    self._on_move_selected_units()
+                imgui.separator()
+
             if self.composer.draw_menu_item("View Details", "I"):
                 self.panels.set_visible("INSPECTOR", True)
                 self.viewport.select_region_by_id(self._target_id)
-            
+
+            if self.composer.draw_menu_item("More Info", "F"):
+                self.panels.set_visible("COUNTRY_MORE_INFO", True)
+                self.viewport.select_region_by_id(self._target_id)
+
             if self.composer.draw_menu_item("Center Camera"):
                 self.viewport.focus_on_region(self._target_id)
-            
+
             imgui.separator()
 
         # 2. Map Modes Menu
         if self.composer.begin_menu("Map Mode"):
             # A. Terrain (Physical) Toggle
             if self.composer.draw_menu_item("Physical (Terrain)"):
-                # Switches to terrain mode. 
+                # Switches to terrain mode.
                 # Requires ViewportController.set_map_mode("terrain") to handle disabling overlays.
                 if hasattr(self.viewport, "set_map_mode"):
                     self.viewport.set_map_mode("terrain")
@@ -70,10 +89,10 @@ class ContextMenu:
                 for key, mode_obj in self.viewport.map_modes.items():
                     # Highlight if active
                     is_active = (getattr(self.viewport, "current_mode_key", "") == key)
-                    
+
                     if imgui.menu_item(mode_obj.name, "", is_active)[0]:
                         self.viewport.set_map_mode(key)
-            
+
             self.composer.end_menu()
 
         # 3. Units Menu
@@ -82,12 +101,15 @@ class ContextMenu:
             if self.composer.begin_menu("Units Visibility"):
                 if imgui.menu_item("Show All Units Globally", "", self.viewport.show_all_units)[0]:
                     self.viewport.show_all_units = not self.viewport.show_all_units
+                if hasattr(self.viewport, "show_engagement_zones"):
+                    if imgui.menu_item("Show Engagement Zones", "", self.viewport.show_engagement_zones)[0]:
+                        self.viewport.show_engagement_zones = not self.viewport.show_engagement_zones
                 self.composer.end_menu()
 
         # 4. Tools Menu (Conditional)
         # Check if the Data Inspector panel is registered before showing the menu
         has_data_inspector = any(e.id == "DATA_INSPECTOR" for e in self.panels.get_entries())
-        
+
         if has_data_inspector:
             imgui.separator()
             if self.composer.begin_menu("Tools"):

@@ -11,14 +11,14 @@ from src.client.utils.coords_util import calculate_centroid
 from src.client.utils.color_generator import generate_political_colors
 
 if TYPE_CHECKING:
-    from src.server.session import GameSession
+    from src.shared.protocols import SessionPort
 
 
 COUNTRY_SELECTION_FOCUS_DISTANCE = 1.55
 
 
 class NewGameView(BaseImGuiView):
-    def __init__(self, session: "GameSession", config: GameConfig):
+    def __init__(self, session: "SessionPort", config: GameConfig):
         super().__init__()
         self.session = session 
         self.config = config

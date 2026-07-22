@@ -1,68 +1,97 @@
-import time
 import multiprocessing as mp
+import time
+from queue import Empty, Full
 from typing import Optional
-from src.server.session import GameSession
-from src.shared.config import GameConfig
 
-def run_server_process(config_root, action_queue: mp.Queue, state_queue: mp.Queue, progress_queue: mp.Queue, save_name: Optional[str] = None):
-    """
-    The infinite loop that lives on a separate CPU core.
-    Completely isolated from Pyglet/Arcade OpenGL context.
-    """
-    # 1. Initialize Configuration in this new memory space
+from src.engine.clock import FixedStepClock
+from src.server.session import GameSession
+from src.shared.commands import CommandEnvelope
+from src.shared.config import GameConfig
+from src.shared.snapshots import StateSnapshotEncoder
+
+
+def _drain_queue(queue_obj):
+    items = []
+    while True:
+        try:
+            items.append(queue_obj.get_nowait())
+        except Empty:
+            return items
+
+
+def run_server_process(
+    config_root,
+    action_queue: mp.Queue,
+    state_queue: mp.Queue,
+    progress_queue: mp.Queue,
+    save_name: Optional[str] = None,
+    shutdown_event: Optional[mp.Event] = None,
+    player_tag: Optional[str] = None,
+    snapshot_ack_queue: mp.Queue | None = None,
+):
     from pathlib import Path
+
     config = GameConfig(Path(config_root))
 
-    def progress_cb(p: float, text: str):
-        progress_queue.put(("PROGRESS", p, text))
+    def progress_cb(progress: float, text: str) -> None:
+        progress_queue.put(("PROGRESS", progress, text))
 
     try:
-        # Load heavy data
-        session = GameSession.create_local(config, progress_cb=progress_cb, save_name=save_name)
+        session = GameSession.create_headless(
+            config,
+            progress_cb=progress_cb,
+            save_name=save_name,
+            player_tag=player_tag,
+        )
         progress_queue.put(("READY", 1.0, "Engine Started"))
-    except Exception as e:
-        progress_queue.put(("ERROR", 0.0, str(e)))
+    except Exception as exc:
+        progress_queue.put(("ERROR", 0.0, str(exc)))
         return
 
-    # 2. Main Simulation Loop
-    target_tps = 10  # 10 Engine ticks per second (100ms per tick)
-    tick_time = 1.0 / target_tps
+    clock = FixedStepClock(step_seconds=0.1, max_catch_up_steps=5)
+    snapshots = StateSnapshotEncoder()
     last_time = time.perf_counter()
 
     while True:
-        current_time = time.perf_counter()
-        delta_time = current_time - last_time
-        last_time = current_time
+        if shutdown_event is not None and shutdown_event.is_set():
+            return
 
-        # A. Process Incoming Actions from UI
-        while not action_queue.empty():
+        frame_start = time.perf_counter()
+        elapsed = frame_start - last_time
+        last_time = frame_start
+
+        for incoming in _drain_queue(action_queue):
+            if incoming == "SHUTDOWN":
+                return
+            if incoming == "SAVE_MAP_CHANGES":
+                session.save_map_changes()
+                continue
+            if isinstance(incoming, CommandEnvelope):
+                session.receive_command(incoming)
+                continue
+            print(
+                f"[ServerProcess] Ignoring unsupported action payload "
+                f"{type(incoming).__name__}."
+            )
+
+        if snapshot_ack_queue is not None:
+            for acknowledged_sequence in _drain_queue(snapshot_ack_queue):
+                snapshots.acknowledge(int(acknowledged_sequence))
+
+        steps = clock.consume(elapsed)
+        for fixed_delta in steps:
+            session.tick(fixed_delta)
+
+        if steps:
+            packet = snapshots.encode(session.state)
             try:
-                action = action_queue.get_nowait()
-                if action == "SHUTDOWN":
-                    return # Graceful exit
-                if action == "SAVE_MAP_CHANGES":
-                    session.save_map_changes()
-                    continue
-                session.receive_action(action)
-            except Exception:
+                state_queue.put_nowait(packet)
+            except Full:
+                # Deltas remain cumulative from the last client acknowledgement.
                 pass
 
-        # B. Run the Heavy Mathematics
-        session.tick(delta_time)
-
-        # C. Serialize and Send State to UI
-        ipc_data = session.state.to_ipc()
-        
-        # Keep queue lean (drain old frames if UI is lagging behind)
-        while not state_queue.empty():
-            try:
-                state_queue.get_nowait()
-            except Exception:
-                pass
-                
-        state_queue.put(ipc_data)
-
-        # D. Pace the thread
-        elapsed = time.perf_counter() - current_time
-        sleep_time = max(0.0, tick_time - elapsed)
+        sleep_time = max(
+            0.0,
+            clock.step_seconds - (time.perf_counter() - frame_start),
+        )
         time.sleep(sleep_time)

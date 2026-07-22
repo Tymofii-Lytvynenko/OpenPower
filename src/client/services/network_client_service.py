@@ -1,9 +1,10 @@
+from dataclasses import replace
 from typing import TYPE_CHECKING
 from src.shared.actions import GameAction
 
 if TYPE_CHECKING:
-    from src.server.session import GameSession
-    from src.server.state import GameState
+    from src.shared.protocols import SessionPort
+    from src.shared.state import GameState
 
 class NetworkClient:
     """
@@ -12,19 +13,28 @@ class NetworkClient:
     and a write-only channel for Actions.
     """
     
-    def __init__(self, session: "GameSession"):
+    def __init__(self, session: "SessionPort"):
         self.session = session
         # In a real networked game, this ID comes from the handshake
         self.player_id = "local_admin" 
 
-    def send_action(self, action: GameAction):
+    def get_system_errors(self) -> list:
+        if hasattr(self.session, "system_errors"):
+            return self.session.system_errors
+        return []
+
+    def clear_system_errors(self) -> None:
+        if hasattr(self.session, "system_errors"):
+            self.session.system_errors.clear() 
+
+    def send_action(self, action: GameAction) -> str:
         """
         Sends an intent to the server.
         The client NEVER applies this action locally. It waits for the 
         server to process it and send back a new State.
         """
-        action.player_id = self.player_id
-        self.session.receive_action(action)
+        authoritative_action = replace(action, player_id=self.player_id)
+        return self.session.receive_action(authoritative_action)
 
     def get_state(self) -> "GameState":
         """

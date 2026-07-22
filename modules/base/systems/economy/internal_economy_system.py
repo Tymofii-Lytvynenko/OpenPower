@@ -1,7 +1,10 @@
 import polars as pl
-from src.engine.interfaces import ISystem
-from src.server.state import GameState
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
+from src.shared.system_state import SYSTEM_STATE_CACHE
+from src.shared.state import GameState
+from src.shared.numeric import stable_sum, stable_total
 from src.shared.events import EventRealSecond
+from src.shared.actions import ActionUpdateResourcePolicy
 from src.shared.economy_meta import RESOURCE_MAPPING
 
 class InternalEconomySystem(ISystem):
@@ -10,7 +13,18 @@ class InternalEconomySystem(ISystem):
     generation, base internal taxation, and calculating national demand (consumption).
     Now features Dynamic Wealth Anchoring, Propensity to Consume, and Income Elasticity.
     """
+
+    access = SystemAccess(
+        reads=frozenset({'countries', 'domestic_production', 'regions', 'units'}),
+        writes=frozenset({'countries', 'domestic_production', 'resource_ledger'}),
+        handles=frozenset({ActionUpdateResourcePolicy}),
+        phase=SystemPhase.ECONOMY,
+    )
     
+    runtime_state_contract = {
+        "_missing_columns": SYSTEM_STATE_CACHE,
+    }
+
     def __init__(self):
         self._missing_columns = set()
 
@@ -93,6 +107,11 @@ class InternalEconomySystem(ISystem):
     }
 
     def update(self, state: GameState, delta_time: float) -> None:
+        # 1. Process Actions
+        for action in state.current_actions:
+            if isinstance(action, ActionUpdateResourcePolicy):
+                self._handle_update_resource_policy(state, action)
+
         rebuild_ledger = False
         
         if "resource_ledger" not in state.tables and "domestic_production" in state.tables and "trade_network" in state.tables:
@@ -113,6 +132,43 @@ class InternalEconomySystem(ISystem):
         if rebuild_ledger:
             self._build_resource_ledger(state)
 
+    def _handle_update_resource_policy(self, state: GameState, action: ActionUpdateResourcePolicy) -> None:
+        if "domestic_production" not in state.tables:
+            return
+
+        df = state.get_table("domestic_production")
+        expressions = []
+        if "is_gov_controlled" not in df.columns:
+            expressions.append(pl.lit(False).alias("is_gov_controlled"))
+        if "is_legal" not in df.columns:
+            expressions.append(pl.lit(True).alias("is_legal"))
+        if "tax_rate" not in df.columns:
+            expressions.append(pl.lit(0.0).alias("tax_rate"))
+        if expressions:
+            df = df.with_columns(expressions)
+
+        tax_rate = max(0.0, min(1.0, float(action.tax_rate)))
+        target = (
+            (pl.col("country_id") == action.country_tag)
+            & (pl.col("game_resource_id") == action.resource_id)
+        )
+
+        updated = df.with_columns([
+            pl.when(target)
+            .then(pl.lit(bool(action.is_gov_controlled)))
+            .otherwise(pl.col("is_gov_controlled"))
+            .alias("is_gov_controlled"),
+            pl.when(target)
+            .then(pl.lit(bool(action.is_legal)))
+            .otherwise(pl.col("is_legal"))
+            .alias("is_legal"),
+            pl.when(target)
+            .then(pl.lit(tax_rate))
+            .otherwise(pl.col("tax_rate"))
+            .alias("tax_rate"),
+        ])
+        state.update_table("domestic_production", updated)
+
     def _get_population(self, state: GameState) -> pl.DataFrame:
         regions = state.get_table("regions")
         
@@ -125,7 +181,7 @@ class InternalEconomySystem(ISystem):
                     self._missing_columns.add(col)
                 regions = regions.with_columns(pl.lit(0).alias(col))
 
-        return regions.group_by("owner").agg(
+        return regions.group_by("owner", maintain_order=True).agg(
             (pl.col("pop_14").fill_null(0) + pl.col("pop_15_64").fill_null(0) + pl.col("pop_65").fill_null(0)).sum().alias("population")
         ).rename({"owner": "country_id"})
 
@@ -164,7 +220,7 @@ class InternalEconomySystem(ISystem):
         # Calculate total GDP to find the global average
         data = data.with_columns((pl.col("gdp_per_capita") * pl.col("population")).alias("total_gdp"))
         
-        total_gdp_sum = data["total_gdp"].sum() if not data.is_empty() else 0.0
+        total_gdp_sum = stable_total(data["total_gdp"]) if not data.is_empty() else 0.0
         total_pop_sum = data["population"].sum() if not data.is_empty() else 1.0
         
         # The zero-mile marker for global wealth, minimum $100
@@ -236,9 +292,9 @@ class InternalEconomySystem(ISystem):
             )
             
         # Format output
-        long_consumption = res_dfs.select(["country_id"] + raw_demand_cols).melt(
-            id_vars="country_id",
-            value_vars=raw_demand_cols,
+        long_consumption = res_dfs.select(["country_id"] + raw_demand_cols).unpivot(
+            index="country_id",
+            on=raw_demand_cols,
             variable_name="game_resource_id",
             value_name="consumption_usd"
         )
@@ -251,19 +307,19 @@ class InternalEconomySystem(ISystem):
         Now seamlessly integrates outputs from the TradeSystem to reflect global flows.
         """
         prod_table = state.get_table("domestic_production")
-        prod_usd = prod_table.group_by(["country_id", "game_resource_id"]).agg(
-            pl.col("domestic_production").sum().alias("production_usd")
+        prod_usd = prod_table.group_by(["country_id", "game_resource_id"], maintain_order=True).agg(
+            stable_sum("domestic_production").alias("production_usd")
         )
         
         # Aggregate real trade flows generated by TradeSystem in the previous phase
         if "trade_network" in state.tables:
             trade_table = state.get_table("trade_network")
-            exports = trade_table.group_by(["exporter_id", "game_resource_id"]).agg(
-                pl.col("trade_value_usd").sum().alias("export_usd")
+            exports = trade_table.group_by(["exporter_id", "game_resource_id"], maintain_order=True).agg(
+                stable_sum("trade_value_usd").alias("export_usd")
             ).rename({"exporter_id": "country_id"})
             
-            imports = trade_table.group_by(["importer_id", "game_resource_id"]).agg(
-                pl.col("trade_value_usd").sum().alias("import_usd")
+            imports = trade_table.group_by(["importer_id", "game_resource_id"], maintain_order=True).agg(
+                stable_sum("trade_value_usd").alias("import_usd")
             ).rename({"importer_id": "country_id"})
         else:
             exports = pl.DataFrame(schema={"country_id": pl.Utf8, "game_resource_id": pl.Utf8, "export_usd": pl.Float64})
@@ -303,7 +359,9 @@ class InternalEconomySystem(ISystem):
             pl.col("unit_str").fill_null("units")
         )
         
-        state.update_table("resource_ledger", ledger)
+        state.update_table(
+            "resource_ledger", ledger.sort(["country_id", "game_resource_id"])
+        )
 
     def _process_economy(self, state: GameState, fraction: float):
         """
@@ -320,9 +378,9 @@ class InternalEconomySystem(ISystem):
         if "economic_health" not in countries.columns:
             countries = countries.with_columns(pl.lit(1.0).alias("economic_health"))
 
-        prod_val = prod_table.group_by("country_id").agg(
-            (pl.col("domestic_production") * fraction).sum().alias("production_income"),
-            pl.col("domestic_production").sum().alias("gdp") 
+        prod_val = prod_table.group_by("country_id", maintain_order=True).agg(
+            stable_sum(pl.col("domestic_production") * fraction).alias("production_income"),
+            stable_sum("domestic_production").alias("gdp")
         ).rename({"country_id": "id"})
 
         pop_data = self._get_population(state).rename({"country_id": "id"})
@@ -356,7 +414,9 @@ class InternalEconomySystem(ISystem):
             (pl.col("money_reserves") + (pl.col("production_income") * pl.col("internal_tax_rate").fill_null(0.20))).alias("money_reserves")
         )
 
-        state.update_table("countries", updated_countries.drop(["production_income"]))
+        state.update_table(
+            "countries", updated_countries.drop(["production_income"]).sort("id")
+        )
 
         # Base organic industrial growth over time
         # Join with countries to get per-country growth rate
