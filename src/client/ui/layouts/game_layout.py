@@ -64,7 +64,14 @@ class GameLayout:
         self._last_selected_id: Optional[int] = None
         self._cached_target_tag: str = player_tag
 
-    def render(self, selected_region_id: Optional[int], fps: float, nav_service, state=None):
+    def render(
+        self,
+        selected_region_id: Optional[int],
+        fps: float,
+        nav_service,
+        state=None,
+        presentation_total_minutes: float | None = None,
+    ):
         GAMETHEME.apply()
         if state is None:
             state = self.net.get_state()
@@ -86,6 +93,7 @@ class GameLayout:
             selected_region_id=selected_region_id,
             on_focus_request=self._on_focus_region,
             net_client=self.net,
+            presentation_total_minutes=presentation_total_minutes,
         )
         self.panel_manager.render_all(state, context)
         self.context_menu.render()

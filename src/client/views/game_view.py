@@ -161,6 +161,7 @@ class GameView(BaseImGuiView):
         # 4. Render Unit Overlay and UI
         self.window.use() # Switch back for UI
         state = self.net.get_state()
+        presentation_total_minutes = self.net.get_display_total_minutes()
 
         visible_owners = None
         if state is not None and not self.viewport_ctrl.show_all_units:
@@ -176,6 +177,7 @@ class GameView(BaseImGuiView):
             selection_rect=self._active_selection_rect(),
             visible_owners=visible_owners,
             show_engagement_zones=self.viewport_ctrl.show_engagement_zones,
+            presentation_total_minutes=presentation_total_minutes,
         )
 
         # Draw random event placards above affected regions
@@ -187,6 +189,7 @@ class GameView(BaseImGuiView):
                 self.imgui.real_fps,
                 self.nav,
                 state=state,
+                presentation_total_minutes=presentation_total_minutes,
             )
             self.unit_context_menu.render()
             self.unit_details_window.render(state)

@@ -7,6 +7,35 @@ from src.shared.state import GameState
 
 
 class TestMilitaryPresenter(unittest.TestCase):
+    def test_unit_list_uses_presentation_clock_for_movement_progress(self):
+        state = GameState(
+            tables={
+                "countries": pl.DataFrame({"id": ["USA"], "name": ["United States"]}),
+                "regions": pl.DataFrame({"id": [1], "name": ["Origin"]}),
+                "units": pl.DataFrame(
+                    {
+                        "id": ["unit-1"],
+                        "owner": ["USA"],
+                        "unit_type": ["army"],
+                        "strength": [100],
+                        "current_region_id": [1],
+                        "departed_at_minute": [10],
+                        "arrival_at_minute": [30],
+                        "movement_progress": [0.1],
+                        "is_moving": [True],
+                        "readiness_status": ["ready"],
+                        "readiness_transition_id": [""],
+                    }
+                ),
+            }
+        )
+
+        rows = MilitaryPresenter().unit_rows(state, "USA", presentation_total_minutes=20.0)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].status, "Moving")
+        self.assertAlmostEqual(rows[0].progress_pct, 50.0)
+
     def test_preferred_war_targets_excludes_self_allies_and_active_enemies(self):
         state = GameState(
             tables={

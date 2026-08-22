@@ -43,6 +43,8 @@ UNIT_SIGNATURE_COLUMNS = (
     "target_region_id",
     "target_latitude",
     "target_longitude",
+    "departed_at_minute",
+    "arrival_at_minute",
     "movement_progress",
     "is_moving",
     "readiness_status",
@@ -107,6 +109,7 @@ class UnitRenderer:
         selection_rect: Optional[tuple[float, float, float, float]] = None,
         visible_owners: Optional[set[str]] = None,
         show_engagement_zones: bool = True,
+        presentation_total_minutes: float | None = None,
     ) -> None:
         window = imgui.get_io().display_size
         width = int(window.x)
@@ -115,7 +118,14 @@ class UnitRenderer:
         units_signature = self._get_units_signature(state, filtered_units, visible_owners)
 
         self._prepare_flag_atlas_for_state(filtered_units, drag_preview, units_signature)
-        self._billboards = self._project_units(state, filtered_units, width, height, units_signature)
+        self._billboards = self._project_units(
+            state,
+            filtered_units,
+            width,
+            height,
+            units_signature,
+            presentation_total_minutes,
+        )
         batch_drawn = self._batch.render(self._billboards, self._flags, width, height)
         has_zone_targets = show_engagement_zones and any(
             unit.unit_id == selected_unit_id
@@ -243,6 +253,7 @@ class UnitRenderer:
         window_width: int,
         window_height: int,
         units_signature: tuple | None,
+        presentation_total_minutes: float | None = None,
     ) -> list[ProjectedUnit]:
         if state is None or filtered_units is None:
             self._projection_cache_key = None
@@ -257,7 +268,12 @@ class UnitRenderer:
             return []
 
         self._refresh_region_lookup(state)
-        cache_key = self._make_projection_cache_key(units_signature, window_width, window_height)
+        cache_key = self._make_projection_cache_key(
+            units_signature,
+            window_width,
+            window_height,
+            presentation_total_minutes,
+        )
         if cache_key == self._projection_cache_key:
             return self._billboards
 
@@ -267,6 +283,7 @@ class UnitRenderer:
             prepared,
             window_width,
             window_height,
+            presentation_total_minutes,
         )
 
     def _make_projection_cache_key(
@@ -274,6 +291,7 @@ class UnitRenderer:
         units_signature: tuple | None,
         window_width: int,
         window_height: int,
+        presentation_total_minutes: float | None = None,
     ) -> tuple:
         return (
             units_signature,
@@ -283,6 +301,7 @@ class UnitRenderer:
             round(self._camera.pitch, 6),
             round(self._camera.distance, 4),
             self._region_count,
+            None if presentation_total_minutes is None else round(presentation_total_minutes, 5),
         )
 
     def _get_prepared_units(self, units, units_signature: tuple | None) -> PreparedUnitProjectionData:

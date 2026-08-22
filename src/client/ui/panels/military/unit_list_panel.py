@@ -21,7 +21,11 @@ class UnitListPanel:
             return True
 
     def _render_content(self, state, context: PanelRenderContext) -> None:
-        rows = self._presenter.unit_rows(state, context.target_tag)
+        rows = self._presenter.unit_rows(
+            state,
+            context.target_tag,
+            context.presentation_total_minutes,
+        )
         if not rows:
             draw_empty_state("No deployed units are tracked for the selected country.")
             return

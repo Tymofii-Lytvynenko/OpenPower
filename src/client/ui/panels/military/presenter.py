@@ -110,7 +110,12 @@ class MilitaryPresenter:
             missile_defense_pct=missile_defense_pct,
         )
 
-    def unit_rows(self, state, country_tag: str) -> list[UnitListRow]:
+    def unit_rows(
+        self,
+        state,
+        country_tag: str,
+        presentation_total_minutes: float | None = None,
+    ) -> list[UnitListRow]:
         rows: list[UnitListRow] = []
         for row in self._country_units(state, country_tag):
             owner_tag = safe_text(row.get("owner"), country_tag)
@@ -121,7 +126,8 @@ class MilitaryPresenter:
                 progress_pct = max(0.0, min(100.0, safe_float(row.get("readiness_progress"), 0.0) * 100.0))
             elif bool(row.get("is_moving", False)):
                 status = "Moving"
-                progress_pct = max(0.0, min(100.0, safe_float(row.get("movement_progress"), 0.0) * 100.0))
+                progress = self._movement_progress(row, presentation_total_minutes)
+                progress_pct = max(0.0, min(100.0, progress * 100.0))
             else:
                 status = readiness.title()
                 progress_pct = 100.0 if readiness in {"ready", "fortified"} else 0.0
@@ -138,6 +144,19 @@ class MilitaryPresenter:
             )
 
         return sorted(rows, key=lambda item: (item.status != "Moving", item.location, item.unit_id))
+
+    def _movement_progress(self, row: dict, presentation_total_minutes: float | None) -> float:
+        if presentation_total_minutes is None:
+            return safe_float(row.get("movement_progress"), 0.0)
+
+        departed = safe_float(row.get("departed_at_minute"), 0.0)
+        arrival = safe_float(row.get("arrival_at_minute"), departed)
+        if arrival <= departed:
+            return safe_float(row.get("movement_progress"), 0.0)
+        return max(
+            0.0,
+            min(1.0, (presentation_total_minutes - departed) / (arrival - departed)),
+        )
 
     def production_orders_for_country(self, state, country_tag: str) -> list[dict]:
         orders = state.tables.get("production_orders")

@@ -20,6 +20,7 @@ class PanelRenderContext:
     selected_region_id: Optional[int] = None
     on_focus_request: Optional[Callable[[int], None]] = None
     net_client: Optional["NetworkClient"] = None
+    presentation_total_minutes: Optional[float] = None
 
 
 class PanelRenderable(Protocol):

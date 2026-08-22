@@ -63,6 +63,8 @@ class PreparedUnitProjectionData:
     source_vectors: np.ndarray
     target_vectors: np.ndarray
     movement_progress: np.ndarray
+    departed_at_minutes: np.ndarray
+    arrival_at_minutes: np.ndarray
     is_moving: np.ndarray
     readiness_statuses: list[str]
     readiness_progress: np.ndarray
@@ -87,6 +89,8 @@ class PreparedUnitProjectionData:
             source_vectors=empty_vectors,
             target_vectors=empty_vectors,
             movement_progress=empty_float,
+            departed_at_minutes=empty_float,
+            arrival_at_minutes=empty_float,
             is_moving=np.empty(0, dtype=np.bool_),
             readiness_statuses=[],
             readiness_progress=empty_float,
@@ -124,9 +128,15 @@ class UnitProjectionService:
         region_lookup: dict[int, RegionAnchor],
         window_width: int,
         window_height: int,
+        presentation_total_minutes: float | None = None,
     ) -> list[ProjectedUnit]:
         prepared = self.prepare_units(unit_rows, region_lookup)
-        return self.project_prepared_units(prepared, window_width, window_height)
+        return self.project_prepared_units(
+            prepared,
+            window_width,
+            window_height,
+            presentation_total_minutes,
+        )
 
     def prepare_units(
         self,
@@ -145,6 +155,8 @@ class UnitProjectionService:
         source_vectors: list[np.ndarray] = []
         target_vectors: list[np.ndarray] = []
         movement_progress: list[float] = []
+        departed_at_minutes: list[float] = []
+        arrival_at_minutes: list[float] = []
         is_moving: list[bool] = []
         readiness_statuses: list[str] = []
         readiness_progress: list[float] = []
@@ -179,6 +191,8 @@ class UnitProjectionService:
             source_vectors.append(source_vec)
             target_vectors.append(target_vec)
             movement_progress.append(float(row.get("movement_progress", 0.0) or 0.0))
+            departed_at_minutes.append(float(row.get("departed_at_minute", 0) or 0))
+            arrival_at_minutes.append(float(row.get("arrival_at_minute", 0) or 0))
             is_moving.append(bool(row.get("is_moving", False)))
             readiness_statuses.append(str(row.get("readiness_status", "ready") or "ready"))
             readiness_progress.append(float(row.get("readiness_progress", 0.0) or 0.0))
@@ -197,6 +211,8 @@ class UnitProjectionService:
             source_vectors=np.asarray(source_vectors, dtype=np.float32),
             target_vectors=np.asarray(target_vectors, dtype=np.float32),
             movement_progress=np.asarray(movement_progress, dtype=np.float32),
+            departed_at_minutes=np.asarray(departed_at_minutes, dtype=np.float32),
+            arrival_at_minutes=np.asarray(arrival_at_minutes, dtype=np.float32),
             is_moving=np.asarray(is_moving, dtype=np.bool_),
             readiness_statuses=readiness_statuses,
             readiness_progress=np.asarray(readiness_progress, dtype=np.float32),
@@ -208,6 +224,7 @@ class UnitProjectionService:
         prepared: PreparedUnitProjectionData,
         window_width: int,
         window_height: int,
+        presentation_total_minutes: float | None = None,
     ) -> list[ProjectedUnit]:
         if window_width <= 0 or window_height <= 0:
             return []
@@ -220,7 +237,11 @@ class UnitProjectionService:
             return []
 
         camera_pos = np.array([0.0, 0.0, self.camera.distance], dtype=np.float32)
-        local_positions = self._resolve_local_positions(prepared)
+        effective_progress = self._presentation_movement_progress(
+            prepared,
+            presentation_total_minutes,
+        )
+        local_positions = self._resolve_local_positions(prepared, effective_progress)
         local_h = np.empty((prepared.count, 4), dtype=np.float32)
         local_h[:, :3] = local_positions
         local_h[:, 3] = 1.0
@@ -270,7 +291,7 @@ class UnitProjectionService:
                 distance_to_camera=float(distances[index]),
                 width=width,
                 height=height,
-                movement_progress=float(prepared.movement_progress[index]),
+                movement_progress=float(effective_progress[index]),
                 is_moving=bool(prepared.is_moving[index]),
                 readiness_status=prepared.readiness_statuses[index],
                 readiness_progress=float(prepared.readiness_progress[index]),
@@ -353,18 +374,54 @@ class UnitProjectionService:
             for index in range(segments)
         ]
 
-    def _resolve_local_positions(self, prepared: PreparedUnitProjectionData) -> np.ndarray:
+    def _presentation_movement_progress(
+        self,
+        prepared: PreparedUnitProjectionData,
+        presentation_total_minutes: float | None,
+    ) -> np.ndarray:
+        # Snapshots arrive less often than render frames; the schedule lets the
+        # overlay advance between snapshots without mutating authoritative state.
+        progress = prepared.movement_progress.copy()
+        if presentation_total_minutes is None:
+            return progress
+
+        valid_schedule = (
+            prepared.is_moving
+            & (prepared.target_region_ids > 0)
+            & (prepared.arrival_at_minutes > prepared.departed_at_minutes)
+        )
+        if np.any(valid_schedule):
+            progress[valid_schedule] = np.clip(
+                (
+                    float(presentation_total_minutes)
+                    - prepared.departed_at_minutes[valid_schedule]
+                )
+                / (
+                    prepared.arrival_at_minutes[valid_schedule]
+                    - prepared.departed_at_minutes[valid_schedule]
+                ),
+                0.0,
+                1.0,
+            )
+        return progress
+
+    def _resolve_local_positions(
+        self,
+        prepared: PreparedUnitProjectionData,
+        movement_progress: np.ndarray | None = None,
+    ) -> np.ndarray:
         positions = prepared.source_vectors.copy()
+        progress = prepared.movement_progress if movement_progress is None else movement_progress
         moving = (
             prepared.is_moving
             & (prepared.target_region_ids > 0)
-            & (prepared.movement_progress > 0.0)
+            & (progress > 0.0)
         )
         if np.any(moving):
             positions[moving] = self._slerp_rows(
                 prepared.source_vectors[moving],
                 prepared.target_vectors[moving],
-                prepared.movement_progress[moving],
+                progress[moving],
             )
 
         return positions * self.surface_radius
