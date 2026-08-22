@@ -50,6 +50,17 @@ class NetworkClient:
         state = self.get_state()
         return getattr(getattr(state, "time", None), "date_str", None)
 
+    def get_display_total_minutes(self) -> float | None:
+        """Return the interpolated simulation minute for frame-local presentation."""
+        getter = getattr(self.session, "get_display_total_minutes", None)
+        if callable(getter):
+            return getter()
+        state = self.get_state()
+        time_data = getattr(state, "time", None)
+        if time_data is None:
+            return None
+        return float(getattr(time_data, "total_minutes", 0))
+
     def request_save(self, is_editor: bool = False):
         """Saves gameplay state or editor state depending on the context."""
         if is_editor:

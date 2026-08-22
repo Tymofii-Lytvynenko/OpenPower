@@ -127,6 +127,9 @@ class ClientSessionProxy:
     def get_display_date_text(self) -> str | None:
         return self._display_clock.date_text()
 
+    def get_display_total_minutes(self) -> float | None:
+        return self._display_clock.display_minutes
+
     def shutdown(self) -> None:
         self.action_queue.put("SHUTDOWN")
         self.process.join(timeout=2.0)
