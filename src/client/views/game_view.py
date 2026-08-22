@@ -92,6 +92,7 @@ class GameView(BaseImGuiView):
             composer=self.layout.composer,
             on_deselect=self.unit_interactions.clear_selection,
             on_view_units_list=self.unit_details_window.open_for_unit,
+            on_set_readiness=self._set_unit_readiness,
         )
 
         self.selected_region_id = None
@@ -102,6 +103,8 @@ class GameView(BaseImGuiView):
         self._right_context_unit_id = None
         self._context_click_pos = None
         self._drag_threshold = 5.0
+        self._visible_owners_cache_key: tuple | None = None
+        self._visible_owners_cache: set[str] | None = None
 
         # 4. Handle Initial Focusing
         # If initial_pos is passed (e.g. centroid of selected country), make sure we look at it.
@@ -124,6 +127,10 @@ class GameView(BaseImGuiView):
         self.window.background_color = (10, 10, 10, 255)
         self.viewport_ctrl.refresh_map_layer()
 
+    def _set_unit_readiness(self, unit_id: str, target_status: str) -> None:
+        self.unit_interactions.selected_unit_ids = {unit_id}
+        self.unit_interactions.set_selected_units_readiness(target_status)
+
     def on_game_update(self, delta_time: float):
         # Feed real delta_time into ImGuiService so real_fps stays accurate.
         self.imgui.update_time(delta_time)
@@ -132,6 +139,14 @@ class GameView(BaseImGuiView):
         self.selected_region_id = region_id
 
     def on_draw(self):
+        # ImGui and batched overlays can leave a clipping rectangle active. It must be
+        # removed before clearing, otherwise stale depth values cut holes into the globe.
+        ctx = self.window.ctx
+        ctx.scissor = None
+        framebuffer_width, framebuffer_height = self.window.get_framebuffer_size()
+        ctx.viewport = (0, 0, framebuffer_width, framebuffer_height)
+        ctx.enable_only(ctx.DEPTH_TEST, ctx.BLEND)
+
         # 1. Clear Screen
         self.clear()
         
@@ -140,28 +155,20 @@ class GameView(BaseImGuiView):
         # Note: Layout setup happens inside layout.render()
 
         # 3. Render 3D World
-        # CRITICAL FIX: Reset OpenGL Context before drawing 3D
-        ctx = self.window.ctx
-        ctx.scissor = None
-        ctx.viewport = (0, 0, self.window.width, self.window.height)
-        ctx.enable_only((ctx.DEPTH_TEST, ctx.BLEND))
 
         self.renderer.draw()
 
         # 4. Render Unit Overlay and UI
         self.window.use() # Switch back for UI
+        state = self.net.get_state()
 
         visible_owners = None
-        if not self.viewport_ctrl.show_all_units:
+        if state is not None and not self.viewport_ctrl.show_all_units:
             active_country = self.viewport_ctrl.selected_country_tag or self.player_tag
-            from src.client.utils.diplomacy_utils import get_military_allies, get_military_enemies
-            state = self.net.get_state()
-            allies = get_military_allies(state, active_country)
-            enemies = get_military_enemies(state, active_country)
-            visible_owners = {active_country} | allies | enemies
+            visible_owners = self._visible_unit_owners(state, active_country)
 
         self.unit_renderer.render(
-            state=self.net.get_state(),
+            state=state,
             selected_unit_id=self.unit_interactions.selected_unit_id,
             selected_unit_ids=self.unit_interactions.selected_unit_ids,
             hovered_unit_id=self.unit_interactions.hovered_unit_id,
@@ -172,20 +179,42 @@ class GameView(BaseImGuiView):
         )
 
         # Draw random event placards above affected regions
-        self.event_renderer.render(self.net.get_state())
+        self.event_renderer.render(state)
 
         try:
             self.layout.render(
                 self.selected_region_id,
                 self.imgui.real_fps,
-                self.nav
+                self.nav,
+                state=state,
             )
             self.unit_context_menu.render()
-            self.unit_details_window.render(self.net.get_state())
+            self.unit_details_window.render(state)
         except Exception as e:
             print(f"[GameView] UI Rendering Error: {e}")
 
         self.imgui.render()
+
+    def _visible_unit_owners(self, state, active_country: str) -> set[str]:
+        revisions = getattr(state, "table_revisions", {})
+        cache_key = (
+            active_country,
+            int(revisions.get("countries_treaties", 0)),
+            int(revisions.get("countries_wars", 0)),
+        )
+        if cache_key == self._visible_owners_cache_key and self._visible_owners_cache is not None:
+            return self._visible_owners_cache
+
+        from src.client.utils.diplomacy_utils import get_military_allies, get_military_enemies
+
+        visible = (
+            {active_country}
+            | get_military_allies(state, active_country)
+            | get_military_enemies(state, active_country)
+        )
+        self._visible_owners_cache_key = cache_key
+        self._visible_owners_cache = visible
+        return visible
 
     # --- INPUT HANDLING ---
 

@@ -36,6 +36,16 @@ class RegionInspectorPanel:
         imgui.text(f"Owner: {row.get('owner', 'N/A')}")
         if "controller" in row:
             imgui.text(f"Controller: {row.get('controller', row.get('owner', 'N/A'))}")
+        occupations = state.tables.get("occupations")
+        if occupations is not None and not occupations.is_empty() and "region_id" in occupations.columns:
+            occupation = occupations.filter(pl.col("region_id") == int(region_id))
+            if not occupation.is_empty():
+                occupation_row = occupation.to_dicts()[0]
+                imgui.separator()
+                imgui.text("Military occupation")
+                imgui.text(f"Garrison: {int(occupation_row.get('garrison_strength') or 0)}")
+                imgui.text(f"Resistance: {float(occupation_row.get('resistance') or 0.0):.1f}")
+                imgui.text(f"Status: {occupation_row.get('occupation_status', 'active')}")
         imgui.text(f"Biome: {row.get('biome', 'N/A')}")
 
         if on_focus and imgui.button("Center Camera"):

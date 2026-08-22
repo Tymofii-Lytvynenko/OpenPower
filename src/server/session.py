@@ -13,6 +13,7 @@ from src.server.command_policy import authorize_country_scope, validate_finite_p
 from src.server.io.data_export_manager import DataExporter
 from src.server.io.data_load_manager import DataLoader
 from src.server.io.save_writer import SaveWriter
+from src.server.state_migrations import migrate_tactical_combat_state, validate_tactical_combat_state
 from src.shared.actions import ActionSaveGame, GameAction
 from src.shared.commands import CommandEnvelope, CommandStatus, command_id_for
 from src.shared.config import GameConfig
@@ -42,6 +43,13 @@ class GameSession:
         self.map_data = map_data
         self.schemas = schema_registry or WorldSchemaRegistry()
         self.state = initial_state
+
+        migrate_tactical_combat_state(self.state)
+        migration_issues = validate_tactical_combat_state(self.state)
+        if migration_issues:
+            raise RuntimeError(
+                "Tactical combat state migration failed: " + ", ".join(migration_issues)
+            )
 
         self.schemas.capture_state(self.state)
         self.schemas.ensure_state(self.state)

@@ -8,9 +8,11 @@ from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_HELPER
 from src.shared.state import GameState
 from src.shared.actions import ActionAttackUnit, ActionBuildUnit, ActionBuyMarketUnit, ActionMoveUnit
+from src.shared.actions import ActionSetUnitReadiness
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 from modules.base.systems.military.movement_access import MovementAccessPolicy
 from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
+from modules.base.systems.military.readiness_system import ReadinessSystem
 from src.shared.engagement import engagement_radius_km, first_zone_contact_fraction, hostile_country_pairs, interpolate_geo
 
 
@@ -38,6 +40,10 @@ UNIT_SCHEMA: dict[str, pl.DataType] = {
     "movement_progress": pl.Float64,
     "is_moving": pl.Boolean,
     "engagement_mode": pl.Utf8,
+    "readiness_status": pl.Utf8,
+    "readiness_transition_id": pl.Utf8,
+    "readiness_progress": pl.Float64,
+    "readiness_eta_minute": pl.Int64,
 }
 
 
@@ -128,19 +134,24 @@ class UnitFactory:
             "movement_progress": 0.0,
             "is_moving": False,
             "engagement_mode": "",
+            "readiness_status": "parked",
+            "readiness_transition_id": "",
+            "readiness_progress": 0.0,
+            "readiness_eta_minute": 0,
         }
 
 
 class MilitarySystem(ISystem):
     access = SystemAccess(
-        reads=frozenset({'countries', 'regions', 'units', 'production_orders', 'unit_designs', 'countries_wars'}),
-        writes=frozenset({'countries', 'units', 'production_orders', 'unit_market_listings'}),
+        reads=frozenset({'countries', 'regions', 'units', 'production_orders', 'unit_designs', 'countries_wars', 'unit_readiness_transitions', 'unit_pending_orders'}),
+        writes=frozenset({'countries', 'units', 'production_orders', 'unit_market_listings', 'unit_pending_orders'}),
         handles=frozenset(
             {
                 ActionAttackUnit,
                 ActionBuildUnit,
                 ActionBuyMarketUnit,
                 ActionMoveUnit,
+                ActionSetUnitReadiness,
             }
         ),
         phase=SystemPhase.MILITARY,
@@ -151,6 +162,7 @@ class MilitarySystem(ISystem):
         "_unit_factory": SYSTEM_STATE_HELPER,
         "_access_policy": SYSTEM_STATE_HELPER,
         "_weapons_trade_policy": SYSTEM_STATE_HELPER,
+        "_readiness_system": SYSTEM_STATE_HELPER,
     }
 
     def __init__(self):
@@ -159,6 +171,7 @@ class MilitarySystem(ISystem):
         self._unit_factory = UnitFactory()
         self._access_policy = MovementAccessPolicy()
         self._weapons_trade_policy = WeaponsTradePolicy()
+        self._readiness_system = ReadinessSystem()
 
     @property
     def id(self) -> str:
@@ -170,13 +183,16 @@ class MilitarySystem(ISystem):
 
     def update(self, state: GameState, delta_time: float) -> None:
         units = self._ensure_units_table(state)
+        self._readiness_system.update(state, delta_time)
+        units = self._ensure_units_table(state)
         units = self._process_completed_production_orders(state, units)
         units = self._process_build_actions(state, units)
         units = self._process_market_buy_actions(state, units)
         units = self._process_move_actions(state, units)
         units = self._process_attack_actions(state, units)
         units = self._update_unit_movements(state, units, state.time.total_minutes)
-        state.update_table(UNIT_TABLE, units)
+        if not state.get_table(UNIT_TABLE).equals(units):
+            state.update_table(UNIT_TABLE, units)
 
         from src.shared.events import EventNewDay
         has_new_day = any(isinstance(e, EventNewDay) for e in state.events)
@@ -460,6 +476,9 @@ class MilitarySystem(ISystem):
                 continue
             if int(attacker.get("strength") or 0) <= 0 or int(defender.get("strength") or 0) <= 0:
                 continue
+            if self._unit_is_transitioning(state, str(attacker.get("id") or "")):
+                self._queue_pending_attack(state, action)
+                continue
             attacker_owner = str(attacker.get("owner") or "").strip().upper()
             defender_owner = str(defender.get("owner") or "").strip().upper()
             if frozenset((attacker_owner, defender_owner)) not in hostile_pairs:
@@ -498,6 +517,10 @@ class MilitarySystem(ISystem):
         for row in units.to_dicts():
             action = action_by_unit.get(str(row["id"]))
             if action is None:
+                rows.append(row)
+                continue
+            if self._unit_is_transitioning(state, str(row.get("id") or "")):
+                self._queue_pending_move(state, action)
                 rows.append(row)
                 continue
             if str(row.get("engagement_mode") or "").lower() == "positional":
@@ -541,6 +564,66 @@ class MilitarySystem(ISystem):
             rows.append(row)
 
         return self._units_from_rows(rows)
+
+    def _unit_is_transitioning(self, state: GameState, unit_id: str) -> bool:
+        transitions = state.tables.get("unit_readiness_transitions")
+        return transitions is not None and not transitions.is_empty() and "unit_id" in transitions.columns and transitions.filter(pl.col("unit_id") == unit_id).height > 0
+
+    def _queue_pending_move(self, state: GameState, action: ActionMoveUnit) -> None:
+        pending = self._ensure_pending_table(state.tables.get("unit_pending_orders"))
+        rows = [row for row in pending.to_dicts() if str(row.get("unit_id") or "") != str(action.unit_id)]
+        order_id = f"pending-{action.unit_id}-move-{state.time.total_minutes}"
+        rows.append({
+            "id": order_id, "unit_id": str(action.unit_id), "player_id": str(action.player_id),
+            "order_type": "move", "target_region_id": int(action.target_region_id),
+            "target_latitude": float(action.target_latitude or 0.0), "target_longitude": float(action.target_longitude or 0.0),
+            "target_unit_id": "", "via_region_ids": list(action.via_region_ids),
+            "created_at_minute": int(state.time.total_minutes), "status": "queued",
+        })
+        state.update_table("unit_pending_orders", pl.DataFrame(rows, schema=self._pending_schema()))
+        self._attach_pending_to_transition(state, action.unit_id, order_id)
+
+    def _queue_pending_attack(self, state: GameState, action: ActionAttackUnit) -> None:
+        pending = self._ensure_pending_table(state.tables.get("unit_pending_orders"))
+        rows = [row for row in pending.to_dicts() if str(row.get("unit_id") or "") != str(action.attacker_unit_id)]
+        order_id = f"pending-{action.attacker_unit_id}-attack-{state.time.total_minutes}"
+        rows.append({
+            "id": order_id, "unit_id": str(action.attacker_unit_id), "player_id": str(action.player_id),
+            "order_type": "attack", "target_region_id": 0, "target_latitude": 0.0, "target_longitude": 0.0,
+            "target_unit_id": str(action.defender_unit_id), "via_region_ids": [],
+            "created_at_minute": int(state.time.total_minutes), "status": "queued",
+        })
+        state.update_table("unit_pending_orders", pl.DataFrame(rows, schema=self._pending_schema()))
+        self._attach_pending_to_transition(state, action.attacker_unit_id, order_id)
+
+    def _attach_pending_to_transition(self, state: GameState, unit_id: str, order_id: str) -> None:
+        transitions = state.tables.get("unit_readiness_transitions")
+        if transitions is None or transitions.is_empty() or "unit_id" not in transitions.columns:
+            return
+        rows = transitions.to_dicts()
+        for row in rows:
+            if str(row.get("unit_id") or "") == str(unit_id):
+                row["pending_order_id"] = order_id
+        state.update_table("unit_readiness_transitions", pl.DataFrame(rows, schema=transitions.schema))
+
+    def _pending_schema(self) -> dict[str, pl.DataType]:
+        return {
+            "id": pl.Utf8, "unit_id": pl.Utf8, "player_id": pl.Utf8,
+            "order_type": pl.Utf8, "target_region_id": pl.Int32,
+            "target_latitude": pl.Float64, "target_longitude": pl.Float64,
+            "target_unit_id": pl.Utf8, "via_region_ids": pl.List(pl.Int32),
+            "created_at_minute": pl.Int64, "status": pl.Utf8,
+        }
+
+    def _ensure_pending_table(self, pending: pl.DataFrame | None) -> pl.DataFrame:
+        schema = self._pending_schema()
+        if pending is None:
+            return pl.DataFrame(schema=schema)
+        for column, dtype in schema.items():
+            if column not in pending.columns:
+                default: Any = [] if dtype == pl.List(pl.Int32) else (0 if dtype in (pl.Int32, pl.Int64, pl.Float64) else "")
+                pending = pending.with_columns(pl.lit(default).cast(dtype).alias(column))
+        return pending.select([pl.col(column).cast(dtype) for column, dtype in schema.items()])
 
     def _resolve_action_target_geo(
         self,
@@ -746,6 +829,10 @@ class MilitarySystem(ISystem):
             "movement_progress": 0.0,
             "is_moving": False,
             "engagement_mode": "",
+            "readiness_status": "ready",
+            "readiness_transition_id": "",
+            "readiness_progress": 0.0,
+            "readiness_eta_minute": 0,
         }
 
         had_latitude = "latitude" in units.columns

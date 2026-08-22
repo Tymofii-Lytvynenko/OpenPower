@@ -61,6 +61,9 @@ class UnitBatchRenderer:
         self._capacity_vertices = 0
         self._stride_bytes = 8 * 4
         self._error_printed = False
+        self._vertices_cache_key: tuple | None = None
+        self._vertices_cache: np.ndarray | None = None
+        self._uploaded_vertices_key: tuple | None = None
 
     def render(
         self,
@@ -81,7 +84,14 @@ class UnitBatchRenderer:
             if self._program is None or self._geometry is None or self._buffer is None:
                 return False
 
-            vertices = self._build_vertices(units, flags)
+            cache_key = (id(units), screen_width, screen_height, flags.texture_id)
+            if cache_key != self._vertices_cache_key:
+                self._vertices_cache = self._build_vertices(units, flags)
+                self._vertices_cache_key = cache_key
+
+            vertices = self._vertices_cache
+            if vertices is None:
+                return True
             if vertices.size == 0:
                 return True
 
@@ -90,12 +100,14 @@ class UnitBatchRenderer:
             if self._geometry is None or self._buffer is None:
                 return False
 
-            self._buffer.orphan()
-            self._buffer.write(vertices)
+            if cache_key != self._uploaded_vertices_key:
+                self._buffer.orphan()
+                self._buffer.write(vertices)
+                self._uploaded_vertices_key = cache_key
 
             self._ctx.scissor = None
             self._ctx.viewport = (0, 0, screen_width, screen_height)
-            self._ctx.enable_only((self._ctx.BLEND,))
+            self._ctx.enable_only(self._ctx.BLEND)
             self._ctx.blend_func = self._ctx.BLEND_DEFAULT
 
             flags.texture.use(0)
@@ -127,6 +139,7 @@ class UnitBatchRenderer:
             reserve=self._capacity_vertices * self._stride_bytes,
             usage="dynamic",
         )
+        self._uploaded_vertices_key = None
         self._geometry = self._ctx.geometry(
             [
                 arcade.gl.BufferDescription(

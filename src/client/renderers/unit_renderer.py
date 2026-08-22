@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from math import radians, sin, tan
 from dataclasses import dataclass
 from typing import Any, Optional, TYPE_CHECKING
 
@@ -28,6 +27,8 @@ UNIT_DRAG_PREVIEW_WIDTH = 22.0
 UNIT_DRAG_PREVIEW_HEIGHT = 15.0
 UNIT_COMPOSITION_PLATE_WIDTH = 118.0
 UNIT_COMPOSITION_PLATE_HEIGHT = 58.0
+ENGAGEMENT_ZONE_SEGMENTS = 32
+MAX_SELECTED_ENGAGEMENT_ZONES = 32
 UNIT_SIGNATURE_COLUMNS = (
     "id",
     "owner",
@@ -44,6 +45,9 @@ UNIT_SIGNATURE_COLUMNS = (
     "target_longitude",
     "movement_progress",
     "is_moving",
+    "readiness_status",
+    "readiness_progress",
+    "readiness_transition_id",
 )
 
 
@@ -83,8 +87,11 @@ class UnitRenderer:
         self._prepared_units_key: tuple | None = None
         self._last_state_id: int | None = None
         self._last_units_signature: tuple | None = None
+        self._last_units_revision: int | None = None
         self._flag_units_signature: tuple | None = None
         self._flag_owners: frozenset[str] = frozenset()
+        self._filtered_units_cache_key: tuple | None = None
+        self._filtered_units_cache: Any = None
 
     @property
     def billboards(self) -> list[ProjectedUnit]:
@@ -110,9 +117,16 @@ class UnitRenderer:
         self._prepare_flag_atlas_for_state(filtered_units, drag_preview, units_signature)
         self._billboards = self._project_units(state, filtered_units, width, height, units_signature)
         batch_drawn = self._batch.render(self._billboards, self._flags, width, height)
+        has_zone_targets = show_engagement_zones and any(
+            unit.unit_id == selected_unit_id
+            or (selected_unit_ids is not None and unit.unit_id in selected_unit_ids)
+            or unit.unit_id == hovered_unit_id
+            for unit in self._billboards
+        )
         needs_imgui_overlay = (
             not batch_drawn
-            or show_engagement_zones
+            or has_zone_targets
+            or self._has_active_battles(state)
             or drag_preview is not None
             or selection_rect is not None
             or any(
@@ -138,10 +152,13 @@ class UnitRenderer:
             if show_engagement_zones:
                 self._draw_engagement_zones(
                     draw_list,
+                    width,
                     height,
                     selected_unit_id,
                     selected_unit_ids,
+                    hovered_unit_id,
                 )
+            self._draw_battle_markers(state, draw_list, height)
 
             for unit in self._billboards:
                 if batch_drawn:
@@ -172,6 +189,40 @@ class UnitRenderer:
                 self._draw_selection_rect(draw_list, selection_rect, height)
 
         imgui.end()
+
+    def _draw_battle_markers(self, state: Optional["GameState"], draw_list: Any, window_height: int) -> None:
+        """Draw active battle markers from authoritative battle/unit rows."""
+        if state is None or "battles" not in state.tables or "units" not in state.tables:
+            return
+        battles = state.tables["battles"]
+        units = state.tables["units"]
+        if battles.is_empty() or units.is_empty() or "region_id" not in units.columns:
+            return
+        unit_positions = {}
+        for unit in self._billboards:
+            unit_positions.setdefault(int(unit.current_region_id), []).append(unit)
+        for battle in battles.to_dicts():
+            if str(battle.get("status") or "").lower() not in {"active", "stalemate"}:
+                continue
+            candidates = unit_positions.get(int(battle.get("region_id") or 0), [])
+            if not candidates:
+                continue
+            x = sum(unit.screen_x for unit in candidates) / len(candidates)
+            y = window_height - (sum(unit.screen_y for unit in candidates) / len(candidates)) - 18.0
+            draw_list.add_circle_filled((x, y), 7.0, imgui.get_color_u32((0.85, 0.18, 0.18, 0.92)), 24)
+            draw_list.add_circle((x, y), 9.0, imgui.get_color_u32((1.0, 0.75, 0.25, 0.95)), 24, 1.5)
+            draw_list.add_text((x - 3.0, y - 7.0), imgui.get_color_u32((1.0, 1.0, 1.0, 1.0)), "!")
+
+    def _has_active_battles(self, state: Optional["GameState"]) -> bool:
+        if state is None or "battles" not in state.tables:
+            return False
+        battles = state.tables["battles"]
+        if battles.is_empty() or "status" not in battles.columns:
+            return False
+        return any(
+            str(status or "").lower() in {"active", "stalemate"}
+            for status in battles["status"].to_list()
+        )
 
     def get_unit_at(self, screen_x: float, screen_y: float) -> Optional[ProjectedUnit]:
         for unit in reversed(self._billboards):
@@ -247,12 +298,24 @@ class UnitRenderer:
         if state is None or "units" not in state.tables:
             return None
         units = state.tables["units"]
+        revisions = getattr(state, "table_revisions", None)
+        units_revision = int(revisions.get("units", 0)) if revisions is not None else None
+        owners_hash = hash(frozenset(visible_owners)) if visible_owners is not None else 0
+        cache_key = (id(units), units_revision, owners_hash)
+        if cache_key == self._filtered_units_cache_key:
+            return self._filtered_units_cache
+
         if units.is_empty():
-            return units
-        if visible_owners is not None and "owner" in units.columns:
+            filtered = units
+        elif visible_owners is not None and "owner" in units.columns:
             import polars as pl
-            units = units.filter(pl.col("owner").is_in(list(visible_owners)))
-        return units
+            filtered = units.filter(pl.col("owner").is_in(list(visible_owners)))
+        else:
+            filtered = units
+
+        self._filtered_units_cache_key = cache_key
+        self._filtered_units_cache = filtered
+        return filtered
 
     def _get_units_signature(
         self, 
@@ -266,9 +329,16 @@ class UnitRenderer:
             return None
 
         state_id = id(state)
-        # Using hash of visible_owners if it exists to invalidate cache when filter changes
+        # Snapshot decoding replaces the GameState object, so revisions are a
+        # more stable cache key than object identity when the authoritative
+        # units table did not change.
         owners_hash = hash(frozenset(visible_owners)) if visible_owners is not None else 0
-        if state_id == self._last_state_id and owners_hash == getattr(self, '_last_owners_hash', None):
+        revisions = getattr(state, "table_revisions", None)
+        units_revision = int(revisions.get("units", 0)) if revisions is not None else None
+        same_filter = owners_hash == getattr(self, "_last_owners_hash", None)
+        same_units = units_revision is not None and units_revision == self._last_units_revision
+        same_state = state_id == self._last_state_id
+        if same_filter and (same_units or (units_revision is None and same_state)):
             return self._last_units_signature
 
         self._last_owners_hash = owners_hash
@@ -290,6 +360,7 @@ class UnitRenderer:
             signature = (units.height, tuple(columns), row_hash)
 
         self._last_state_id = state_id
+        self._last_units_revision = units_revision
         self._last_units_signature = signature
         return signature
 
@@ -320,27 +391,58 @@ class UnitRenderer:
     def _draw_engagement_zones(
         self,
         draw_list: Any,
+        window_width: int,
         window_height: int,
         selected_unit_id: Optional[str],
         selected_unit_ids: Optional[set[str]],
+        hovered_unit_id: Optional[str],
     ) -> None:
-        for unit in self._billboards:
+        selected_ids = selected_unit_ids or set()
+        units = [
+            unit
+            for unit in self._billboards
+            if unit.unit_id == selected_unit_id
+            or unit.unit_id in selected_ids
+            or unit.unit_id == hovered_unit_id
+        ]
+        units = units[:MAX_SELECTED_ENGAGEMENT_ZONES]
+
+        for unit in units:
             is_selected = unit.unit_id == selected_unit_id or (
                 selected_unit_ids is not None and unit.unit_id in selected_unit_ids
             )
             fill_color = (0.95, 0.50, 0.16, 0.18) if is_selected else (0.30, 0.64, 0.96, 0.12)
             outline_color = (1.0, 0.68, 0.24, 0.92) if is_selected else (0.43, 0.76, 1.0, 0.72)
-            center = (unit.screen_x, window_height - unit.screen_y)
-            radius = self._engagement_zone_radius_pixels(unit, window_height)
-            draw_list.add_circle_filled(center, radius, imgui.get_color_u32(fill_color), 48)
-            draw_list.add_circle(center, radius, imgui.get_color_u32(outline_color), 48, 1.25)
+            ring = self._projection.project_surface_ring(
+                unit.local_position,
+                ENGAGEMENT_RADIUS_KM / EARTH_RADIUS_KM,
+                window_width,
+                window_height,
+                ENGAGEMENT_ZONE_SEGMENTS,
+            )
+            visible_points = [imgui.ImVec2(*point) for point in ring if point is not None]
+            if len(visible_points) == len(ring) and len(visible_points) >= 3:
+                draw_list.add_convex_poly_filled(
+                    visible_points,
+                    imgui.get_color_u32(fill_color),
+                )
+                draw_list.add_polyline(
+                    visible_points,
+                    imgui.get_color_u32(outline_color),
+                    imgui.ImDrawFlags_.closed,
+                    1.25,
+                )
+                continue
 
-    def _engagement_zone_radius_pixels(self, unit: ProjectedUnit, window_height: int) -> float:
-        half_fov_radians = radians(max(1.0, self._camera.fov_deg)) * 0.5
-        focal_length = window_height / (2.0 * tan(half_fov_radians))
-        angular_radius = ENGAGEMENT_RADIUS_KM / EARTH_RADIUS_KM
-        world_radius = self._projection.globe_radius * sin(angular_radius)
-        return max(12.0, min(90.0, focal_length * world_radius / max(unit.distance_to_camera, 0.1)))
+            for index, point in enumerate(ring):
+                next_point = ring[(index + 1) % len(ring)] if ring else None
+                if point is not None and next_point is not None:
+                    draw_list.add_line(
+                        point,
+                        next_point,
+                        imgui.get_color_u32(outline_color),
+                        1.25,
+                    )
 
     def _unit_needs_imgui_overlay(
         self,
@@ -354,6 +456,7 @@ class UnitRenderer:
             or (selected_unit_ids is not None and unit.unit_id in selected_unit_ids)
             or unit.unit_id == hovered_unit_id
             or unit.is_moving
+            or bool(unit.readiness_transition_id)
             or (unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1)
         )
 
@@ -461,6 +564,8 @@ class UnitRenderer:
 
         if unit.is_moving:
             self._draw_progress_bar(draw_list, left, bottom + 4, image_w, unit.movement_progress)
+        elif unit.readiness_transition_id:
+            self._draw_progress_bar(draw_list, left, bottom + 4, image_w, unit.readiness_progress)
 
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
@@ -504,6 +609,8 @@ class UnitRenderer:
 
         if unit.is_moving:
             self._draw_progress_bar(draw_list, left, bottom + 4, image_w, unit.movement_progress)
+        elif unit.readiness_transition_id:
+            self._draw_progress_bar(draw_list, left, bottom + 4, image_w, unit.readiness_progress)
 
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)

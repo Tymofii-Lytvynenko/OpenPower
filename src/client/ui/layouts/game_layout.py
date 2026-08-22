@@ -64,9 +64,10 @@ class GameLayout:
         self._last_selected_id: Optional[int] = None
         self._cached_target_tag: str = player_tag
 
-    def render(self, selected_region_id: Optional[int], fps: float, nav_service):
+    def render(self, selected_region_id: Optional[int], fps: float, nav_service, state=None):
         GAMETHEME.apply()
-        state = self.net.get_state()
+        if state is None:
+            state = self.net.get_state()
 
         target_tag, is_own = self._resolve_active_context(state, selected_region_id)
         hud_summary = self.feed_presenter.build_summary(state, target_tag)

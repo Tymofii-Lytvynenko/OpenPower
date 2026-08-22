@@ -142,6 +142,10 @@ class EventBattleStarted(DomainGameEvent):
 
     battle_id: str
     region_id: int
+    war_id: str = ""
+    side_a_countries: tuple[str, ...] = ()
+    side_b_countries: tuple[str, ...] = ()
+    started_at_minute: int = 0
 
 
 @dataclass
@@ -152,6 +156,70 @@ class EventBattleEnded(DomainGameEvent):
 
     battle_id: str
     victor_tag: str
+    victor_side: str = ""
+    region_id: int = 0
+    concluded_at_minute: int = 0
+
+
+@dataclass
+class EventBattleUpdated(DomainGameEvent):
+    """Fired when an active battle's canonical status or strength changes."""
+
+    battle_id: str
+    region_id: int
+    status: str
+    round: int = 0
+    side_a_countries: tuple[str, ...] = ()
+    side_b_countries: tuple[str, ...] = ()
+    side_a_strength: float = 0.0
+    side_b_strength: float = 0.0
+    balance: float = 0.0
+    updated_at_minute: int = 0
+
+
+@dataclass
+class EventBattleParticipantRejected(DomainGameEvent):
+    """Explains why a physically present country was omitted from a battle."""
+
+    battle_id: str
+    country_id: str
+    reason: str
+    at_minute: int = 0
+
+
+@dataclass
+class EventUnitReadinessStarted(DomainGameEvent):
+    """Fired when a unit begins a timed readiness transition."""
+
+    unit_id: str
+    transition_id: str
+    from_status: str
+    target_status: str
+    stage: str
+    started_at_minute: int
+    completes_at_minute: int
+
+
+@dataclass
+class EventUnitReadinessCompleted(DomainGameEvent):
+    """Fired when a readiness transition reaches its completion boundary."""
+
+    unit_id: str
+    transition_id: str
+    status: str
+    completed_at_minute: int
+    released_order_id: str = ""
+
+
+@dataclass
+class EventUnitReadinessCanceled(DomainGameEvent):
+    """Fired when combat or an explicit command cancels a transition."""
+
+    unit_id: str
+    transition_id: str
+    status: str
+    canceled_at_minute: int
+    reason: str
 
 
 @dataclass

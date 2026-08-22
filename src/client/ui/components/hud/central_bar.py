@@ -203,7 +203,7 @@ class CentralBar:
             if self.show_speed_controls:
                 self._draw_speed_controls(state, net, height)
             else:
-                self._draw_date_display(state, lcd_w, height)
+                self._draw_date_display(state, net, lcd_w, height)
             imgui.end_child()
 
         finally:
@@ -272,10 +272,10 @@ class CentralBar:
             
         imgui.pop_style_var(3)
 
-    def _draw_date_display(self, state, avail_w, avail_h):
+    def _draw_date_display(self, state, net, avail_w, avail_h):
         """Renders the text date."""
-        t = state.time
-        parts = t.date_str.split(" ")
+        date_text = net.get_display_date_text() or state.time.date_str
+        parts = date_text.split(" ")
         date_part = parts[0] if len(parts) > 0 else "N/A"
         time_part = parts[1] if len(parts) > 1 else ""
         

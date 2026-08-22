@@ -16,7 +16,15 @@ class HudFeedSummary:
 class FeedPresenter:
     """Builds lightweight HUD and service panel models from the shared state."""
 
+    def __init__(self) -> None:
+        self._summary_cache_key: tuple | None = None
+        self._summary_cache: HudFeedSummary | None = None
+
     def build_summary(self, state, country_tag: str) -> HudFeedSummary:
+        cache_key = self._summary_key(state, country_tag)
+        if cache_key == self._summary_cache_key and self._summary_cache is not None:
+            return self._summary_cache
+
         messages = self.messages_for_country(state, country_tag)
         news_items = self.news_for_country(state, country_tag)
         objectives = self.objectives_for_country(state, country_tag)
@@ -30,11 +38,29 @@ class FeedPresenter:
         unread_messages = len([row for row in messages if not bool(row.get("is_read", False))])
         unread_news = max(0, len(news_items) - 1)
         active_objectives = len([row for row in objectives if str(row.get("status", "active")).lower() != "completed"])
-        return HudFeedSummary(
+        summary = HudFeedSummary(
             ticker_text=ticker_text,
             unread_messages=unread_messages,
             unread_news=unread_news,
             active_objectives=active_objectives,
+        )
+        self._summary_cache_key = cache_key
+        self._summary_cache = summary
+        return summary
+
+    def _summary_key(self, state, country_tag: str) -> tuple:
+        """Use table revisions so unchanged HUD feeds are not re-sorted per frame."""
+        revisions = getattr(state, "table_revisions", None)
+        if revisions is None:
+            # Lightweight test doubles may not expose revisions; their object
+            # identity is still safe because each replacement is a new state.
+            return (id(state), country_tag)
+        return (
+            country_tag,
+            tuple(
+                (name, int(revisions.get(name, 0)))
+                for name in ("messages", "news_items", "objectives")
+            ),
         )
 
     def messages_for_country(self, state, country_tag: str) -> list[dict]:

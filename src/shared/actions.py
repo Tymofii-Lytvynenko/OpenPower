@@ -98,6 +98,14 @@ class ActionAttackUnit(GameAction):
     attacker_unit_id: str
     defender_unit_id: str
 
+
+@dataclass
+class ActionSetUnitReadiness(GameAction):
+    """Requests a timed readiness posture change for one owned unit."""
+
+    unit_id: str
+    target_status: str
+
 @dataclass
 class ActionAnnexRegion(GameAction):
     """

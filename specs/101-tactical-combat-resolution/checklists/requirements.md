@@ -1,8 +1,8 @@
-# Specification Quality Checklist: Tactical Combat Resolution
+# Specification Quality Checklist: Tactical Combat Resolution MVP
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning  
-**Created**: 2026-07-22  
-**Feature**: [spec.md](file:///c:/ProgramData/DEV/OpenPower/specs/101-tactical-combat-resolution/spec.md)
+**Created**: 2026-08-22
+**Feature**: [spec.md](../spec.md)
 
 ## Content Quality
 
@@ -16,7 +16,7 @@
 - [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
-- [x] Success criteria are technology-agnostic (no implementation details)
+- [x] Success criteria are technology-agnostic
 - [x] All acceptance scenarios are defined
 - [x] Edge cases are identified
 - [x] Scope is clearly bounded
@@ -31,4 +31,7 @@
 
 ## Notes
 
-- Specification complete and validated against OpenPower Constitution. Ready for `/speckit-plan`.
+- MVP scope intentionally excludes terrain classification, regional fortification data, supply networks, organization simulation, pathfinding, and permanent annexation.
+- The two-sided battle model supports multiple countries per side through allied participation.
+- Readiness timing is explicit and configurable: four days for parked-to-ready, two days for ready-to-park, two days for ready-to-fortified, and immediate fortified-to-ready.
+- Specification is ready for `$speckit-plan`.

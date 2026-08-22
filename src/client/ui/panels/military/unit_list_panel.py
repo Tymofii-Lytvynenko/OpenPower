@@ -35,7 +35,7 @@ class UnitListPanel:
         imgui.table_setup_column("STRENGTH", imgui.TableColumnFlags_.width_fixed, 90.0)
         imgui.table_setup_column("LOCATION")
         imgui.table_setup_column("STATUS", imgui.TableColumnFlags_.width_fixed, 90.0)
-        imgui.table_setup_column("MOVE", imgui.TableColumnFlags_.width_fixed, 80.0)
+        imgui.table_setup_column("PROGRESS", imgui.TableColumnFlags_.width_fixed, 80.0)
         imgui.table_headers_row()
 
         for row in rows:
@@ -49,7 +49,7 @@ class UnitListPanel:
             imgui.table_next_column()
             imgui.text(row.location)
             imgui.table_next_column()
-            status_color = GAMETHEME.colors.info if row.status == "Moving" else GAMETHEME.colors.text_main
+            status_color = GAMETHEME.colors.info if row.status in {"Moving", "Parked"} else GAMETHEME.colors.text_main
             imgui.text_colored(status_color, row.status)
             imgui.table_next_column()
             imgui.text(f"{row.progress_pct:.0f}%")

@@ -6,6 +6,7 @@ from queue import Empty, Full
 from typing import Optional
 
 from src.core.map_data import RegionMapData
+from src.client.services.client_game_clock import ClientGameClock
 from src.shared.actions import GameAction
 from src.shared.commands import CommandEnvelope, command_id_for
 from src.shared.events import EventSystemError
@@ -37,6 +38,7 @@ class ClientSessionProxy:
         self._snapshots = StateSnapshotDecoder()
         self._state_poll_accumulator = 0.0
         self._state_poll_interval = 1.0 / 30.0
+        self._display_clock = ClientGameClock()
 
     def save_map_changes(self) -> None:
         self.action_queue.put("SAVE_MAP_CHANGES")
@@ -57,6 +59,7 @@ class ClientSessionProxy:
         return command_id
 
     def tick(self, delta_time: float) -> None:
+        self._display_clock.advance(delta_time)
         if delta_time > 0.0:
             self._state_poll_accumulator += delta_time
             if self._state_poll_accumulator < self._state_poll_interval:
@@ -74,6 +77,7 @@ class ClientSessionProxy:
 
             try:
                 self.state = self._snapshots.decode(packet)
+                self._display_clock.sync(self.state.time)
             except SnapshotProtocolError as exc:
                 print(f"[ClientSessionProxy] Snapshot protocol error: {exc}")
                 continue
@@ -119,6 +123,9 @@ class ClientSessionProxy:
 
     def get_state_snapshot(self) -> Optional[GameState]:
         return self.state
+
+    def get_display_date_text(self) -> str | None:
+        return self._display_clock.date_text()
 
     def shutdown(self) -> None:
         self.action_queue.put("SHUTDOWN")

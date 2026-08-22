@@ -15,7 +15,7 @@ class CameraController:
         min_distance: float = 1.1,
         max_distance: float = 6.0,
         fov_deg: float = 60.0,
-        near: float = 0.1,
+        near: float = 0.02,
         far: float = 100.0
     ):
         # Camera parameters
@@ -42,12 +42,26 @@ class CameraController:
         # Cached matrices for picking
         self._u_vp_np: Optional[np.ndarray] = None
         self._u_model_np: Optional[np.ndarray] = None
+        self._matrix_cache_key: tuple | None = None
 
     def update_matrices(self, window_width: int, window_height: int) -> None:
         """Recalculate matrices based on current Yaw/Pitch/Zoom."""
         
         # 1. Clamp Pitch
         self.pitch = float(np.clip(self.pitch, -self.max_pitch, self.max_pitch))
+        cache_key = (
+            int(window_width),
+            int(window_height),
+            float(self.yaw),
+            float(self.pitch),
+            float(self.distance),
+            float(self.fov_deg),
+            float(self.near),
+            float(self.far),
+            tuple(float(value) for value in self.target),
+        )
+        if cache_key == self._matrix_cache_key:
+            return
         
         # 2. Model Matrix: Rotate the Globe (Base Flip + User Rotation)
         # Note: We rotate the MODEL, not the Camera eye, to simulate orbiting.
@@ -66,6 +80,7 @@ class CameraController:
         vp = self._u_proj @ self._u_view
         self._u_vp_np = np.ascontiguousarray(vp, dtype=np.float32)
         self._u_model_np = np.ascontiguousarray(self._u_model, dtype=np.float32)
+        self._matrix_cache_key = cache_key
 
     # --- INPUT HANDLING ---
 
@@ -116,11 +131,9 @@ class CameraController:
 
     def get_position(self) -> tuple[float, float, float]:
         """Get camera position in World Space."""
-        # Spherical to Cartesian
-        x = self.distance * np.sin(self.yaw) * np.cos(self.pitch)
-        y = self.distance * np.sin(self.pitch)
-        z = self.distance * np.cos(self.yaw) * np.cos(self.pitch)
-        return (float(x), float(y), float(z))
+        # The view matrix keeps the camera fixed and rotates the globe model. Returning
+        # an orbiting position made atmosphere shading detach from the visible surface.
+        return (0.0, 0.0, float(self.distance))
 
     # --- MATH UTILS ---
     

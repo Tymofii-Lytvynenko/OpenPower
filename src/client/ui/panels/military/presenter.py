@@ -46,6 +46,34 @@ class UnitListRow:
     progress_pct: float
 
 
+@dataclass(frozen=True, slots=True)
+class BattleParticipantView:
+    country_id: str
+    side: str
+    role: str
+    unit_count: int
+    weighted_strength: float
+    readiness: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BattleStatusView:
+    battle_id: str
+    region_id: int
+    status: str
+    mode: str
+    side_a_countries: tuple[str, ...]
+    side_b_countries: tuple[str, ...]
+    side_a_strength: float
+    side_b_strength: float
+    balance: float
+    side_a_losses: int
+    side_b_losses: int
+    round: int
+    participants: tuple[BattleParticipantView, ...]
+    occupation: dict
+
+
 class MilitaryPresenter:
     def build_summary(self, state, country_tag: str) -> MilitarySummaryViewModel:
         units = self._country_units(state, country_tag)
@@ -86,8 +114,17 @@ class MilitaryPresenter:
         rows: list[UnitListRow] = []
         for row in self._country_units(state, country_tag):
             owner_tag = safe_text(row.get("owner"), country_tag)
-            status = "Moving" if bool(row.get("is_moving", False)) else "Ready"
-            progress_pct = max(0.0, min(100.0, safe_float(row.get("movement_progress"), 0.0) * 100.0))
+            readiness = safe_text(row.get("readiness_status"), "ready").lower()
+            transitioning = safe_text(row.get("readiness_transition_id"), "") != ""
+            if transitioning:
+                status = readiness.title()
+                progress_pct = max(0.0, min(100.0, safe_float(row.get("readiness_progress"), 0.0) * 100.0))
+            elif bool(row.get("is_moving", False)):
+                status = "Moving"
+                progress_pct = max(0.0, min(100.0, safe_float(row.get("movement_progress"), 0.0) * 100.0))
+            else:
+                status = readiness.title()
+                progress_pct = 100.0 if readiness in {"ready", "fortified"} else 0.0
             rows.append(
                 UnitListRow(
                     unit_id=safe_text(row.get("id"), ""),
@@ -249,11 +286,64 @@ class MilitaryPresenter:
         if battles is None or battles.is_empty():
             return []
 
-        wars = {row["id"] for row in self.wars_for_country(state, country_tag)}
         rows = battles.to_dicts()
-        if not wars:
+        if not country_tag:
             return rows
-        return [row for row in rows if safe_text(row.get("id")) in wars or safe_text(row.get("status")).lower() == "active"]
+        result = []
+        for row in rows:
+            sides = set(normalize_side(row.get("attacker_side"))) | set(normalize_side(row.get("defender_side")))
+            if not sides or country_tag in sides or safe_text(row.get("status")).lower() == "active":
+                result.append(row)
+        return result
+
+    def battle_status(self, state, battle_id: str) -> BattleStatusView | None:
+        battles = state.tables.get("battles")
+        if battles is None or battles.is_empty() or "id" not in battles.columns:
+            return None
+        matches = battles.filter(pl.col("id") == battle_id)
+        if matches.is_empty():
+            return None
+        row = matches.to_dicts()[0]
+        participants_table = state.tables.get("battle_participants")
+        unit_table = state.tables.get("battle_units")
+        readiness_by_country: dict[str, set[str]] = {}
+        if unit_table is not None and not unit_table.is_empty():
+            for unit in unit_table.filter(pl.col("battle_id") == battle_id).to_dicts():
+                readiness_by_country.setdefault(safe_text(unit.get("country_id")), set()).add(safe_text(unit.get("readiness_status"), "ready"))
+        participants: list[BattleParticipantView] = []
+        if participants_table is not None and not participants_table.is_empty():
+            for participant in participants_table.filter(pl.col("battle_id") == battle_id).sort("country_id").to_dicts():
+                country_id = safe_text(participant.get("country_id"))
+                participants.append(BattleParticipantView(
+                    country_id=country_id,
+                    side=safe_text(participant.get("side")),
+                    role=safe_text(participant.get("role"), "principal"),
+                    unit_count=safe_int(participant.get("unit_count"), 0),
+                    weighted_strength=safe_float(participant.get("weighted_strength"), 0.0),
+                    readiness=tuple(sorted(readiness_by_country.get(country_id, {"ready"}))),
+                ))
+        occupation = {}
+        occupations = state.tables.get("occupations")
+        if occupations is not None and not occupations.is_empty() and "region_id" in occupations.columns:
+            matches = occupations.filter(pl.col("region_id") == int(row.get("region_id") or 0))
+            if not matches.is_empty():
+                occupation = matches.to_dicts()[0]
+        return BattleStatusView(
+            battle_id=safe_text(row.get("id"), battle_id),
+            region_id=safe_int(row.get("region_id"), 0),
+            status=safe_text(row.get("status"), "inactive"),
+            mode=safe_text(row.get("mode"), "positional"),
+            side_a_countries=tuple(normalize_side(row.get("attacker_side"))),
+            side_b_countries=tuple(normalize_side(row.get("defender_side"))),
+            side_a_strength=safe_float(row.get("side_a_strength"), 0.0),
+            side_b_strength=safe_float(row.get("side_b_strength"), 0.0),
+            balance=safe_float(row.get("balance"), 0.0),
+            side_a_losses=safe_int(row.get("side_a_losses"), 0),
+            side_b_losses=safe_int(row.get("side_b_losses"), 0),
+            round=safe_int(row.get("round"), 0),
+            participants=tuple(participants),
+            occupation=occupation,
+        )
 
     def strategic_inventory_for_country(self, state, country_tag: str) -> list[dict]:
         inventory = state.tables.get("strategic_weapons")

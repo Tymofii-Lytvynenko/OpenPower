@@ -36,6 +36,10 @@ class ProjectedUnit:
     height: float
     movement_progress: float
     is_moving: bool
+    readiness_status: str = "ready"
+    readiness_progress: float = 0.0
+    readiness_transition_id: str = ""
+    local_position: tuple[float, float, float] = (0.0, 0.0, 0.0)
     stack_index: int = 0
     stack_count: int = 1
 
@@ -60,6 +64,9 @@ class PreparedUnitProjectionData:
     target_vectors: np.ndarray
     movement_progress: np.ndarray
     is_moving: np.ndarray
+    readiness_statuses: list[str]
+    readiness_progress: np.ndarray
+    readiness_transition_ids: list[str]
 
     @property
     def count(self) -> int:
@@ -81,6 +88,9 @@ class PreparedUnitProjectionData:
             target_vectors=empty_vectors,
             movement_progress=empty_float,
             is_moving=np.empty(0, dtype=np.bool_),
+            readiness_statuses=[],
+            readiness_progress=empty_float,
+            readiness_transition_ids=[],
         )
 
 
@@ -136,6 +146,9 @@ class UnitProjectionService:
         target_vectors: list[np.ndarray] = []
         movement_progress: list[float] = []
         is_moving: list[bool] = []
+        readiness_statuses: list[str] = []
+        readiness_progress: list[float] = []
+        readiness_transition_ids: list[str] = []
 
         for row in unit_rows:
             current_region_id = int(row.get("current_region_id", 0) or 0)
@@ -167,6 +180,9 @@ class UnitProjectionService:
             target_vectors.append(target_vec)
             movement_progress.append(float(row.get("movement_progress", 0.0) or 0.0))
             is_moving.append(bool(row.get("is_moving", False)))
+            readiness_statuses.append(str(row.get("readiness_status", "ready") or "ready"))
+            readiness_progress.append(float(row.get("readiness_progress", 0.0) or 0.0))
+            readiness_transition_ids.append(str(row.get("readiness_transition_id", "") or ""))
 
         if not unit_ids:
             return PreparedUnitProjectionData.empty()
@@ -182,6 +198,9 @@ class UnitProjectionService:
             target_vectors=np.asarray(target_vectors, dtype=np.float32),
             movement_progress=np.asarray(movement_progress, dtype=np.float32),
             is_moving=np.asarray(is_moving, dtype=np.bool_),
+            readiness_statuses=readiness_statuses,
+            readiness_progress=np.asarray(readiness_progress, dtype=np.float32),
+            readiness_transition_ids=readiness_transition_ids,
         )
 
     def project_prepared_units(
@@ -253,12 +272,86 @@ class UnitProjectionService:
                 height=height,
                 movement_progress=float(prepared.movement_progress[index]),
                 is_moving=bool(prepared.is_moving[index]),
+                readiness_status=prepared.readiness_statuses[index],
+                readiness_progress=float(prepared.readiness_progress[index]),
+                readiness_transition_id=prepared.readiness_transition_ids[index],
+                local_position=tuple(float(value) for value in local_positions[index]),
             )
             for index in sorted_indices
         ]
 
         self._apply_stack_offsets(projected)
         return projected
+
+    def project_surface_ring(
+        self,
+        center_local_position: tuple[float, float, float],
+        angular_radius: float,
+        window_width: int,
+        window_height: int,
+        segments: int = 32,
+    ) -> list[tuple[float, float] | None]:
+        """Project a fixed geographic ring from the globe surface into screen space."""
+        if window_width <= 0 or window_height <= 0 or segments < 3:
+            return []
+
+        center = np.asarray(center_local_position, dtype=np.float32)
+        center_length = float(np.linalg.norm(center))
+        if center_length <= 1e-6:
+            return []
+        center /= center_length
+
+        reference = (
+            np.array([0.0, 1.0, 0.0], dtype=np.float32)
+            if abs(float(center[1])) < 0.9
+            else np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        )
+        tangent_a = self._safe_normalize(np.cross(reference, center))
+        tangent_b = self._safe_normalize(np.cross(center, tangent_a))
+        angles = np.linspace(0.0, 2.0 * np.pi, int(segments), endpoint=False, dtype=np.float32)
+        directions = (
+            center.reshape(1, 3) * np.cos(angular_radius)
+            + (
+                np.cos(angles)[:, None] * tangent_a.reshape(1, 3)
+                + np.sin(angles)[:, None] * tangent_b.reshape(1, 3)
+            )
+            * np.sin(angular_radius)
+        )
+        local_positions = directions * self.surface_radius
+
+        self.camera.update_matrices(window_width, window_height)
+        vp_matrix, model_matrix = self.camera.get_cached_matrices()
+        if vp_matrix is None or model_matrix is None:
+            return []
+
+        local_h = np.empty((segments, 4), dtype=np.float32)
+        local_h[:, :3] = local_positions
+        local_h[:, 3] = 1.0
+        world_h = local_h @ model_matrix.T
+        world = world_h[:, :3]
+        normal = self._normalize_rows(world)
+        camera_pos = np.array([0.0, 0.0, self.camera.distance], dtype=np.float32)
+        facing = np.einsum("ij,ij->i", normal, camera_pos.reshape(1, 3) - world) > -0.02
+
+        clip = local_h @ (vp_matrix @ model_matrix).T
+        clip_w = clip[:, 3]
+        valid_w = np.abs(clip_w) >= 1e-6
+        ndc = np.zeros((segments, 3), dtype=np.float32)
+        ndc[valid_w] = clip[valid_w, :3] / clip_w[valid_w, None]
+        in_frame = (
+            (ndc[:, 0] >= -1.2)
+            & (ndc[:, 0] <= 1.2)
+            & (ndc[:, 1] >= -1.2)
+            & (ndc[:, 1] <= 1.2)
+        )
+        visible = facing & valid_w & in_frame
+
+        screen_x = (ndc[:, 0] * 0.5 + 0.5) * float(window_width)
+        screen_y = (1.0 - (ndc[:, 1] * 0.5 + 0.5)) * float(window_height)
+        return [
+            (float(screen_x[index]), float(screen_y[index])) if visible[index] else None
+            for index in range(segments)
+        ]
 
     def _resolve_local_positions(self, prepared: PreparedUnitProjectionData) -> np.ndarray:
         positions = prepared.source_vectors.copy()
@@ -369,6 +462,10 @@ class UnitProjectionService:
             height=height,
             movement_progress=float(row.get("movement_progress", 0.0) or 0.0),
             is_moving=bool(row.get("is_moving", False)),
+            readiness_status=str(row.get("readiness_status", "ready") or "ready"),
+            readiness_progress=float(row.get("readiness_progress", 0.0) or 0.0),
+            readiness_transition_id=str(row.get("readiness_transition_id", "") or ""),
+            local_position=tuple(float(value) for value in local_pos),
         )
 
     def _unit_local_position(

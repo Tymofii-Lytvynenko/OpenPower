@@ -42,6 +42,14 @@ class NetworkClient:
         """
         return self.session.get_state_snapshot()
 
+    def get_display_date_text(self) -> str | None:
+        """Return the frame-interpolated clock without mutating authoritative state."""
+        getter = getattr(self.session, "get_display_date_text", None)
+        if callable(getter):
+            return getter()
+        state = self.get_state()
+        return getattr(getattr(state, "time", None), "date_str", None)
+
     def request_save(self, is_editor: bool = False):
         """Saves gameplay state or editor state depending on the context."""
         if is_editor:

@@ -10,6 +10,17 @@ from typing import Sequence
 ROOT_DIR = Path(__file__).parent.resolve()
 sys.path.append(str(ROOT_DIR))
 
+
+def profiling_enabled(environment: dict[str, str] | None = None) -> bool:
+    values = os.environ if environment is None else environment
+    return str(values.get("OPENPOWER_PROFILE", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments:
@@ -20,13 +31,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     from src.shared.config import GameConfig
     from src.client.window import MainWindow
 
-    try:
-        from pyinstrument import Profiler
-    except ImportError:
-        profiler = None
-    else:
-        profiler = Profiler()
-        profiler.start()
+    profiler = None
+    if profiling_enabled():
+        try:
+            from pyinstrument import Profiler
+        except ImportError:
+            pass
+        else:
+            profiler = Profiler()
+            profiler.start()
 
     print("--- OpenPower Engine Initializing ---")
     print(f"Process ID (PID): {os.getpid()}")

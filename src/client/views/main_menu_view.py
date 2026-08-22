@@ -93,7 +93,7 @@ class MainMenuView(BaseImGuiView):
         ctx = self.window.ctx
         ctx.scissor = None
         ctx.viewport = (0, 0, self.window.width, self.window.height)
-        ctx.enable_only((ctx.DEPTH_TEST, ctx.BLEND))
+        ctx.enable_only(ctx.DEPTH_TEST, ctx.BLEND)
 
         self.renderer.draw()
 

@@ -10,7 +10,7 @@ from src.client.renderers.map_renderer import MapRenderer
 from src.client.renderers.unit_projection import ProjectedUnit
 from src.client.renderers.unit_renderer import UnitDragPreview, UnitRenderer
 from src.client.services.network_client_service import NetworkClient
-from src.shared.actions import ActionAttackUnit, ActionMoveUnit
+from src.shared.actions import ActionAttackUnit, ActionMoveUnit, ActionSetUnitReadiness
 
 
 class UnitInteractionController:
@@ -247,6 +247,18 @@ class UnitInteractionController:
                 player_id=self._net.player_id,
                 attacker_unit_id=attacker.unit_id,
                 defender_unit_id=defender.unit_id,
+            ))
+        return True
+
+    def set_selected_units_readiness(self, target_status: str) -> bool:
+        """Queue a posture command for each selected unit."""
+        if not self.selected_unit_ids:
+            return False
+        for unit_id in sorted(self.selected_unit_ids):
+            self._net.send_action(ActionSetUnitReadiness(
+                player_id=self._net.player_id,
+                unit_id=unit_id,
+                target_status=target_status,
             ))
         return True
 

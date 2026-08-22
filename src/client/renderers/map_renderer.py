@@ -37,7 +37,6 @@ class MapRenderer(BaseRenderer):
 
         # --- CACHE SERVICE INIT ---
         self.cache_service = CacheService(ProjectPaths.root())
-        self.texture_manager = TextureManager(self.ctx, self.cache_service)
 
         # --- COMPONENTS ---
         # Pass service to components using Dependency Injection (Composition)
@@ -89,8 +88,6 @@ class MapRenderer(BaseRenderer):
         self._set_uniform_if_present("u_opacity", 0.90)
         self._set_uniform_if_present("u_light_dir", (0.4, 0.3, 1.0))
         self._set_uniform_if_present("u_ambient", 0.35)
-        self._set_uniform_if_present("u_texture_size", (float(self.width), float(self.height)))
-
         self.sphere = SphereMesh(self.ctx, radius=self.globe_radius, seg_u=256, seg_v=128)
         self.sphere.build_geometry(self.ctx, self.program)
 
@@ -132,7 +129,9 @@ class MapRenderer(BaseRenderer):
         w, h = self.window.get_size()
         self.camera.update_matrices(w, h)
         
-        self._enable_rendering_state()
+        # The globe is opaque, so blending is unnecessary. Both sides remain enabled
+        # because culling produced view-dependent holes on some driver/state combinations.
+        self.ctx.enable_only(self.ctx.DEPTH_TEST)
         self.texture_manager.bind_textures(self.program)
         
         model, view, proj = self.camera.get_matrices()

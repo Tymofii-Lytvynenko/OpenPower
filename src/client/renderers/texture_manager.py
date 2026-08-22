@@ -11,11 +11,14 @@ class TextureManager:
     Manages loading, caching, and updating of textures for rendering.
     Uses CacheService for I/O operations.
     """
+
+    MAX_TERRAIN_TEXTURE_SIZE = (8192, 4096)
+    MAX_MAP_TEXTURE_SIZE = (16000, 8000)
     
-    def __init__(self, ctx: arcade.gl.Context, cache_service: CacheService, lut_dim: int = 4096):
+    def __init__(self, ctx: arcade.gl.Context, cache_service: CacheService, lut_dim: int = 128):
         self.ctx = ctx
         self.cache = cache_service
-        self.lut_dim = lut_dim
+        self.lut_dim = max(1, int(lut_dim))
         
         # --- Texture Storage ---
         self.map_texture: Optional[arcade.gl.Texture] = None
@@ -50,10 +53,20 @@ class TextureManager:
         
         self.dense_to_real = unique_ids
         self.real_to_dense = {real_id: i for i, real_id in enumerate(unique_ids)}
+        self._ensure_lookup_capacity(len(unique_ids))
         # print(f"[TextureManager] Indexed {len(unique_ids)} unique regions.")
         
+        visual_width, visual_height = self.fit_texture_size(
+            width,
+            height,
+            *self.MAX_MAP_TEXTURE_SIZE,
+        )
+
         # 2. Check Visual Cache
-        cache_path = self.cache.get_cache_path(map_path, "_visual.npy")
+        cache_path = self.cache.get_cache_path(
+            map_path,
+            f"_visual_rgba_{visual_width}x{visual_height}.npy",
+        )
         encoded_data = None
         
         if self.cache.is_cache_valid(map_path, cache_path):
@@ -62,15 +75,18 @@ class TextureManager:
         # 3. CPU Generation (Fallback)
         if encoded_data is None:
             print("[TextureManager] Generating MAP visual texture (CPU)...")
-            dense_map_2d = dense_map.reshape((height, width)).astype(np.uint32)
-            
-            # Use bit shifting to pack ID into RGB
-            r = ((dense_map_2d >> 16) & 0xFF).astype(np.uint8)
-            g = ((dense_map_2d >> 8) & 0xFF).astype(np.uint8)
-            b = (dense_map_2d & 0xFF).astype(np.uint8)
-            
-            encoded_data = np.dstack((r, g, b))
-            encoded_data = np.flipud(encoded_data)
+            visual_map = self.resample_dense_map(
+                dense_map,
+                width,
+                height,
+                visual_width,
+                visual_height,
+            )
+            encoded_data = self.encode_map_visual(
+                visual_map,
+                visual_width,
+                visual_height,
+            )
             
             # 4. Background Save via Service
             # Note: We pass a COPY to the thread to avoid race conditions 
@@ -79,19 +95,62 @@ class TextureManager:
 
         # 5. Upload to GPU
         self.map_texture = self.ctx.texture(
-            (width, height),
-            components=3,
+            (visual_width, visual_height),
+            components=4,
             data=encoded_data.tobytes(),
             filter=(self.ctx.NEAREST, self.ctx.NEAREST),
         )
         self.map_texture.wrap_x = self.ctx.REPEAT # type: ignore
         self.map_texture.wrap_y = self.ctx.CLAMP_TO_EDGE # type: ignore
 
+    @staticmethod
+    def encode_map_visual(dense_map: np.ndarray, width: int, height: int) -> np.ndarray:
+        """Pack dense region IDs and a precomputed border mask into one RGBA texture."""
+        dense = dense_map.reshape((height, width)).astype(np.uint32, copy=False)
+        right = np.roll(dense, -1, axis=1)
+        up = np.empty_like(dense)
+        up[:-1] = dense[1:]
+        up[-1] = dense[-1]
+        borders = ((dense != right) | (dense != up)) & (dense > 0)
+
+        red = ((dense >> 16) & 0xFF).astype(np.uint8)
+        green = ((dense >> 8) & 0xFF).astype(np.uint8)
+        blue = (dense & 0xFF).astype(np.uint8)
+        alpha = borders.astype(np.uint8) * 255
+        return np.flipud(np.dstack((red, green, blue, alpha)))
+
+    @staticmethod
+    def resample_dense_map(
+        dense_map: np.ndarray,
+        width: int,
+        height: int,
+        target_width: int,
+        target_height: int,
+    ) -> np.ndarray:
+        """Downsample discrete region IDs with nearest-neighbour sampling."""
+        dense = dense_map.reshape((height, width))
+        if (width, height) == (target_width, target_height):
+            return dense
+
+        x_indices = np.minimum(
+            (np.arange(target_width, dtype=np.uint64) * width) // target_width,
+            width - 1,
+        )
+        y_indices = np.minimum(
+            (np.arange(target_height, dtype=np.uint64) * height) // target_height,
+            height - 1,
+        )
+        return dense[np.ix_(y_indices, x_indices)]
+
     def load_terrain_texture(self, terrain_path: Path) -> None:
         if not terrain_path.exists():
             raise FileNotFoundError(f"[TextureManager] Terrain path not found: {terrain_path}")
         
-        cache_path = self.cache.get_cache_path(terrain_path, ".npy")
+        max_width, max_height = self.MAX_TERRAIN_TEXTURE_SIZE
+        cache_path = self.cache.get_cache_path(
+            terrain_path,
+            f"_gpu_{max_width}x{max_height}.npy",
+        )
         rgba_array = None
 
         # 1. Try Loading Cache
@@ -100,14 +159,24 @@ class TextureManager:
 
         # 2. Slow Fallback (PNG Decode)
         if rgba_array is None:
-            print(f"[TextureManager] Decoding PNG (Slow): {terrain_path.name}")
+            print(f"[TextureManager] Preparing GPU terrain texture: {terrain_path.name}")
             try:
                 Image.MAX_IMAGE_PIXELS = None
-                img = Image.open(terrain_path).convert("RGBA")
-                arr = np.array(img, dtype=np.uint8)
-                rgba_array = np.flipud(arr)
+                with Image.open(terrain_path) as source_image:
+                    image = source_image.convert("RGBA")
+                    target_size = self.fit_texture_size(
+                        image.width,
+                        image.height,
+                        max_width,
+                        max_height,
+                    )
+                    if image.size != target_size:
+                        # The source is far above the useful screen resolution. Reducing it
+                        # once prevents excessive VRAM use without changing the visible map.
+                        image = image.resize(target_size, Image.Resampling.LANCZOS)
+                    rgba_array = np.flipud(np.asarray(image, dtype=np.uint8))
                 
-                # Save cache (Terrain is fast enough to save sync usually, but async is safer)
+                # Retaining this GPU-ready level avoids decoding and resizing on later starts.
                 self.cache.save_numpy_array(cache_path, rgba_array, in_background=True)
             except Exception as e:
                 raise RuntimeError(f"[TextureManager] Failed to load terrain texture: {e}")
@@ -120,8 +189,37 @@ class TextureManager:
             data=rgba_array.tobytes(),
             filter=(self.ctx.LINEAR, self.ctx.LINEAR),
         )
+        # Automatic mipmap generation does not filter across the periodic longitude
+        # boundary and exposes it as a one-pixel meridian on the sphere.
         self.terrain_texture.wrap_x = self.ctx.REPEAT # type: ignore
         self.terrain_texture.wrap_y = self.ctx.CLAMP_TO_EDGE # type: ignore
+
+    @staticmethod
+    def fit_texture_size(
+        width: int,
+        height: int,
+        max_width: int,
+        max_height: int,
+    ) -> tuple[int, int]:
+        """Return an aspect-preserving size bounded by the GPU texture budget."""
+        scale = min(1.0, max_width / width, max_height / height)
+        return max(1, round(width * scale)), max(1, round(height * scale))
+
+    def _ensure_lookup_capacity(self, item_count: int) -> None:
+        required_dimension = self.required_lut_dimension(item_count, self.lut_dim)
+        if required_dimension == self.lut_dim:
+            return
+
+        self.lut_dim = required_dimension
+        self.lut_data = np.zeros((self.lut_dim * self.lut_dim, 4), dtype=np.uint8)
+
+    @staticmethod
+    def required_lut_dimension(item_count: int, minimum_dimension: int = 128) -> int:
+        """Return a power-of-two square dimension that can hold every dense ID."""
+        minimum = max(1, int(minimum_dimension))
+        required = max(1, int(np.ceil(np.sqrt(max(0, item_count)))))
+        dimension = 1 << (required - 1).bit_length()
+        return max(minimum, dimension)
 
     def init_lookup_texture(self) -> None:
         self.lookup_texture = self.ctx.texture(

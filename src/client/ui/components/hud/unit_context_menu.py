@@ -16,10 +16,12 @@ class UnitContextMenu:
         composer: UIComposer,
         on_deselect: Callable[[], None],
         on_view_units_list: Callable[[str], None],
+        on_set_readiness: Callable[[str, str], None] | None = None,
     ):
         self.composer = composer
         self._on_deselect = on_deselect
         self._on_view_units_list = on_view_units_list
+        self._on_set_readiness = on_set_readiness
         self._unit_id: Optional[str] = None
         self._queued_open = False
         self._popup_id = "unit_context_menu"
@@ -48,9 +50,12 @@ class UnitContextMenu:
         self.composer.draw_menu_item("Move and attack", "0")
 
         if self.composer.begin_menu("Change status"):
-            self.composer.draw_menu_item("Park")
-            self.composer.draw_menu_item("Ready")
-            self.composer.draw_menu_item("Fortify")
+            if self.composer.draw_menu_item("Park") and self._on_set_readiness:
+                self._on_set_readiness(self._unit_id, "parked")
+            if self.composer.draw_menu_item("Ready") and self._on_set_readiness:
+                self._on_set_readiness(self._unit_id, "ready")
+            if self.composer.draw_menu_item("Fortify") and self._on_set_readiness:
+                self._on_set_readiness(self._unit_id, "fortified")
             self.composer.end_menu()
 
         if self.composer.draw_menu_item("Deselect"):

@@ -32,6 +32,10 @@ class UnitDetailsViewModel:
     owner_name: str
     unit_label: str
     entries: tuple[UnitRosterEntry, ...]
+    readiness_status: str = "ready"
+    readiness_target: str = ""
+    readiness_progress: float = 0.0
+    readiness_eta_minute: int = 0
 
 
 class UnitDetailsPresenter:
@@ -53,7 +57,11 @@ class UnitDetailsPresenter:
         owner_tag = str(unit.get("owner", "") or "")
         owner_name = self._resolve_country_name(state, owner_tag)
         location_name = self._resolve_region_name(state, int(unit.get("current_region_id", 0) or 0))
-        status = "Moving" if bool(unit.get("is_moving", False)) else "Parked"
+        readiness = str(unit.get("readiness_status", "ready") or "ready").title()
+        status = "Moving" if bool(unit.get("is_moving", False)) else readiness
+        if str(unit.get("readiness_transition_id", "") or ""):
+            progress = float(unit.get("readiness_progress", 0.0) or 0.0) * 100.0
+            status = f"{readiness} {progress:.0f}%"
         quantity = max(1, int(unit.get("strength", 1) or 1))
 
         entry = UnitRosterEntry(
@@ -68,6 +76,10 @@ class UnitDetailsPresenter:
             owner_name=owner_name,
             unit_label=f"{owner_name} field unit",
             entries=(entry,),
+            readiness_status=readiness,
+            readiness_target=readiness if not str(unit.get("readiness_transition_id", "") or "") else "in progress",
+            readiness_progress=float(unit.get("readiness_progress", 0.0) or 0.0),
+            readiness_eta_minute=int(unit.get("readiness_eta_minute", 0) or 0),
         )
 
     def _resolve_country_name(self, state: "GameState", owner_tag: str) -> str:
@@ -151,6 +163,9 @@ class UnitDetailsWindow:
 
         imgui.same_line()
         imgui.text_colored(GAMETHEME.colors.text_dim, f"{model.owner_name} | {model.unit_label}")
+        imgui.text(f"Readiness: {model.readiness_status.title()}" + (f" | ETA {model.readiness_eta_minute}" if model.readiness_eta_minute else ""))
+        if model.readiness_eta_minute:
+            imgui.progress_bar(max(0.0, min(1.0, model.readiness_progress)), (-1.0, 12.0), "")
         imgui.separator()
 
     def _render_roster_table(self, model: UnitDetailsViewModel) -> None:
