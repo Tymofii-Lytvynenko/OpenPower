@@ -34,7 +34,10 @@ class AlliancePolicy:
         rejected: list[tuple[str, str]] = []
 
         if treaties is not None and not treaties.is_empty():
-            rows = treaties.to_dicts()
+            rows = sorted(
+                treaties.to_dicts(),
+                key=lambda row: (str(row.get("id") or ""), str(row.get("type") or row.get("treaty_type") or "")),
+            )
             for country in present:
                 if country in side_a or country in side_b:
                     continue

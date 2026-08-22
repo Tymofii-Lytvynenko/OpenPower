@@ -23,12 +23,12 @@ After implementation, run the complete suite:
 Use a headless `GameState` fixture with one owned unit in `parked` status and the server's normal fixed-step clock.
 
 1. Submit `ActionSetUnitReadiness(unit_id, "ready")`.
-2. Verify one transition row exists with `from_status=parked`, `target_status=ready`, progress `0.0`, and a completion time four game days ahead.
+2. Verify one transition row exists with `from_status=parked`, `target_status=ready`, progress `0.0`, and a completion time two game days ahead.
 3. Advance simulation time to one half of the interval. Verify stable status is still `parked` and progress is approximately `0.5`.
 4. Submit `ActionMoveUnit` while the transition is active. Verify a pending move order exists and no movement begins.
 5. Submit a second valid move order. Verify it replaces the first pending order. Submit an invalid order and verify the valid pending order remains.
 6. Advance to the completion boundary. Verify the status becomes `ready`, the progress bar reaches `1.0` for the completion snapshot, and the latest pending move is released exactly once.
-7. Request `fortified`, save, reload, and advance two game days. Verify the transition completes with `fortified` and the reloaded run matches the uninterrupted run.
+7. Request `fortified`, save, reload, and advance two game days. Verify the transition completes with `fortified`, the remaining time is derived from the persisted ETA, and the reloaded run matches the uninterrupted run.
 8. Issue movement from `fortified`. Verify the release to `ready` is immediate and the movement order is applied without a third status.
 9. Schedule a transition to complete at the same minute as hostile contact. Verify contact cancels the transition first and combat uses the last completed status.
 
@@ -76,4 +76,6 @@ Run the existing tests as well; no focused command may be used as a substitute f
 
 Run the same fixture twice from the same serialized input, actions, and simulation minutes. Compare canonical Polars rows and event payloads after sorting by table key; they must be identical.
 
-The performance smoke fixture should create 100 concurrent active engagements and advance one resolution boundary. Record elapsed server update time and run a separate bounded client snapshot-consumption check without graphics or network I/O. This is a validation gate for the MVP, not a promise of a final 500-engagement benchmark.
+The performance smoke fixture should create 100 concurrent active engagements and advance one resolution boundary. The server resolution tick must be `≤250 ms`. Run a separate bounded client snapshot-consumption check without graphics or network I/O; it must be `≤100 ms` with a representative payload `≤2 MB`. This is a validation gate for the MVP, not a promise of a final 500-engagement benchmark.
+
+Verification note: the feature-focused suite and both performance gates pass. In the current restricted Windows runner, two full-discovery headless-server tests fail before application startup when `multiprocessing` tries to create a pipe (`PermissionError: [WinError 5] Access is denied`); rerun those two tests in an unrestricted process environment before release.

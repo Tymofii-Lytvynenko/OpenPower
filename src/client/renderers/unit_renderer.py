@@ -17,7 +17,7 @@ from src.client.renderers.unit_projection import (
 from src.client.ui.core.primitives import UIPrimitives, UnitCompositionRow
 from src.client.ui.core.theme import GAMETHEME
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
-from src.shared.engagement import EARTH_RADIUS_KM, ENGAGEMENT_RADIUS_KM
+from src.core.map.engagement_geometry import EARTH_RADIUS_KM, ENGAGEMENT_RADIUS_KM
 
 if TYPE_CHECKING:
     from src.shared.state import GameState
@@ -212,15 +212,18 @@ class UnitRenderer:
         for unit in self._billboards:
             unit_positions.setdefault(int(unit.current_region_id), []).append(unit)
         for battle in battles.to_dicts():
-            if str(battle.get("status") or "").lower() not in {"active", "stalemate"}:
+            status = str(battle.get("status") or "").lower()
+            if status not in {"active", "stalemate"}:
                 continue
             candidates = unit_positions.get(int(battle.get("region_id") or 0), [])
             if not candidates:
                 continue
             x = sum(unit.screen_x for unit in candidates) / len(candidates)
             y = window_height - (sum(unit.screen_y for unit in candidates) / len(candidates)) - 18.0
-            draw_list.add_circle_filled((x, y), 7.0, imgui.get_color_u32((0.85, 0.18, 0.18, 0.92)), 24)
-            draw_list.add_circle((x, y), 9.0, imgui.get_color_u32((1.0, 0.75, 0.25, 0.95)), 24, 1.5)
+            fill_color = (0.85, 0.18, 0.18, 0.92) if status == "active" else (0.85, 0.55, 0.12, 0.92)
+            outline_color = (1.0, 0.75, 0.25, 0.95) if status == "active" else (1.0, 0.9, 0.35, 0.95)
+            draw_list.add_circle_filled((x, y), 7.0, imgui.get_color_u32(fill_color), 24)
+            draw_list.add_circle((x, y), 9.0, imgui.get_color_u32(outline_color), 24, 1.5)
             draw_list.add_text((x - 3.0, y - 7.0), imgui.get_color_u32((1.0, 1.0, 1.0, 1.0)), "!")
 
     def _has_active_battles(self, state: Optional["GameState"]) -> bool:
@@ -277,7 +280,17 @@ class UnitRenderer:
         if cache_key == self._projection_cache_key:
             return self._billboards
 
-        prepared = self._get_prepared_units(filtered_units, units_signature)
+        current_minute = presentation_total_minutes
+        if current_minute is None and state is not None:
+            current_minute = float(state.time.total_minutes)
+        transitions = state.tables.get("unit_readiness_transitions") if state is not None else None
+        transition_rows = transitions.to_dicts() if transitions is not None and not transitions.is_empty() else []
+        prepared = self._get_prepared_units(
+            filtered_units,
+            units_signature,
+            transition_rows,
+            current_minute,
+        )
         self._projection_cache_key = cache_key
         return self._projection.project_prepared_units(
             prepared,
@@ -304,12 +317,57 @@ class UnitRenderer:
             None if presentation_total_minutes is None else round(presentation_total_minutes, 5),
         )
 
-    def _get_prepared_units(self, units, units_signature: tuple | None) -> PreparedUnitProjectionData:
-        prepared_key = (units_signature, self._region_count)
+    def _get_prepared_units(
+        self,
+        units,
+        units_signature: tuple | None,
+        transition_rows: list[dict] | None = None,
+        current_minute: float | None = None,
+    ) -> PreparedUnitProjectionData:
+        transition_by_unit = {
+            str(row.get("unit_id") or ""): row
+            for row in (transition_rows or [])
+        }
+        transition_signature = tuple(
+            sorted(
+                (
+                    unit_id,
+                    str(row.get("id") or ""),
+                    str(row.get("target_status") or ""),
+                    int(row.get("completes_at_minute") or 0),
+                    float(row.get("progress") or 0.0),
+                )
+                for unit_id, row in transition_by_unit.items()
+            )
+        )
+        display_minute = int(current_minute or 0)
+        prepared_key = (units_signature, self._region_count, transition_signature, display_minute)
         if prepared_key == self._prepared_units_key:
             return self._prepared_units
 
-        self._prepared_units = self._projection.prepare_units(units.to_dicts(), self._region_lookup)
+        enriched_rows = []
+        for row in units.to_dicts():
+            enriched = dict(row)
+            transition = transition_by_unit.get(str(row.get("id") or ""))
+            if transition is not None:
+                enriched["readiness_target"] = str(transition.get("target_status") or row.get("readiness_status") or "ready")
+                enriched["readiness_eta_minute"] = int(
+                    row.get("readiness_eta_minute")
+                    or transition.get("completes_at_minute")
+                    or 0
+                )
+                enriched["readiness_transition_id"] = str(
+                    row.get("readiness_transition_id")
+                    or transition.get("id")
+                    or ""
+                )
+            enriched["current_game_minute"] = display_minute
+            enriched_rows.append(enriched)
+        self._prepared_units = self._projection.prepare_units(
+            enriched_rows,
+            self._region_lookup,
+            current_game_minute=display_minute,
+        )
         self._prepared_units_key = prepared_key
         return self._prepared_units
 
@@ -585,6 +643,8 @@ class UnitRenderer:
             self._draw_progress_bar(draw_list, left, bottom + 4, image_w, unit.movement_progress)
         elif unit.readiness_transition_id:
             self._draw_progress_bar(draw_list, left, bottom + 4, image_w, unit.readiness_progress)
+            if is_primary_selected or is_hovered:
+                self._draw_readiness_label(draw_list, unit, left, bottom + 10)
 
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
@@ -630,6 +690,8 @@ class UnitRenderer:
             self._draw_progress_bar(draw_list, left, bottom + 4, image_w, unit.movement_progress)
         elif unit.readiness_transition_id:
             self._draw_progress_bar(draw_list, left, bottom + 4, image_w, unit.readiness_progress)
+            if is_primary_selected or is_hovered:
+                self._draw_readiness_label(draw_list, unit, left, bottom + 10)
 
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
             self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
@@ -729,6 +791,21 @@ class UnitRenderer:
             (left + width * fraction, top + height),
             imgui.get_color_u32(GAMETHEME.colors.military),
             2.0,
+        )
+
+    def _draw_readiness_label(
+        self,
+        draw_list: imgui.ImDrawList,
+        unit: ProjectedUnit,
+        left: float,
+        top: float,
+    ) -> None:
+        target = unit.readiness_target.title()
+        remaining = unit.readiness_remaining_label or "0h"
+        draw_list.add_text(
+            (left, top),
+            imgui.get_color_u32(GAMETHEME.colors.text_main),
+            f"{target} · {remaining}",
         )
 
     def _draw_stack_badge(

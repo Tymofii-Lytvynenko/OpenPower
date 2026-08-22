@@ -13,10 +13,9 @@ from modules.base.systems.military.readiness_policy import (
     READINESS_STATUSES,
     ReadinessPolicy,
 )
-from src.shared.actions import ActionAttackUnit, ActionSetUnitReadiness
+from src.shared.actions import ActionSetUnitReadiness
 from src.shared.actions import ActionMoveUnit
 from src.shared.events import (
-    EventBattleStarted,
     EventUnitReadinessCanceled,
     EventUnitReadinessCompleted,
     EventUnitReadinessStarted,
@@ -79,15 +78,6 @@ class ReadinessSystem(ISystem):
         transitions = self._ensure_transitions(state.tables.get(TRANSITIONS_TABLE))
         now = int(state.time.total_minutes)
 
-        # An explicit assault is a same-minute combat contact. Cancel first so
-        # a transition due at this minute cannot complete before combat starts.
-        for action in state.current_actions:
-            if isinstance(action, ActionAttackUnit):
-                self.cancel_transition_for_unit(state, action.attacker_unit_id, "combat_order")
-                self.cancel_transition_for_unit(state, action.defender_unit_id, "combat_order")
-        units = self._ensure_units(state.tables.get(UNITS_TABLE))
-        transitions = self._ensure_transitions(state.tables.get(TRANSITIONS_TABLE))
-
         # Commands are processed before due transitions. This gives an explicit
         # replacement command the same-tick precedence expected by the UI.
         for action in state.current_actions:
@@ -122,13 +112,14 @@ class ReadinessSystem(ISystem):
                 unit["readiness_progress"] = 1.0
                 unit["readiness_transition_id"] = ""
                 unit["readiness_eta_minute"] = 0
+                released_order_id = "" if staged else str(transition.get("pending_order_id") or "")
                 state.events.append(
                     EventUnitReadinessCompleted(
                         unit_id=unit_id,
                         transition_id=str(transition.get("id") or ""),
                         status=target,
                         completed_at_minute=now,
-                        released_order_id=str(transition.get("pending_order_id") or ""),
+                        released_order_id=released_order_id,
                     )
                 )
                 transition_rows = [row for row in transition_rows if row is not transition]
@@ -143,6 +134,14 @@ class ReadinessSystem(ISystem):
                         now,
                         self._policy.READY_TO_FORTIFIED_MINUTES,
                     )
+                    # Keep the order attached to the request until the final
+                    # stage completes; otherwise a staged readiness order can
+                    # strand its pending movement or attack.
+                    next_transition["pending_order_id"] = str(transition.get("pending_order_id") or "")
+                    unit["readiness_status"] = READINESS_READY
+                    unit["readiness_progress"] = 0.0
+                    unit["readiness_transition_id"] = next_transition["id"]
+                    unit["readiness_eta_minute"] = next_transition["completes_at_minute"]
                     transition_rows.append(next_transition)
                     by_unit[unit_id] = next_transition
                 else:
@@ -150,14 +149,17 @@ class ReadinessSystem(ISystem):
                     by_unit.pop(unit_id, None)
                 continue
 
+            started_at = transition.get("started_at_minute")
+            completes_at = transition.get("completes_at_minute")
             unit["readiness_status"] = self._policy.normalize(transition.get("from_status"))
             unit["readiness_progress"] = self._policy.progress(
-                int(transition.get("started_at_minute") or now),
-                int(transition.get("completes_at_minute") or now),
+                int(started_at if started_at is not None else now),
+                int(completes_at if completes_at is not None else now),
                 now,
             )
+            transition["progress"] = unit["readiness_progress"]
             unit["readiness_transition_id"] = str(transition.get("id") or "")
-            unit["readiness_eta_minute"] = int(transition.get("completes_at_minute") or 0)
+            unit["readiness_eta_minute"] = int(completes_at if completes_at is not None else 0)
 
         self._update_table_if_changed(
             state,
@@ -169,6 +171,105 @@ class ReadinessSystem(ISystem):
             TRANSITIONS_TABLE,
             self._frame_from_rows(TRANSITION_SCHEMA, transition_rows),
         )
+
+    def prepare_order(self, state: GameState, unit_id: str, pending_order_id: str = "") -> bool:
+        """Prepare a validated order and report whether it may execute now.
+
+        Orders are validated by the military system before this method is
+        called. This method only reconciles posture: parked units start or
+        join a transition to ready, while fortified units are released
+        immediately. A ready unit with a pending fortification transition is
+        released as well so the latest valid order is not delayed by an older
+        posture request.
+        """
+        units = self._ensure_units(state.tables.get(UNITS_TABLE))
+        transitions = self._ensure_transitions(state.tables.get(TRANSITIONS_TABLE))
+        unit_key = str(unit_id)
+        rows = units.to_dicts()
+        unit = next((row for row in rows if str(row.get("id") or "") == unit_key), None)
+        if unit is None:
+            return False
+
+        current = self._policy.normalize(unit.get("readiness_status"))
+        existing = [
+            row
+            for row in transitions.to_dicts()
+            if str(row.get("unit_id") or "") == unit_key
+        ]
+        if current == READINESS_READY and not existing:
+            return True
+
+        if existing:
+            existing_target = self._policy.normalize(existing[0].get("target_status"))
+            if current == READINESS_PARKED and existing_target == READINESS_READY:
+                if pending_order_id:
+                    updated_rows = [
+                        {
+                            **row,
+                            "pending_order_id": str(pending_order_id),
+                        }
+                        if str(row.get("unit_id") or "") == unit_key
+                        else row
+                        for row in transitions.to_dicts()
+                    ]
+                    state.update_table(
+                        TRANSITIONS_TABLE,
+                        self._frame_from_rows(TRANSITION_SCHEMA, updated_rows),
+                    )
+                return False
+            # A movement/attack order supersedes a pending fortification or a
+            # stale transition target, but only after the order was validated.
+            self.cancel_transition_for_unit(state, unit_key, "order_posture_release")
+            units = self._ensure_units(state.tables.get(UNITS_TABLE))
+            rows = units.to_dicts()
+            unit = next(row for row in rows if str(row.get("id") or "") == unit_key)
+            current = self._policy.normalize(unit.get("readiness_status"))
+
+        if current == READINESS_FORTIFIED:
+            unit["readiness_status"] = READINESS_READY
+            unit["readiness_progress"] = 0.0
+            unit["readiness_transition_id"] = ""
+            unit["readiness_eta_minute"] = 0
+            state.update_table(UNITS_TABLE, self._frame_from_rows(units.schema, rows))
+            return True
+
+        transition = self._policy.transition(current, READINESS_READY)
+        if transition is None:
+            return True
+        now = int(state.time.total_minutes)
+        transition_row = self._new_transition(
+            unit_key,
+            current,
+            READINESS_READY,
+            transition.stage,
+            now,
+            transition.duration_minutes,
+        )
+        transition_row["pending_order_id"] = str(pending_order_id or "")
+        updated_rows = [
+            row
+            for row in transitions.to_dicts()
+            if str(row.get("unit_id") or "") != unit_key
+        ]
+        updated_rows.append(transition_row)
+        unit["readiness_status"] = current
+        unit["readiness_progress"] = 0.0
+        unit["readiness_transition_id"] = transition_row["id"]
+        unit["readiness_eta_minute"] = transition_row["completes_at_minute"]
+        state.update_table(UNITS_TABLE, self._frame_from_rows(units.schema, rows))
+        state.update_table(TRANSITIONS_TABLE, self._frame_from_rows(TRANSITION_SCHEMA, updated_rows))
+        state.events.append(
+            EventUnitReadinessStarted(
+                unit_id=unit_key,
+                transition_id=transition_row["id"],
+                from_status=current,
+                target_status=READINESS_READY,
+                stage=transition.stage,
+                started_at_minute=now,
+                completes_at_minute=transition_row["completes_at_minute"],
+            )
+        )
+        return False
 
     def cancel_transition_for_unit(self, state: GameState, unit_id: str, reason: str) -> None:
         transitions = self._ensure_transitions(state.tables.get(TRANSITIONS_TABLE))

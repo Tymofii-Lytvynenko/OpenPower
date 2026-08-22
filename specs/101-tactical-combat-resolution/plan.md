@@ -6,7 +6,7 @@
 
 ## Summary
 
-Extend the existing server-authoritative military simulation with explicit unit readiness, timed readiness transitions, allied participation in two-sided battles, a queryable battle-status view, and occupation updates after victory. Stable readiness is stored on each unit; an active transition is represented by a persisted start/end interval so progress and ETA are deterministic. Orders that require a different posture are queued behind the transition or rejected according to the order contract. Combat continues to use the existing engagement discovery and deterministic resolution policy, adding readiness-weighted contributions and side membership without introducing terrain, regional fortification, supply, or logistics data.
+Extend the existing server-authoritative military simulation with explicit unit readiness, timed readiness transitions, allied participation in two-sided battles, a queryable battle-status view, and occupation updates after victory. Stable readiness is stored on each unit using lowercase machine values; an active transition is represented by a persisted start/end interval whose absolute completion minute is the authoritative ETA. Orders that require a different posture are queued behind the transition or rejected according to the order contract. Combat preserves the existing deterministic resolution policy, adding readiness-weighted contributions and side membership without introducing terrain, regional fortification, supply, or logistics data.
 
 The implementation will preserve existing action/event compatibility, keep gameplay policy in `modules/base`, expose passive contracts through `src/shared`, and make the client render snapshots rather than mutate simulation state.
 
@@ -24,11 +24,11 @@ The implementation will preserve existing action/event compatibility, keep gamep
 
 **Project Type**: Desktop strategy game engine with layered shared contracts, server systems, client renderers/controllers, and data-driven module systems.
 
-**Performance Goals**: Keep the fixed-step server update non-blocking for the client; resolve and publish 100 concurrent active engagements in a validation scenario without quadratic work in readiness processing; keep readiness progress derivation O(number of transitioning units); consume a representative snapshot within a bounded headless client update without graphics or network I/O.
+**Performance Goals**: Keep the fixed-step server update non-blocking for the client; resolve and publish 100 concurrent active engagements with one server resolution tick at or below 250 ms; keep readiness progress derivation O(number of transitioning units); consume a representative snapshot in a headless client update at or below 100 ms without graphics or network I/O; keep the representative snapshot payload at or below 2 MB.
 
-**Constraints**: Server-authoritative state; deterministic results for identical state, actions, and time; passive stdlib-only contracts in `src/shared`; server-owned save migration and snapshot compatibility; gameplay policy in `modules/base`; strict client observation; English-only code comments; no terrain classification, regional fortification level, supply factor, full logistics, routing, pathfinding, or more than two opposing battle sides in this MVP.
+**Constraints**: Server-authoritative state; deterministic results for identical state, actions, and time; lowercase readiness values (`parked`, `ready`, `fortified`) in state tables; passive stdlib-only contracts in `src/shared`; server-owned save migration and snapshot compatibility; gameplay policy in `modules/base`; strict client observation; English-only code comments; no terrain classification, regional fortification level, supply factor, full logistics, routing, pathfinding, or more than two opposing battle sides in this MVP.
 
-**Scale/Scope**: Existing unit and battle tables, three stable readiness statuses (`PARKED`, `READY`, `FORTIFIED`), one active transition per unit, two battle sides with multiple country participants per side, and occupation state for regions won in combat.
+**Scale/Scope**: Existing unit and battle tables, three stable readiness statuses (`parked`, `ready`, `fortified`) with uppercase/title-case presentation labels only, one active transition per unit, two battle sides with multiple country participants per side, and occupation state for regions won in combat.
 
 ## Constitution Check
 
@@ -36,16 +36,16 @@ The implementation will preserve existing action/event compatibility, keep gamep
 
 | Principle | Check | Result |
 |-----------|-------|--------|
-| Layer separation | Shared actions/events/view contracts remain passive; save migration/compatibility stays in `src/server`; readiness, ally eligibility, combat, and occupation policy stay in `modules/base`; client only presents snapshots and emits actions. | PASS |
+| Layer separation | Shared actions/events/view contracts remain passive; save migration/compatibility stays in `src/server`; readiness, ally eligibility, combat, and occupation policy stay in `modules/base`; client only presents snapshots and emits actions. | PASS — engagement geometry is in `src/core/map`, wartime relationship policy is in `modules/base`, and an import-boundary regression guard covers the split. |
 | Data-oriented state | Additive Polars schemas and keyed tables hold unit transitions, battle participants/status, and occupations; no per-entity mutable service graph is introduced. | PASS |
 | Modularity and SOLID | Transition timing, side resolution, combat contribution, and view projection are separate policies with stable inputs; existing systems are extended through composition/helpers rather than inheritance. | PASS |
 | Determinism | Transition completion is derived from simulation time, battle grouping uses stable sorted keys, and events are emitted once per state change. | PASS |
 | Commenting and maintainability | New comments explain policy decisions in English only; self-documenting names are preferred and no external product is referenced in comments. | PASS |
 | Empirical verification | Focused unit, integration, contract, save/load, and performance smoke tests are planned before implementation is considered complete. | PASS |
 
-**Gate status before Phase 0**: PASS — all constitutional constraints are addressed by the specification and this plan.
+**Gate status before Phase 0**: PASS for the clarified design.
 
-**Gate status after Phase 1 design**: PASS — feature-specific validation is server-owned, shared contracts remain passive, and no violation requires a complexity exception.
+**Gate status after Phase 1 design**: PASS — T063 moved engagement mechanisms/policy to their constitution-compliant layers and the import-boundary tests pass.
 
 ## Project Structure
 
@@ -136,12 +136,12 @@ tests/
 ### Phase 2 — Implementation sequencing
 
 1. Add passive actions/events and schema columns without changing existing action signatures; keep schema migration out of `src/shared`.
-2. Implement readiness transition policy and persisted progress/ETA updates.
+2. Implement readiness transition policy with the MVP timing contract (`2/0/2/0` days/minutes as specified), persisted absolute ETA, and derived remaining time.
 3. Add pending-order gating and cancellation rules for movement, attack, and fortified posture.
 4. Extend combat grouping to exactly two sides, resolve eligible allies, apply readiness contribution weights, and publish lifecycle events/status rows.
 5. Add occupation updates while preserving political ownership.
 6. Add server-owned legacy migration/default validation, then update client presentation for unit progress and battle status; refresh overlays on relevant snapshot changes.
-7. Add focused tests, run the existing regression suite, then run the 100-engagement server and bounded client snapshot performance smoke tests.
+7. Add focused tests, run the existing regression suite, then run the 100-engagement server (`≤250 ms`), bounded headless client snapshot (`≤100 ms`), and payload-size (`≤2 MB`) performance smoke tests.
 
 ### Phase 3 — Verification and handoff
 
@@ -149,6 +149,14 @@ tests/
 2. Verify deterministic replay, transition timing, event uniqueness, ally eligibility, and occupation behavior.
 3. Verify client progress/battle views with a snapshot fixture and ensure no client-side state mutation is introduced.
 4. Generate `tasks.md` from these artifacts with `$speckit-tasks`; implementation begins only after the dependency-ordered task list is reviewed.
+
+### Phase 4 — Convergence remediation (complete)
+
+1. Completed T063 and passed the layer-boundary/import tests before engagement grouping.
+2. Completed T064–T067 as the readiness/order correctness slice and verified the clarified `2/0/2/0` timing contract.
+3. Completed T068–T070 as the deterministic battle lifecycle and occupation slice.
+4. Completed T071–T073 for ETA presentation, battle/occupation details, and persistence invariants.
+5. Completed T074–T075 as final performance and replay gates after all prior remediation slices passed.
 
 ## Complexity Tracking
 

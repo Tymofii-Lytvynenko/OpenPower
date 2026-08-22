@@ -11,7 +11,7 @@ The existing `units` table remains the canonical unit record. Add these columns:
 | `readiness_status` | `Utf8` | `parked` for newly deployed units | One of `parked`, `ready`, `fortified`; this is the last completed status. |
 | `readiness_transition_id` | `Utf8` | `""` | Empty when no transition is active; otherwise references `unit_readiness_transitions.id`. |
 | `readiness_progress` | `Float64` | `0.0` | Clamped to `[0.0, 1.0]`; a view cache derived from transition timestamps. |
-| `readiness_eta_minute` | `Int64` | `0` | Simulation minute at completion, or `0` when no transition is active. |
+| `readiness_eta_minute` | `Int64` | `0` | Authoritative simulation minute at completion, or `0` when no transition is active. Clients derive remaining time from this value and the current game minute. |
 
 Existing movement and engagement columns remain unchanged. A unit cannot have two active transition rows. Newly deployed units are created as `parked`. For backward compatibility, a loaded save that predates this feature fills the missing column with `ready` so existing formations are not unexpectedly immobilized; invalid values normalize to `ready`.
 
@@ -25,7 +25,7 @@ Key: `id` (one active row per `unit_id`).
 | `unit_id` | `Utf8` | Foreign key to `units.id`. |
 | `from_status` | `Utf8` | Stable status at transition start. |
 | `target_status` | `Utf8` | Requested final status. |
-| `stage` | `Utf8` | `direct`, `to_ready`, or `to_fortified`; `PARKED -> FORTIFIED` reuses the active row for two ordered stages. |
+| `stage` | `Utf8` | `direct`, `parked_to_ready`, `parked_to_fortified`, or `ready_to_fortified`; `parked -> fortified` reuses the active row for two ordered stages. |
 | `started_at_minute` | `Int64` | Inclusive simulation start time. |
 | `completes_at_minute` | `Int64` | Exclusive completion boundary. |
 | `progress` | `Float64` | Server-updated cache for snapshot consumers. |
@@ -145,7 +145,7 @@ started_at_minute, updated_at_minute, concluded_at_minute,
 participants, readiness_distribution, occupation
 ```
 
-`UnitReadinessView` similarly exposes `unit_id`, `readiness_status`, `transition_target`, `progress`, and `eta_minute`. Both projections are built from snapshot tables and never write back to `GameState`.
+`UnitReadinessView` similarly exposes `unit_id`, `readiness_status`, `transition_target`, `progress`, `eta_minute`, and `remaining_minutes`. `remaining_minutes` is derived as `max(0, eta_minute - current_game_minute)` when a transition is active and is never persisted as a second countdown. Both projections are built from snapshot tables and never write back to `GameState`.
 
 ## Migration and compatibility
 

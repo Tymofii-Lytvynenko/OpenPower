@@ -37,8 +37,12 @@ class ProjectedUnit:
     movement_progress: float
     is_moving: bool
     readiness_status: str = "ready"
+    readiness_target: str = "ready"
     readiness_progress: float = 0.0
     readiness_transition_id: str = ""
+    readiness_eta_minute: int = 0
+    readiness_remaining_minutes: int = 0
+    readiness_remaining_label: str = ""
     local_position: tuple[float, float, float] = (0.0, 0.0, 0.0)
     stack_index: int = 0
     stack_count: int = 1
@@ -67,8 +71,11 @@ class PreparedUnitProjectionData:
     arrival_at_minutes: np.ndarray
     is_moving: np.ndarray
     readiness_statuses: list[str]
+    readiness_targets: list[str]
     readiness_progress: np.ndarray
     readiness_transition_ids: list[str]
+    readiness_eta_minutes: np.ndarray
+    readiness_remaining_minutes: np.ndarray
 
     @property
     def count(self) -> int:
@@ -93,8 +100,11 @@ class PreparedUnitProjectionData:
             arrival_at_minutes=empty_float,
             is_moving=np.empty(0, dtype=np.bool_),
             readiness_statuses=[],
+            readiness_targets=[],
             readiness_progress=empty_float,
             readiness_transition_ids=[],
+            readiness_eta_minutes=empty_int,
+            readiness_remaining_minutes=empty_int,
         )
 
 
@@ -142,6 +152,7 @@ class UnitProjectionService:
         self,
         unit_rows: list[dict],
         region_lookup: dict[int, RegionAnchor],
+        current_game_minute: float | None = None,
     ) -> PreparedUnitProjectionData:
         if not unit_rows:
             return PreparedUnitProjectionData.empty()
@@ -159,8 +170,11 @@ class UnitProjectionService:
         arrival_at_minutes: list[float] = []
         is_moving: list[bool] = []
         readiness_statuses: list[str] = []
+        readiness_targets: list[str] = []
         readiness_progress: list[float] = []
         readiness_transition_ids: list[str] = []
+        readiness_eta_minutes: list[int] = []
+        readiness_remaining_minutes: list[int] = []
 
         for row in unit_rows:
             current_region_id = int(row.get("current_region_id", 0) or 0)
@@ -194,9 +208,19 @@ class UnitProjectionService:
             departed_at_minutes.append(float(row.get("departed_at_minute", 0) or 0))
             arrival_at_minutes.append(float(row.get("arrival_at_minute", 0) or 0))
             is_moving.append(bool(row.get("is_moving", False)))
-            readiness_statuses.append(str(row.get("readiness_status", "ready") or "ready"))
+            readiness_status = str(row.get("readiness_status", "ready") or "ready").strip().lower()
+            transition_id = str(row.get("readiness_transition_id", "") or "")
+            eta_minute = int(row.get("readiness_eta_minute", 0) or 0)
+            remaining_minutes = max(
+                0,
+                eta_minute - int(current_game_minute or 0),
+            ) if transition_id else 0
+            readiness_statuses.append(readiness_status)
+            readiness_targets.append(str(row.get("readiness_target", readiness_status) or readiness_status).strip().lower())
             readiness_progress.append(float(row.get("readiness_progress", 0.0) or 0.0))
-            readiness_transition_ids.append(str(row.get("readiness_transition_id", "") or ""))
+            readiness_transition_ids.append(transition_id)
+            readiness_eta_minutes.append(eta_minute)
+            readiness_remaining_minutes.append(remaining_minutes)
 
         if not unit_ids:
             return PreparedUnitProjectionData.empty()
@@ -215,8 +239,11 @@ class UnitProjectionService:
             arrival_at_minutes=np.asarray(arrival_at_minutes, dtype=np.float32),
             is_moving=np.asarray(is_moving, dtype=np.bool_),
             readiness_statuses=readiness_statuses,
+            readiness_targets=readiness_targets,
             readiness_progress=np.asarray(readiness_progress, dtype=np.float32),
             readiness_transition_ids=readiness_transition_ids,
+            readiness_eta_minutes=np.asarray(readiness_eta_minutes, dtype=np.int64),
+            readiness_remaining_minutes=np.asarray(readiness_remaining_minutes, dtype=np.int64),
         )
 
     def project_prepared_units(
@@ -294,8 +321,12 @@ class UnitProjectionService:
                 movement_progress=float(effective_progress[index]),
                 is_moving=bool(prepared.is_moving[index]),
                 readiness_status=prepared.readiness_statuses[index],
+                readiness_target=prepared.readiness_targets[index],
                 readiness_progress=float(prepared.readiness_progress[index]),
                 readiness_transition_id=prepared.readiness_transition_ids[index],
+                readiness_eta_minute=int(prepared.readiness_eta_minutes[index]),
+                readiness_remaining_minutes=int(prepared.readiness_remaining_minutes[index]),
+                readiness_remaining_label=self._format_remaining(int(prepared.readiness_remaining_minutes[index])),
                 local_position=tuple(float(value) for value in local_positions[index]),
             )
             for index in sorted_indices
@@ -519,9 +550,23 @@ class UnitProjectionService:
             height=height,
             movement_progress=float(row.get("movement_progress", 0.0) or 0.0),
             is_moving=bool(row.get("is_moving", False)),
-            readiness_status=str(row.get("readiness_status", "ready") or "ready"),
+            readiness_status=str(row.get("readiness_status", "ready") or "ready").strip().lower(),
+            readiness_target=str(row.get("readiness_target", row.get("readiness_status", "ready")) or "ready").strip().lower(),
             readiness_progress=float(row.get("readiness_progress", 0.0) or 0.0),
             readiness_transition_id=str(row.get("readiness_transition_id", "") or ""),
+            readiness_eta_minute=int(row.get("readiness_eta_minute", 0) or 0),
+            readiness_remaining_minutes=max(
+                0,
+                int(row.get("readiness_eta_minute", 0) or 0)
+                - int(row.get("current_game_minute", 0) or 0),
+            ) if str(row.get("readiness_transition_id", "") or "") else 0,
+            readiness_remaining_label=self._format_remaining(
+                max(
+                    0,
+                    int(row.get("readiness_eta_minute", 0) or 0)
+                    - int(row.get("current_game_minute", 0) or 0),
+                )
+            ) if str(row.get("readiness_transition_id", "") or "") else "",
             local_position=tuple(float(value) for value in local_pos),
         )
 
@@ -557,6 +602,11 @@ class UnitProjectionService:
     def _geo_to_unit_vector(self, geo: GeoCoordinate) -> np.ndarray:
         x, y, z = self._geo_projection.geo_to_unit_vector(geo)
         return np.array([x, y, z], dtype=np.float32)
+
+    def _format_remaining(self, minutes: int) -> str:
+        days, remainder = divmod(max(0, int(minutes)), 24 * 60)
+        hours = remainder // 60
+        return f"{days}d {hours}h" if days else f"{hours}h"
 
     def _row_geo(self, row: dict, latitude_key: str, longitude_key: str) -> Optional[GeoCoordinate]:
         latitude = row.get(latitude_key)

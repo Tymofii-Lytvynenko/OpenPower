@@ -48,6 +48,13 @@ class BattleOverviewPanel:
                 context.on_focus_request(int(row.get("region_id") or 0))
             if model:
                 imgui.text(f"Losses {model.side_a_losses} : {model.side_b_losses}")
+                distribution = model.readiness_distribution
+                imgui.text(
+                    "Readiness "
+                    f"parked {distribution.get('parked', 0)} | "
+                    f"ready {distribution.get('ready', 0)} | "
+                    f"fortified {distribution.get('fortified', 0)}"
+                )
                 imgui.text(f"A: {', '.join(model.side_a_countries) or '—'}")
                 imgui.text(f"B: {', '.join(model.side_b_countries) or '—'}")
                 for participant in model.participants:
@@ -57,7 +64,9 @@ class BattleOverviewPanel:
                 if model.occupation:
                     imgui.text_disabled(
                         f"Occupation: {model.occupation.get('controller_country_id', '')} "
-                        f"garrison {model.occupation.get('garrison_strength', 0)}"
+                        f"garrison {model.occupation.get('garrison_strength', 0)} "
+                        f"resistance {float(model.occupation.get('resistance', 0.0) or 0.0):.1f} "
+                        f"status {model.occupation.get('occupation_status', 'active')}"
                     )
             if hasattr(imgui, "progress_bar"):
                 imgui.progress_bar(max(0.0, min(1.0, balance / 100.0)), (0.0, 12.0), "")

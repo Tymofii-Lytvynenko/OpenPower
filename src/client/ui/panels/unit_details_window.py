@@ -36,6 +36,8 @@ class UnitDetailsViewModel:
     readiness_target: str = ""
     readiness_progress: float = 0.0
     readiness_eta_minute: int = 0
+    readiness_remaining_minutes: int = 0
+    readiness_remaining_label: str = ""
 
 
 class UnitDetailsPresenter:
@@ -57,11 +59,24 @@ class UnitDetailsPresenter:
         owner_tag = str(unit.get("owner", "") or "")
         owner_name = self._resolve_country_name(state, owner_tag)
         location_name = self._resolve_region_name(state, int(unit.get("current_region_id", 0) or 0))
-        readiness = str(unit.get("readiness_status", "ready") or "ready").title()
+        readiness_machine = str(unit.get("readiness_status", "ready") or "ready").strip().lower()
+        readiness = readiness_machine.title()
         status = "Moving" if bool(unit.get("is_moving", False)) else readiness
-        if str(unit.get("readiness_transition_id", "") or ""):
+        transition_id = str(unit.get("readiness_transition_id", "") or "")
+        transition = self._readiness_transition(state, unit_id, transition_id)
+        if transition_id:
             progress = float(unit.get("readiness_progress", 0.0) or 0.0) * 100.0
             status = f"{readiness} {progress:.0f}%"
+        target_machine = str(
+            (transition or {}).get("target_status", readiness_machine) or readiness_machine
+        ).strip().lower()
+        eta_minute = int(
+            unit.get("readiness_eta_minute", 0)
+            or (transition or {}).get("completes_at_minute", 0)
+            or 0
+        )
+        remaining_minutes = max(0, eta_minute - int(state.time.total_minutes)) if transition_id else 0
+        remaining_label = self._format_remaining(remaining_minutes) if transition_id else ""
         quantity = max(1, int(unit.get("strength", 1) or 1))
 
         entry = UnitRosterEntry(
@@ -77,10 +92,28 @@ class UnitDetailsPresenter:
             unit_label=f"{owner_name} field unit",
             entries=(entry,),
             readiness_status=readiness,
-            readiness_target=readiness if not str(unit.get("readiness_transition_id", "") or "") else "in progress",
+            readiness_target=target_machine.title(),
             readiness_progress=float(unit.get("readiness_progress", 0.0) or 0.0),
-            readiness_eta_minute=int(unit.get("readiness_eta_minute", 0) or 0),
+            readiness_eta_minute=eta_minute,
+            readiness_remaining_minutes=remaining_minutes,
+            readiness_remaining_label=remaining_label,
         )
+
+    def _readiness_transition(self, state: "GameState", unit_id: str, transition_id: str) -> dict:
+        transitions = state.tables.get("unit_readiness_transitions")
+        if transitions is None or transitions.is_empty() or "unit_id" not in transitions.columns:
+            return {}
+        matches = transitions.filter(pl.col("unit_id") == unit_id)
+        if transition_id and "id" in transitions.columns:
+            matches = matches.filter(pl.col("id") == transition_id)
+        return matches.to_dicts()[0] if not matches.is_empty() else {}
+
+    def _format_remaining(self, minutes: int) -> str:
+        days, remainder = divmod(max(0, int(minutes)), 24 * 60)
+        hours = remainder // 60
+        if days:
+            return f"{days}d {hours}h"
+        return f"{hours}h"
 
     def _resolve_country_name(self, state: "GameState", owner_tag: str) -> str:
         countries = state.tables.get("countries")
@@ -163,7 +196,10 @@ class UnitDetailsWindow:
 
         imgui.same_line()
         imgui.text_colored(GAMETHEME.colors.text_dim, f"{model.owner_name} | {model.unit_label}")
-        imgui.text(f"Readiness: {model.readiness_status.title()}" + (f" | ETA {model.readiness_eta_minute}" if model.readiness_eta_minute else ""))
+        readiness_text = f"Readiness: {model.readiness_status.title()} → {model.readiness_target}"
+        if model.readiness_remaining_label:
+            readiness_text += f" | {model.readiness_remaining_label} remaining"
+        imgui.text(readiness_text)
         if model.readiness_eta_minute:
             imgui.progress_bar(max(0.0, min(1.0, model.readiness_progress)), (-1.0, 12.0), "")
         imgui.separator()

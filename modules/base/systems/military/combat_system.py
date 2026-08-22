@@ -142,7 +142,7 @@ class WarIndex:
                 )
             )
 
-        return cls(records)
+        return cls(sorted(records, key=lambda record: record.war_id))
 
     def active_battle_for_region(self, owners: set[str]) -> ConflictContext | None:
         for war in self._active_wars:
@@ -275,13 +275,28 @@ class CombatSystem(ISystem):
         active_battle_ids: set[str] = set()
         victorious_battles: dict[str, str] = {}
         victorious_sides: dict[str, str] = {}
+        battle_regions: dict[str, int] = {}
+        battle_metadata: dict[str, dict[str, Any]] = {}
 
         regions_by_id = {
             int(row.get("id") or 0): row
             for row in region_rows
             if int(row.get("id") or 0) > 0
         }
-        for region_id in sorted(stationary_units):
+        def battle_iteration_key(region_id: int) -> tuple[int, str, int]:
+            owners = {
+                self._clean_tag(row.get("owner"))
+                for row in stationary_units[region_id]
+                if self._clean_tag(row.get("owner"))
+            }
+            conflict = wars.active_battle_for_region(owners)
+            if conflict is not None:
+                return (0, self._battle_id(region_id, conflict.war_id), region_id)
+            return (1, f"region-{region_id:010d}", region_id)
+
+        # Stable battle-ID ordering keeps multi-region event sequences replayable
+        # even when numeric region IDs do not share the same lexical order.
+        for region_id in sorted(stationary_units, key=battle_iteration_key):
             region_row = regions_by_id.get(region_id)
             if region_row is None:
                 continue
@@ -322,6 +337,7 @@ class CombatSystem(ISystem):
                     ))
                 battle_mode = self._battle_mode(local_units)
                 battle_id = self._battle_id(region_id, conflict.war_id)
+                battle_regions[battle_id] = region_id
                 active_battle_ids.add(battle_id)
                 if battle_id not in existing_battles:
                     state.events.append(EventBattleStarted(
@@ -347,31 +363,59 @@ class CombatSystem(ISystem):
                 prior_row = self._battle_row(state.tables.get(BATTLE_TABLE), battle_id)
                 previous_a = self._total_strength(local_units, conflict.side_a_members)
                 previous_b = self._total_strength(local_units, conflict.side_b_members)
+                battle_metadata[battle_id] = {
+                    "war_id": conflict.war_id,
+                    "mode": battle_mode,
+                    "side_a_tags": conflict.side_a_tags,
+                    "side_b_tags": conflict.side_b_tags,
+                    "prior_row": prior_row,
+                    "previous_a": previous_a,
+                    "previous_b": previous_b,
+                    "round_resolved": False,
+                }
 
                 resolve_this_tick = should_resolve or (
                     battle_mode == "assault"
                     and any(str(row.get("id") or "") in assaulting_unit_ids for row in local_units)
                 )
                 if resolve_this_tick:
+                    battle_metadata[battle_id]["round_resolved"] = True
                     victor = self._apply_combat_round(local_units, conflict, battle_mode)
                     if victor is not None:
                         victorious_battles[battle_id] = victor
-                        victorious_sides[battle_id] = "attacker" if victor in conflict.side_a_members else "defender"
+                        victorious_sides[battle_id] = "SIDE_A" if victor in conflict.side_a_members else "SIDE_B"
                     post_a = self._total_strength(local_units, conflict.side_a_members)
                     post_b = self._total_strength(local_units, conflict.side_b_members)
                     if post_a <= 0 and post_b <= 0:
                         victorious_battles[battle_id] = ""
-                        victorious_sides[battle_id] = "draw"
+                        victorious_sides[battle_id] = ""
 
                 side_a_strength = self._total_strength(local_units, conflict.side_a_members)
                 side_b_strength = self._total_strength(local_units, conflict.side_b_members)
+                battle_metadata[battle_id]["side_a_strength"] = side_a_strength
+                battle_metadata[battle_id]["side_b_strength"] = side_b_strength
                 if side_a_strength > 0 and side_b_strength > 0:
+                    status = self._lifecycle_status(
+                        prior_row,
+                        resolve_this_tick,
+                        previous_a,
+                        previous_b,
+                        side_a_strength,
+                        side_b_strength,
+                    )
+                    round_number = int(prior_row.get("round") or 0) + (1 if resolve_this_tick else 0)
+                    current_balance = float(side_a_strength / max(1, side_a_strength + side_b_strength))
                     battle_changed = (
                         not prior_row
                         or resolve_this_tick
+                        or str(prior_row.get("status") or "active") != status
                         or str(prior_row.get("mode") or "") != battle_mode
+                        or str(prior_row.get("attacker_side") or "") != ",".join(sorted(conflict.side_a_tags))
+                        or str(prior_row.get("defender_side") or "") != ",".join(sorted(conflict.side_b_tags))
                         or float(prior_row.get("side_a_strength") or -1.0) != float(side_a_strength)
                         or float(prior_row.get("side_b_strength") or -1.0) != float(side_b_strength)
+                        or float(prior_row.get("balance") or -1.0) != current_balance
+                        or self._battle_units_changed(state.tables.get(BATTLE_UNITS_TABLE), battle_id, local_units, conflict)
                     )
                     if battle_changed:
                         battle_row = self._build_battle_row(
@@ -384,8 +428,10 @@ class CombatSystem(ISystem):
                             side_b_strength=side_b_strength,
                             war_id=conflict.war_id,
                             now=int(state.time.total_minutes),
-                            side_a_losses=int(prior_row.get("side_a_losses") or 0) + max(0, previous_a - side_a_strength),
-                            side_b_losses=int(prior_row.get("side_b_losses") or 0) + max(0, previous_b - side_b_strength),
+                            side_a_losses=int(prior_row.get("side_a_losses") or 0) + (max(0, previous_a - side_a_strength) if resolve_this_tick else 0),
+                            side_b_losses=int(prior_row.get("side_b_losses") or 0) + (max(0, previous_b - side_b_strength) if resolve_this_tick else 0),
+                            status=status,
+                            round_number=round_number,
                             prior_row=prior_row,
                         )
                     else:
@@ -402,18 +448,12 @@ class CombatSystem(ISystem):
                     participant_rows.extend(self._build_participants(
                         battle_id, local_units, conflict,
                     ))
-                    current_balance = float(side_a_strength / max(1, side_a_strength + side_b_strength))
-                    if (
-                        not prior_row
-                        or float(prior_row.get("side_a_strength") or -1.0) != float(side_a_strength)
-                        or float(prior_row.get("side_b_strength") or -1.0) != float(side_b_strength)
-                        or float(prior_row.get("balance") or -1.0) != current_balance
-                    ):
+                    if battle_changed or float(prior_row.get("balance") or -1.0) != current_balance:
                         state.events.append(EventBattleUpdated(
                             battle_id=battle_id,
                             region_id=region_id,
-                            status="active",
-                            round=int(state.time.total_minutes // 60),
+                            status=status,
+                            round=round_number,
                             side_a_countries=tuple(sorted(conflict.side_a_members)),
                             side_b_countries=tuple(sorted(conflict.side_b_members)),
                             side_a_strength=float(side_a_strength),
@@ -425,7 +465,7 @@ class CombatSystem(ISystem):
                     winner = self._winning_country(local_units, conflict)
                     if winner:
                         victorious_battles[battle_id] = winner
-                        victorious_sides[battle_id] = "attacker" if winner in conflict.side_a_members else "defender"
+                        victorious_sides[battle_id] = "SIDE_A" if winner in conflict.side_a_members else "SIDE_B"
             else:
                 for unit in local_units:
                     unit["engagement_mode"] = ""
@@ -459,7 +499,49 @@ class CombatSystem(ISystem):
         for battle_id, victor in victorious_battles.items():
             if battle_id in active_battle_ids:
                 active_battle_ids.remove(battle_id)
-            region_id = int(battle_id.split("-")[2])
+            region_id = battle_regions.get(battle_id, int(battle_id.split("-")[2]))
+            prior_row = self._battle_row(state.tables.get(BATTLE_TABLE), battle_id)
+            concluded_row = dict(prior_row)
+            if not concluded_row:
+                metadata = battle_metadata.get(battle_id, {})
+                side_a_strength = int(metadata.get("side_a_strength", 0))
+                side_b_strength = int(metadata.get("side_b_strength", 0))
+                previous_a = int(metadata.get("previous_a", 0))
+                previous_b = int(metadata.get("previous_b", 0))
+                round_number = 1 if bool(metadata.get("round_resolved")) else 0
+                concluded_row = self._build_battle_row(
+                    battle_id=battle_id,
+                    mode=str(metadata.get("mode") or "positional"),
+                    region_id=region_id,
+                    side_a_tags=frozenset(metadata.get("side_a_tags") or ()),
+                    side_b_tags=frozenset(metadata.get("side_b_tags") or ()),
+                    side_a_strength=side_a_strength,
+                    side_b_strength=side_b_strength,
+                    war_id=str(metadata.get("war_id") or ""),
+                    now=int(state.time.total_minutes),
+                    side_a_losses=max(0, previous_a - side_a_strength) if bool(metadata.get("round_resolved")) else 0,
+                    side_b_losses=max(0, previous_b - side_b_strength) if bool(metadata.get("round_resolved")) else 0,
+                    status="concluded",
+                    round_number=round_number,
+                )
+            else:
+                metadata = battle_metadata.get(battle_id, {})
+                if bool(metadata.get("round_resolved")):
+                    current_a = int(metadata.get("side_a_strength", concluded_row.get("side_a_strength") or 0))
+                    current_b = int(metadata.get("side_b_strength", concluded_row.get("side_b_strength") or 0))
+                    previous_a = int(metadata.get("previous_a", current_a))
+                    previous_b = int(metadata.get("previous_b", current_b))
+                    concluded_row["side_a_strength"] = float(current_a)
+                    concluded_row["side_b_strength"] = float(current_b)
+                    concluded_row["balance"] = float(current_a / max(1, current_a + current_b))
+                    concluded_row["side_a_losses"] = int(concluded_row.get("side_a_losses") or 0) + max(0, previous_a - current_a)
+                    concluded_row["side_b_losses"] = int(concluded_row.get("side_b_losses") or 0) + max(0, previous_b - current_b)
+                    concluded_row["round"] = int(concluded_row.get("round") or 0) + 1
+            concluded_row["status"] = "concluded"
+            concluded_row["updated_at_minute"] = int(state.time.total_minutes)
+            concluded_row["concluded_at_minute"] = int(state.time.total_minutes)
+            concluded_row["victor_side"] = victorious_sides.get(battle_id, "")
+            battle_rows.append(concluded_row)
             state.events.append(EventBattleEnded(
                 battle_id=battle_id,
                 victor_tag=victor,
@@ -469,6 +551,37 @@ class CombatSystem(ISystem):
             ))
             if victor:
                 self._set_region_controller(region_rows, region_id, victor)
+                victor_tag = self._clean_tag(victor)
+                garrison_units = [
+                    row
+                    for row in unit_rows
+                    if int(row.get("current_region_id") or 0) == region_id
+                    and self._clean_tag(row.get("owner")) == victor_tag
+                    and int(row.get("strength") or 0) > 0
+                    and not bool(row.get("is_moving"))
+                ]
+                previous_occupation = next(
+                    (row for row in occupation_rows if int(row.get("region_id") or 0) == region_id),
+                    None,
+                )
+                occupation_rows = [
+                    row for row in occupation_rows if int(row.get("region_id") or 0) != region_id
+                ]
+                occupation_rows.append(
+                    self._occupation_row(
+                        region_id,
+                        victor_tag,
+                        garrison_units,
+                        int(state.time.total_minutes),
+                        previous_occupation,
+                    )
+                )
+            else:
+                for occupation in occupation_rows:
+                    if int(occupation.get("region_id") or 0) == region_id:
+                        occupation["contested"] = True
+                        occupation["occupation_status"] = "contested"
+                        occupation["updated_at_minute"] = int(state.time.total_minutes)
 
         unit_rows = [row for row in unit_rows if int(row.get("strength") or 0) > 0]
         self._update_table_if_changed(state, UNITS_TABLE, self._frame_from_rows(units.schema, unit_rows))
@@ -523,7 +636,7 @@ class CombatSystem(ISystem):
 
     def _stationary_units_by_region(self, unit_rows: list[dict[str, Any]]) -> dict[int, list[dict[str, Any]]]:
         grouped: dict[int, list[dict[str, Any]]] = {}
-        for row in unit_rows:
+        for row in sorted(unit_rows, key=lambda unit: str(unit.get("id") or "")):
             if bool(row.get("is_moving", False)):
                 continue
             region_id = int(row.get("current_region_id") or 0)
@@ -531,8 +644,78 @@ class CombatSystem(ISystem):
                 continue
             grouped.setdefault(region_id, []).append(row)
         return grouped
+
+    def engagement_anchor_region(self, contact_units: Iterable[dict[str, Any]]) -> int:
+        """Return the deterministic region anchor for an engagement contact."""
+        candidates = sorted(
+            (
+                int(row.get("current_region_id") or 0),
+                str(row.get("id") or ""),
+            )
+            for row in contact_units
+            if int(row.get("current_region_id") or 0) > 0
+        )
+        return candidates[0][0] if candidates else 0
+
     def _battle_mode(self, local_units: list[dict[str, Any]]) -> str:
         return "assault" if any(str(row.get("engagement_mode") or "").lower() == "assault" for row in local_units) else "positional"
+
+    def _lifecycle_status(
+        self,
+        prior_row: dict[str, Any],
+        round_resolved: bool,
+        previous_a: int,
+        previous_b: int,
+        current_a: int,
+        current_b: int,
+    ) -> str:
+        """Classify a still-contested battle without inventing extra outcomes."""
+        prior_status = str(prior_row.get("status") or "active").lower()
+        if not round_resolved:
+            return prior_status if prior_status in {"active", "stalemate"} else "active"
+        if current_a == previous_a and current_b == previous_b:
+            return "stalemate"
+        return "active"
+
+    def _battle_units_changed(
+        self,
+        battle_units: pl.DataFrame | None,
+        battle_id: str,
+        local_units: list[dict[str, Any]],
+        conflict: ConflictContext,
+    ) -> bool:
+        """Detect readiness or participant changes that require a status update."""
+        if battle_units is None or battle_units.is_empty() or "battle_id" not in battle_units.columns:
+            return bool(local_units)
+        existing = {
+            str(row.get("unit_id") or ""): (
+                str(row.get("country_id") or ""),
+                str(row.get("side") or ""),
+                str(row.get("readiness_status") or ""),
+                float(row.get("contribution_weight") or 0.0),
+                float(row.get("effective_strength") or 0.0),
+            )
+            for row in battle_units.filter(pl.col("battle_id") == battle_id).to_dicts()
+        }
+        current: dict[str, tuple[str, str, str, float, float]] = {}
+        for row in sorted(local_units, key=lambda unit: str(unit.get("id") or "")):
+            owner = self._clean_tag(row.get("owner"))
+            if owner in conflict.side_a_members:
+                side = "SIDE_A"
+            elif owner in conflict.side_b_members:
+                side = "SIDE_B"
+            else:
+                continue
+            weight = self._readiness.combat_weight(row.get("readiness_status"))
+            unit_id = str(row.get("id") or "")
+            current[unit_id] = (
+                owner,
+                side,
+                self._readiness.normalize(row.get("readiness_status")),
+                float(weight),
+                float(max(0, int(row.get("strength") or 0)) * weight),
+            )
+        return existing != current
 
 
     def _apply_combat_round(
@@ -577,10 +760,13 @@ class CombatSystem(ISystem):
         now: int,
         side_a_losses: int = 0,
         side_b_losses: int = 0,
+        status: str = "active",
+        round_number: int | None = None,
         prior_row: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         prior = prior_row or {}
         total_strength = max(1, side_a_strength + side_b_strength)
+        current_round = int(prior.get("round") or 0) if round_number is None else int(round_number)
         return {
             "id": battle_id,
             "war_id": war_id,
@@ -593,12 +779,16 @@ class CombatSystem(ISystem):
             "side_b_strength": float(side_b_strength),
             "side_a_losses": int(side_a_losses),
             "side_b_losses": int(side_b_losses),
-            "round": int(now // 60),
-            "started_at_minute": int(prior.get("started_at_minute") or now),
+            "round": current_round,
+            "started_at_minute": int(
+                prior.get("started_at_minute")
+                if prior.get("started_at_minute") is not None
+                else now
+            ),
             "updated_at_minute": now,
             "concluded_at_minute": 0,
             "victor_side": "",
-            "status": "active",
+            "status": status,
         }
 
     def _build_battle_units(
@@ -613,9 +803,9 @@ class CombatSystem(ISystem):
         for row in sorted(local_units, key=lambda unit: str(unit.get("id") or "")):
             owner = self._clean_tag(row.get("owner"))
             if owner in conflict.side_a_members:
-                side = "attacker"
+                side = "SIDE_A"
             elif owner in conflict.side_b_members:
-                side = "defender"
+                side = "SIDE_B"
             else:
                 continue
 
@@ -644,9 +834,9 @@ class CombatSystem(ISystem):
         for unit in local_units:
             owner = self._clean_tag(unit.get("owner"))
             if owner in conflict.side_a_members:
-                side = "attacker"
+                side = "SIDE_A"
             elif owner in conflict.side_b_members:
-                side = "defender"
+                side = "SIDE_B"
             else:
                 continue
             key = (owner, side)
@@ -675,10 +865,14 @@ class CombatSystem(ISystem):
         row = {
             "region_id": region_id,
             "controller_country_id": occupier,
-            "garrison_strength": int(self._total_strength(local_units, {occupier})),
+            "garrison_strength": int(self._raw_strength(local_units, {occupier})),
             "resistance": 0.0,
             "occupation_status": "active",
-            "started_at_minute": int(prior.get("started_at_minute") or now),
+            "started_at_minute": int(
+                prior.get("started_at_minute")
+                if prior.get("started_at_minute") is not None
+                else now
+            ),
             "updated_at_minute": now,
             "contested": False,
         }
@@ -745,11 +939,19 @@ class CombatSystem(ISystem):
 
     def _total_strength(self, local_units: list[dict[str, Any]], eligible_tags: Iterable[str]) -> int:
         eligible = set(eligible_tags)
-        return int(round(sum(
+        raw_strength = sum(
+            max(0, int(row.get("strength") or 0))
+            for row in local_units
+            if self._clean_tag(row.get("owner")) in eligible
+        )
+        if raw_strength <= 0:
+            return 0
+        effective_strength = sum(
             max(0, int(row.get("strength") or 0)) * self._readiness.combat_weight(row.get("readiness_status"))
             for row in local_units
             if self._clean_tag(row.get("owner")) in eligible
-        )))
+        )
+        return max(1, int(round(effective_strength)))
 
     def _raw_strength(self, local_units: list[dict[str, Any]], eligible_tags: Iterable[str]) -> int:
         eligible = set(eligible_tags)

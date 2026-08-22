@@ -2,7 +2,7 @@ import unittest
 
 from src.client.controllers.camera_controller import CameraController
 from src.client.renderers.unit_projection import UnitProjectionService
-from src.shared.engagement import EARTH_RADIUS_KM, ENGAGEMENT_RADIUS_KM
+from src.core.map.engagement_geometry import EARTH_RADIUS_KM, ENGAGEMENT_RADIUS_KM
 
 
 class UnitEngagementProjectionTest(unittest.TestCase):

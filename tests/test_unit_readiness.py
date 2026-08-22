@@ -29,7 +29,11 @@ class UnitReadinessTest(unittest.TestCase):
         state.time.total_minutes = ReadinessPolicy.PARKED_TO_READY_MINUTES
         system.update(state, 0)
         self.assertEqual(state.get_table("units")["readiness_status"][0], "ready")
-        self.assertGreater(state.get_table("units")["readiness_progress"][0], 0.9)
+        self.assertEqual(state.get_table("units")["readiness_progress"][0], 0.0)
+        self.assertEqual(
+            state.get_table("unit_readiness_transitions")["target_status"][0],
+            "fortified",
+        )
 
         state.time.total_minutes = ReadinessPolicy.PARKED_TO_READY_MINUTES + ReadinessPolicy.READY_TO_FORTIFIED_MINUTES
         system.update(state, 0)
@@ -45,7 +49,8 @@ class UnitReadinessTest(unittest.TestCase):
         state.current_actions = [ActionAttackUnit("USA", "USA-army-001", "CAN-army-001")]
         system.update(state, 0)
         self.assertEqual(state.get_table("unit_readiness_transitions").height, 0)
-        self.assertTrue(any(isinstance(event, EventUnitReadinessCanceled) for event in state.events))
+        # An invalid attack target must not cancel a valid readiness transition.
+        self.assertFalse(any(isinstance(event, EventUnitReadinessCanceled) for event in state.events))
 
     def test_invalid_target_is_rejected_without_mutating_status(self) -> None:
         state = self._state()
@@ -71,6 +76,19 @@ class UnitReadinessTest(unittest.TestCase):
         system.update(state, 0)
 
         self.assertEqual(dict(state.table_revisions), revisions)
+
+    def test_transition_progress_is_persisted_at_minute_zero(self) -> None:
+        state = self._state()
+        system = ReadinessSystem()
+        state.current_actions = [ActionSetUnitReadiness("USA", "USA-army-001", "ready")]
+        system.update(state, 0)
+        transition = state.get_table("unit_readiness_transitions").to_dicts()[0]
+        self.assertEqual(transition["started_at_minute"], 0)
+        self.assertEqual(transition["progress"], 0.0)
+        state.time.total_minutes = 1
+        state.current_actions = []
+        system.update(state, 0)
+        self.assertGreater(state.get_table("unit_readiness_transitions")["progress"][0], 0.0)
 
 
 if __name__ == "__main__":

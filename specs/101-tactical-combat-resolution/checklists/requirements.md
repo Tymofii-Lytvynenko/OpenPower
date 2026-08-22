@@ -33,5 +33,5 @@
 
 - MVP scope intentionally excludes terrain classification, regional fortification data, supply networks, organization simulation, pathfinding, and permanent annexation.
 - The two-sided battle model supports multiple countries per side through allied participation.
-- Readiness timing is explicit and configurable: four days for parked-to-ready, two days for ready-to-park, two days for ready-to-fortified, and immediate fortified-to-ready.
-- Specification is ready for `$speckit-plan`.
+- Readiness timing is explicit and configurable: two days for parked-to-ready, immediate ready-to-park, two days for ready-to-fortified, and immediate fortified-to-ready; parked-to-fortified is two ordered two-day stages.
+- Clarified design, implementation tasks, and convergence checks are complete; the feature-focused and performance gates pass. Full discovery still requires an unrestricted Windows process run for the two headless-server tests blocked by `WinError 5` pipe creation (see quickstart verification note).

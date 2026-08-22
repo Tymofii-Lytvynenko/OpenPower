@@ -1,12 +1,11 @@
-"""Shared engagement geometry and wartime relationship helpers."""
+"""Geometry primitives used to detect tactical engagement-zone contact."""
 
 from __future__ import annotations
 
 from math import cos, radians, sqrt
-from typing import Any, Iterable
+from typing import Any
 
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate
-from src.shared.treaties import normalize_country_tags
 
 
 EARTH_RADIUS_KM = 6371.0
@@ -17,38 +16,12 @@ _GEOGRAPHY = EquirectangularProjection(360.0, 180.0)
 
 
 def engagement_radius_km(unit_row: dict[str, Any]) -> float:
-    """Returns the fixed MVP zone radius while preserving a future data hook."""
+    """Return the fixed MVP zone radius while preserving a future data hook."""
     value = unit_row.get("engagement_radius_km")
     try:
         return max(0.0, float(value)) if value is not None else ENGAGEMENT_RADIUS_KM
     except (TypeError, ValueError):
         return ENGAGEMENT_RADIUS_KM
-
-
-def hostile_country_pairs(war_rows: Iterable[dict[str, Any]]) -> set[frozenset[str]]:
-    """Builds a reusable index of countries on opposite sides of active wars."""
-    pairs: set[frozenset[str]] = set()
-    for war in war_rows:
-        status = str(war.get("status") or "active").strip().lower()
-        if status not in {"", "active", "ongoing"}:
-            continue
-        side_a = normalize_country_tags(war.get("side_a"))
-        side_b = normalize_country_tags(war.get("side_b"))
-        pairs.update(
-            frozenset((left, right))
-            for left in side_a
-            for right in side_b
-            if left != right
-        )
-    return pairs
-
-
-def countries_are_hostile(war_rows: Iterable[dict[str, Any]], left: str, right: str) -> bool:
-    """Checks whether two country tags occupy opposite sides of an active war."""
-    left_tag, right_tag = _tag(left), _tag(right)
-    if not left_tag or left_tag == right_tag:
-        return False
-    return frozenset((left_tag, right_tag)) in hostile_country_pairs(war_rows)
 
 
 def first_zone_contact_fraction(
@@ -57,7 +30,7 @@ def first_zone_contact_fraction(
     zone_center: GeoCoordinate,
     radius_km: float,
 ) -> float | None:
-    """Returns the first point where a direct route enters a circular engagement zone."""
+    """Return the first point where a direct route enters a circular zone."""
     safe_radius = max(0.0, float(radius_km))
     if safe_radius <= 0.0:
         return None
@@ -88,7 +61,7 @@ def first_zone_contact_fraction(
 
 
 def interpolate_geo(start: GeoCoordinate, end: GeoCoordinate, fraction: float) -> GeoCoordinate:
-    """Interpolates a short strategic movement segment with dateline-safe longitude handling."""
+    """Interpolate a short strategic movement segment across the date line safely."""
     clamped = max(0.0, min(1.0, float(fraction)))
     latitude = start.latitude + (end.latitude - start.latitude) * clamped
     longitude_delta = _normalized_longitude(end.longitude - start.longitude)
@@ -99,12 +72,12 @@ def interpolate_geo(start: GeoCoordinate, end: GeoCoordinate, fraction: float) -
 
 
 def distance_to_zone_km(point: GeoCoordinate, zone_center: GeoCoordinate) -> float:
-    """Measures a point against a zone center for assertions and status displays."""
+    """Measure a point against a zone center for assertions and status displays."""
     return _GEOGRAPHY.geo_distance_km(point, zone_center)
 
 
 def zone_edge_north(center: GeoCoordinate, radius_km: float) -> GeoCoordinate:
-    """Provides a nearby geographic edge used to scale the zone marker on the globe."""
+    """Provide a nearby geographic edge used to scale a zone marker on the globe."""
     latitude = center.latitude + max(0.0, float(radius_km)) / _KILOMETERS_PER_LATITUDE_DEGREE
     return GeoCoordinate(latitude=max(-89.5, min(89.5, latitude)), longitude=center.longitude)
 
@@ -118,7 +91,3 @@ def _relative_kilometers(point: GeoCoordinate, origin: GeoCoordinate) -> tuple[f
 
 def _normalized_longitude(value: float) -> float:
     return (float(value) + 180.0) % 360.0 - 180.0
-
-
-def _tag(value: Any) -> str:
-    return str(value or "").strip().upper()

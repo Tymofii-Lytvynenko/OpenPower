@@ -59,10 +59,11 @@ The unit details/overlay projection contains:
 
 ```text
 unit_id, owner, readiness_status, transition_target,
-readiness_progress, readiness_eta_minute, pending_order_type
+readiness_progress, readiness_eta_minute, remaining_minutes, pending_order_type
 ```
 
 The progress bar is determinate only when a transition exists. It is hidden (or rendered as zero) for a stable unit. A transition status label must identify both current and target statuses so `ready -> fortified` is not mistaken for an already fortified unit.
+`remaining_minutes` is derived at read time as `max(0, readiness_eta_minute - current_game_minute)`; the client must not maintain a second independent countdown. Presentation rounds this value to days and hours.
 
 ## Refresh contract
 
@@ -75,7 +76,7 @@ selected_unit_readiness, selected_unit_pending_order
 
 When the signature changes, the presenter rebuilds views and the renderer refreshes markers/overlays. A snapshot with unchanged signature is safe to skip. The client does not infer combat results, advance progress, or write a table.
 
-Snapshot decoding and view projection are bounded, headless-safe operations. They must not wait for graphics initialization, network I/O, or simulation locks; the performance fixture records the update bound for a representative battle snapshot.
+Snapshot decoding and view projection are bounded, headless-safe operations. They must not wait for graphics initialization, network I/O, or simulation locks; the performance fixture records a `<=100 ms` client update bound for a representative payload of `<=2 MB`, while a separate server fixture records `<=250 ms` for one tick resolving 100 concurrent engagements.
 
 ## Panel behavior
 

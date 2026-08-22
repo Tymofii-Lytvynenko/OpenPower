@@ -13,7 +13,8 @@ from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelC
 from modules.base.systems.military.movement_access import MovementAccessPolicy
 from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
 from modules.base.systems.military.readiness_system import ReadinessSystem
-from src.shared.engagement import engagement_radius_km, first_zone_contact_fraction, hostile_country_pairs, interpolate_geo
+from src.core.map.engagement_geometry import engagement_radius_km, first_zone_contact_fraction, interpolate_geo
+from modules.base.systems.military.war_policy import hostile_country_pairs
 
 
 UNIT_TABLE = "units"
@@ -183,6 +184,7 @@ class MilitarySystem(ISystem):
 
     def update(self, state: GameState, delta_time: float) -> None:
         units = self._ensure_units_table(state)
+        self._preflight_contact_transition_interruptions(state, units)
         self._readiness_system.update(state, delta_time)
         units = self._ensure_units_table(state)
         units = self._process_completed_production_orders(state, units)
@@ -198,6 +200,127 @@ class MilitarySystem(ISystem):
         has_new_day = any(isinstance(e, EventNewDay) for e in state.events)
         if has_new_day and not state.time.is_paused and state.time.day % 7 == 1:
             self._update_manpower(state)
+
+    def _preflight_contact_transition_interruptions(self, state: GameState, units: pl.DataFrame) -> None:
+        """Cancel transitions before due processing when contact is already knowable.
+
+        Readiness and movement share one military phase. Looking one movement
+        segment ahead preserves contact-before-completion precedence without
+        making the readiness system depend on the movement implementation.
+        """
+        unit_rows = units.to_dicts()
+        if not unit_rows:
+            return
+        war_table = state.tables.get("countries_wars")
+        war_rows = [] if war_table is None else war_table.to_dicts()
+        hostile_pairs = hostile_country_pairs(war_rows)
+        by_id = {str(row.get("id") or ""): row for row in unit_rows}
+        contact_ids: set[str] = set()
+
+        for action in state.current_actions:
+            if not isinstance(action, ActionAttackUnit):
+                continue
+            attacker = by_id.get(str(action.attacker_unit_id or ""))
+            defender = by_id.get(str(action.defender_unit_id or ""))
+            if not self._valid_hostile_attack(attacker, defender, hostile_pairs, state):
+                continue
+            if self._unit_is_transitioning(state, str(attacker.get("id") or "")):
+                continue
+            if str(attacker.get("readiness_status") or "").strip().lower() == "parked":
+                continue
+            contact_ids.update({str(attacker.get("id") or ""), str(defender.get("id") or "")})
+
+        ordered_rows = sorted(unit_rows, key=lambda row: str(row.get("id") or ""))
+        owners_by_country: dict[str, list[dict[str, Any]]] = {}
+        for row in ordered_rows:
+            owner = str(row.get("owner") or "").strip().upper()
+            if owner:
+                owners_by_country.setdefault(owner, []).append(row)
+        for row in ordered_rows:
+            if str(row.get("engagement_mode") or "").lower() not in {"assault", "positional"}:
+                continue
+            owner = str(row.get("owner") or "").strip().upper()
+            hostile_units = [
+                candidate
+                for enemy in sorted(owners_by_country)
+                if frozenset((owner, enemy)) in hostile_pairs
+                for candidate in owners_by_country[enemy]
+                if int(candidate.get("strength") or 0) > 0
+            ]
+            if hostile_units:
+                contact_ids.add(str(row.get("id") or ""))
+                contact_ids.update(str(candidate.get("id") or "") for candidate in hostile_units)
+        for row in ordered_rows:
+            if not bool(row.get("is_moving")):
+                continue
+            owner = str(row.get("owner") or "").strip().upper()
+            hostile_candidates = [
+                candidate
+                for enemy in sorted(owners_by_country)
+                if frozenset((owner, enemy)) in hostile_pairs
+                for candidate in owners_by_country[enemy]
+            ]
+            if not hostile_candidates:
+                continue
+            departed_value = row.get("departed_at_minute")
+            arrival_value = row.get("arrival_at_minute")
+            departed = int(departed_value if departed_value is not None else state.time.total_minutes)
+            arrival = int(arrival_value if arrival_value is not None else state.time.total_minutes)
+            duration = max(1, arrival - departed)
+            previous_progress = max(0.0, min(1.0, float(row.get("movement_progress") or 0.0)))
+            next_progress = max(
+                0.0,
+                min(1.0, (int(state.time.total_minutes) - departed) / duration),
+            )
+            start = self._interpolate_row_geo(row, previous_progress)
+            end = self._interpolate_row_geo(row, next_progress)
+            contact = self._first_hostile_contact(
+                row,
+                hostile_candidates,
+                start,
+                end,
+                int(state.time.total_minutes),
+            )
+            if contact is not None:
+                contact_ids.update({str(row.get("id") or ""), str(contact[0].get("id") or "")})
+
+        for unit_id in sorted(contact_ids):
+            self._readiness_system.cancel_transition_for_unit(state, unit_id, "combat_contact")
+
+    def _valid_hostile_attack(
+        self,
+        attacker: dict[str, Any] | None,
+        defender: dict[str, Any] | None,
+        hostile_pairs: set[frozenset[str]],
+        state: GameState,
+    ) -> bool:
+        if attacker is None or defender is None or attacker is defender:
+            return False
+        if int(attacker.get("strength") or 0) <= 0 or int(defender.get("strength") or 0) <= 0:
+            return False
+        attacker_owner = str(attacker.get("owner") or "").strip().upper()
+        defender_owner = str(defender.get("owner") or "").strip().upper()
+        return frozenset((attacker_owner, defender_owner)) in hostile_pairs
+
+    def _interpolate_row_geo(self, row: dict[str, Any], progress: float) -> GeoCoordinate:
+        source = GeoCoordinate(
+            latitude=self._row_float(row, "source_latitude", row.get("latitude")),
+            longitude=self._row_float(row, "source_longitude", row.get("longitude")),
+        )
+        target = GeoCoordinate(
+            latitude=self._row_float(row, "target_latitude", row.get("latitude")),
+            longitude=self._row_float(row, "target_longitude", row.get("longitude")),
+        )
+        return interpolate_geo(source, target, progress)
+
+    def _row_float(self, row: dict[str, Any], key: str, fallback: Any = 0.0) -> float:
+        value = row.get(key)
+        if value is None:
+            value = fallback
+        try:
+            return float(value if value is not None else 0.0)
+        except (TypeError, ValueError):
+            return 0.0
 
     def _ensure_units_table(self, state: GameState) -> pl.DataFrame:
         if UNIT_TABLE not in state.tables or state.tables[UNIT_TABLE].is_empty():
@@ -472,17 +595,30 @@ class MilitarySystem(ISystem):
         for action in actions:
             attacker = units_by_id.get(str(action.attacker_unit_id or ""))
             defender = units_by_id.get(str(action.defender_unit_id or ""))
-            if attacker is None or defender is None or attacker is defender:
+            if attacker is None:
+                continue
+            released_fortification = self._release_fortified_for_order(state, attacker)
+            if defender is None or attacker is defender:
+                changed = changed or released_fortification
                 continue
             if int(attacker.get("strength") or 0) <= 0 or int(defender.get("strength") or 0) <= 0:
-                continue
-            if self._unit_is_transitioning(state, str(attacker.get("id") or "")):
-                self._queue_pending_attack(state, action)
+                changed = changed or released_fortification
                 continue
             attacker_owner = str(attacker.get("owner") or "").strip().upper()
             defender_owner = str(defender.get("owner") or "").strip().upper()
             if frozenset((attacker_owner, defender_owner)) not in hostile_pairs:
+                changed = changed or released_fortification
                 continue
+
+            attacker_id = str(attacker.get("id") or "")
+            can_execute = released_fortification or self._readiness_system.prepare_order(state, attacker_id)
+            if not can_execute:
+                self._queue_pending_attack(state, action)
+                continue
+            attacker["readiness_status"] = "ready"
+            attacker["readiness_progress"] = 0.0
+            attacker["readiness_transition_id"] = ""
+            attacker["readiness_eta_minute"] = 0
 
             defender_geo = self._unit_geo_at(defender, now)
             self._stop_unit_at(attacker, defender_geo, now)
@@ -503,7 +639,6 @@ class MilitarySystem(ISystem):
         action_by_unit = {
             action.unit_id: action
             for action in move_actions
-            if action.target_region_id in valid_regions
         }
         if not action_by_unit:
             return units
@@ -519,18 +654,12 @@ class MilitarySystem(ISystem):
             if action is None:
                 rows.append(row)
                 continue
-            if self._unit_is_transitioning(state, str(row.get("id") or "")):
-                self._queue_pending_move(state, action)
-                rows.append(row)
-                continue
-            if str(row.get("engagement_mode") or "").lower() == "positional":
-                row["engagement_mode"] = "assault"
-                rows.append(row)
-                continue
-
-
+            released_fortification = self._release_fortified_for_order(state, row)
             source_region_id = int(row["current_region_id"])
             target_region_id = int(action.target_region_id)
+            if target_region_id not in valid_regions:
+                rows.append(row)
+                continue
             via_regions = [
                 region_by_id.get(int(region_id))
                 for region_id in action.via_region_ids
@@ -550,6 +679,20 @@ class MilitarySystem(ISystem):
                 rows.append(row)
                 continue
 
+            can_execute = released_fortification or self._readiness_system.prepare_order(state, str(row.get("id") or ""))
+            if not can_execute:
+                self._queue_pending_move(state, action)
+                rows.append(row)
+                continue
+            row["readiness_status"] = "ready"
+            row["readiness_progress"] = 0.0
+            row["readiness_transition_id"] = ""
+            row["readiness_eta_minute"] = 0
+            if str(row.get("engagement_mode") or "").lower() == "positional":
+                row["engagement_mode"] = "assault"
+                rows.append(row)
+                continue
+
             duration = self._duration_policy.estimate_between(source_geo, target_geo)
             row["source_region_id"] = source_region_id
             row["source_latitude"] = source_geo.latitude
@@ -565,11 +708,26 @@ class MilitarySystem(ISystem):
 
         return self._units_from_rows(rows)
 
+    def _release_fortified_for_order(self, state: GameState, unit: dict[str, Any]) -> bool:
+        """Release a stable fortified posture before validating an order's route."""
+        unit_id = str(unit.get("id") or "")
+        if str(unit.get("readiness_status") or "").strip().lower() != "fortified":
+            return False
+        if self._unit_is_transitioning(state, unit_id):
+            return False
+        if not self._readiness_system.prepare_order(state, unit_id):
+            return False
+        unit["readiness_status"] = "ready"
+        unit["readiness_progress"] = 0.0
+        unit["readiness_transition_id"] = ""
+        unit["readiness_eta_minute"] = 0
+        return True
+
     def _unit_is_transitioning(self, state: GameState, unit_id: str) -> bool:
         transitions = state.tables.get("unit_readiness_transitions")
         return transitions is not None and not transitions.is_empty() and "unit_id" in transitions.columns and transitions.filter(pl.col("unit_id") == unit_id).height > 0
 
-    def _queue_pending_move(self, state: GameState, action: ActionMoveUnit) -> None:
+    def _queue_pending_move(self, state: GameState, action: ActionMoveUnit) -> str:
         pending = self._ensure_pending_table(state.tables.get("unit_pending_orders"))
         rows = [row for row in pending.to_dicts() if str(row.get("unit_id") or "") != str(action.unit_id)]
         order_id = f"pending-{action.unit_id}-move-{state.time.total_minutes}"
@@ -582,8 +740,9 @@ class MilitarySystem(ISystem):
         })
         state.update_table("unit_pending_orders", pl.DataFrame(rows, schema=self._pending_schema()))
         self._attach_pending_to_transition(state, action.unit_id, order_id)
+        return order_id
 
-    def _queue_pending_attack(self, state: GameState, action: ActionAttackUnit) -> None:
+    def _queue_pending_attack(self, state: GameState, action: ActionAttackUnit) -> str:
         pending = self._ensure_pending_table(state.tables.get("unit_pending_orders"))
         rows = [row for row in pending.to_dicts() if str(row.get("unit_id") or "") != str(action.attacker_unit_id)]
         order_id = f"pending-{action.attacker_unit_id}-attack-{state.time.total_minutes}"
@@ -595,6 +754,7 @@ class MilitarySystem(ISystem):
         })
         state.update_table("unit_pending_orders", pl.DataFrame(rows, schema=self._pending_schema()))
         self._attach_pending_to_transition(state, action.attacker_unit_id, order_id)
+        return order_id
 
     def _attach_pending_to_transition(self, state: GameState, unit_id: str, order_id: str) -> None:
         transitions = state.tables.get("unit_readiness_transitions")
@@ -677,18 +837,20 @@ class MilitarySystem(ISystem):
                 row["is_moving"] = False
                 continue
 
-            departed_at = int(row.get("departed_at_minute") or current_minute)
-            arrival_at = int(row.get("arrival_at_minute") or current_minute)
+            departed_value = row.get("departed_at_minute")
+            arrival_value = row.get("arrival_at_minute")
+            departed_at = int(departed_value if departed_value is not None else current_minute)
+            arrival_at = int(arrival_value if arrival_value is not None else current_minute)
             duration = max(1, arrival_at - departed_at)
             previous_progress = max(0.0, min(1.0, float(row.get("movement_progress") or 0.0)))
             progress = max(0.0, min(1.0, (current_minute - departed_at) / duration))
             source_geo = GeoCoordinate(
-                latitude=float(row.get("source_latitude") or row.get("latitude") or 0.0),
-                longitude=float(row.get("source_longitude") or row.get("longitude") or 0.0),
+                latitude=self._row_float(row, "source_latitude", row.get("latitude")),
+                longitude=self._row_float(row, "source_longitude", row.get("longitude")),
             )
             target_geo = GeoCoordinate(
-                latitude=float(row.get("target_latitude") or row.get("latitude") or 0.0),
-                longitude=float(row.get("target_longitude") or row.get("longitude") or 0.0),
+                latitude=self._row_float(row, "target_latitude", row.get("latitude")),
+                longitude=self._row_float(row, "target_longitude", row.get("longitude")),
             )
             previous_geo = interpolate_geo(source_geo, target_geo, previous_progress)
             next_geo = interpolate_geo(source_geo, target_geo, progress)
@@ -743,27 +905,44 @@ class MilitarySystem(ISystem):
             )
             if fraction is None:
                 continue
-            if best_contact is None or fraction < best_contact[1]:
+            # Stop at the first route contact; region and unit IDs make exact
+            # fraction ties deterministic across equivalent snapshots.
+            candidate_key = (
+                round(float(fraction), 12),
+                int(defender.get("current_region_id") or 0) if int(defender.get("current_region_id") or 0) > 0 else 2**31,
+                str(defender.get("id") or ""),
+            )
+            best_key = None
+            if best_contact is not None:
+                best_defender, best_fraction = best_contact
+                best_key = (
+                    round(float(best_fraction), 12),
+                    int(best_defender.get("current_region_id") or 0) if int(best_defender.get("current_region_id") or 0) > 0 else 2**31,
+                    str(best_defender.get("id") or ""),
+                )
+            if best_contact is None or candidate_key < best_key:
                 best_contact = (defender, fraction)
         return best_contact
 
     def _unit_geo_at(self, row: dict[str, Any], current_minute: int) -> GeoCoordinate:
         current_geo = GeoCoordinate(
-            latitude=float(row.get("latitude") or 0.0),
-            longitude=float(row.get("longitude") or 0.0),
+            latitude=self._row_float(row, "latitude"),
+            longitude=self._row_float(row, "longitude"),
         )
         if not bool(row.get("is_moving")) or int(row.get("target_region_id") or NO_TARGET_REGION) <= 0:
             return current_geo
         source_geo = GeoCoordinate(
-            latitude=float(row.get("source_latitude") or current_geo.latitude),
-            longitude=float(row.get("source_longitude") or current_geo.longitude),
+            latitude=self._row_float(row, "source_latitude", current_geo.latitude),
+            longitude=self._row_float(row, "source_longitude", current_geo.longitude),
         )
         target_geo = GeoCoordinate(
-            latitude=float(row.get("target_latitude") or current_geo.latitude),
-            longitude=float(row.get("target_longitude") or current_geo.longitude),
+            latitude=self._row_float(row, "target_latitude", current_geo.latitude),
+            longitude=self._row_float(row, "target_longitude", current_geo.longitude),
         )
-        departed_at = int(row.get("departed_at_minute") or current_minute)
-        arrival_at = int(row.get("arrival_at_minute") or current_minute)
+        departed_value = row.get("departed_at_minute")
+        arrival_value = row.get("arrival_at_minute")
+        departed_at = int(departed_value if departed_value is not None else current_minute)
+        arrival_at = int(arrival_value if arrival_value is not None else current_minute)
         progress = max(0.0, min(1.0, (current_minute - departed_at) / max(1, arrival_at - departed_at)))
         return interpolate_geo(source_geo, target_geo, progress)
 

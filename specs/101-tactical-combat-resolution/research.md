@@ -19,14 +19,14 @@ The MVP uses game-time durations expressed in days and converts them through the
 
 | From | To | Duration | Rationale |
 |------|----|----------|-----------|
-| `PARKED` | `READY` | 4 game days | Mobilizing a parked formation is deliberately slower than returning from a field posture. |
-| `READY` | `PARKED` | 2 game days | Standing down is shorter than mobilization. |
+| `PARKED` | `READY` | 2 game days | Preserve the current implementation and keep the first mobilization interval short enough for the MVP feedback loop. |
+| `READY` | `PARKED` | 0 game days | Preserve the current implementation's immediate stand-down behavior. |
 | `READY` | `FORTIFIED` | 2 game days | The exact reference duration was not available, so the MVP uses a configurable symmetric default. |
 | `FORTIFIED` | `READY` | 0 game days | Leaving a fixed defensive posture is immediate. |
 
-`PARKED -> FORTIFIED` is never a direct jump. It is a persisted two-stage sequence (`PARKED -> READY`, then `READY -> FORTIFIED`) and therefore takes 6 game days at the defaults. Duration constants belong to a small readiness policy so balancing can change them without changing table shape or UI contracts.
+`PARKED -> FORTIFIED` is never a direct jump. It is a persisted two-stage sequence (`PARKED -> READY`, then `READY -> FORTIFIED`) and therefore takes 4 game days at the MVP defaults. Duration constants belong to a small readiness policy so balancing can change them without changing table shape or UI contracts.
 
-Progress is `0.0` at transition start and reaches `1.0` only when the simulation clock reaches the stored completion timestamp. A paused simulation does not advance timestamps. Save/load restores the timestamps and pending stage, so a resumed game continues at the same progress.
+Progress is `0.0` at transition start and reaches `1.0` only when the simulation clock reaches the stored completion timestamp. The completion timestamp is the authoritative ETA; remaining minutes are derived from it at read time and are never stored as a second countdown. A paused simulation does not advance timestamps. Save/load restores the timestamps and pending stage, so a resumed game continues at the same progress.
 
 ## 3. Readiness behavior and combat contribution
 
@@ -58,7 +58,7 @@ The resolver reads the existing war and treaty tables, expands side membership d
 
 For an engagement-zone contact that does not yet share a region, the battle region is the lowest positive `current_region_id` among contact units, with unit ID as the tie-breaker. Units still moving do not contribute until they are stationary in that anchor region.
 
-Combat resolves aggregate weighted strength for the two sides. The existing deterministic loss policy remains the baseline; readiness-weighted strength is the only new combat input in this MVP. A side may contain any number of countries, but a battle never creates a third opposing aggregate. If both sides reach zero in the same deterministic round, the result is a draw: the battle is concluded with an empty victor side, no controller transfer, and the region remains contested. This avoids choosing a winner from iteration order.
+Combat resolves aggregate weighted strength for the two sides. The existing deterministic loss policy remains the baseline: positional rounds resolve on each new in-game hour, assault actions may resolve immediately, readiness-weighted strength is the only new combat input, and a strength ratio of at least `2.5:1` uses the decisive-advantage branch. A side may contain any number of countries, but a battle never creates a third opposing aggregate. If both sides reach zero in the same deterministic round, the result is a draw: the battle is concluded with an empty victor side, no controller transfer, and the region remains contested. This avoids choosing a winner from iteration order.
 
 ## 6. Battle lifecycle and status interface
 
@@ -90,4 +90,4 @@ Combat victory changes `regions.controller` and creates or updates an occupation
 
 ## 9. Verification strategy
 
-Use focused `unittest` modules for transition boundaries, interrupted/persisted progress, same-minute precedence, alliance resolution including engagement-zone contact, battle lifecycle events, zero-strength removal/draw, occupation, and snapshot shape. Keep existing combat and engagement tests as regression coverage. Add a deterministic replay fixture, a headless smoke scenario with 100 concurrent engagements, and a bounded client snapshot-consumption check that does not initialize graphics or network I/O. UI validation uses the existing presenter and renderer interfaces with snapshot fixtures rather than requiring a live graphics context.
+Use focused `unittest` modules for transition boundaries, interrupted/persisted progress, same-minute precedence, alliance resolution including engagement-zone contact, battle lifecycle events, zero-strength removal/draw, occupation, and snapshot shape. Keep existing combat and engagement tests as regression coverage. Add a deterministic replay fixture, a headless smoke scenario with 100 concurrent engagements and a `≤250 ms` server tick budget, and a bounded client snapshot-consumption check with a `≤100 ms` budget and `≤2 MB` representative payload; neither check may initialize graphics or network I/O. UI validation uses the existing presenter and renderer interfaces with snapshot fixtures rather than requiring a live graphics context.

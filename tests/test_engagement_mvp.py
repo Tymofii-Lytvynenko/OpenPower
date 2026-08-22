@@ -6,7 +6,7 @@ from modules.base.systems.military.combat_system import CombatSystem
 from modules.base.systems.military.military_system import MilitarySystem, UnitFactory
 from src.core.map.geo import GeoCoordinate
 from src.shared.actions import ActionAttackUnit, ActionMoveUnit
-from src.shared.engagement import ENGAGEMENT_RADIUS_KM, distance_to_zone_km
+from src.core.map.engagement_geometry import ENGAGEMENT_RADIUS_KM, distance_to_zone_km
 from src.shared.state import GameState
 
 
@@ -107,6 +107,8 @@ class EngagementMvpTest(unittest.TestCase):
         factory = UnitFactory()
         usa = factory.create("usa-1", "USA", "army", 100, 1, GeoCoordinate(0.0, 0.0), 0)
         canada = factory.create("can-1", "CAN", "army", 100, 2, GeoCoordinate(0.0, 10.0), 0)
+        usa["readiness_status"] = "ready"
+        canada["readiness_status"] = "ready"
         return GameState(
             tables={
                 "countries": pl.DataFrame({"id": ["USA", "CAN"], "military_count": [100, 100]}),

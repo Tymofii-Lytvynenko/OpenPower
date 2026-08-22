@@ -11,6 +11,14 @@
 - **Alliance eligibility**: only a direct active military/defensive alliance with a country already on a battle side can add an ally. Alliances are not transitive. An ambiguous ally assignment is omitted for that tick and produces a diagnostic event; it never creates a third side.
 - **Occupation resistance**: occupation exposes `resistance=0.0` as a deterministic MVP value. No separate resistance simulation is included.
 
+### Session 2026-08-23
+
+- Q: Which combat-round formula should be canonical for the MVP? → A: Option A — preserve the existing deterministic combat policy: resolve positional rounds on each new in-game hour, use readiness-weighted effective strength, apply the existing positional/assault intensity and 2.5× decisive-advantage branch, and conclude a side only when its strength reaches zero.
+- Q: Which readiness timing contract should be canonical for the MVP? → A: Option B — preserve the current implementation: `PARKED → READY` takes two game days, `READY → PARKED` is immediate, `READY → FORTIFIED` takes two game days, `FORTIFIED → READY` is immediate, and `PARKED → FORTIFIED` remains two ordered two-day stages.
+- Q: Which performance budget should define the MVP validation gate? → A: Option A — validate 100 simultaneous active engagements with one server resolution tick at or below 250 ms, headless client snapshot consumption at or below 100 ms, and a snapshot payload at or below 2 MB.
+- Q: How should readiness transition remaining time be stored and displayed? → A: Option A — persist the authoritative absolute `eta_minute`, derive `remaining_minutes=max(0, eta_minute-current_game_minute)`, and display the remaining time in rounded days and hours.
+- Q: Which canonical casing should readiness statuses use in state tables and the UI? → A: Option A — store lowercase machine values (`parked`, `ready`, `fortified`) and render uppercase/title-case labels in the spec and UI.
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Manage Unit Readiness (Priority: P1)
@@ -24,12 +32,12 @@ As a national military commander, I want to place units into parked, ready, or f
 **Acceptance Scenarios**:
 
 1. **Given** a newly deployed unit, **When** no readiness order is issued, **Then** the unit remains `PARKED`.
-2. **Given** a `PARKED` unit, **When** the commander requests `READY`, **Then** the unit remains parked while a four-day transition progresses and becomes ready only when the transition completes.
-3. **Given** a `READY` unit, **When** the commander requests `PARKED`, **Then** a two-day transition is shown and the unit becomes parked at completion.
+2. **Given** a `PARKED` unit, **When** the commander requests `READY`, **Then** the unit remains parked while a two-day transition progresses and becomes ready only when the transition completes.
+3. **Given** a `READY` unit, **When** the commander requests `PARKED`, **Then** the status changes immediately and no transition row is created.
 4. **Given** a `READY` unit, **When** the commander requests `FORTIFIED`, **Then** a two-day transition is shown and the unit becomes fortified at completion.
 5. **Given** a `FORTIFIED` unit, **When** the commander requests `READY`, **Then** the status changes immediately.
-6. **Given** a `PARKED` unit, **When** the commander requests `FORTIFIED`, **Then** the unit first completes the transition to `READY` and then completes the fortification transition before becoming fortified.
-7. **Given** a unit with an active status transition, **When** the commander views the unit on the map or in the unit details view, **Then** the current status, target status, progress, and estimated remaining time are visible.
+6. **Given** a `PARKED` unit, **When** the commander requests `FORTIFIED`, **Then** the unit first completes a two-day transition to `READY` and then completes a second two-day fortification transition before becoming fortified.
+7. **Given** a unit with an active status transition, **When** the commander views the unit on the map or in the unit details view, **Then** the current status, target status, progress, and a derived remaining-time estimate are visible; the estimate is calculated from the persisted completion minute and the current game minute and is displayed in rounded days and hours.
 
 ---
 
@@ -121,9 +129,9 @@ As a victorious commander, I want the conquered region to retain its political o
 
 ## Functional Requirements
 
-- **FR-001**: Every military unit MUST have one stable readiness status: `PARKED`, `READY`, or `FORTIFIED`.
-- **FR-002**: Readiness changes MUST be asynchronous and MUST expose current status, target status, progress from 0 to 1, and estimated remaining game time.
-- **FR-003**: The default readiness durations MUST be four game days for `PARKED → READY`, two game days for `READY → PARKED`, two game days for `READY → FORTIFIED`, and zero time for `FORTIFIED → READY`.
+- **FR-001**: Every military unit MUST have one stable readiness status using the canonical lowercase machine values `parked`, `ready`, or `fortified`; uppercase/title-case forms (`PARKED`, `READY`, `FORTIFIED`) are presentation labels only.
+- **FR-002**: Readiness changes MUST be asynchronous and MUST expose current status, target status, progress from 0 to 1, the authoritative absolute `eta_minute`, and a derived `remaining_minutes=max(0, eta_minute-current_game_minute)`. The client MUST display the derived remaining time in rounded days and hours without persisting a second countdown value.
+- **FR-003**: The MVP readiness durations MUST be two game days for `PARKED → READY`, zero time for `READY → PARKED`, two game days for `READY → FORTIFIED`, and zero time for `FORTIFIED → READY`. A `PARKED → FORTIFIED` request MUST use two ordered two-day stages.
 - **FR-004**: `PARKED → FORTIFIED` MUST execute as two ordered transitions, first to `READY` and then to `FORTIFIED`.
 - **FR-005**: Movement and attack orders MUST not bypass an active readiness transition. The latest valid order MUST replace the existing pending order, an invalid order MUST leave the existing pending order unchanged, and a valid pending order MUST execute only after the transition completes.
 - **FR-006**: Movement or attack MUST cancel `FORTIFIED`; a fortified unit MUST become `READY` before the order executes.
@@ -131,7 +139,7 @@ As a victorious commander, I want the conquered region to retain its political o
 - **FR-008**: The engine MUST automatically create one tracked battle when hostile forces contact each other in the same region or engagement zone. For an engagement-zone contact, the battle region MUST be the lowest positive current region ID among the contact units, with unit ID as the tie-breaker, and only stationary units in that region contribute to the first round.
 - **FR-009**: Each battle MUST contain exactly two sides, and each side MAY contain multiple countries, including eligible military allies.
 - **FR-010**: Allied participation MUST require a direct active military or defensive alliance with a country already on the side and a valid stationary presence in the engagement; alliance chains MUST NOT be transitive, neutral countries MUST not join automatically, and ambiguous assignments MUST be omitted with a diagnostic event.
-- **FR-011**: Combat rounds MUST apply deterministic outcomes based on unit strength and readiness status. Units whose strength reaches zero MUST be removed; simultaneous zero strength MUST produce a draw without occupation. Terrain type, regional fortification data, supply factor, and full logistics MUST be outside this MVP.
+- **FR-011**: Combat rounds MUST apply the canonical deterministic combat policy: positional rounds resolve on each new in-game hour, assault actions may resolve immediately, each side uses readiness-weighted effective strength (`PARKED=0.25`, `READY=1.0`, `FORTIFIED=1.5`), the existing positional/assault intensity is preserved, and a strength ratio of at least `2.5:1` uses the decisive-advantage branch. A side is defeated only when its strength reaches zero; units at zero strength are removed, and simultaneous zero strength produces a draw without occupation. Terrain type, regional fortification data, supply factor, and full logistics MUST be outside this MVP.
 - **FR-012**: Battle lifecycle state MUST distinguish at least `ACTIVE`, `STALEMATE`, and `CONCLUDED`.
 - **FR-013**: Battle state changes MUST emit semantic start, update, and conclusion events that are available to the client through the existing state synchronization path.
 - **FR-014**: The battle status interface MUST display both sides, country membership, allied contributions, strength balance, cumulative losses, readiness distribution, round information, lifecycle status, and battle region.
@@ -142,8 +150,8 @@ As a victorious commander, I want the conquered region to retain its political o
 
 ## Key Entities & Data Model
 
-- **UnitReadiness**: Stable status of a unit (`PARKED`, `READY`, or `FORTIFIED`) and the combat readiness modifier associated with that status.
-- **StatusTransition**: The requested target status, transition stage, start time, completion time, progress, and optional pending movement or attack order.
+- **UnitReadiness**: Stable status of a unit using canonical lowercase values (`parked`, `ready`, or `fortified`) and the combat readiness modifier associated with that status.
+- **StatusTransition**: The requested target status, transition stage, start time, authoritative completion minute (`eta_minute`), progress, and optional pending movement or attack order; remaining time is derived at read time.
 - **CombatEngagement**: Battle identifier, region, conflict identifier, lifecycle status, round number, start time, last update time, side membership, current balance, and cumulative losses.
 - **CombatParticipant**: Unit and country membership within one of the two battle sides, including ally role, current strength, readiness status, and contribution.
 - **OccupationStatus**: Region, military controller, garrison strength, resistance value, occupation start time, and contested state.
@@ -162,7 +170,7 @@ The MVP does not add terrain classification, regional fortification levels, supp
 - **SC-005**: Allied participants are displayed on the correct side in 100% of valid alliance scenarios, while neutral participants remain outside the battle sides.
 - **SC-006**: Players can identify both sides, allied contributions, current balance, losses, readiness states, and lifecycle status from the battle interface without opening raw state data.
 - **SC-007**: A concluded victory updates visible military control within one client state update while preserving political ownership.
-- **SC-008**: Validation covers at least 100 simultaneous active engagements without blocking the simulation step or client update loop, including a bounded headless snapshot-consumption check independent of graphics and network I/O; a 500-engagement performance target remains a post-MVP benchmark.
+- **SC-008**: Validation MUST cover at least 100 simultaneous active engagements without blocking the simulation step or client update loop. One server resolution tick MUST complete in `≤250 ms`, headless client snapshot consumption independent of graphics and network I/O MUST complete in `≤100 ms`, and the representative snapshot payload MUST be `≤2 MB`. A 500-engagement performance target remains a post-MVP benchmark.
 
 ## Assumptions & Dependencies
 

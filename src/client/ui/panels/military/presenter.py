@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import polars as pl
 
@@ -72,9 +72,19 @@ class BattleStatusView:
     round: int
     participants: tuple[BattleParticipantView, ...]
     occupation: dict
+    readiness_distribution: dict[str, int] = field(default_factory=dict)
+    region_name: str = ""
+    started_at_minute: int = 0
+    updated_at_minute: int = 0
+    concluded_at_minute: int = 0
+    victor_side: str = ""
 
 
 class MilitaryPresenter:
+    def __init__(self) -> None:
+        self._battle_view_cache_key: tuple | None = None
+        self._battle_view_cache: dict[str, object] = {}
+
     def build_summary(self, state, country_tag: str) -> MilitarySummaryViewModel:
         units = self._country_units(state, country_tag)
         buckets = {
@@ -319,34 +329,30 @@ class MilitaryPresenter:
         battles = state.tables.get("battles")
         if battles is None or battles.is_empty() or "id" not in battles.columns:
             return None
-        matches = battles.filter(pl.col("id") == battle_id)
-        if matches.is_empty():
+        index = self._battle_view_index(state)
+        row = index["battles"].get(str(battle_id))
+        if row is None:
             return None
-        row = matches.to_dicts()[0]
-        participants_table = state.tables.get("battle_participants")
-        unit_table = state.tables.get("battle_units")
         readiness_by_country: dict[str, set[str]] = {}
-        if unit_table is not None and not unit_table.is_empty():
-            for unit in unit_table.filter(pl.col("battle_id") == battle_id).to_dicts():
-                readiness_by_country.setdefault(safe_text(unit.get("country_id")), set()).add(safe_text(unit.get("readiness_status"), "ready"))
+        readiness_distribution = {"parked": 0, "ready": 0, "fortified": 0}
+        for unit in index["battle_units"].get(str(battle_id), ()):
+            readiness = safe_text(unit.get("readiness_status"), "ready").strip().lower()
+            readiness_by_country.setdefault(safe_text(unit.get("country_id")), set()).add(readiness)
+            if readiness in readiness_distribution:
+                readiness_distribution[readiness] += 1
         participants: list[BattleParticipantView] = []
-        if participants_table is not None and not participants_table.is_empty():
-            for participant in participants_table.filter(pl.col("battle_id") == battle_id).sort("country_id").to_dicts():
-                country_id = safe_text(participant.get("country_id"))
-                participants.append(BattleParticipantView(
-                    country_id=country_id,
-                    side=safe_text(participant.get("side")),
-                    role=safe_text(participant.get("role"), "principal"),
-                    unit_count=safe_int(participant.get("unit_count"), 0),
-                    weighted_strength=safe_float(participant.get("weighted_strength"), 0.0),
-                    readiness=tuple(sorted(readiness_by_country.get(country_id, {"ready"}))),
-                ))
-        occupation = {}
-        occupations = state.tables.get("occupations")
-        if occupations is not None and not occupations.is_empty() and "region_id" in occupations.columns:
-            matches = occupations.filter(pl.col("region_id") == int(row.get("region_id") or 0))
-            if not matches.is_empty():
-                occupation = matches.to_dicts()[0]
+        for participant in index["participants"].get(str(battle_id), ()):
+            country_id = safe_text(participant.get("country_id"))
+            participants.append(BattleParticipantView(
+                country_id=country_id,
+                side=safe_text(participant.get("side")),
+                role=safe_text(participant.get("role"), "principal"),
+                unit_count=safe_int(participant.get("unit_count"), 0),
+                weighted_strength=safe_float(participant.get("weighted_strength"), 0.0),
+                readiness=tuple(sorted(readiness_by_country.get(country_id, {"ready"}))),
+            ))
+        occupation = index["occupations"].get(int(row.get("region_id") or 0), {})
+        region_name = index["regions"].get(int(row.get("region_id") or 0), f"Region {int(row.get('region_id') or 0)}")
         return BattleStatusView(
             battle_id=safe_text(row.get("id"), battle_id),
             region_id=safe_int(row.get("region_id"), 0),
@@ -362,7 +368,57 @@ class MilitaryPresenter:
             round=safe_int(row.get("round"), 0),
             participants=tuple(participants),
             occupation=occupation,
+            readiness_distribution=readiness_distribution,
+            region_name=region_name,
+            started_at_minute=safe_int(row.get("started_at_minute"), 0),
+            updated_at_minute=safe_int(row.get("updated_at_minute"), 0),
+            concluded_at_minute=safe_int(row.get("concluded_at_minute"), 0),
+            victor_side=safe_text(row.get("victor_side"), ""),
         )
+
+    def _battle_view_index(self, state) -> dict[str, object]:
+        revisions = getattr(state, "table_revisions", {})
+        key = (
+            id(state),
+            tuple(
+                (name, int(revisions.get(name, 0)))
+                for name in ("battles", "battle_units", "battle_participants", "occupations", "regions")
+            ),
+        )
+        if key == self._battle_view_cache_key:
+            return self._battle_view_cache
+
+        battles = state.tables.get("battles")
+        battle_rows = battles.to_dicts() if battles is not None and not battles.is_empty() else []
+        battle_units = state.tables.get("battle_units")
+        participant_table = state.tables.get("battle_participants")
+        occupations = state.tables.get("occupations")
+        regions = state.tables.get("regions")
+        units_by_battle: dict[str, list[dict]] = {}
+        for row in (battle_units.to_dicts() if battle_units is not None and not battle_units.is_empty() else []):
+            units_by_battle.setdefault(str(row.get("battle_id") or ""), []).append(row)
+        participants_by_battle: dict[str, list[dict]] = {}
+        for row in (participant_table.to_dicts() if participant_table is not None and not participant_table.is_empty() else []):
+            participants_by_battle.setdefault(str(row.get("battle_id") or ""), []).append(row)
+        for rows in participants_by_battle.values():
+            rows.sort(key=lambda row: safe_text(row.get("country_id")))
+        occupation_by_region = {
+            int(row.get("region_id") or 0): row
+            for row in (occupations.to_dicts() if occupations is not None and not occupations.is_empty() else [])
+        }
+        region_names = {
+            int(row.get("id") or 0): safe_text(row.get("name"), f"Region {int(row.get('id') or 0)}")
+            for row in (regions.to_dicts() if regions is not None and not regions.is_empty() else [])
+        }
+        self._battle_view_cache = {
+            "battles": {str(row.get("id") or ""): row for row in battle_rows},
+            "battle_units": units_by_battle,
+            "participants": participants_by_battle,
+            "occupations": occupation_by_region,
+            "regions": region_names,
+        }
+        self._battle_view_cache_key = key
+        return self._battle_view_cache
 
     def strategic_inventory_for_country(self, state, country_tag: str) -> list[dict]:
         inventory = state.tables.get("strategic_weapons")

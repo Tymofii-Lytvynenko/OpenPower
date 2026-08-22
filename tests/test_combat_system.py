@@ -50,7 +50,8 @@ class TestCombatSystem(unittest.TestCase):
         regions = state.get_table("regions")
         countries = state.get_table("countries")
 
-        self.assertEqual(len(battles), 0)
+        self.assertEqual(len(battles), 1)
+        self.assertEqual(battles["status"][0], "concluded")
         self.assertEqual(len(units), 1)
         self.assertEqual(units["owner"][0], "USA")
         self.assertEqual(regions["controller"][0], "USA")

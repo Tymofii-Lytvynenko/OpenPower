@@ -43,9 +43,12 @@ class RegionInspectorPanel:
                 occupation_row = occupation.to_dicts()[0]
                 imgui.separator()
                 imgui.text("Military occupation")
+                imgui.text(f"Controller: {occupation_row.get('controller_country_id', row.get('controller', 'N/A'))}")
                 imgui.text(f"Garrison: {int(occupation_row.get('garrison_strength') or 0)}")
                 imgui.text(f"Resistance: {float(occupation_row.get('resistance') or 0.0):.1f}")
                 imgui.text(f"Status: {occupation_row.get('occupation_status', 'active')}")
+                imgui.text(f"Started: {int(occupation_row.get('started_at_minute') or 0)}")
+                imgui.text(f"Contested: {'Yes' if bool(occupation_row.get('contested')) else 'No'}")
         imgui.text(f"Biome: {row.get('biome', 'N/A')}")
 
         if on_focus and imgui.button("Center Camera"):

@@ -6,7 +6,7 @@ The wire values are lowercase strings:
 
 ```text
 readiness_status: parked | ready | fortified
-transition_stage: direct | to_ready | to_fortified
+transition_stage: direct | parked_to_ready | parked_to_fortified | ready_to_fortified
 pending_order_status: queued | released | canceled | rejected
 ```
 
@@ -30,19 +30,20 @@ readiness_status: str
 readiness_transition_id: str
 readiness_progress: float  # [0.0, 1.0]
 readiness_eta_minute: int
+remaining_minutes: int  # derived, never persisted as a second countdown
 ```
 
-When `readiness_transition_id` is empty, progress is `0.0` and ETA is `0`. During a transition, `readiness_status` remains the last completed status, while the target and timing are read from the transition row. The server clamps progress and derives it from simulation time; clients must not extrapolate or submit progress.
+When `readiness_transition_id` is empty, progress is `0.0`, ETA is `0`, and `remaining_minutes` is `0`. During a transition, `readiness_status` remains the last completed status, while the target and timing are read from the transition row. The server clamps progress and persists the absolute ETA; `remaining_minutes=max(0, readiness_eta_minute-current_game_minute)` is derived for presentation. Clients must not extrapolate or submit progress.
 
 ## Transition rules
 
 | Current | Requested | Server result |
 |---------|-----------|---------------|
-| `parked` | `ready` | Schedule 4 game days. |
-| `ready` | `parked` | Schedule 2 game days. |
+| `parked` | `ready` | Schedule 2 game days. |
+| `ready` | `parked` | Complete immediately. |
 | `ready` | `fortified` | Schedule 2 game days. |
 | `fortified` | `ready` | Complete immediately. |
-| `parked` | `fortified` | Schedule `to_ready` for 4 days, then `to_fortified` for 2 days. |
+| `parked` | `fortified` | Schedule `parked_to_ready` for 2 days, then `ready_to_fortified` for 2 days. |
 | any | current stable status | No-op if no transition; an explicit request cancels an incompatible transition and pending order. |
 
 At each simulation update the readiness system:
@@ -96,4 +97,4 @@ Events are server-generated, ordered by `(simulation_minute, unit_id, transition
 
 ## Client presentation
 
-The unit overlay displays the stable status icon/label. When a transition is active, it additionally displays target status, a determinate progress bar, and ETA. The UI disables or explains commands that will wait for readiness but does not silently change the action payload.
+The unit overlay displays the stable status icon/label. When a transition is active, it additionally displays target status, a determinate progress bar, and the derived remaining time in rounded days and hours. The UI disables or explains commands that will wait for readiness but does not silently change the action payload.

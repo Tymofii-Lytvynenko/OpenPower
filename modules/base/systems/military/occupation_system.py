@@ -77,7 +77,11 @@ class OccupationSystem(ISystem):
                 "garrison_strength": garrison,
                 "resistance": 0.0,
                 "occupation_status": "active" if garrison > 0 else "contested",
-                "started_at_minute": int(previous.get("started_at_minute") or now),
+                "started_at_minute": int(
+                    previous.get("started_at_minute")
+                    if previous.get("started_at_minute") is not None
+                    else now
+                ),
                 "updated_at_minute": now,
                 "contested": garrison <= 0,
             }
