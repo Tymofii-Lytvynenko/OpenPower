@@ -6,6 +6,7 @@ from enum import Enum, auto
 from src.client.controllers.camera_controller import CameraController
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.services.network_client_service import NetworkClient
+from src.client.utils.coords_util import calculate_centroid
 
 # Strategy Imports
 from src.client.visualization.map_modes.base_map_mode import BaseMapMode
@@ -42,6 +43,7 @@ class ViewportController:
         self.selected_country_tag: Optional[str] = None
         self.show_all_units: bool = False
         self.show_engagement_zones: bool = True
+        self._map_layer_cache_key: tuple | None = None
 
         # --- MAP MODES (Composition) ---
         self.map_modes: Dict[str, BaseMapMode] = {
@@ -139,11 +141,13 @@ class ViewportController:
 
     # --- VISUALIZATION HELPERS ---
 
-    def refresh_map_layer(self):
-        state = self.net.get_state()
+    def refresh_map_layer(self, state=None):
+        if state is None:
+            state = self.net.get_state()
         
         # Safety check if we are in 'terrain' mode or invalid key
         if self.current_mode_key not in self.map_modes:
+            self._map_layer_cache_key = self._map_layer_state_key(state)
             return
 
         active_mode = self.map_modes[self.current_mode_key]
@@ -156,6 +160,40 @@ class ViewportController:
             opacity=active_mode.opacity
         )
         self.renderer.update_overlay(color_map)
+        self._map_layer_cache_key = self._map_layer_state_key(state)
+
+    def refresh_map_layer_if_stale(self, state=None) -> bool:
+        """Refresh the map overlay only after relevant state has changed."""
+        if state is None:
+            state = self.net.get_state()
+
+        cache_key = self._map_layer_state_key(state)
+        if cache_key == self._map_layer_cache_key:
+            return False
+
+        self.refresh_map_layer(state)
+        return True
+
+    def _map_layer_state_key(self, state) -> tuple:
+        revisions = getattr(state, "table_revisions", {})
+        mode = self.current_mode_key
+        selected_country = self.selected_country_tag if mode == "empire" else None
+        if mode == "political":
+            source_revisions = (int(revisions.get("regions", 0)),)
+        elif mode == "empire":
+            source_revisions = (
+                int(revisions.get("regions", 0)),
+                int(revisions.get("countries_treaties", 0)),
+                int(revisions.get("countries_wars", 0)),
+                int(revisions.get("annexation_claims", 0)),
+            )
+        else:
+            source_revisions = (
+                int(revisions.get("regions", 0)),
+                int(revisions.get("countries", 0)),
+            )
+
+        return (mode, selected_country, *source_revisions)
 
     def refresh_political_layer(self):
         self.set_map_mode("political")
@@ -201,6 +239,69 @@ class ViewportController:
         self.cam.zoom_scroll(scroll_y)
 
     # --- SELECTION LOGIC ---
+    def focus_on_country(self, country_tag: str | None) -> Optional[int]:
+        """Focus and select a country exactly as a country-mode map click would."""
+        normalized_tag = str(country_tag).strip() if country_tag else ""
+        if not normalized_tag:
+            return None
+
+        state = self.net.get_state()
+        regions = getattr(state, "tables", {}).get("regions")
+        if regions is None or regions.is_empty():
+            return None
+
+        authority_col = "controller" if "controller" in regions.columns else "owner"
+        if authority_col not in regions.columns or "id" not in regions.columns:
+            return None
+
+        country_regions = regions.filter(pl.col(authority_col) == normalized_tag)
+        if country_regions.is_empty():
+            return None
+
+        region_ids = [
+            int(region_id)
+            for region_id in country_regions["id"].drop_nulls().to_list()
+            if int(region_id) > 0
+        ]
+        if not region_ids:
+            return None
+
+        representative_region_id = self._representative_region_id(country_regions, region_ids[0])
+        centroid = None
+        if {"center_x", "center_y"}.issubset(set(country_regions.columns)):
+            centroid = calculate_centroid(
+                country_regions,
+                self.renderer.height,
+                self.renderer.width,
+            )
+        if centroid is not None:
+            world_x, world_y = centroid
+            self.cam.look_at_pixel_coords(
+                world_x,
+                self.renderer.height - world_y,
+                self.renderer.width,
+                self.renderer.height,
+            )
+
+        self._commit_selection(
+            representative_region_id,
+            normalized_tag,
+            region_ids,
+        )
+        return representative_region_id
+
+    def select_country_viewpoint(self, country_tag: str | None) -> None:
+        """Compatibility wrapper for callers that do not need the focused region."""
+        self.focus_on_country(country_tag)
+
+    def _representative_region_id(self, country_regions, fallback_region_id: int) -> int:
+        if "area_km2" not in country_regions.columns:
+            return fallback_region_id
+        ranked_regions = country_regions.sort("area_km2", descending=True, nulls_last=True)
+        if ranked_regions.is_empty():
+            return fallback_region_id
+        return int(ranked_regions["id"][0])
+
     def select_region_by_id(self, region_id: int):
         if region_id is None or region_id <= 0:
             self.renderer.clear_highlight()
@@ -232,7 +333,15 @@ class ViewportController:
                         selected_owner = authority
                         highlight_ids = df.filter(pl.col(authority_col) == authority)["id"].to_list()
 
-        self.selected_country_tag = selected_owner
+        self._commit_selection(region_id, selected_owner, highlight_ids)
+
+    def _commit_selection(
+        self,
+        region_id: int,
+        selected_country_tag: Optional[str],
+        highlight_ids: list[int],
+    ) -> None:
+        self.selected_country_tag = selected_country_tag
         self._sync_empire_focus()
 
         if self.current_mode_key == "empire":
@@ -253,5 +362,3 @@ class ViewportController:
         mode = self.map_modes.get("empire")
         if hasattr(mode, "set_selected_country"):
             mode.set_selected_country(self.selected_country_tag)
-
-

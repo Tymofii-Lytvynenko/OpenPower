@@ -4,6 +4,7 @@ from imgui_bundle import imgui
 
 from src.client.services.network_client_service import NetworkClient
 from src.client.ui.components.hud.central_bar import CentralBar
+from src.client.ui.components.hud.country_selector import resolve_country_status
 from src.client.ui.components.hud.context_menu import ContextMenu
 from src.client.ui.components.hud.system_bar import SystemBar
 from src.client.ui.components.hud.toggle_bar import ToggleBar
@@ -39,10 +40,11 @@ class GameLayout:
 
         self.feed_presenter = FeedPresenter()
         self.central_bar = CentralBar(
-            open_objectives_cb=lambda: self.panel_manager.set_visible("OBJECTIVES", True),
             open_statistics_cb=lambda: self.panel_manager.set_visible("DATA_INSPECTOR", True),
             open_mail_cb=lambda: self.panel_manager.set_visible("MAIL", True),
             open_news_cb=lambda: self.panel_manager.set_visible("NEWS_LOG", True),
+            open_relations_cb=lambda: self.panel_manager.set_visible("POL", True),
+            open_more_info_cb=lambda: self.panel_manager.set_visible("COUNTRY_MORE_INFO", True),
         )
         self.system_bar = SystemBar(
             open_help_cb=lambda: self.panel_manager.set_visible("TOOLTIP_HELP", True),
@@ -78,12 +80,26 @@ class GameLayout:
 
         target_tag, is_own = self._resolve_active_context(state, selected_region_id)
         hud_summary = self.feed_presenter.build_summary(state, target_tag)
+        country_status = resolve_country_status(state, self.local_player_tag, target_tag)
 
         self.system_bar.render(self.net, nav_service, hud_summary)
 
-        req_tag = self.central_bar.render(state, self.net, target_tag, is_own, hud_summary)
+        req_tag = self.central_bar.render(
+            state,
+            self.net,
+            target_tag,
+            country_status,
+            hud_summary,
+        )
         if req_tag:
             self._cached_target_tag = req_tag
+            target_tag = req_tag
+            is_own = req_tag == self.local_player_tag
+            hud_summary = self.feed_presenter.build_summary(state, target_tag)
+            if hasattr(self.viewport_ctrl, "focus_on_country"):
+                focused_region_id = self.viewport_ctrl.focus_on_country(req_tag)
+                if focused_region_id is not None:
+                    selected_region_id = focused_region_id
 
         self.toggle_bar.render()
 

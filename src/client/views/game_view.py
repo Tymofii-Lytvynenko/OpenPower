@@ -154,13 +154,15 @@ class GameView(BaseImGuiView):
         self.imgui.new_frame()
         # Note: Layout setup happens inside layout.render()
 
+        state = self.net.get_state()
+        self.viewport_ctrl.refresh_map_layer_if_stale(state)
+
         # 3. Render 3D World
 
         self.renderer.draw()
 
         # 4. Render Unit Overlay and UI
         self.window.use() # Switch back for UI
-        state = self.net.get_state()
         presentation_total_minutes = self.net.get_display_total_minutes()
 
         visible_owners = None

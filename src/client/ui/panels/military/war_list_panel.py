@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import random
 from imgui_bundle import imgui, icons_fontawesome_6
 
+from src.client.renderers.flag_renderer import FlagRenderer
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.primitives import UIPrimitives as Prims
@@ -15,6 +15,7 @@ from src.shared.actions import ActionOfferPeace
 class WarListPanel:
     def __init__(self):
         self._presenter = MilitaryPresenter()
+        self._flag_renderer = FlagRenderer()
         self._selected_war_id = None
 
     def render(self, state, context: PanelRenderContext) -> bool:
@@ -25,9 +26,9 @@ class WarListPanel:
             self._render_content(state, context.target_tag, context.is_own_country, context.net_client)
             return True
 
-    def _get_flag_color(self, tag: str):
-        rng = random.Random(tag)
-        return (rng.random(), rng.random(), rng.random(), 1.0)
+    def _draw_flag(self, tag: str) -> None:
+        """Draw the country's actual flag while keeping a fixed row footprint."""
+        self._flag_renderer.draw_flag(str(tag or ""), 20.0, 14.0)
 
     def _render_content(self, state, country_tag: str, is_own_country: bool, net_client) -> None:
         wars_data = self._presenter.all_wars(state)
@@ -86,7 +87,7 @@ class WarListPanel:
                     imgui.set_cursor_pos_y(imgui.get_cursor_pos_y() - 4) # Adjust back to same line
                     
                     # Left side
-                    imgui.color_button(f"##t_fa_{wid}", self._get_flag_color(leader_a), imgui.ColorEditFlags_.no_tooltip, (20, 14))
+                    self._draw_flag(leader_a)
                     imgui.same_line()
                     imgui.text(name_a)
                     
@@ -99,7 +100,7 @@ class WarListPanel:
                     
                     # Right side
                     imgui.same_line(half_w + 40)
-                    imgui.color_button(f"##t_fb_{wid}", self._get_flag_color(leader_b), imgui.ColorEditFlags_.no_tooltip, (20, 14))
+                    self._draw_flag(leader_b)
                     imgui.same_line()
                     imgui.text(name_b)
                     
@@ -142,7 +143,7 @@ class WarListPanel:
             # Left box
             with Prims.dark_child_box("bottom_left_list", half_w, 180):
                 for tag in side_a_members:
-                    imgui.color_button(f"##bl_f_{tag}", self._get_flag_color(tag), imgui.ColorEditFlags_.no_tooltip, (20, 14))
+                    self._draw_flag(tag)
                     imgui.same_line()
                     imgui.text(resolve_country_name(state, tag))
                     
@@ -156,7 +157,7 @@ class WarListPanel:
             # Right box
             with Prims.dark_child_box("bottom_right_list", half_w, 180):
                 for tag in side_b_members:
-                    imgui.color_button(f"##br_f_{tag}", self._get_flag_color(tag), imgui.ColorEditFlags_.no_tooltip, (20, 14))
+                    self._draw_flag(tag)
                     imgui.same_line()
                     imgui.text(resolve_country_name(state, tag))
                     

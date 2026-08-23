@@ -111,7 +111,7 @@ class SystemBar:
             SystemBarAction(
                 id="news",
                 icon=icons_fontawesome_6.ICON_FA_NEWSPAPER,
-                tooltip="News",
+                tooltip="Event feed",
                 callback=lambda: self._safe_call(self._open_news_cb),
                 badge=hud_summary.unread_news,
             ),

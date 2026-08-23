@@ -245,7 +245,7 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
         ),
         PanelSpec(
             id="NEWS_LOG",
-            title="News Log",
+            title="Event Feed",
             category="service",
             factory=NewsPanel,
             show_in_toggle_bar=False,

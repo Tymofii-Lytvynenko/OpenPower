@@ -1,6 +1,15 @@
 from typing import Set, Optional
 from src.shared.state import GameState
 
+
+MILITARY_ALLIANCE_TYPES = {
+    "alliance",
+    "defensive_alliance",
+    "military_alliance",
+    "defensive_pact",
+    "military_pact",
+}
+
 def normalize_side(value) -> Set[str]:
     if value is None:
         return set()
@@ -26,7 +35,7 @@ def get_military_allies(state: GameState, country_tag: Optional[str]) -> Set[str
     if {"members", "type"}.issubset(columns):
         for row in treaties.select(["members", "type"]).iter_rows(named=True):
             treaty_type = str(row["type"]).lower() if row["type"] is not None else ""
-            if treaty_type not in {"alliance", "defensive_alliance", "military_alliance"}:
+            if treaty_type not in MILITARY_ALLIANCE_TYPES:
                 continue
 
             members = normalize_side(row["members"])
@@ -36,7 +45,7 @@ def get_military_allies(state: GameState, country_tag: Optional[str]) -> Set[str
     if {"side_a", "side_b", "type"}.issubset(columns):
         for row in treaties.select(["side_a", "side_b", "type"]).iter_rows(named=True):
             treaty_type = str(row["type"]).lower() if row["type"] is not None else ""
-            if treaty_type not in {"alliance", "defensive_alliance", "military_alliance"}:
+            if treaty_type not in MILITARY_ALLIANCE_TYPES:
                 continue
 
             side_a = normalize_side(row["side_a"])
