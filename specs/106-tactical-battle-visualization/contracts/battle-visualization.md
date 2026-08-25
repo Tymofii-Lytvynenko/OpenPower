@@ -34,9 +34,10 @@ The battle overview and map marker MUST use the same mapping. They MAY show the 
 The effect is projected from the geographic anchor on every camera change. The shared globe projection MUST:
 
 1. reject back-facing anchors;
-2. clip or split geometry at the visible globe silhouette and longitude seam;
+2. return silhouette clearance for front-facing anchors and reject exchange geometry that would cross the longitude seam;
 3. keep marker dimensions in bounded screen-space pixels rather than scaling them with globe radius;
-4. return a stable draw order for identical battle IDs, camera inputs, and presentation time.
+4. return a stable draw order for identical battle IDs, camera inputs, and presentation time;
+5. retain a bounded static marker for every front-facing anchor and omit any decorative halo, flash, or exchange segment whose complete footprint exceeds the returned silhouette clearance. A geographic point marker has no longitude-seam span; exchange segments must never connect across the hidden hemisphere.
 
 ## Side identity contract
 
@@ -44,7 +45,15 @@ Exactly two visual side identities are produced from `attacker_side` and `defend
 
 ## Timing contract
 
-`BattleEffectRenderer.render(state, presentation_total_minutes, reduce_motion)` evaluates a pure deterministic phase. The phase advances between snapshots using the client presentation clock and is independent of network arrival time. With `reduce_motion=True`, the renderer keeps the marker and labels but freezes the phase and suppresses flashes/movement.
+`BattleEffectRenderer.render(state, presentation_total_minutes, reduce_motion)` evaluates a pure deterministic phase using a stable digest of battle identity. The phase advances between snapshots using the client presentation clock and is independent of network arrival time and Python's randomized process hash. With `reduce_motion=True`, the renderer keeps the marker and labels but freezes the phase and suppresses flashes/movement.
+
+## Overlap contract
+
+Stable battle-ID order is cached by battle revision. Visible footprints are inserted into a screen-space grid whose cell size is at least the maximum bounded footprint diameter, and collision checks are limited to the same and neighboring cells. Each label/decorative effect receives the first available offset from a fixed ordered candidate set. A small mark and leader remain at each exact projected anchor. Identical battle rows, camera inputs, and presentation time therefore produce identical placement without rewriting authoritative coordinates.
+
+## Cache contract
+
+Normalized battle inputs, stable order, region lookup, and side palettes may be cached by their table revisions. Camera projection, silhouette clearance, phase, and collision-grid membership are recalculated only for visible candidate anchors. All effects are submitted through one no-input overlay draw list; the cache never mutates authoritative state.
 
 ## Visibility and failure contract
 

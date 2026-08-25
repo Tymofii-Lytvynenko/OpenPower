@@ -20,6 +20,8 @@
 - [x] Scope boundaries explicitly exclude changes to combat rules and outcomes
 - [x] Smooth timing, deterministic phases, and snapshot behavior are defined
 - [x] Performance expectations are measurable
+- [x] User acceptance defines a fixed participant count, scenario balance, and pass calculation
+- [x] Globe occlusion defines a finite yaw, pitch, zoom, and seam acceptance matrix
 - [x] Dependencies and assumptions are identified
 
 ## Feature Readiness
@@ -29,6 +31,9 @@
 - [x] Battle location behavior is defined for exact contact points and deterministic fallbacks
 - [x] Side and ally visualization is compatible with the existing two-side battle model
 - [x] Back-face, globe-edge, and zoom behavior is explicitly covered
+- [x] Front-facing silhouette behavior preserves the anchor marker and permits deterministic decorative culling
+- [x] Overlap behavior preserves an exact anchor mark while applying deterministic offsets
+- [x] Performance optimizations remain presentation-only and do not remove gameplay or engine capabilities
 - [x] Lifecycle stop behavior prevents stale combat effects after conclusion
 - [x] Reduced-motion behavior preserves essential battle information
 - [x] Testing and replay requirements are sufficient for planning

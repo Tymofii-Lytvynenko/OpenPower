@@ -6,7 +6,7 @@
 
 ## Summary
 
-Add a map-anchored, presentation-only battle effect for the existing authoritative `positional` and `assault` combat modes. The server will persist one stable geographic anchor per battle with a region fallback. The client will project that anchor through shared globe occlusion rules and render deterministic passive/active aggregate effects from the smooth presentation clock, independently of unit visibility. Battle panels will use the same Passive/Active terminology, and a local reduced-motion setting will suppress motion without hiding state.
+Add a map-anchored, presentation-only battle effect for the existing authoritative `positional` and `assault` combat modes. The simulation will persist one stable geographic anchor per battle, derived from contact coordinates or backfilled from the authoritative region center without using `0,0` as a missing-value sentinel. The client will project that anchor through shared globe occlusion rules and render deterministic passive/active aggregate effects from the smooth presentation clock, independently of unit visibility. Battle panels will use the same Passive/Active terminology, and a local reduced-motion setting will suppress motion without hiding state.
 
 ## Technical Context
 
@@ -22,7 +22,7 @@ Add a map-anchored, presentation-only battle effect for the existing authoritati
 
 **Project Type**: Python desktop grand-strategy game engine with modular simulation and client rendering layers.
 
-**Performance Goals**: Maintain the existing smooth-clock/render performance gate; 100 visible battles add no more than 5% frame-time overhead and do not allocate work per participating unit.
+**Performance Goals**: Maintain the existing smooth-clock/render performance gate; repeated baseline-versus-feature measurements with 100 visible battles add no more than 5% median frame-time overhead and do not allocate work per participating unit.
 
 **Constraints**: Client is a passive observer; no combat rules, formulas, movement, readiness, ownership, or outcomes change. Effects must obey visible-hemisphere/seam clipping, have bounded screen-space size, be deterministic, and degrade safely for legacy/malformed rows.
 
@@ -51,24 +51,27 @@ The resolved design decisions and alternatives are recorded in [research.md](res
 ### Phase 1 — authoritative data and compatibility
 
 1. Extend `modules/base/systems/military/combat_system.py`’s battle schema and row builder with `anchor_latitude`, `anchor_longitude`, and `anchor_source`.
-2. Add a small server-side anchor policy beside the military combat system. It computes a spherical mean of valid participant contact coordinates on first creation, otherwise the region center, then preserves the original values on every update.
-3. Mirror the columns/defaults in `modules/base/schema.py` and update state-load validation/migration paths so old saves normalize to `region_center` without changing combat outcomes.
-4. Keep `mode`, status transitions, events, and battle IDs unchanged; add regression assertions that passive contact and assault escalation still use the current authoritative behavior and that stalemate lifecycle bookkeeping remains idempotent.
+2. Add a small simulation-side anchor policy beside the military combat system. It computes a spherical mean of finite, in-range participant contact coordinates ordered by unit ID on first creation, otherwise uses the region center, then preserves the original values on every update.
+3. Mirror the columns in `modules/base/schema.py`. Use nullable schema defaults only as a pre-normalization compatibility state; `src/server/state_migrations.py` must backfill legacy rows from their actual region latitude/longitude before schema capture. Never interpret `0,0` as “missing,” because it is a valid geographic location.
+4. Extend state validation for finite coordinate ranges and the `contact`/`region_center` source vocabulary. Repair missing legacy anchors when their region exists; leave the client contract able to isolate a malformed incoming row without hiding other overlays.
+5. Keep `mode`, status transitions, events, and battle IDs unchanged; add regression assertions that passive contact and assault escalation still use the current authoritative behavior and that stalemate lifecycle bookkeeping remains idempotent.
 
 ### Phase 1 — client projection and visual effects
 
-1. Extract the reusable geographic anchor projection, back-face test, globe-edge clipping, seam handling, and bounded screen-size calculation from existing overlay math into a client presentation helper.
-2. Update existing event/overlay consumers to use the helper where practical, preserving current globe rendering behavior.
-3. Add `src/client/renderers/battle_effect_renderer.py`. It reads battle rows, resolves a deterministic two-side palette, projects each valid anchor, derives a pure phase from battle ID/round/presentation time, and draws one aggregate marker/effect per visible battle. Keep only a short-lived conclusion cache for a row that disappears after its terminal tick; never use it to resurrect combat.
+1. Add a reusable geographic anchor projection helper containing the back-face test, projected silhouette clearance, and bounded screen-size calculation already proven by existing overlay math. Reject back-facing anchors. For a front-facing anchor, always draw the bounded static marker; draw halos, flashes, and exchange segments only when their complete footprint fits within the returned silhouette clearance. This avoids per-primitive circular clipping work while preserving battle visibility.
+2. Keep `EventRenderer` and `UnitProjectionService` behavior unchanged in this feature. Verify projection parity with focused tests instead of expanding the change into unrelated overlay refactoring; later consumers may adopt the helper independently.
+3. Add `src/client/renderers/battle_effect_renderer.py`. Cache normalized battle inputs, stable order, region lookup, and side palettes by relevant table revisions. Per frame, project only cached battle anchors, reject invisible anchors before phase/effect preparation, derive a pure phase with a stable byte-level digest of battle ID plus round/presentation time, and append all visible primitives to one no-input overlay draw list. Keep only a bounded short-lived conclusion cache; never use it to resurrect combat.
 4. Move the existing unit-dependent battle marker out of `UnitRenderer` so filtered/hidden units do not suppress authoritative battle effects and duplicate markers are not drawn.
 5. Integrate the renderer in `src/client/views/game_view.py` with `ClientGameClock.get_display_total_minutes()` and the local reduced-motion preference. Preserve input/selection/UI draw ordering and never mutate `GameState`.
 6. Add Passive/Active label mapping in the military presenter/panel while retaining the raw `positional`/`assault` value for diagnostics.
+7. Cache stable battle-ID ordering when battle revisions change. Each frame, insert visible bounded footprints into a screen-space grid whose cell size is at least the maximum bounded footprint diameter, then test collisions only within the same and neighboring cells, avoiding all-pairs overlap work without missing contacts. Assign the first available offset from a fixed ordered candidate set to labels and decorative effects. Keep a small leader and anchor mark at the authoritative point.
 
 ### Phase 1 — settings and validation
 
 1. Add `reduce_motion` to the local game settings model, serialization, and settings UI with a default of `False`.
-2. Implement focused tests for anchor policy, schema compatibility, globe projection, deterministic phases, mode/lifecycle rendering, filtered units, reduced motion, multiple-battle ordering, and stalemate/conclusion idempotency.
-3. Extend the existing 100-battle client performance check and run the quickstart commands plus a manual globe orbit/zoom smoke test.
+2. Implement focused tests for anchor policy, schema compatibility, globe projection and silhouette clearance, deterministic phases, revision-keyed caches, mode/lifecycle rendering, filtered units, reduced motion, grid-based overlap layout, and stalemate/conclusion idempotency.
+3. Preserve the existing snapshot/presenter performance check and add `tests/test_battle_effect_performance.py` as a dedicated battle-effect preparation/render benchmark. Measure repeated baseline and 100-battle frames after warm-up and compare medians, then run the quickstart commands plus the defined globe orbit/zoom acceptance matrix.
+4. Run the blinded Passive/Active classification protocol from the quickstart with at least 10 representative players and record the 200 classifications and aggregate result without collecting unrelated personal data.
 
 ## Project Structure
 
@@ -100,7 +103,6 @@ src/client/
 ├── renderers/
 │   ├── globe_overlay_projection.py   # shared geo-to-screen/occlusion mechanism
 │   ├── battle_effect_renderer.py     # passive/active aggregate effects
-│   ├── event_renderer.py             # consume shared projection helper
 │   └── unit_renderer.py              # retain unit overlays; remove battle marker
 ├── services/
 │   └── game_settings_service.py      # local reduced-motion preference
@@ -117,6 +119,7 @@ tests/
 ├── test_battle_anchor_policy.py
 ├── test_globe_overlay_projection.py
 ├── test_battle_effect_renderer.py
+├── test_battle_effect_performance.py
 ├── test_battle_status_interface.py
 ├── test_engagement_mvp.py             # regression for positional/assault modes
 └── test_client_snapshot_performance.py

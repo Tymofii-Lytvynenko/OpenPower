@@ -10,7 +10,7 @@
 
 ## Decision 2: Store one additive geographic anchor on each battle
 
-- **Decision**: Add `anchor_latitude`, `anchor_longitude`, and `anchor_source` to the existing `battles` table. Compute the anchor when a battle is first created from the participating units’ stopped contact coordinates; preserve it for the lifetime of that battle. Use the region center only when no valid participant coordinate is available. Keep the source vocabulary small: `contact` and `region_center`.
+- **Decision**: Add `anchor_latitude`, `anchor_longitude`, and `anchor_source` to the existing `battles` table. Compute the anchor when a battle is first created from the participating units’ stopped contact coordinates; preserve it for the lifetime of that battle. Use the region center only when no valid participant coordinate is available. Keep the source vocabulary small: `contact` and `region_center`. Legacy rows are backfilled from the actual referenced region before schema capture; `0,0` is never a missing-value sentinel because it is a valid coordinate.
 - **Rationale**: A battle has one map location and already has a stable primary key, region, and lifecycle. Additive columns keep snapshots, saves, and the existing battle panel compatible while making the location independent of visible unit billboards. The movement system already persists the exact first-contact position in each stopped unit, so a deterministic spherical mean of sorted participant positions is a better source than a region center. Preserving the first anchor prevents a moving or filtered unit from moving the effect after the contact has been established. `anchor_source` distinguishes observed contact from the documented fallback and makes legacy rows diagnosable.
 - **Alternatives considered**:
   - Create a separate battle-anchor table: rejected because it adds another join, schema, and persistence lifecycle for a one-to-one value.
@@ -21,8 +21,8 @@ The battle ID is already stable across `positional` → `assault`, so the anchor
 
 ## Decision 3: Use a shared globe-anchor projection mechanism
 
-- **Decision**: Extract the common geographic-to-screen projection and visible-hemisphere/edge handling used by map overlays into a reusable client presentation helper. Implement a dedicated `BattleEffectRenderer` that consumes this helper and the battle table; retire the current unit-dependent battle marker from `UnitRenderer`.
-- **Rationale**: `EventRenderer` and `UnitProjectionService` currently contain related camera, globe-facing, and clipping calculations. A shared projection mechanism prevents the new effect from reintroducing the back-side/seam bugs already addressed elsewhere. A dedicated renderer keeps battle effects independent of unit filters and gives the renderer a single bounded loop over battles rather than one animation object per unit.
+- **Decision**: Extract the minimal geographic-to-screen projection, visible-hemisphere test, silhouette clearance, and bounded marker sizing needed by battle overlays into a reusable client presentation helper. Implement a dedicated `BattleEffectRenderer` that consumes this helper and the battle table; retire the current unit-dependent battle marker from `UnitRenderer`. Do not refactor existing event or unit projection paths as part of this feature.
+- **Rationale**: `EventRenderer` and `UnitProjectionService` provide proven reference math, but changing both would expand regression risk without improving battle gameplay. A focused helper plus parity tests prevents back-side/seam regressions, keeps battle effects independent of unit filters, and gives the renderer one bounded loop over battles rather than one animation object per unit.
 - **Alternatives considered**:
   - Draw the effect from `UnitRenderer`: rejected because the existing marker requires visible unit billboards and disappears when owners are filtered.
   - Copy the projection math into a new renderer: rejected because duplicated edge and hemisphere rules would drift and regress globe rendering.
@@ -30,7 +30,7 @@ The battle ID is already stable across `positional` → `assault`, so the anchor
 
 ## Decision 4: Drive animation from the client presentation clock
 
-- **Decision**: Derive effect phase from the stable battle ID, authoritative round/start time, and `ClientGameClock.get_display_total_minutes()`. Never use network arrival time or unseeded randomness. Keep the renderer read-only.
+- **Decision**: Derive effect phase from a stable byte-level digest of battle ID, authoritative round/start time, and `ClientGameClock.get_display_total_minutes()`. Never use Python's process-randomized `hash()`, network arrival time, or unseeded randomness. Keep the renderer read-only.
 - **Rationale**: `GameView` already supplies a smooth presentation time between snapshots. A pure phase function gives continuous motion at display refresh rate, deterministic replay, and no server-state mutation. A phase can be evaluated per visible battle without allocating persistent animation objects.
 - **Alternatives considered**:
   - Advance animation only when a battle snapshot arrives: rejected because it produces the reported stutter.
@@ -63,13 +63,39 @@ The battle ID is already stable across `positional` → `assault`, so the anchor
 
 ## Decision 8: Verify with focused deterministic and performance tests
 
-- **Decision**: Add unit tests for anchor computation and projection, renderer tests for lifecycle/mode/reduced-motion/filter behavior, integration coverage for passive-to-active escalation, and a 100-battle performance gate using the existing client performance harness.
-- **Rationale**: The critical risks are geographic correctness, stale snapshot smoothing, globe occlusion, and frame cost. Focused tests make each risk observable without requiring a full interactive session; the existing performance test provides a comparable baseline.
+- **Decision**: Add unit tests for anchor computation and projection, renderer tests for lifecycle/mode/reduced-motion/filter behavior, integration coverage for passive-to-active escalation, and a dedicated 100-battle render benchmark. Preserve the existing snapshot/presenter performance test, but do not treat it as evidence for frame-time overhead because it measures serialization and presentation-model consumption rather than drawing.
+- **Rationale**: The critical risks are geographic correctness, stale snapshot smoothing, globe occlusion, and frame cost. Focused tests make each risk observable without requiring a full interactive session. The render benchmark uses warm-up plus repeated baseline/feature samples and compares medians to reduce timing noise.
 - **Alternatives considered**:
   - Rely only on manual visual checks: rejected because deterministic anchor and lifecycle regressions are easy to miss.
   - Benchmark per-unit effects: rejected because the design intentionally removes per-unit work from the battle renderer.
 
 The renderer will not depend exclusively on transient battle events. A concluded row may exist for only one authoritative tick, so the client keeps a short-lived last-visual cache keyed by battle ID to show the bounded conclusion cue and then expires it. Lifecycle tests also cover stalemate idempotency so a status marker cannot cause a duplicate start effect.
+
+## Decision 9: Resolve overlaps without moving the authoritative anchor
+
+- **Decision**: Cache stable battle-ID order by battle revision. Insert visible bounded footprints into a screen-space grid whose cell size is at least the maximum bounded footprint diameter, test only the same and neighboring cells, and assign the first available offset from a fixed ordered candidate set to labels and decorative effects. Retain a small anchor mark and leader at the exact projected coordinate.
+- **Rationale**: Two battles can share a region or nearly identical coordinates. Stable offsets keep both identifiable while the anchor mark preserves the meaning of the authoritative contact point and prevents frame-to-frame jitter.
+- **Alternatives considered**:
+  - Random jitter: rejected because repeated frames and replays would diverge.
+  - Move the stored anchor: rejected because collision handling is a presentation concern and must not rewrite authoritative geography.
+  - Hide all but one battle: rejected because the specification requires simultaneous battles to remain identifiable.
+
+## Decision 10: Preserve the marker and cull decorative limb effects
+
+- **Decision**: Reject back-facing anchors. For a front-facing anchor, always retain the bounded static marker, but draw a halo, flash, or exchange segment only when its complete footprint fits within the projected silhouette clearance.
+- **Rationale**: This preserves the authoritative battle location while avoiding CPU-side circular clipping or additional stencil work for presentation-only decoration. It guarantees no hidden-hemisphere bleed and reduces work near the limb without changing simulation or map capabilities.
+- **Alternatives considered**:
+  - Suppress the entire battle near the silhouette: rejected because a valid front-facing battle would disappear prematurely.
+  - Clip every decorative primitive: rejected because the extra geometry work provides little readability benefit over retaining the marker and omitting decoration.
+  - Draw the full screen-space effect: rejected because it would visibly cross the globe boundary.
+
+## Decision 11: Cache snapshot-derived presentation inputs
+
+- **Decision**: Cache normalized battle rows, stable ordering, region lookup, and side palettes by relevant table revisions. Recompute camera projection, visibility, collision grid, and phase only for visible battle anchors on each frame. Submit all primitives through one no-input overlay draw list.
+- **Rationale**: Snapshot-derived data changes far less often than the display refresh. Revision-keyed caches remove repeated Polars row conversion, sorting, and palette resolution while preserving smooth camera and clock-driven presentation.
+- **Alternatives considered**:
+  - Rebuild every input every frame: rejected because it creates avoidable allocations and scales poorly.
+  - Retain a mutable animation object per unit: rejected because cost would depend on participant count and couple presentation to units.
 
 ## Resolved Technical Unknowns
 

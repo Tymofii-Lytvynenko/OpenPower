@@ -10,9 +10,9 @@ The feature extends the existing battle row; it does not create a second combat 
 | `war_id` | `Utf8` | yes | — | Authoritative war relationship. |
 | `region_id` | `Int32` | yes | — | Region containing the engagement and fallback anchor source. |
 | `mode` | `Utf8` | yes | `positional` | `positional` is passive; `assault` is active. Unknown values are rejected at server validation. |
-| `anchor_latitude` | `Float64` | yes | `0.0` | Geographic anchor in degrees, inclusive range `[-90, 90]`. |
-| `anchor_longitude` | `Float64` | yes | `0.0` | Geographic anchor in degrees, normalized to `[-180, 180]`. |
-| `anchor_source` | `Utf8` | yes | `region_center` | `contact` when created from valid participant contact coordinates; `region_center` when the deterministic region fallback is used. |
+| `anchor_latitude` | `Float64` | yes after normalization | derived | Finite geographic anchor in degrees, inclusive range `[-90, 90]`. A nullable compatibility value may exist only before migration. |
+| `anchor_longitude` | `Float64` | yes after normalization | derived | Finite geographic anchor in degrees, normalized to `[-180, 180)`. A nullable compatibility value may exist only before migration. |
+| `anchor_source` | `Utf8` | yes after normalization | derived | `contact` when created from valid participant contact coordinates; `region_center` when the deterministic region fallback is used. |
 | `status` | `Utf8` | yes | `active` | Existing lifecycle values `active`, `stalemate`, and `concluded`. |
 
 The remaining existing columns are carried unchanged through `BATTLE_SCHEMA`, `SUPPORT_TABLE_SPECS["battles"]`, snapshots, and save/load normalization. The anchor columns are additive so old rows receive the documented fallback defaults.
@@ -23,7 +23,7 @@ The remaining existing columns are carried unchanged through `BATTLE_SCHEMA`, `S
 2. Valid coordinates are combined using a spherical mean (unit-vector average), then converted back to latitude/longitude. This avoids a longitude-seam jump when contacts straddle `+180`/`-180` and gives a stable midpoint if the two sides stop a few meters apart.
 3. If no valid participant coordinate exists, the policy reads the region’s canonical latitude/longitude and marks the source `region_center`.
 4. On subsequent updates, the original anchor fields are copied forward unchanged, even when units move, are filtered, or arrive in a later snapshot.
-5. A legacy row with default or missing anchor columns is rendered from its region center and remains compatible with the additive schema.
+5. Before schema capture, a legacy row with missing/null anchor columns is backfilled from its referenced region and marked `region_center`. The migration does not use `0,0` as a sentinel. If no valid region coordinate exists, validation reports the authoritative data-integrity problem; a client that nevertheless receives such a malformed row isolates it and keeps the non-spatial battle status available.
 
 The server owns anchor creation and persistence. The client must never recalculate an existing battle’s anchor from visible units.
 
@@ -33,7 +33,7 @@ The server owns anchor creation and persistence. The client must never recalcula
 
 Not persisted. For a battle row and a presentation time, the renderer derives:
 
-- a stable phase seed from `battle.id`;
+- a stable phase seed from a byte-level digest of `battle.id` (not Python's process-randomized `hash()`);
 - a cadence offset from `started_at_minute` and `round`;
 - a normalized phase from `ClientGameClock.get_display_total_minutes()`;
 - a lifecycle-specific conclusion age when a concluded row is first observed.
@@ -71,9 +71,17 @@ The renderer must not manufacture transitions. A stale row is replaced by the ne
 - `countries_wars` provides the war and side membership used to resolve the two visual sides.
 - Snapshot revisions determine newest authoritative state; the presentation clock determines only local animation phase.
 
+## Deterministic overlap layout
+
+Overlap layout is transient presentation state. Stable battle-ID order is cached by battle revision. Each frame, visible bounded footprints are inserted into a screen-space grid whose cells are at least as wide and tall as the maximum bounded footprint diameter, then compared only within the same and neighboring cells. Each label/decorative effect receives the first available offset from a fixed ordered candidate set. The projected anchor itself is not modified: a small anchor mark and leader remain at the authoritative coordinate.
+
+## Presentation caches
+
+The client may cache normalized battle inputs, stable ordering, region lookup, and side palettes using the corresponding table revisions. Camera projection, silhouette clearance, phase, and the collision grid remain frame-local because they depend on camera or presentation time. Cache invalidation changes presentation inputs only and never writes to `GameState`.
+
 ## Compatibility and validation
 
 - Register the three columns in both the canonical battle schema and the server support-table specification in the same order/types expected by Polars/Arrow normalization.
 - Validate latitude/longitude ranges and the finite-value requirement at server state-load/update boundaries. Validate `anchor_source` against `contact` and `region_center`.
-- Normalize old saved rows with the region fallback; do not reject a save solely because it predates battle anchors.
+- Normalize old saved rows with the actual referenced region coordinate before schema capture; do not reject a save solely because it predates battle anchors.
 - If a row is malformed after normalization, the client skips only its moving effect and draws a deterministic region marker where possible; one bad row must not suppress all battle overlays.
