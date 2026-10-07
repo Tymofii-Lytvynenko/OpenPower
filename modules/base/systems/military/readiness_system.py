@@ -6,6 +6,7 @@ from typing import Any
 
 import polars as pl
 
+from modules.base.systems.politics.political_effect_policy import aggregate_political_effects
 from modules.base.systems.military.readiness_policy import (
     READINESS_FORTIFIED,
     READINESS_PARKED,
@@ -52,7 +53,7 @@ PENDING_SCHEMA: dict[str, pl.DataType] = {
 
 class ReadinessSystem(ISystem):
     access = SystemAccess(
-        reads=frozenset({"units", TRANSITIONS_TABLE, PENDING_TABLE}),
+        reads=frozenset({"units", TRANSITIONS_TABLE, PENDING_TABLE, "political_effects"}),
         writes=frozenset({"units", TRANSITIONS_TABLE, PENDING_TABLE}),
         handles=frozenset({ActionSetUnitReadiness}),
         # A lower numeric phase guarantees readiness advances before movement
@@ -132,7 +133,11 @@ class ReadinessSystem(ISystem):
                         READINESS_FORTIFIED,
                         "ready_to_fortified",
                         now,
-                        self._policy.READY_TO_FORTIFIED_MINUTES,
+                        self._transition_duration_for_owner(
+                            state,
+                            str(unit.get("owner") or ""),
+                            self._policy.READY_TO_FORTIFIED_MINUTES,
+                        ),
                     )
                     # Keep the order attached to the request until the final
                     # stage completes; otherwise a staged readiness order can
@@ -329,7 +334,8 @@ class ReadinessSystem(ISystem):
             unit["readiness_eta_minute"] = 0
             state.update_table(UNITS_TABLE, self._frame_from_rows(units.schema, rows))
             return
-        if transition.duration_minutes <= 0:
+        duration = self._transition_duration_for_owner(state, owner_id, transition.duration_minutes)
+        if duration <= 0:
             unit["readiness_status"] = target
             unit["readiness_progress"] = 1.0
             unit["readiness_transition_id"] = ""
@@ -339,7 +345,7 @@ class ReadinessSystem(ISystem):
             return
 
         transition_row = self._new_transition(
-            str(action.unit_id), current, target, transition.stage, now, transition.duration_minutes
+            str(action.unit_id), current, target, transition.stage, now, duration
         )
         updated_rows = [row for row in transitions.to_dicts() if str(row.get("unit_id") or "") != str(action.unit_id)]
         updated_rows.append(transition_row)
@@ -374,6 +380,19 @@ class ReadinessSystem(ISystem):
             "progress": 0.0,
             "pending_order_id": "",
         }
+
+    @staticmethod
+    def _transition_duration_for_owner(state: GameState, owner_id: str, base_duration: int) -> int:
+        if base_duration <= 0:
+            return max(0, int(base_duration))
+        effect = aggregate_political_effects(
+            state.tables.get("political_effects"),
+            int(state.time.total_minutes),
+            domain="readiness",
+            effect="transition_duration_modifier",
+        ).get(str(owner_id or "").strip().upper(), 0.0)
+        duration_factor = min(1.5, max(0.5, 1.0 + effect))
+        return max(1, round(int(base_duration) * duration_factor))
 
     def _update_table_if_changed(self, state: GameState, name: str, frame: pl.DataFrame) -> bool:
         current = state.tables.get(name)

@@ -32,3 +32,4 @@
 ## Notes
 
 - Reviewed against the existing research, military, economy, diplomacy, politics, persistence, and strategic-weapon inventory boundaries.
+- Review update (2026-10-06): Added research gates, configurable payload defaults, and ordered defense attempts; checklist criteria remain satisfied.

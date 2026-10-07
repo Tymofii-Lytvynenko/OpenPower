@@ -38,6 +38,7 @@ TREATY_PROFILES = (
     ("human_development_collaboration", 1, 55.0, 48.0, 30.0),
     ("economic_partnership", 1, 50.0, 43.0, 25.0),
     ("common_market", 1, 65.0, 57.0, 40.0),
+    ("mobility_agreement", 1, 50.0, 43.0, 25.0),
     ("economic_aid", 1, 65.0, 58.0, 35.0),
     ("assume_foreign_debt", 1, 75.0, 68.0, 50.0),
     ("economic_embargo", -1, 65.0, 58.0, 45.0),
@@ -438,6 +439,8 @@ class DiplomacyPolicy:
             .then((pl.col("_research_complement") > 0.05) & ~pl.col("_at_war"))
             .when(treaty_type == "human_development_collaboration")
             .then((pl.col("_development_gap") > 0.03) & ~pl.col("_at_war"))
+            .when(treaty_type == "mobility_agreement")
+            .then(~pl.col("_at_war"))
             .when(treaty_type.is_in(["economic_partnership", "common_market"]))
             .then((pl.col("_economic_complement") > 0.05) & ~pl.col("_at_war"))
             .when(treaty_type == "economic_aid")

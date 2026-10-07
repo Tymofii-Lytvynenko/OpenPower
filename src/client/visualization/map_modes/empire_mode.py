@@ -1,5 +1,7 @@
 from typing import Dict, Optional, Set, Tuple
 
+import polars as pl
+
 from src.client.utils.diplomacy_utils import get_military_allies, get_military_enemies
 from src.client.visualization.map_modes.base_map_mode import BaseMapMode
 from src.shared.state import GameState
@@ -23,6 +25,7 @@ class EmpireMapMode(BaseMapMode):
 
     def __init__(self):
         self.selected_country: Optional[str] = None
+        self._region_groups_cache = None
 
     @property
     def name(self) -> str:
@@ -33,7 +36,8 @@ class EmpireMapMode(BaseMapMode):
         return 0.82
 
     def set_selected_country(self, country_tag: Optional[str]) -> None:
-        self.selected_country = country_tag if country_tag and country_tag != "None" else None
+        normalized = str(country_tag or "").strip().upper()
+        self.selected_country = normalized if normalized and normalized != "NONE" else None
 
     def calculate_colors(self, state: GameState) -> Dict[int, Tuple[int, ...]]:
         if "regions" not in state.tables:
@@ -49,45 +53,95 @@ class EmpireMapMode(BaseMapMode):
         pending_annexations = self._pending_annexations(state)
         result: Dict[int, Tuple[int, ...]] = {}
 
-        selected_columns = ["id", authority_col]
-        if "owner" in regions.columns and "owner" not in selected_columns:
-            selected_columns.append("owner")
+        has_owner = "owner" in regions.columns
+        authority_values, owner_values, region_id_groups = self._region_groups(
+            regions, authority_col, has_owner
+        )
+        # Region tables have thousands of repeated country tags, so normalize each distinct source value once.
+        normalized_tags = {
+            value: self._clean_tag(value)
+            for value in {*authority_values, *owner_values}
+        }
 
-        for row in regions.select(selected_columns).iter_rows(named=True):
-            region_id = row["id"]
-            authority_tag = row[authority_col]
-            owner_tag = self._clean_tag(row.get("owner"))
-            controller_tag = self._clean_tag(authority_tag)
+        for authority_value, owner_value, region_ids in zip(
+            authority_values, owner_values, region_id_groups
+        ):
+            owner_tag = normalized_tags[owner_value]
+            controller_tag = normalized_tags[authority_value]
 
-            if not authority_tag or authority_tag == "None":
-                result[region_id] = self.UNKNOWN
+            if not controller_tag:
+                result.update(dict.fromkeys(region_ids, self.UNKNOWN))
                 continue
 
             if self._is_occupied(owner_tag, controller_tag):
-                claim_key = (int(region_id), owner_tag, controller_tag)
-                result[region_id] = (
-                    self.ANNEXATION_PENDING
-                    if claim_key in pending_annexations
-                    else self.OCCUPIED
-                )
+                if pending_annexations:
+                    for region_id in region_ids:
+                        claim_key = (int(region_id), owner_tag, controller_tag)
+                        result[region_id] = (
+                            self.ANNEXATION_PENDING
+                            if claim_key in pending_annexations
+                            else self.OCCUPIED
+                        )
+                else:
+                    result.update(dict.fromkeys(region_ids, self.OCCUPIED))
                 continue
 
             if self.selected_country is None:
-                result[region_id] = self.NEUTRAL
+                result.update(dict.fromkeys(region_ids, self.NEUTRAL))
                 continue
 
-            if authority_tag == self.selected_country:
-                result[region_id] = self.SELECTED
+            if controller_tag == self.selected_country:
+                result.update(dict.fromkeys(region_ids, self.SELECTED))
                 continue
 
-            if authority_tag in military_enemies:
-                result[region_id] = self.ENEMY
-            elif authority_tag in military_allies:
-                result[region_id] = self.ALLY
+            if controller_tag in military_enemies:
+                result.update(dict.fromkeys(region_ids, self.ENEMY))
+            elif controller_tag in military_allies:
+                result.update(dict.fromkeys(region_ids, self.ALLY))
             else:
-                result[region_id] = self.NEUTRAL
+                result.update(dict.fromkeys(region_ids, self.NEUTRAL))
 
         return result
+
+    def _region_groups(self, regions, authority_col: str, has_owner: bool):
+        region_ids = regions.get_column("id")
+        authority_values = regions.get_column(authority_col)
+        owner_values = regions.get_column("owner") if has_owner else authority_values
+        cached = self._region_groups_cache
+        if (
+            cached is not None
+            and cached[0] == authority_col
+            and cached[1] == has_owner
+            and cached[2].equals(region_ids)
+            and cached[3].equals(authority_values)
+            and cached[4].equals(owner_values)
+        ):
+            return cached[5], cached[6], cached[7]
+
+        # Population ticks replace the region frame often while political identifiers stay unchanged.
+        group_columns = [authority_col]
+        if has_owner and "owner" not in group_columns:
+            group_columns.append("owner")
+        region_groups = (
+            regions.select(["id", *group_columns])
+            .group_by(group_columns, maintain_order=True)
+            .agg(pl.col("id").alias("_region_ids"))
+            .to_dict(as_series=False)
+        )
+        normalized_authorities = region_groups[authority_col]
+        normalized_owners = region_groups["owner"] if has_owner else normalized_authorities
+        region_id_groups = region_groups["_region_ids"]
+        self._region_groups_cache = (
+            authority_col,
+            has_owner,
+            region_ids,
+            authority_values,
+            owner_values,
+            normalized_authorities,
+            normalized_owners,
+            region_id_groups,
+        )
+        return normalized_authorities, normalized_owners, region_id_groups
 
     def _pending_annexations(self, state: GameState) -> set[tuple[int, str, str]]:
         claims = state.tables.get("annexation_claims")

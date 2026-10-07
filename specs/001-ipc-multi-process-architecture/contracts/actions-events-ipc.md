@@ -28,5 +28,8 @@ Signals generated during simulation system ticks and delivered in `state.events`
 ## 3. IPC Message Queue Contracts
 
 - **`action_queue`**: Enqueues `GameAction` objects or string control commands (`"SHUTDOWN"`, `"SAVE_MAP_CHANGES"`).
-- **`state_queue`**: Enqueues Apache Arrow IPC serialized `dict` payload. Client drains all stale items, reading only the latest snapshot.
+- **`state_queue`**: Enqueues protocol-versioned Arrow IPC full snapshots and table deltas. Delta bases remain cumulative from the last acknowledged sequence if queue backpressure drops a packet.
 - **`progress_queue`**: Enqueues diagnostic tuples `(type_str, float_progress, status_str)`.
+- **`snapshot_ack_queue`**: Enqueues the latest decoded snapshot sequence so the server can advance the delta base.
+
+`src/shared/snapshots.py` owns the full/delta packet format. Full packets include all current tables and journal state; deltas include changed table payloads, removed table names, and journal additions. `src/server/launcher.py` creates all four queues and `src/server/server_process.py` is their authoritative consumer/producer.

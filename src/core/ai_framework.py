@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, runtime_checkable
 
 import polars as pl
@@ -18,6 +18,16 @@ DECISION_SCHEMA: dict[str, pl.DataType] = {
     "reason_code": pl.Utf8,
     "quota": pl.UInt32,
 }
+_AUTHORITY_DOMAINS = {
+    "economy": frozenset({"economy", "budget", "debt"}),
+    "diplomacy": frozenset({"diplomacy"}),
+    "military": frozenset({"military_orders", "procurement", "war", "covert", "strategic_warfare"}),
+    "covert": frozenset({"covert"}),
+    "politics": frozenset({"politics"}),
+    "research": frozenset({"research"}),
+    "infrastructure": frozenset({"infrastructure"}),
+    "migration": frozenset({"migration"}),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +37,10 @@ class AITableContext:
     total_minutes: int
     date_text: str
     player_tag: str = ""
+    globals: Mapping[str, Any] = field(default_factory=dict)
+    delegated_domains: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    delegated_targets: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    delegated_treaty_ids: Mapping[str, frozenset[str]] = field(default_factory=dict)
 
     def table(self, name: str) -> pl.LazyFrame | None:
         frame = self.tables.get(name)
@@ -94,6 +108,7 @@ class DeclarativeAIFramework:
             return AIEvaluation((), empty_decision_frame(), tuple(skipped))
 
         combined = pl.concat(frames, how="diagonal_relaxed")
+        combined = _filter_delegated_scope_candidates(combined, context)
         payload_columns = sorted(
             column
             for column in combined.collect_schema().names()
@@ -144,6 +159,34 @@ class DeclarativeAIFramework:
             .drop("_payload_key")
         )
         decisions = ranked.collect()
+        if (context.delegated_domains or context.delegated_targets or context.delegated_treaty_ids) and not decisions.is_empty():
+            domain_rows = {
+                str(country).strip().upper(): frozenset(str(domain).strip().lower() for domain in domains)
+                for country, domains in context.delegated_domains.items()
+            }
+            allowed_rows = []
+            for row in decisions.iter_rows(named=True):
+                country = str(row.get("country_id") or "").strip().upper()
+                authorities = domain_rows.get(country)
+                if authorities is not None:
+                    allowed = (
+                        set().union(*(_AUTHORITY_DOMAINS.get(item, frozenset()) for item in authorities))
+                        if authorities
+                        else set()
+                    )
+                    if str(row.get("domain") or "").strip().lower() not in allowed:
+                        continue
+                target_scope = context.delegated_targets.get(country)
+                treaty_scope = context.delegated_treaty_ids.get(country)
+                if target_scope is not None and str(row.get("policy_id") or "").strip().lower() == "diplomacy":
+                    target = str(row.get("target_country") or row.get("source_country") or "").strip().upper()
+                    treaty_id = str(row.get("treaty_id") or "").strip()
+                    in_country_scope = bool(target and target in {str(item).strip().upper() for item in target_scope})
+                    in_treaty_scope = bool(treaty_id and treaty_id in set(treaty_scope or ()))
+                    if not (in_country_scope or in_treaty_scope):
+                        continue
+                allowed_rows.append(row)
+            decisions = pl.DataFrame(allowed_rows, schema=decisions.schema) if allowed_rows else decisions.head(0)
 
         actions: list[GameAction] = []
         resolvers = self._policies
@@ -184,7 +227,16 @@ def scheduled_countries(
     if "is_playable" in schema:
         scheduled = scheduled.filter(pl.col("is_playable").fill_null(True))
     if context.player_tag:
-        scheduled = scheduled.filter(pl.col("country_id") != context.player_tag.strip().upper())
+        player_tag = context.player_tag.strip().upper()
+        delegated_tags = sorted(
+            str(country).strip().upper()
+            for country, authorities in context.delegated_domains.items()
+            if authorities
+        )
+        scheduled = scheduled.filter(
+            (pl.col("country_id") != player_tag)
+            | pl.col("country_id").is_in(delegated_tags)
+        )
 
     scheduled = scheduled.sort("country_id").with_row_index("_cadence_slot")
     period = max(1, int(cadence_days))
@@ -217,3 +269,29 @@ def _normalize_candidates(candidates: pl.LazyFrame) -> pl.LazyFrame:
         pl.col("quota").fill_null(1).clip(lower_bound=1),
         pl.col("reason_code").fill_null(""),
     )
+
+
+def _filter_delegated_scope_candidates(
+    candidates: pl.LazyFrame,
+    context: AITableContext,
+) -> pl.LazyFrame:
+    if not context.delegated_targets:
+        return candidates
+    columns = set(candidates.collect_schema().names())
+    for country in sorted(context.delegated_targets):
+        targets = sorted({str(item).strip().upper() for item in context.delegated_targets[country]})
+        treaty_ids = sorted({str(item).strip() for item in context.delegated_treaty_ids.get(country, ())})
+        target_checks = [
+            pl.col(column).cast(pl.Utf8).str.to_uppercase().is_in(targets)
+            for column in ("target_country", "source_country")
+            if column in columns and targets
+        ]
+        if "treaty_id" in columns and treaty_ids:
+            target_checks.append(pl.col("treaty_id").cast(pl.Utf8).is_in(treaty_ids))
+        allowed = pl.any_horizontal(target_checks) if target_checks else pl.lit(False)
+        scoped_diplomacy = (
+            (pl.col("country_id").cast(pl.Utf8).str.to_uppercase() == country)
+            & (pl.col("policy_id").cast(pl.Utf8).str.to_lowercase() == "diplomacy")
+        )
+        candidates = candidates.filter(~scoped_diplomacy | allowed)
+    return candidates

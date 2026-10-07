@@ -54,6 +54,10 @@ class StaticAssetLoader:
         
         return state
 
+    def load_definitions(self) -> Dict[str, pl.DataFrame]:
+        """Load layered static definitions for consumers that enrich their own state."""
+        return self._load_toml_collection("definitions")
+
     # =========================================================================
     # SECTION: TSV LOADING (Entities & Map)
     # =========================================================================
@@ -143,9 +147,8 @@ class StaticAssetLoader:
             # Filter out internal columns (starting with underscore)
             valid_cols = [c for c in df.columns if not c.startswith("_")]
             return df.select(valid_cols)
-        except Exception as e:
-            print(f"[StaticLoader] Error reading {path.name}: {e}")
-            return pl.DataFrame()
+        except Exception as error:
+            raise RuntimeError(f"Failed to read required static TSV: {path}") from error
 
     def _generate_runtime_ids(self, df: pl.DataFrame) -> pl.DataFrame:
         """
@@ -226,15 +229,12 @@ class StaticAssetLoader:
             for file_path in target_dir.glob("*.toml"):
                 key_name = file_path.stem  # e.g., 'wars' from 'wars.toml'
                 
-                try:
-                    df = self._parse_toml_file(file_path, key_name)
-                    if not df.is_empty():
-                        if key_name not in collected_data:
-                            collected_data[key_name] = []
-                        collected_data[key_name].append(df)
-                        print(f"[StaticLoader] Loaded '{folder_name}/{key_name}' from {file_path.name}")
-                except Exception as e:
-                    print(f"[StaticLoader] Error loading TOML {file_path}: {e}")
+                df = self._parse_toml_file(file_path, key_name)
+                if not df.is_empty():
+                    if key_name not in collected_data:
+                        collected_data[key_name] = []
+                    collected_data[key_name].append(df)
+                    print(f"[StaticLoader] Loaded '{folder_name}/{key_name}' from {file_path.name}")
 
         # Concatenate collected DataFrames
         # 'diagonal_relaxed' handles cases where mods might add extra properties/columns
@@ -272,9 +272,8 @@ class StaticAssetLoader:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = rtoml.load(f)
-        except Exception as e:
-            print(f"[StaticLoader] Critical error reading {file_path}: {e}")
-            return pl.DataFrame()
+        except Exception as error:
+            raise RuntimeError(f"Failed to parse required static TOML: {file_path}") from error
 
         raw_content = data.get(key)
 

@@ -103,3 +103,11 @@ The renderer will not depend exclusively on transient battle events. A concluded
 - The existing client presentation clock is suitable for smooth effect timing.
 - Existing battle modes and lifecycle statuses are sufficient; no terrain, supply, combat-formula, or third-side data is required.
 - No extension hooks are registered in `.specify/extensions.yml`; no pre-plan or post-plan command is required.
+
+## Follow-up performance issue
+
+The 100-battle CPU proxy was repeated three times after warm-up. Overlay-free / feature medians were 1.166 / 7.812 ms (570.16% relative overhead), 1.184 / 7.911 ms (568.35%), and 1.175 / 7.660 ms (551.77%). The median run was 1.175 / 7.812 ms (568.35%). This is materially elevated diagnostic CPU work, but the benchmark excludes the rest of the GPU-backed frame and discards ImGui draw commands, so it cannot establish the SC-007 five-percent frame-time criterion.
+
+Source inspection confirmed revision-keyed snapshot normalization, one batched anchor-projection call, bounded spatial occupancy, fixed candidate offsets, and no repeated Polars conversion or all-pairs rectangle scan in the frame path. No algorithm optimization iteration was started from this proxy alone: there is no running-client frame profile here to identify a representative bottleneck, and changing the layout without that evidence risks visual semantics while optimizing a non-acceptance proxy. Track the issue for a future in-client capture; SC-007 remains open.
+
+For the deferred work, allow at most three measured algorithm-optimization iterations after a representative in-client profile identifies the target. Record each change and comparable result. If SC-007 still fails after the third iteration, keep it open with the attempts/results and continue the remaining functional acceptance work.

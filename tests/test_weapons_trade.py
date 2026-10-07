@@ -55,7 +55,7 @@ class WeaponsTradeTest(unittest.TestCase):
                 "id": [1, 2], "owner": ["USA", "CAN"], "latitude": [0.0, 1.0], "longitude": [0.0, 1.0],
             }),
             "treaty_effects": pl.DataFrame(effects),
-        })
+        }, globals={"player_country_map": {"player": "USA"}})
         ensure_base_tables(state)
         state.update_table("unit_designs", pl.DataFrame({
             "id": ["tank-v1"], "country_id": ["CAN"], "branch": ["land"], "class_name": ["tank"],

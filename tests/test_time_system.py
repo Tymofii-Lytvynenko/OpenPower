@@ -1,7 +1,7 @@
 import unittest
 from src.shared.state import GameState
 from modules.base.systems.world.time_system import TimeSystem
-from src.shared.events import EventNewDay, EventRealSecond
+from src.shared.events import EventNewDay, EventNewHour, EventRealSecond
 
 class TestTimeSystem(unittest.TestCase):
     def test_time_progression(self):
@@ -33,3 +33,25 @@ class TestTimeSystem(unittest.TestCase):
         system.update(state, 1.5)
         has_new_day = any(isinstance(e, EventNewDay) for e in state.events)
         self.assertTrue(has_new_day)
+
+    def test_hour_rollover_emits_new_hour(self):
+        state = GameState()
+        state.time.speed_level = 1
+
+        TimeSystem().update(state, 2.0)
+
+        hour_events = [event for event in state.events if isinstance(event, EventNewHour)]
+        self.assertEqual(len(hour_events), 1)
+        self.assertEqual((hour_events[0].hour, hour_events[0].total_minutes), (1, 60))
+
+    def test_paused_clock_keeps_real_second_heartbeat_without_advancing_time(self):
+        state = GameState()
+        state.time.is_paused = True
+        state.time.total_minutes = 123
+
+        TimeSystem().update(state, 1.0)
+
+        heartbeat = next(event for event in state.events if isinstance(event, EventRealSecond))
+        self.assertTrue(heartbeat.is_paused)
+        self.assertEqual(heartbeat.game_seconds_passed, 0.0)
+        self.assertEqual(state.time.total_minutes, 123)

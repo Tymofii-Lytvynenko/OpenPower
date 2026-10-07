@@ -1,4 +1,5 @@
 import dataclasses
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, get_type_hints
 
@@ -8,7 +9,9 @@ import rtoml
 from PIL import Image
 
 from src.core.region_adjacency_source import load_region_adjacency
+from src.core.saves import save_backup_path, validate_save_name
 from src.server.io.migrations import CORE_SAVE_MIGRATIONS
+from src.server.io.static_loader import StaticAssetLoader
 from src.shared.config import GameConfig
 from src.shared.migrations import MigrationRegistry
 from src.shared.schema import WorldSchemaRegistry
@@ -41,11 +44,18 @@ class DataLoader:
         """
         Reconstructs a GameState from a save directory using type-driven reflection.
         """
-        save_dir = self.save_root / save_name
-        if not save_dir.exists():
-            raise FileNotFoundError(f"Save '{save_name}' not found.")
+        safe_name = validate_save_name(save_name)
+        save_dir = self.save_root / safe_name
+        backup_dir = save_backup_path(self.save_root, safe_name)
+        if not save_dir.is_dir():
+            if backup_dir.is_dir() and (backup_dir / "meta.json").exists():
+                save_dir = backup_dir
+            else:
+                raise FileNotFoundError(f"Save '{safe_name}' not found.")
+        elif not (save_dir / "meta.json").exists() and backup_dir.is_dir() and (backup_dir / "meta.json").exists():
+            save_dir = backup_dir
 
-        print(f"[DataLoader] Loading save '{save_name}'...")
+        print(f"[DataLoader] Loading save '{safe_name}'...")
 
         meta_path = save_dir / "meta.json"
         if meta_path.exists():
@@ -100,6 +110,10 @@ class DataLoader:
         print("[DataLoader] Compiling state (Hex-Key Mode)...")
         state = GameState()
 
+        definitions = StaticAssetLoader(self.config).load_definitions()
+        for table_name, definition_df in definitions.items():
+            state.update_table(f"def_{table_name}", definition_df)
+
         regions_df = self._load_master_regions()
 
         if not regions_df.is_empty():
@@ -127,6 +141,8 @@ class DataLoader:
 
         prod_df = self._load_domestic_production()
         state.update_table("domestic_production", prod_df)
+        regional_prod_df = self._load_regional_production(regions_df)
+        state.update_table("regional_production", regional_prod_df)
 
         self._apply_schema_registry(state)
         return state
@@ -153,9 +169,15 @@ class DataLoader:
             )
             valid_cols = [c for c in df.columns if not c.startswith("_")]
             return df.select(valid_cols)
-        except Exception as e:
-            print(f"[DataLoader] Error reading {path.name}: {e}")
-            return pl.DataFrame()
+        except Exception as error:
+            raise RuntimeError(f"Failed to read required static TSV: {path}") from error
+
+    def _read_required_toml(self, path: Path, asset_kind: str) -> Dict[str, Any]:
+        try:
+            with open(path, "r", encoding="utf-8") as source_file:
+                return rtoml.load(source_file)
+        except Exception as error:
+            raise RuntimeError(f"Failed to parse required {asset_kind} TOML: {path}") from error
 
     def _load_master_regions(self) -> pl.DataFrame:
         layers: List[pl.DataFrame] = []
@@ -358,12 +380,7 @@ class DataLoader:
         return combined.group_by(list(keys), maintain_order=True).agg(aggregated_columns)
 
     def _load_world_toml(self, path: Path) -> pl.DataFrame:
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = rtoml.load(f)
-        except Exception as e:
-            print(f"[DataLoader] Failed to parse world TOML {path.name}: {e}")
-            return pl.DataFrame()
+        data = self._read_required_toml(path, "world")
 
         if not data:
             return pl.DataFrame()
@@ -373,8 +390,7 @@ class DataLoader:
         elif len(data) == 1:
             raw = next(iter(data.values()))
         else:
-            print(f"[DataLoader] World TOML {path.name} has no '{path.stem}' root table.")
-            return pl.DataFrame()
+            raise RuntimeError(f"World TOML {path} has no '{path.stem}' root table.")
 
         if isinstance(raw, list):
             return pl.from_dicts(raw) if raw else pl.DataFrame()
@@ -414,28 +430,27 @@ class DataLoader:
             for file_path in target_dir.glob("*.toml"):
                 country_id = file_path.stem
                 try:
-                    with open(file_path, "r", encoding="utf-8") as f:
-                        data = rtoml.load(f)
-                        if "resources" in data:
-                            for res_id, res_data in data["resources"].items():
-                                row = {
-                                    "country_id": country_id,
-                                    "game_resource_id": res_id,
-                                }
-                                if isinstance(res_data, dict):
-                                    row["domestic_production"] = float(res_data.get("production", 0))
-                                    row["is_legal"] = bool(res_data.get("is_legal", True))
-                                    row["is_gov_controlled"] = bool(res_data.get("is_gov_controlled", False))
-                                    row["tax_rate"] = float(res_data.get("tax_rate", 0.0))
-                                else:
-                                    row["domestic_production"] = float(res_data)
-                                    row["is_legal"] = True
-                                    row["is_gov_controlled"] = False
-                                    row["tax_rate"] = 0.0
+                    data = self._read_required_toml(file_path, "country resource")
+                    if "resources" in data:
+                        for res_id, res_data in data["resources"].items():
+                            row = {
+                                "country_id": country_id,
+                                "game_resource_id": res_id,
+                            }
+                            if isinstance(res_data, dict):
+                                row["domestic_production"] = float(res_data.get("production", 0))
+                                row["is_legal"] = bool(res_data.get("is_legal", True))
+                                row["is_gov_controlled"] = bool(res_data.get("is_gov_controlled", False))
+                                row["tax_rate"] = float(res_data.get("tax_rate", 0.0))
+                            else:
+                                row["domestic_production"] = float(res_data)
+                                row["is_legal"] = True
+                                row["is_gov_controlled"] = False
+                                row["tax_rate"] = 0.0
 
-                                records.append(row)
-                except Exception as e:
-                    print(f"[DataLoader] Failed to parse TOML {file_path.name}: {e}")
+                            records.append(row)
+                except Exception as error:
+                    raise RuntimeError(f"Failed to parse required country resource TOML: {file_path}") from error
 
         if records:
             return pl.DataFrame(records)
@@ -443,3 +458,121 @@ class DataLoader:
             {"country_id": [], "game_resource_id": [], "domestic_production": []},
             schema={"country_id": pl.Utf8, "game_resource_id": pl.Utf8, "domestic_production": pl.Float64},
         )
+
+    def _load_regional_production(self, regions: pl.DataFrame) -> pl.DataFrame:
+        """Load only explicit region/resource entries; national totals are never apportioned."""
+
+        schema = {
+            "id": pl.Utf8,
+            "country_id": pl.Utf8,
+            "region_id": pl.Int32,
+            "game_resource_id": pl.Utf8,
+            "domestic_production": pl.Float64,
+        }
+        if regions.is_empty() or not {"id"}.issubset(regions.columns):
+            return pl.DataFrame(schema=schema)
+
+        region_lookup: dict[str, int | None] = {}
+        for region in regions.iter_rows(named=True):
+            region_id = int(region["id"])
+            aliases = [region_id]
+            aliases.extend(region.get(key) for key in ("iso_region", "hex", "postal"))
+            for alias in aliases:
+                normalized = str(alias or "").strip().upper().lstrip("#")
+                if not normalized:
+                    continue
+                previous = region_lookup.get(normalized, region_id)
+                region_lookup[normalized] = region_id if previous == region_id else None
+
+        records_by_id: dict[str, dict[str, Any]] = {}
+        for data_dir in self.config.get_data_dirs():
+            target_dir = data_dir / "countries" / "countries_res"
+            if not target_dir.exists():
+                continue
+
+            for file_path in sorted(target_dir.glob("*.toml")):
+                country_id = file_path.stem.strip().upper()
+                data = self._read_required_toml(file_path, "country resource")
+                for region_key, region_data in self._regional_resource_entries(
+                    data.get("regional_resources", {})
+                ):
+                    normalized_region = str(region_key or "").strip().upper().lstrip("#")
+                    region_id = region_lookup.get(normalized_region)
+                    if region_id is None:
+                        raise ValueError(
+                            f"{file_path.name} references unknown or ambiguous region '{region_key}'."
+                        )
+                    for resource_id, resource_data in region_data.items():
+                        if not resource_id:
+                            raise ValueError(f"{file_path.name} contains an empty regional resource ID.")
+                        if isinstance(resource_data, dict):
+                            unsupported_fields = set(resource_data) - {
+                                "production",
+                                "domestic_production",
+                            }
+                            if unsupported_fields:
+                                raise ValueError(
+                                    f"{file_path.name} has unsupported regional fields for "
+                                    f"'{resource_id}': {sorted(unsupported_fields)}."
+                                )
+                            raw_amount = resource_data.get(
+                                "production",
+                                resource_data.get("domestic_production"),
+                            )
+                        else:
+                            raw_amount = resource_data
+
+                        amount = self._validated_nonnegative(
+                            raw_amount,
+                            f"{file_path.name} has invalid regional production for '{resource_id}'.",
+                        )
+                        record_id = f"{country_id}:{region_id}:{resource_id}"
+                        records_by_id[record_id] = {
+                            "id": record_id,
+                            "country_id": country_id,
+                            "region_id": int(region_id),
+                            "game_resource_id": str(resource_id),
+                            "domestic_production": amount,
+                        }
+
+        rows = [row for row in records_by_id.values() if row["domestic_production"] > 0.0]
+        return pl.DataFrame(rows, schema=schema, strict=False) if rows else pl.DataFrame(schema=schema)
+
+    def _regional_resource_entries(self, regional_resources: Any) -> list[tuple[Any, dict[str, Any]]]:
+        if isinstance(regional_resources, list):
+            entries = []
+            for entry in regional_resources:
+                if not isinstance(entry, dict):
+                    raise ValueError("Each regional_resources list entry must be a mapping.")
+                region_key = entry.get("region_id", entry.get("region"))
+                resources = entry.get("resources", {})
+                if region_key is None or not isinstance(resources, dict):
+                    raise ValueError("Regional resources require a region identifier and resource mapping.")
+                entries.append((region_key, resources))
+            return entries
+
+        if not isinstance(regional_resources, dict):
+            raise ValueError("regional_resources must be a mapping or a list of mappings.")
+
+        entries = []
+        for region_key, region_data in regional_resources.items():
+            if not isinstance(region_data, dict):
+                raise ValueError(f"Regional resource entry '{region_key}' must be a mapping.")
+            resources = region_data.get("resources")
+            if not isinstance(resources, dict):
+                resources = {
+                    key: value
+                    for key, value in region_data.items()
+                    if key not in {"region", "region_id", "name"}
+                }
+            entries.append((region_data.get("region_id", region_data.get("region", region_key)), resources))
+        return entries
+
+    def _validated_nonnegative(self, value: Any, message: str) -> float:
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError) as error:
+            raise ValueError(message) from error
+        if not math.isfinite(number) or number < 0.0:
+            raise ValueError(message)
+        return number

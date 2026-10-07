@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any, Iterable
 
@@ -7,10 +8,12 @@ import polars as pl
 
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_HELPER
-from src.shared.events import EventBattleEnded, EventBattleParticipantRejected, EventBattleStarted, EventBattleUpdated, EventNewHour
+from modules.base.systems.military.capability_catalog import canonical_role
+from src.shared.events import EventBattleEnded, EventBattleParticipantRejected, EventBattleStarted, EventBattleUpdated, EventNewHour, EventOccupationChanged
 from src.shared.actions import ActionAttackUnit, ActionMoveUnit
 from src.shared.state import GameState
 from modules.base.systems.military.alliance_policy import AlliancePolicy
+from modules.base.systems.military.battle_anchor_policy import BattleAnchor, resolve_battle_anchor
 from modules.base.systems.military.readiness_policy import ReadinessPolicy
 from modules.base.systems.military.readiness_system import cancel_readiness_for_contact
 
@@ -26,6 +29,9 @@ BATTLE_SCHEMA: dict[str, pl.DataType] = {
     "id": pl.Utf8,
     "war_id": pl.Utf8,
     "region_id": pl.Int32,
+    "anchor_latitude": pl.Float64,
+    "anchor_longitude": pl.Float64,
+    "anchor_source": pl.Utf8,
     "attacker_side": pl.Utf8,
     "mode": pl.Utf8,
     "defender_side": pl.Utf8,
@@ -83,6 +89,15 @@ UNIT_REQUIRED_COLUMNS: dict[str, tuple[pl.DataType, Any]] = {
     "current_region_id": (pl.Int32, 0),
     "is_moving": (pl.Boolean, False),
     "readiness_status": (pl.Utf8, "ready"),
+    "combat_posture": (pl.Utf8, "hold"),
+    "combat_strength_modifier": (pl.Float64, 1.0),
+    "war_exhaustion_modifier": (pl.Float64, 1.0),
+    "combat_casualty_modifier": (pl.Float64, 1.0),
+    "combat_defense_modifier": (pl.Float64, 1.0),
+    "combat_attack_risk_modifier": (pl.Float64, 1.0),
+    "combat_readiness_modifier": (pl.Float64, 1.0),
+    "combat_holding_modifier": (pl.Float64, 1.0),
+    "combat_counterattack_modifier": (pl.Float64, 1.0),
 }
 
 
@@ -212,8 +227,8 @@ class CombatResolutionPolicy:
 
 class CombatSystem(ISystem):
     access = SystemAccess(
-        reads=frozenset({'countries', 'regions', 'units', 'countries_wars', 'countries_treaties', 'battles', 'unit_readiness_transitions'}),
-        writes=frozenset({'regions', 'units', 'battles', 'battle_units', 'battle_participants', 'occupations'}),
+        reads=frozenset({'countries', 'regions', 'units', 'countries_wars', 'countries_treaties', 'battles', 'unit_readiness_transitions', 'unit_capability_projections', 'battle_casualty_records'}),
+        writes=frozenset({'regions', 'units', 'battles', 'battle_units', 'battle_participants', 'battle_casualty_records', 'occupations'}),
         handles=frozenset({ActionAttackUnit, ActionMoveUnit}),
         phase=SystemPhase.COMBAT,
     )
@@ -221,12 +236,14 @@ class CombatSystem(ISystem):
         "_policy": SYSTEM_STATE_HELPER,
         "_readiness": SYSTEM_STATE_HELPER,
         "_alliances": SYSTEM_STATE_HELPER,
+        "_capability_index": SYSTEM_STATE_HELPER,
     }
 
     def __init__(self):
         self._policy = CombatResolutionPolicy()
         self._readiness = ReadinessPolicy()
         self._alliances = AlliancePolicy()
+        self._capability_index: dict[str, dict[str, Any]] = {}
 
     @property
     def id(self) -> str:
@@ -243,6 +260,11 @@ class CombatSystem(ISystem):
 
         regions = self._ensure_regions_table(state.get_table(REGIONS_TABLE))
         units = self._ensure_units_table(state.get_table(UNITS_TABLE))
+        projection_table = state.tables.get("unit_capability_projections")
+        self._capability_index = {} if projection_table is None else {
+            str(row.get("unit_id") or ""): self._decode_projection(row)
+            for row in projection_table.to_dicts()
+        }
         wars = WarIndex.from_table(state.tables.get(COUNTRIES_WARS_TABLE))
         existing_battles = self._existing_active_battle_ids(state.tables.get(BATTLE_TABLE))
         should_resolve = (not state.time.is_paused) and any(isinstance(event, EventNewHour) for event in state.events)
@@ -253,6 +275,8 @@ class CombatSystem(ISystem):
         }
 
         unit_rows = units.to_dicts()
+        casualty_table = state.tables.get("battle_casualty_records")
+        casualty_rows = [] if casualty_table is None else casualty_table.to_dicts()
         stationary_units = self._stationary_units_by_region(unit_rows)
         relevant_region_ids = sorted(stationary_units)
         region_rows = (
@@ -361,6 +385,7 @@ class CombatSystem(ISystem):
                             unit["readiness_eta_minute"] = 0
 
                 prior_row = self._battle_row(state.tables.get(BATTLE_TABLE), battle_id)
+                anchor = resolve_battle_anchor(local_units, region_row, prior_row)
                 previous_a = self._total_strength(local_units, conflict.side_a_members)
                 previous_b = self._total_strength(local_units, conflict.side_b_members)
                 battle_metadata[battle_id] = {
@@ -369,6 +394,7 @@ class CombatSystem(ISystem):
                     "side_a_tags": conflict.side_a_tags,
                     "side_b_tags": conflict.side_b_tags,
                     "prior_row": prior_row,
+                    "anchor": anchor,
                     "previous_a": previous_a,
                     "previous_b": previous_b,
                     "round_resolved": False,
@@ -380,7 +406,15 @@ class CombatSystem(ISystem):
                 )
                 if resolve_this_tick:
                     battle_metadata[battle_id]["round_resolved"] = True
+                    pre_round_strength = {
+                        str(row.get("id") or ""): max(0, int(row.get("strength") or 0))
+                        for row in local_units
+                    }
                     victor = self._apply_combat_round(local_units, conflict, battle_mode)
+                    self._record_round_casualties(
+                        casualty_rows, battle_id, int(prior_row.get("round") or 0) + 1,
+                        local_units, conflict, pre_round_strength, int(state.time.total_minutes),
+                    )
                     if victor is not None:
                         victorious_battles[battle_id] = victor
                         victorious_sides[battle_id] = "SIDE_A" if victor in conflict.side_a_members else "SIDE_B"
@@ -433,6 +467,7 @@ class CombatSystem(ISystem):
                             status=status,
                             round_number=round_number,
                             prior_row=prior_row,
+                            anchor=anchor,
                         )
                     else:
                         battle_row = prior_row
@@ -460,6 +495,8 @@ class CombatSystem(ISystem):
                             side_b_strength=float(side_b_strength),
                             balance=current_balance,
                             updated_at_minute=int(state.time.total_minutes),
+                            side_a_losses=int(battle_row.get("side_a_losses") or 0),
+                            side_b_losses=int(battle_row.get("side_b_losses") or 0),
                         ))
                 else:
                     winner = self._winning_country(local_units, conflict)
@@ -523,6 +560,7 @@ class CombatSystem(ISystem):
                     side_b_losses=max(0, previous_b - side_b_strength) if bool(metadata.get("round_resolved")) else 0,
                     status="concluded",
                     round_number=round_number,
+                    anchor=metadata.get("anchor"),
                 )
             else:
                 metadata = battle_metadata.get(battle_id, {})
@@ -548,6 +586,9 @@ class CombatSystem(ISystem):
                 victor_side=victorious_sides.get(battle_id, ""),
                 region_id=region_id,
                 concluded_at_minute=int(state.time.total_minutes),
+                side_a_losses=int(concluded_row.get("side_a_losses") or 0),
+                side_b_losses=int(concluded_row.get("side_b_losses") or 0),
+                participant_countries=tuple(sorted({self._clean_tag(unit.get("owner")) for unit in local_units if self._clean_tag(unit.get("owner"))})),
             ))
             if victor:
                 self._set_region_controller(region_rows, region_id, victor)
@@ -595,6 +636,13 @@ class CombatSystem(ISystem):
         if controller_updates:
             all_region_rows = regions.to_dicts()
             for region_id, controller in controller_updates.items():
+                state.events.append(EventOccupationChanged(
+                    region_id=region_id,
+                    previous_controller=str(original_controllers.get(region_id) or ""),
+                    controller=controller,
+                    source="battle_resolution",
+                    at_minute=int(state.time.total_minutes),
+                ))
                 self._set_region_controller(all_region_rows, region_id, controller)
             updated_regions = self._frame_from_rows(regions.schema, all_region_rows)
         self._update_table_if_changed(state, REGIONS_TABLE, updated_regions)
@@ -605,6 +653,14 @@ class CombatSystem(ISystem):
             "battle_participants",
             self._frame_from_rows(BATTLE_PARTICIPANTS_SCHEMA, participant_rows),
         )
+        if casualty_rows != ([] if casualty_table is None else casualty_table.to_dicts()):
+            casualty_schema = {
+                "id": pl.Utf8, "battle_id": pl.Utf8, "unit_id": pl.Utf8,
+                "country_id": pl.Utf8, "side": pl.Utf8, "unit_type": pl.Utf8,
+                "losses": pl.Int64, "round": pl.Int32, "created_at_minute": pl.Int64,
+            }
+            updated_casualties = pl.DataFrame(sorted(casualty_rows, key=lambda row: str(row.get("id") or "")), schema=casualty_schema) if casualty_rows else pl.DataFrame(schema=casualty_schema)
+            self._update_table_if_changed(state, "battle_casualty_records", updated_casualties)
         self._update_table_if_changed(
             state,
             "occupations",
@@ -637,7 +693,8 @@ class CombatSystem(ISystem):
     def _stationary_units_by_region(self, unit_rows: list[dict[str, Any]]) -> dict[int, list[dict[str, Any]]]:
         grouped: dict[int, list[dict[str, Any]]] = {}
         for row in sorted(unit_rows, key=lambda unit: str(unit.get("id") or "")):
-            if bool(row.get("is_moving", False)):
+            # Tactical withdrawals remain attached to their battle until the route lifecycle resolves.
+            if bool(row.get("is_moving", False)) and str(row.get("unit_lifecycle") or "") not in {"battle_retreating", "battle_disengaging"}:
                 continue
             region_id = int(row.get("current_region_id") or 0)
             if region_id <= 0:
@@ -732,10 +789,30 @@ class CombatSystem(ISystem):
         # Resolve tactics on readiness-weighted strength, then translate losses
         # back to personnel so a low-readiness modifier does not make a unit
         # impossible to eliminate in a decisive round.
-        losses_a = int(round(outcome.attacker_losses * raw_a / max(1, side_a_strength)))
-        losses_b = int(round(outcome.defender_losses * raw_b / max(1, side_b_strength)))
-        self._distribute_losses(local_units, conflict.side_a_members, losses_a)
-        self._distribute_losses(local_units, conflict.side_b_members, losses_b)
+        damageable_by_a = self._eligible_defenders(local_units, conflict.side_a_members, conflict.side_b_members)
+        damageable_by_b = self._eligible_defenders(local_units, conflict.side_b_members, conflict.side_a_members)
+        losses_a = 0 if not damageable_by_b else int(round(
+            outcome.attacker_losses * raw_a / max(1, side_a_strength)
+            * self._casualty_modifier(local_units, conflict.side_a_members)
+            * self._side_damage_factor(local_units, conflict.side_b_members, conflict.side_a_members)
+        ))
+        losses_b = 0 if not damageable_by_a else int(round(
+            outcome.defender_losses * raw_b / max(1, side_b_strength)
+            * self._casualty_modifier(local_units, conflict.side_b_members)
+            * self._side_damage_factor(local_units, conflict.side_a_members, conflict.side_b_members)
+        ))
+        self._distribute_losses(
+            local_units,
+            conflict.side_a_members,
+            losses_a,
+            {str(unit.get("id") or "") for unit in damageable_by_b},
+        )
+        self._distribute_losses(
+            local_units,
+            conflict.side_b_members,
+            losses_b,
+            {str(unit.get("id") or "") for unit in damageable_by_a},
+        )
 
         remaining_a = self._total_strength(local_units, conflict.side_a_members)
         remaining_b = self._total_strength(local_units, conflict.side_b_members)
@@ -746,6 +823,36 @@ class CombatSystem(ISystem):
         if remaining_a > 0:
             return self._dominant_country(local_units, conflict.side_a_members)
         return self._dominant_country(local_units, conflict.side_b_members)
+
+    def _record_round_casualties(
+        self,
+        rows: list[dict[str, Any]],
+        battle_id: str,
+        round_number: int,
+        local_units: list[dict[str, Any]],
+        conflict: ConflictContext,
+        pre_round_strength: dict[str, int],
+        now: int,
+    ) -> None:
+        existing_ids = {str(row.get("id") or "") for row in rows}
+        side_a, side_b = set(conflict.side_a_members), set(conflict.side_b_members)
+        for unit in sorted(local_units, key=lambda row: str(row.get("id") or "")):
+            unit_id = str(unit.get("id") or "")
+            losses = max(0, pre_round_strength.get(unit_id, 0) - max(0, int(unit.get("strength") or 0)))
+            record_id = f"{battle_id}:{round_number}:{unit_id}"
+            if losses <= 0 or record_id in existing_ids:
+                continue
+            owner = self._clean_tag(unit.get("owner"))
+            side = "SIDE_A" if owner in side_a else "SIDE_B" if owner in side_b else ""
+            if not side:
+                continue
+            rows.append({
+                "id": record_id, "battle_id": battle_id, "unit_id": unit_id,
+                "country_id": owner, "side": side,
+                "unit_type": str(unit.get("unit_type") or "unit"),
+                "losses": losses, "round": int(round_number), "created_at_minute": int(now),
+            })
+            existing_ids.add(record_id)
 
     def _build_battle_row(
         self,
@@ -763,14 +870,21 @@ class CombatSystem(ISystem):
         status: str = "active",
         round_number: int | None = None,
         prior_row: dict[str, Any] | None = None,
+        anchor: BattleAnchor | None = None,
     ) -> dict[str, Any]:
         prior = prior_row or {}
         total_strength = max(1, side_a_strength + side_b_strength)
         current_round = int(prior.get("round") or 0) if round_number is None else int(round_number)
+        anchor_fields = anchor.as_row_fields() if anchor is not None else {
+            "anchor_latitude": prior.get("anchor_latitude"),
+            "anchor_longitude": prior.get("anchor_longitude"),
+            "anchor_source": str(prior.get("anchor_source") or ""),
+        }
         return {
             "id": battle_id,
             "war_id": war_id,
             "region_id": region_id,
+            **anchor_fields,
             "attacker_side": ",".join(sorted(side_a_tags)),
             "defender_side": ",".join(sorted(side_b_tags)),
             "mode": mode,
@@ -942,34 +1056,215 @@ class CombatSystem(ISystem):
         raw_strength = sum(
             max(0, int(row.get("strength") or 0))
             for row in local_units
-            if self._clean_tag(row.get("owner")) in eligible
+            if self._clean_tag(row.get("owner")) in eligible and self._combat_active(row)
         )
         if raw_strength <= 0:
             return 0
         effective_strength = sum(
-            max(0, int(row.get("strength") or 0)) * self._readiness.combat_weight(row.get("readiness_status"))
+            max(0, int(row.get("strength") or 0))
+            * self._readiness.combat_weight(row.get("readiness_status"))
+            * self._bounded_modifier(row, "combat_strength_modifier", 0.0, 1.5)
+            * self._bounded_modifier(row, "combat_readiness_modifier", 0.0, 1.5)
+            * max(0.5, min(1.0, float(row.get("war_exhaustion_modifier") or 1.0)))
+            * max(0.5, min(1.0, self._number(row.get("cohesion")) or 1.0))
+            * self._capability_strength_factor(row)
             for row in local_units
-            if self._clean_tag(row.get("owner")) in eligible
+            if self._clean_tag(row.get("owner")) in eligible and self._combat_active(row)
         )
         return max(1, int(round(effective_strength)))
+
+    def _side_can_damage(self, local_units, attacking_tags, defending_tags) -> bool:
+        return bool(self._eligible_defenders(local_units, attacking_tags, defending_tags))
+
+    def _eligible_defenders(self, local_units, attacking_tags, defending_tags):
+        attacking = set(attacking_tags)
+        defending = set(defending_tags)
+        attackers = [
+            row for row in local_units
+            if self._clean_tag(row.get("owner")) in attacking
+            and int(row.get("strength") or 0) > 0
+            and self._can_initiate_combat(row)
+        ]
+        defenders = [
+            row for row in local_units
+            if self._clean_tag(row.get("owner")) in defending
+            and int(row.get("strength") or 0) > 0
+            and self._combat_active(row)
+        ]
+        return [
+            defender for defender in defenders
+            if any(self._attacker_can_damage(attacker, defender) for attacker in attackers)
+        ]
+
+    def _attacker_can_damage(self, attacker, defender) -> bool:
+        profile = self._capability_index.get(str(attacker.get("id") or ""))
+        if profile is None:
+            return True
+        targets = set(profile.get("valid_targets") or [])
+        if "generic" in targets or "all" in targets:
+            return True
+        target_profile = self._capability_index.get(str(defender.get("id") or ""), {})
+        role = canonical_role(target_profile.get("role") or defender.get("unit_type"))
+        domain = str(target_profile.get("domain") or defender.get("unit_domain") or "land").lower()
+        categories = {role, domain, self._target_category(role, domain)}
+        return bool(targets.intersection(categories))
+
+    def _side_damage_factor(self, local_units, attacking_tags, defending_tags) -> float:
+        attackers = [
+            row for row in local_units
+            if self._clean_tag(row.get("owner")) in set(attacking_tags)
+            and int(row.get("strength") or 0) > 0
+            and self._can_initiate_combat(row)
+        ]
+        defenders = self._eligible_defenders(local_units, attacking_tags, defending_tags)
+        if not attackers or not defenders:
+            return 0.0
+        eligible_attackers = [
+            attacker for attacker in attackers
+            if any(self._attacker_can_damage(attacker, defender) for defender in defenders)
+        ]
+        eligible_raw_strength = sum(max(0, int(row.get("strength") or 0)) for row in eligible_attackers)
+        all_raw_strength = sum(max(0, int(row.get("strength") or 0)) for row in attackers)
+        if eligible_raw_strength <= 0 or all_raw_strength <= 0:
+            return 0.0
+        attack_factor = sum(
+            max(0, int(row.get("strength") or 0))
+            * self._capability_damage_factor(
+                row,
+                [defender for defender in defenders if self._attacker_can_damage(row, defender)],
+            )
+            * (
+                self._bounded_modifier(row, "combat_counterattack_modifier", 0.0, 1.5)
+                if str(row.get("combat_posture") or "hold").strip().lower() == "defend"
+                else 1.0
+            )
+            for row in eligible_attackers
+        ) / eligible_raw_strength
+        eligible_strength = self._total_strength(eligible_attackers, attacking_tags)
+        total_strength = self._total_strength(attackers, attacking_tags)
+        participation = min(1.0, eligible_strength / max(1, total_strength))
+        protection = sum(
+            max(0.5, min(1.5,
+                self._bounded_modifier(row, "combat_defense_modifier", 0.5, 1.5)
+                * self._bounded_modifier(row, "combat_holding_modifier", 0.5, 1.5)
+            ))
+            for row in defenders
+        ) / len(defenders)
+        return max(0.0, min(1.5, attack_factor * participation / protection))
+
+    def _capability_strength_factor(self, unit):
+        profile = self._capability_index.get(str(unit.get("id") or ""))
+        if profile is None:
+            return 1.0
+        capabilities = profile.get("capabilities") or {}
+        firepower = max(0.0, self._number(capabilities.get("gun_damage"))) + max(0.0, self._number(capabilities.get("missile_damage")))
+        precision = max(self._number(capabilities.get("gun_precision")), self._number(capabilities.get("missile_precision")))
+        return max(0.75, min(1.5, 1.0 + min(0.4, firepower / 100.0) * max(0.0, min(1.0, precision))))
+
+    def _combat_active(self, unit):
+        return str(unit.get("combat_posture") or "hold").strip().lower() != "reorganize"
+
+    def _can_initiate_combat(self, unit):
+        return self._combat_active(unit) and str(unit.get("combat_posture") or "hold").strip().lower() not in {"back_off", "retreat"}
+
+    def _capability_damage_factor(self, unit, defenders):
+        profile = self._capability_index.get(str(unit.get("id") or ""))
+        if profile is None:
+            return 1.0
+        factor = self._capability_strength_factor(unit)
+        targets = set(profile.get("valid_targets") or [])
+        if "generic" in targets or "all" in targets:
+            return factor
+        for defender in defenders:
+            if not self._attacker_can_damage(unit, defender):
+                continue
+            target_profile = self._capability_index.get(str(defender.get("id") or ""), {})
+            vulnerabilities = set(target_profile.get("vulnerabilities") or [])
+            domain = str(profile.get("domain") or unit.get("unit_domain") or "land").lower()
+            if domain in vulnerabilities:
+                factor *= 1.1
+                break
+        return max(0.75, min(1.5, factor))
+
+    def _number(self, value):
+        try:
+            result = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return 0.0
+        return result if result == result and abs(result) != float("inf") else 0.0
+
+    def _bounded_modifier(self, row, name, minimum, maximum):
+        value = row.get(name)
+        if value is None:
+            return 1.0
+        return max(minimum, min(maximum, self._number(value)))
+
+    def _target_category(self, role, domain):
+        if role in {"tanks", "infantry_vehicles", "artillery", "air_defense", "mobile_launchers"}:
+            return "armor" if role in {"tanks", "infantry_vehicles"} else role
+        if domain == "air":
+            return "air"
+        if domain == "naval":
+            return "ships"
+        return role
+
+    def _decode_projection(self, row):
+        def decode(key, fallback):
+            try:
+                value = json.loads(str(row.get(key) or fallback))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return json.loads(fallback)
+            return value
+        return {
+            "role": canonical_role(row.get("role")),
+            "domain": str(row.get("domain") or "land").lower(),
+            "valid_targets": decode("valid_targets_json", "[]"),
+            "vulnerabilities": decode("vulnerabilities_json", "[]"),
+            "capabilities": decode("capabilities_json", "{}"),
+        }
+
+    def _casualty_modifier(self, local_units: list[dict[str, Any]], eligible_tags: Iterable[str]) -> float:
+        eligible = set(eligible_tags)
+        rows = [row for row in local_units if self._clean_tag(row.get("owner")) in eligible and int(row.get("strength") or 0) > 0 and self._combat_active(row)]
+        total = sum(int(row.get("strength") or 0) for row in rows)
+        if total <= 0:
+            return 1.0
+        weighted = sum(
+            int(row.get("strength") or 0)
+            * self._bounded_modifier(row, "combat_casualty_modifier", 0.5, 1.5)
+            * self._bounded_modifier(row, "combat_attack_risk_modifier", 0.5, 1.5)
+            for row in rows
+        )
+        return weighted / total
 
     def _raw_strength(self, local_units: list[dict[str, Any]], eligible_tags: Iterable[str]) -> int:
         eligible = set(eligible_tags)
         return sum(
             max(0, int(row.get("strength") or 0))
             for row in local_units
-            if self._clean_tag(row.get("owner")) in eligible
+            if self._clean_tag(row.get("owner")) in eligible and self._combat_active(row)
         )
 
-    def _distribute_losses(self, local_units: list[dict[str, Any]], eligible_tags: Iterable[str], total_losses: int) -> None:
+    def _distribute_losses(
+        self,
+        local_units: list[dict[str, Any]],
+        eligible_tags: Iterable[str],
+        total_losses: int,
+        eligible_unit_ids: set[str] | None = None,
+    ) -> None:
         remaining_losses = max(0, total_losses)
         if remaining_losses <= 0:
             return
 
+        allowed_ids = None if eligible_unit_ids is None else set(eligible_unit_ids)
+        eligible_country_tags = set(eligible_tags)
         eligible_rows = [
             row
             for row in sorted(local_units, key=lambda unit: str(unit.get("id") or ""))
-            if self._clean_tag(row.get("owner")) in set(eligible_tags) and int(row.get("strength") or 0) > 0
+            if self._clean_tag(row.get("owner")) in eligible_country_tags
+            and (allowed_ids is None or str(row.get("id") or "") in allowed_ids)
+            and int(row.get("strength") or 0) > 0
+            and self._combat_active(row)
         ]
         if not eligible_rows:
             return

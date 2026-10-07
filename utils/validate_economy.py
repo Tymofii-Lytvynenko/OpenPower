@@ -1,6 +1,8 @@
 import os
 import rtoml
 import csv
+import math
+from numbers import Real
 from pathlib import Path
 
 # Path to the directory containing country economy TOML files
@@ -65,6 +67,8 @@ def validate_file(file_path: Path, target_gdp: float):
         return ["Missing [resources] section"]
     
     resources = data["resources"]
+    if not isinstance(resources, dict):
+        return ["[resources] must contain a table"]
     
     # 1. Check for missing categories
     missing = [res for res in ALL_RESOURCES if res not in resources]
@@ -72,9 +76,41 @@ def validate_file(file_path: Path, target_gdp: float):
         errors.append(f"Missing categories: {', '.join(missing)}")
     
     # 2. Check for zero or negative production values
-    zeros = [k for k, v in resources.items() if isinstance(v, dict) and v.get('production', 0) <= 0]
+    zeros = []
+    invalid_production = []
+    total_sum = 0.0
+    for name, entry in resources.items():
+        if not isinstance(entry, dict):
+            continue
+        production = entry.get("production", 0)
+        if isinstance(production, bool) or not isinstance(production, Real):
+            invalid_production.append(name)
+            continue
+        production = float(production)
+        if not math.isfinite(production):
+            invalid_production.append(name)
+            continue
+        total_sum += production
+        if production <= 0:
+            zeros.append(name)
+
+    if invalid_production:
+        errors.append(
+            "Invalid production values (expected finite numbers): "
+            + ", ".join(invalid_production)
+        )
+    valid_target_gdp = (
+        target_gdp is None
+        or (
+            not isinstance(target_gdp, bool)
+            and isinstance(target_gdp, Real)
+            and math.isfinite(float(target_gdp))
+        )
+    )
+    if target_gdp is not None and not valid_target_gdp:
+        errors.append("Target GDP must be a finite number")
     if zeros:
-        if target_gdp and target_gdp > 0:
+        if valid_target_gdp and target_gdp and target_gdp > 0:
             errors.append(f"Zero/Negative production values found: {', '.join(zeros)}")
     
     # 3. Check for missing fields in dict
@@ -88,11 +124,11 @@ def validate_file(file_path: Path, target_gdp: float):
                 errors.append(f"Resource {k} missing required field: {field}")
 
     # 4. Check sum if target_gdp is provided
-    total_sum = sum(v.get('production', 0) for v in resources.values() if isinstance(v, dict))
     if target_gdp is not None:
-        diff = abs(total_sum - target_gdp)
-        if diff > 1000:
-            errors.append(f"Sum mismatch: Found {total_sum:,.0f}, Expected {target_gdp:,.0f} (Diff: {diff:,.0f})")
+        if valid_target_gdp:
+            diff = abs(total_sum - float(target_gdp))
+            if diff > 1000:
+                errors.append(f"Sum mismatch: Found {total_sum:,.0f}, Expected {target_gdp:,.0f} (Diff: {diff:,.0f})")
     
     # 5. Check for extra categories not in the master list
     extra = [k for k in resources.keys() if k not in ALL_RESOURCES]

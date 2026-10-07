@@ -1,3 +1,5 @@
+import math
+
 import polars as pl
 from imgui_bundle import imgui, icons_fontawesome_6
 
@@ -13,6 +15,22 @@ class BudgetPanel:
     Detailed National Budget Menu.
     Uses real data from the simulation and allows interaction for the player's country.
     """
+    ROW_DETAILS = {
+        "income-tax": (
+            "Annual income-tax revenue, calculated from GDP, human development, "
+            "and the effective personal tax rate."
+        ),
+        "income-trade": "Annual public revenue recorded by the global trade market.",
+        "fixed-security": "Recurring security-services expenditure recorded for this country.",
+        "fixed-diplomacy": "Diplomatic aid and treaty-maintenance expenditure recorded for this country.",
+        "fixed-trade": "Government trade-import and trade-agreement expenditure recorded for this country.",
+        "fixed-military-upkeep": (
+            "Annual military operating costs based on force size, readiness, "
+            "and active design maintenance."
+        ),
+    }
+    PERSONAL_INCOME_TAX_KEY = "personal_income_tax_rate"
+
     def __init__(self):
         self.K_BUDGET = 0.15
         self.PERSONAL_INCOME_TAX_CONSTANT = 3.0
@@ -48,6 +66,7 @@ class BudgetPanel:
         }
         
         self.allocations = {k: 0.50 for k in self.M_SECTOR_LABELS.keys()}
+        self.allocations[self.PERSONAL_INCOME_TAX_KEY] = 0.20
         self.draft_allocations = self.allocations.copy()
         
         self.REQUIREMENT_THRESHOLD = 0.50
@@ -92,13 +111,7 @@ class BudgetPanel:
 
                 if imgui.button("apply"):
                     if net_client and is_own:
-                        action = ActionUpdateBudget(
-                            player_id=net_client.player_id,
-                            country_tag=target_tag,
-                            allocations=self.draft_allocations.copy()
-                        )
-                        net_client.send_action(action)
-                        self.allocations = self.draft_allocations.copy()
+                        self._dispatch_budget_update(net_client, target_tag)
 
                 imgui.pop_style_color(2)
                 if has_changes and is_own:
@@ -126,10 +139,10 @@ class BudgetPanel:
         if df.is_empty(): return
         
         row = df.to_dicts()[0]
-        for col in self.M_SECTOR_LABELS.keys():
+        for col in (*self.M_SECTOR_LABELS.keys(), self.PERSONAL_INCOME_TAX_KEY):
             if col in row:
-                val = row[col]
-                self.allocations[col] = float(val) if val is not None else 0.5
+                fallback = 0.20 if col == self.PERSONAL_INCOME_TAX_KEY else 0.50
+                self.allocations[col] = self._bounded_ratio(row[col], fallback)
         
         self.draft_allocations = self.allocations.copy()
 
@@ -185,8 +198,11 @@ class BudgetPanel:
 
         Prims.header("INCOME", show_bg=False)
         self._draw_total_bar("TOTAL", total_income, GAMETHEME.colors.positive)
-        self._draw_standard_row("PERSONAL INCOME TAX", revenue_tax, has_more=True)
-        self._draw_standard_row("TRADE", trade_income, has_more=True)
+        self._draw_standard_row(
+            "PERSONAL INCOME TAX", revenue_tax, has_more=True, detail_key="income-tax"
+        )
+        self._draw_income_tax_slider(is_own)
+        self._draw_standard_row("TRADE", trade_income, has_more=True, detail_key="income-trade")
         self._draw_standard_row("TOURISM", tourism_income)
         if budget_imf_ratio > 0:
             self._draw_standard_row("IMF AID", budget_imf_ratio)
@@ -228,10 +244,12 @@ class BudgetPanel:
 
         Prims.header("FIXED EXPENSES", show_bg=False)
         self._draw_total_bar("TOTAL", total_fixed, GAMETHEME.colors.negative)
-        self._draw_standard_row("SECURITY", security_upkeep, has_more=True)
-        self._draw_standard_row("DIPLOMACY", diplomacy_upkeep, has_more=True)
-        self._draw_standard_row("TRADE", trade_expense, has_more=True)
-        self._draw_standard_row("MILITARY UPKEEP", military_upkeep, has_more=True)
+        self._draw_standard_row("SECURITY", security_upkeep, has_more=True, detail_key="fixed-security")
+        self._draw_standard_row("DIPLOMACY", diplomacy_upkeep, has_more=True, detail_key="fixed-diplomacy")
+        self._draw_standard_row("TRADE", trade_expense, has_more=True, detail_key="fixed-trade")
+        self._draw_standard_row(
+            "MILITARY UPKEEP", military_upkeep, has_more=True, detail_key="fixed-military-upkeep"
+        )
         self._draw_standard_row("DEBT INTEREST", debt_interest)
         self._draw_standard_row("CORRUPTION", expense_corruption)
         imgui.dummy((0, 5))
@@ -261,16 +279,33 @@ class BudgetPanel:
         elif abs_val >= 1_000_000: return f"$ {abs_val / 1_000_000:,.1f} M".replace(",", " ")
         return self._fmt_money(val)
 
-    def _draw_standard_row(self, label: str, value: float, has_more: bool = False):
+    def _draw_standard_row(
+        self,
+        label: str,
+        value: float,
+        has_more: bool = False,
+        detail_key: str | None = None,
+    ):
         imgui.text(label)
-        if has_more:
+        if has_more and detail_key in self.ROW_DETAILS:
             imgui.same_line(180)
             imgui.push_style_var(imgui.StyleVar_.frame_padding, (6, 1))
             imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.bg_input)
-            if imgui.button(f"more##{label}"): pass 
+            popup_id = f"Budget details##{detail_key}"
+            if imgui.button(f"more##{detail_key}"):
+                imgui.open_popup(popup_id)
             imgui.pop_style_color()
             imgui.pop_style_var()
+            if imgui.begin_popup(popup_id):
+                imgui.text_wrapped(self._standard_row_details(detail_key, value))
+                imgui.end_popup()
         Prims.right_align_text(self._fmt_money(value), GAMETHEME.colors.text_main)
+
+    def _standard_row_details(self, detail_key: str, value: float) -> str:
+        description = self.ROW_DETAILS.get(detail_key)
+        if description is None:
+            description = "Additional information is not available for this budget row."
+        return f"{description}\nCurrent recorded amount: {self._fmt_money(value)}"
 
     def _draw_total_bar(self, label: str, value: float, color: tuple, hide_label: bool = False):
         if not hide_label:
@@ -333,3 +368,40 @@ class BudgetPanel:
 
         imgui.same_line()
         Prims.right_align_text(self._fmt_short_money(value), GAMETHEME.colors.text_main)
+
+    def _draw_income_tax_slider(self, is_own: bool) -> None:
+        key = self.PERSONAL_INCOME_TAX_KEY
+        current = self.draft_allocations[key]
+        imgui.set_next_item_width(220)
+        if not is_own:
+            imgui.begin_disabled()
+        changed, percentage = imgui.slider_float(
+            "PERSONAL INCOME TAX RATE", current * 100.0, 0.0, 100.0, "%.0f%%"
+        )
+        if not is_own:
+            imgui.end_disabled()
+        if changed:
+            self.draft_allocations[key] = self._bounded_ratio(percentage / 100.0, current)
+
+    def _dispatch_budget_update(self, net_client, country_tag: str) -> None:
+        action = ActionUpdateBudget(
+            player_id=net_client.player_id,
+            country_tag=country_tag,
+            allocations={
+                key: self._bounded_ratio(value, self.allocations.get(key, 0.0))
+                for key, value in self.draft_allocations.items()
+            },
+        )
+        net_client.send_action(action)
+        self.allocations = action.allocations.copy()
+        self.draft_allocations = self.allocations.copy()
+
+    @staticmethod
+    def _bounded_ratio(value, fallback: float) -> float:
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
+            number = fallback
+        if not math.isfinite(number):
+            number = fallback
+        return max(0.0, min(number, 1.0))

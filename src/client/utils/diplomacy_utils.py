@@ -29,33 +29,37 @@ def get_military_allies(state: GameState, country_tag: Optional[str]) -> Set[str
     if treaties.is_empty():
         return set()
 
+    selected_tag = str(country_tag).strip().upper()
+    current_minute = int(state.time.total_minutes)
     allies = set()
     columns = set(treaties.columns)
 
     if {"members", "type"}.issubset(columns):
-        for row in treaties.select(["members", "type"]).iter_rows(named=True):
+        for row in treaties.to_dicts():
             treaty_type = str(row["type"]).lower() if row["type"] is not None else ""
-            if treaty_type not in MILITARY_ALLIANCE_TYPES:
+            if treaty_type not in MILITARY_ALLIANCE_TYPES or not _is_active_treaty(row, current_minute):
                 continue
 
-            members = normalize_side(row["members"])
-            if country_tag in members:
+            suspended = normalize_side(row.get("suspended_members"))
+            members = normalize_side(row["members"]) - suspended
+            if selected_tag in members:
                 allies.update(members)
 
     if {"side_a", "side_b", "type"}.issubset(columns):
-        for row in treaties.select(["side_a", "side_b", "type"]).iter_rows(named=True):
+        for row in treaties.to_dicts():
             treaty_type = str(row["type"]).lower() if row["type"] is not None else ""
-            if treaty_type not in MILITARY_ALLIANCE_TYPES:
+            if treaty_type not in MILITARY_ALLIANCE_TYPES or not _is_active_treaty(row, current_minute):
                 continue
 
-            side_a = normalize_side(row["side_a"])
-            side_b = normalize_side(row["side_b"])
-            if country_tag in side_a:
+            suspended = normalize_side(row.get("suspended_members"))
+            side_a = normalize_side(row["side_a"]) - suspended
+            side_b = normalize_side(row["side_b"]) - suspended
+            if selected_tag in side_a:
                 allies.update(side_b)
-            elif country_tag in side_b:
+            elif selected_tag in side_b:
                 allies.update(side_a)
 
-    allies.discard(country_tag)
+    allies.discard(selected_tag)
     return allies
 
 def get_military_enemies(state: GameState, country_tag: Optional[str]) -> Set[str]:
@@ -67,13 +71,28 @@ def get_military_enemies(state: GameState, country_tag: Optional[str]) -> Set[st
     if "side_a" not in wars.columns or "side_b" not in wars.columns:
         return enemies
 
-    for row in wars.select(["side_a", "side_b"]).iter_rows(named=True):
+    for row in wars.to_dicts():
+        status = str(row.get("status") or "active").strip().lower()
+        if status != "active":
+            continue
         side_a = normalize_side(row["side_a"])
         side_b = normalize_side(row["side_b"])
-        if country_tag in side_a:
+        selected_tag = str(country_tag).strip().upper()
+        if selected_tag in side_a:
             enemies.update(side_b)
-        elif country_tag in side_b:
+        elif selected_tag in side_b:
             enemies.update(side_a)
 
-    enemies.discard(country_tag)
+    enemies.discard(str(country_tag).strip().upper())
     return enemies
+
+
+def _is_active_treaty(row: dict, current_minute: int) -> bool:
+    status = str(row.get("status") or "active").strip().lower()
+    if status != "active":
+        return False
+    try:
+        expires_at = int(row.get("expires_at_minute") or 0)
+    except (TypeError, ValueError):
+        return True
+    return expires_at <= 0 or expires_at > current_minute

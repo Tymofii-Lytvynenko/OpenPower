@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import polars as pl
 from imgui_bundle import imgui, icons_fontawesome_6
 
 from src.client.renderers.flag_renderer import FlagRenderer
@@ -10,6 +11,7 @@ from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.panels.military.presenter import MilitaryPresenter
 from src.client.ui.panels.shared.panel_data import resolve_country_name
 from src.client.ui.panels.shared.panel_widgets import draw_required_tables, draw_empty_state
+from src.client.ui.panels.military.peace_deal_editor import PeaceDealEditor
 from src.shared.actions import ActionOfferPeace
 
 class WarListPanel:
@@ -17,10 +19,11 @@ class WarListPanel:
         self._presenter = MilitaryPresenter()
         self._flag_renderer = FlagRenderer()
         self._selected_war_id = None
+        self._peace_editor = PeaceDealEditor()
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        flags = imgui.WindowFlags_.no_collapse | imgui.WindowFlags_.no_scrollbar
-        with WindowManager.window("WAR LIST###War List", x=300, y=150, w=720, h=520, flags=flags) as is_open:
+        flags = imgui.WindowFlags_.no_collapse
+        with WindowManager.window("WAR LIST###War List", x=300, y=150, w=820, h=760, flags=flags) as is_open:
             if not is_open:
                 return False
             self._render_content(state, context.target_tag, context.is_own_country, context.net_client)
@@ -145,7 +148,8 @@ class WarListPanel:
                 for tag in side_a_members:
                     self._draw_flag(tag)
                     imgui.same_line()
-                    imgui.text(resolve_country_name(state, tag))
+                    exhaustion = self._war_exhaustion(state, selected_war, tag)
+                    imgui.text(f"{resolve_country_name(state, tag)} — WE {exhaustion:.0f}")
                     
                     imgui.same_line(half_w - 30)
                     if tag == leader_a:
@@ -159,12 +163,15 @@ class WarListPanel:
                 for tag in side_b_members:
                     self._draw_flag(tag)
                     imgui.same_line()
-                    imgui.text(resolve_country_name(state, tag))
+                    exhaustion = self._war_exhaustion(state, selected_war, tag)
+                    imgui.text(f"{resolve_country_name(state, tag)} — WE {exhaustion:.0f}")
                     
                     imgui.same_line(half_w - 30)
                     if tag == leader_b:
                         icon = icons_fontawesome_6.ICON_FA_GUN if intent_b == "war" else icons_fontawesome_6.ICON_FA_FLAG
                         imgui.text(icon)
+
+            self._draw_coalition_summary(state, selected_war)
             
             imgui.dummy((0, 4))
             
@@ -217,7 +224,7 @@ class WarListPanel:
                 imgui.pop_style_color(3)
                 
             imgui.end_disabled()
-                
+
             # Action handles for Side B (Defender Leader)
             can_act_b = is_own_country and net_client is not None and selected_war is not None and country_tag == leader_b
             imgui.begin_disabled(not can_act_b)
@@ -267,4 +274,44 @@ class WarListPanel:
             imgui.end_disabled()
                 
         imgui.end_child()
+        if imgui.begin_child("peace_package_editor", (-1, 220), True):
+            self._peace_editor.render(
+                state,
+                selected_war,
+                country_tag,
+                is_own_country,
+                net_client,
+            )
+        imgui.end_child()
+
+    def _war_exhaustion(self, state, war, country_tag: str) -> float:
+        table = state.tables.get("war_exhaustion_states")
+        if table is None or table.is_empty() or war is None:
+            return 0.0
+        matches = table.filter(
+            (pl.col("war_id") == str(war.get("id") or ""))
+            & (pl.col("country_id").cast(pl.Utf8).str.to_uppercase() == str(country_tag).upper())
+        )
+        return 0.0 if matches.is_empty() else float(matches.item(0, "exhaustion_index") or 0.0)
+
+    def _draw_coalition_summary(self, state, war) -> None:
+        if war is None:
+            return
+        participants = set(war.get("side_a", [])) | set(war.get("side_b", []))
+        table = state.tables.get("coalition_pacts")
+        if table is None or table.is_empty():
+            return
+        coalitions = [
+            row
+            for row in table.to_dicts()
+            if str(row.get("status") or "").lower() == "active"
+            and participants.intersection(str(tag).upper() for tag in row.get("member_country_ids") or [])
+        ]
+        if not coalitions:
+            return
+        labels = [
+            f"{row.get('primary_target_country_id')}: {', '.join(row.get('member_country_ids') or [])}"
+            for row in sorted(coalitions, key=lambda item: str(item.get("id") or ""))
+        ]
+        imgui.text_wrapped("Defensive coalitions — " + "; ".join(labels))
 

@@ -80,15 +80,14 @@ class ActionBuildUnit(GameAction):
 @dataclass
 class ActionMoveUnit(GameAction):
     """
-    Orders a unit to move directly to a target coordinate.
-    Routing is intentionally omitted; the military system interpolates progress
-    between the source and target geolocation.
+    Orders a unit to move over a validated route to a target region or coordinate.
     """
     unit_id: str
     target_region_id: int
     target_latitude: Optional[float] = None
     target_longitude: Optional[float] = None
     via_region_ids: list[int] = field(default_factory=list)
+    is_naval_invasion: bool = False
 
 @dataclass
 class ActionAttackUnit(GameAction):
@@ -105,6 +104,30 @@ class ActionSetUnitReadiness(GameAction):
 
     unit_id: str
     target_status: str
+
+
+@dataclass
+class ActionTrainUnit(GameAction):
+    """Trains one owned unit to a selected experience level."""
+
+    country_tag: str
+    unit_id: str
+    target_level: str
+
+
+@dataclass
+class ActionCancelUnitTraining(GameAction):
+    """Stops training and returns the unit to its recorded deployment location."""
+
+    unit_id: str
+
+
+@dataclass
+class ActionSetUnitTrainingPaused(GameAction):
+    """Pauses or resumes training while preserving completed progress."""
+
+    unit_id: str
+    is_paused: bool
 
 @dataclass
 class ActionAnnexRegion(GameAction):
@@ -132,6 +155,50 @@ class ActionUpdateBudget(GameAction):
 
 
 @dataclass
+class ActionChangeEconomicPolicy(GameAction):
+    """Requests a server-validated, effective-dated wage or interest policy change."""
+
+    country_tag: str
+    policy_name: str
+    target_value: float
+
+
+@dataclass
+class ActionRequestDebtContract(GameAction):
+    """Requests foreign financing; the request has no treasury effect before approval."""
+
+    debtor_country_id: str
+    creditor_country_id: str
+    principal: float
+    annual_interest_rate: float
+    payment_frequency_months: int
+    principal_installment: float
+    maturity_months: int
+    currency_code: str = "USD"
+    conditions: str = ""
+
+
+@dataclass
+class ActionResolveDebtContract(GameAction):
+    """Accepts or rejects a pending contract on behalf of its named creditor."""
+
+    contract_id: str
+    accept: bool
+
+
+@dataclass
+class ActionRequestDebtRestructuring(GameAction):
+    """Requests revised terms for an eligible active debt contract."""
+
+    country_tag: str
+    contract_id: str
+    annual_interest_rate: float
+    payment_frequency_months: int
+    principal_installment: float
+    maturity_months: int
+
+
+@dataclass
 class ActionUpdateResourcePolicy(GameAction):
     """
     Updates per-resource economic policy for a country's domestic production.
@@ -151,6 +218,28 @@ class ActionUpdateGovernment(GameAction):
     country_tag: str
     government_type: str
     capital_region_id: Optional[int] = None
+
+
+@dataclass
+class ActionStartCampaign(GameAction):
+    """Starts a scenario for one selected country through the authoritative server."""
+
+    scenario_id: str
+    country_tag: str
+
+
+@dataclass
+class ActionSetSphereDelegation(GameAction):
+    """Changes a bounded campaign delegation without transferring country ownership."""
+
+    country_tag: str
+    scope_type: str
+    scope_id: str
+    delegate_id: str
+    authority: list[str] = field(default_factory=list)
+    priorities: list[str] = field(default_factory=list)
+    active: bool = True
+    return_condition: str = "manual"
     next_election: Optional[str] = None
     martial_law: Optional[bool] = None
     election_risk: Optional[float] = None
@@ -177,6 +266,51 @@ class ActionUpdateMigrationPolicy(GameAction):
     country_tag: str
     migration_policy: str
     border_policy: str
+    entry_rate: Optional[float] = None
+    exit_rate: Optional[float] = None
+    asylum_rate: Optional[float] = None
+    family_reunification_rate: Optional[float] = None
+    skilled_worker_preference: Optional[float] = None
+    enforcement_strength: Optional[float] = None
+    effective_at_minute: Optional[int] = None
+
+
+@dataclass
+class ActionInvestRegionalInfrastructure(GameAction):
+    """Requests a server-quoted upgrade for an owned region and category."""
+
+    country_tag: str
+    region_id: int
+    category: str
+    target_level: float
+
+
+@dataclass
+class ActionCancelInfrastructureProject(GameAction):
+    """Cancels an active infrastructure project owned by the acting player."""
+
+    project_id: str
+
+
+@dataclass
+class ActionSetRandomEventControls(GameAction):
+    """Updates global or per-category event controls at a simulation boundary."""
+
+    enabled: Optional[bool] = None
+    category: str = ""
+    category_enabled: Optional[bool] = None
+    frequency_multiplier: Optional[float] = None
+    maximum_active_events: Optional[int] = None
+    seed: Optional[int] = None
+
+
+@dataclass
+class ActionRespondToRandomEvent(GameAction):
+    """Requests one authorized, paid response to an active event."""
+
+    event_id: str
+    response_id: str
+    country_tag: str
 
 
 @dataclass
@@ -240,14 +374,40 @@ class ActionQueueUnitProduction(GameAction):
     design_id: str
     quantity: int
     priority: int = 1
+    training_level: str = "Recruit"
 
 
 @dataclass
 class ActionCancelProductionOrder(GameAction):
     """
-    Cancels a queued production order.
+    Cancels a queued production order without refunding incurred costs.
     """
     order_id: str
+
+
+@dataclass
+class ActionSetProductionPaused(GameAction):
+    """Pauses or resumes a production order without losing completed work."""
+
+    order_id: str
+    is_paused: bool
+
+
+@dataclass
+class ActionSetProductionPriority(GameAction):
+    """Changes queue priority without resetting completed work."""
+
+    order_id: str
+    priority: int
+
+
+@dataclass
+class ActionDispatchUnitDeployment(GameAction):
+    """Dispatches all or part of a completed unit group to a legal region."""
+
+    unit_id: str
+    destination_region_id: int
+    quantity: int = 0
 
 
 @dataclass
@@ -314,6 +474,17 @@ class ActionStartCovertMission(GameAction):
 
 
 @dataclass
+class ActionRetireCovertCell(GameAction):
+    cell_id: str
+
+
+@dataclass
+class ActionSetCovertCellAssignment(GameAction):
+    cell_id: str
+    assignment: str
+
+
+@dataclass
 class ActionDeclareWar(GameAction):
     """
     Opens a new war entry between two sides.
@@ -334,12 +505,73 @@ class ActionOfferPeace(GameAction):
 
 
 @dataclass
+class ActionSubmitPeaceDeal(GameAction):
+    """Submits a multi-clause settlement for every member of the opposing war side."""
+
+    war_id: str
+    proposer_country_id: str
+    offered_clauses: list[dict[str, Any]] = field(default_factory=list)
+    requested_clauses: list[dict[str, Any]] = field(default_factory=list)
+    expires_after_days: int = 30
+
+
+@dataclass
+class ActionRespondPeaceDeal(GameAction):
+    """Records one authorized war participant's response to a peace package."""
+
+    deal_id: str
+    responder_country_id: str
+    accept: bool
+
+
+@dataclass
+class ActionCastRecognitionVote(GameAction):
+    """Casts or replaces one country's vote in an open recognition case."""
+
+    case_id: str
+    country_tag: str
+    vote: str
+
+
+@dataclass
+class ActionChangePoliticalLaw(GameAction):
+    """Requests an authorized, effective-dated domestic law transition."""
+
+    country_tag: str
+    law_id: str
+    target_value: str
+    decision_reason: str = ""
+
+
+@dataclass
+class ActionSetElectionOverride(GameAction):
+    """Requests a government-configured election schedule override."""
+
+    country_tag: str
+    override_type: str
+    duration_days: int
+    decision_reason: str = ""
+
+
+@dataclass
+class ActionResolvePoliticalCrisis(GameAction):
+    """Submits an authorized decision for one active political crisis."""
+
+    country_tag: str
+    crisis_id: str
+    decision: str
+    decision_reason: str = ""
+
+
+@dataclass
 class ActionSetBattleStrategy(GameAction):
     """
     Updates strategic posture for an active battle.
     """
     battle_id: str
     strategy: str
+    country_tag: str = ""
+    unit_type: str = "all"
 
 
 @dataclass
@@ -350,6 +582,59 @@ class ActionLaunchStrategicStrike(GameAction):
     country_tag: str
     target_region_id: int
     weapon_type: str
+    target_country_tag: str = ""
+    target_mode: str = "military"
+    weapon_id: str = ""
+    target_object_id: str = ""
+    payload_level: int = 0
+    authorization_context: str = ""
+    origin_region_id: int = 0
+
+
+@dataclass
+class ActionProduceStrategicWeapon(GameAction):
+    """Queues production against an existing scenario-configured weapon design."""
+    country_tag: str
+    weapon_id: str
+    quantity: int = 1
+
+
+@dataclass
+class ActionSetForeignOrderAcceptance(GameAction):
+    country_tag: str
+    is_accepting: bool
+
+
+@dataclass
+class ActionRequestForeignUnitOrder(GameAction):
+    buyer_country_tag: str
+    seller_country_tag: str
+    design_id: str
+    quantity: int
+
+
+@dataclass
+class ActionRespondForeignUnitOrder(GameAction):
+    order_id: str
+    accept: bool
+
+
+@dataclass
+class ActionCancelForeignUnitOrder(GameAction):
+    order_id: str
+
+
+@dataclass
+class ActionListUsedUnit(GameAction):
+    country_tag: str
+    unit_id: str
+    price: float = 0.0
+
+
+@dataclass
+class ActionWithdrawUsedUnitListing(GameAction):
+    country_tag: str
+    listing_id: str
 
 
 @dataclass

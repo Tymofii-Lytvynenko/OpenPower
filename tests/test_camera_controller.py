@@ -17,6 +17,16 @@ class CameraControllerTest(unittest.TestCase):
         surface_gap = camera.min_distance - 1.0
         self.assertLess(camera.near, surface_gap)
 
+    def test_normalized_map_focus_is_independent_of_texture_resolution(self) -> None:
+        original_sized_map = CameraController()
+        original_sized_map.look_at_pixel_coords(12_000, 2_400, 16_000, 8_000)
+
+        resized_map = CameraController()
+        resized_map.look_at_pixel_fraction(0.75, 0.30, 8_000, 4_000)
+
+        self.assertAlmostEqual(resized_map.yaw, original_sized_map.yaw)
+        self.assertAlmostEqual(resized_map.pitch, original_sized_map.pitch)
+
 
 if __name__ == "__main__":
     unittest.main()

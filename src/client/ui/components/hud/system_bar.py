@@ -25,6 +25,7 @@ class SystemBar:
         open_mail_cb=None,
         open_news_cb=None,
         open_settings_cb=None,
+        open_history_cb=None,
     ):
         self._open_help_cb = open_help_cb
         self._open_objectives_cb = open_objectives_cb
@@ -32,6 +33,7 @@ class SystemBar:
         self._open_mail_cb = open_mail_cb
         self._open_news_cb = open_news_cb
         self._open_settings_cb = open_settings_cb
+        self._open_history_cb = open_history_cb
 
     def render(self, net_client, nav_service, hud_summary):
         self._consume_shortcuts(net_client, nav_service)
@@ -65,6 +67,8 @@ class SystemBar:
             self._show_load(nav_service, net_client)
         if imgui.is_key_pressed(imgui.Key.f5, False):
             self._safe_call(self._open_objectives_cb)
+        if imgui.is_key_pressed(imgui.Key.f6, False):
+            self._safe_call(self._open_history_cb)
         if imgui.is_key_pressed(imgui.Key.f9, False):
             self._safe_call(self._open_console_cb)
         if imgui.is_key_pressed(imgui.Key.f10, False):
@@ -114,6 +118,13 @@ class SystemBar:
                 tooltip="Event feed",
                 callback=lambda: self._safe_call(self._open_news_cb),
                 badge=hud_summary.unread_news,
+            ),
+            SystemBarAction(
+                id="history",
+                icon=icons_fontawesome_6.ICON_FA_CHART_LINE,
+                tooltip="History & analytics",
+                shortcut="F6",
+                callback=lambda: self._safe_call(self._open_history_cb),
             ),
             SystemBarAction(
                 id="console",

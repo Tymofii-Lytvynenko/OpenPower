@@ -4,26 +4,32 @@ import polars as pl
 
 from modules.base.systems.world.ai import (
     BudgetPolicy,
+    BudgetSurvivalPolicy,
     DiplomacyPolicy,
     MilitaryOperationsPolicy,
+    MilitaryTrainingPolicy,
     ProcurementPolicy,
     WarPolicy,
 )
+from modules.base.systems.world.ai.military_policies import MilitaryROIPolicy
 from modules.base.systems.world.ai.diplomacy_policy import TREATY_PROFILES
 from modules.base.systems.world.ai_system import AISystem
 from src.core.ai_framework import AITableContext, DeclarativeAIFramework
 from src.shared.actions import (
     ActionAttackUnit,
+    ActionBuildUnit,
     ActionBuyMarketUnit,
     ActionDeclareWar,
     ActionMoveUnit,
     ActionOfferPeace,
     ActionQueueUnitProduction,
     ActionRespondTreaty,
+    ActionTrainUnit,
     ActionUpdateBudget,
 )
 from src.shared.events import EventNewDay
 from src.shared.state import GameState
+from modules.base.systems.military.capability_system import MilitaryCapabilitySystem
 from src.shared.treaties import TREATY_DEFINITIONS
 
 
@@ -37,12 +43,18 @@ class TestTabularAIPolicies(unittest.TestCase):
                 "countries_wars": self._wars([]),
                 "unit_designs": self._designs([]),
                 "production_orders": self._orders([]),
+                "unit_training_facilities": pl.DataFrame(schema={
+                    "id": pl.Utf8, "country_id": pl.Utf8, "region_id": pl.Int32,
+                    "supported_domains": pl.List(pl.Utf8), "capacity": pl.Int32,
+                    "instructor_count": pl.Int32, "enabled": pl.Boolean,
+                }),
             }
         )
 
         for policy in (
             BudgetPolicy(),
             ProcurementPolicy(),
+            MilitaryTrainingPolicy(),
             MilitaryOperationsPolicy(),
             WarPolicy(),
             DiplomacyPolicy(),
@@ -76,7 +88,9 @@ class TestTabularAIPolicies(unittest.TestCase):
                 },
             },
         )
-        result = self._evaluate(BudgetPolicy(), {"countries": countries})
+        result = DeclarativeAIFramework(BudgetPolicy(), BudgetSurvivalPolicy()).evaluate(
+            self._context({"countries": countries})
+        )
         actions = {
             action.country_tag: action
             for action in result.actions
@@ -86,7 +100,7 @@ class TestTabularAIPolicies(unittest.TestCase):
         self.assertEqual(set(actions), {"CRITICAL", "MANAGED", "SURPLUS"})
         self.assertAlmostEqual(
             actions["CRITICAL"].allocations["personal_income_tax_rate"],
-            0.25,
+            0.22,
         )
         self.assertGreater(len(actions["CRITICAL"].allocations), 2)
         self.assertEqual(len(actions["MANAGED"].allocations), 1)
@@ -132,6 +146,129 @@ class TestTabularAIPolicies(unittest.TestCase):
 
         result = self._evaluate(ProcurementPolicy(), tables)
 
+        self.assertFalse(
+            any(
+                isinstance(action, (ActionQueueUnitProduction, ActionBuyMarketUnit))
+                and getattr(action, "country_tag", getattr(action, "buyer_country_tag", "")) == "AAA"
+                for action in result.actions
+            )
+        )
+
+    def test_procurement_ignores_designs_with_unmet_research_prerequisites(self):
+        tables = self._procurement_tables()
+        tables.pop("unit_market_listings")
+        tables["unit_designs"] = pl.DataFrame([
+            {
+                "id": "aaa-locked", "country_id": "AAA", "cost": 1.0,
+                "quality": 1.0, "speed": 1.0, "firepower": 1.0,
+                "research_requirements_json": '{"land":2}',
+            },
+            {
+                "id": "aaa-unlocked", "country_id": "AAA", "cost": 100.0,
+                "quality": 0.6, "speed": 0.5, "firepower": 0.7,
+                "research_requirements_json": '{"land":1}',
+            },
+            {
+                "id": "bbb-ground", "country_id": "BBB", "cost": 80.0,
+                "quality": 0.6, "speed": 0.5, "firepower": 0.7,
+                "research_requirements_json": "{}",
+            },
+        ])
+        tables["research_tracks"] = pl.DataFrame({
+            "country_id": ["AAA", "BBB"],
+            "branch": ["land", "land"],
+            "research_level": [1, 0],
+        })
+
+        result = self._evaluate(ProcurementPolicy(), tables)
+
+        production = [action for action in result.actions if isinstance(action, ActionQueueUnitProduction)]
+        self.assertEqual(len(production), 1)
+        self.assertEqual(production[0].design_id, "aaa-unlocked")
+
+    def test_ai_training_uses_the_authoritative_local_facility_and_funding_rules(self):
+        tables = self._training_tables(money_reserves=1_000.0)
+        first = self._evaluate(MilitaryTrainingPolicy(), tables)
+        repeated = self._evaluate(MilitaryTrainingPolicy(), tables)
+        self.assertEqual(first.actions, repeated.actions)
+        self.assertEqual(first.actions, (ActionTrainUnit("ai_system", "AAA", "a1", "Regular"),))
+
+        state = GameState(tables={
+            "countries": tables["countries"],
+            "units": tables["units"],
+            "regions": self._regions(),
+            "unit_training_facilities": tables["unit_training_facilities"],
+        })
+        state.current_actions = list(first.actions)
+        MilitaryCapabilitySystem().update(state, 0.0)
+        self.assertEqual(state.get_table("unit_training_orders")["status"][0], "active")
+        self.assertEqual(state.get_table("countries").filter(pl.col("id") == "AAA")["money_reserves"][0], 900.0)
+
+        underfunded = self._training_tables(money_reserves=0.0)
+        self.assertFalse(self._evaluate(MilitaryTrainingPolicy(), underfunded).actions)
+        rejected_state = GameState(tables={
+            "countries": underfunded["countries"],
+            "units": underfunded["units"],
+            "regions": self._regions(),
+            "unit_training_facilities": underfunded["unit_training_facilities"],
+        })
+        rejected_state.current_actions = [ActionTrainUnit("ai_system", "AAA", "a1", "Regular")]
+        MilitaryCapabilitySystem().update(rejected_state, 0.0)
+        self.assertTrue(rejected_state.get_table("unit_training_orders").is_empty())
+        self.assertEqual(rejected_state.journal.command_results[-1]["status"], "rejected")
+
+    def test_ai_training_does_not_propose_without_domain_compatible_capacity(self):
+        tables = self._training_tables(money_reserves=1_000.0)
+        tables["unit_training_facilities"] = tables["unit_training_facilities"].with_columns(
+            pl.lit(0).cast(pl.Int32).alias("capacity")
+        )
+        self.assertFalse(self._evaluate(MilitaryTrainingPolicy(), tables).actions)
+
+        tables = self._training_tables(money_reserves=1_000.0)
+        tables["unit_training_facilities"] = tables["unit_training_facilities"].with_columns(
+            pl.Series("supported_domains", [["air"]])
+        )
+        self.assertFalse(self._evaluate(MilitaryTrainingPolicy(), tables).actions)
+
+    def test_ai_training_never_proposes_for_the_human_country_without_delegation(self):
+        result = DeclarativeAIFramework(MilitaryTrainingPolicy()).evaluate(
+            self._context(self._training_tables(money_reserves=1_000.0), player_tag="AAA")
+        )
+
+        self.assertFalse(result.actions)
+
+    def test_profitable_roi_dispatches_immediate_build_instead_of_duplicate_procurement(self):
+        tables = self._procurement_tables()
+        countries = tables["countries"].with_columns(
+            pl.when(pl.col("id") == "AAA")
+            .then(275_000_000.0)
+            .otherwise(pl.col("gdp"))
+            .alias("gdp"),
+            pl.when(pl.col("id") == "AAA")
+            .then(0)
+            .otherwise(pl.col("military_count"))
+            .alias("military_count"),
+            pl.when(pl.col("id") == "AAA")
+            .then(3_000_000.0)
+            .otherwise(pl.col("money_reserves"))
+            .alias("money_reserves"),
+            pl.when(pl.col("id") == "AAA")
+            .then(200.0)
+            .otherwise(pl.col("total_annual_revenue"))
+            .alias("total_annual_revenue"),
+            pl.when(pl.col("id") == "AAA")
+            .then(100.0)
+            .otherwise(pl.col("total_annual_expense"))
+            .alias("total_annual_expense"),
+        )
+        tables["countries"] = countries
+        result = DeclarativeAIFramework(
+            ProcurementPolicy(),
+            MilitaryROIPolicy(),
+        ).evaluate(self._context(tables))
+
+        builds = [action for action in result.actions if isinstance(action, ActionBuildUnit)]
+        self.assertEqual(builds, [ActionBuildUnit("ai_system", "AAA", "infantry", 1)])
         self.assertFalse(
             any(
                 isinstance(action, (ActionQueueUnitProduction, ActionBuyMarketUnit))
@@ -610,6 +747,25 @@ class TestTabularAIPolicies(unittest.TestCase):
                     "eligibility": ["open"],
                 }
             ),
+        }
+
+    def _training_tables(self, *, money_reserves: float) -> dict[str, pl.DataFrame]:
+        return {
+            "countries": self._countries(["AAA"], {"AAA": {"money_reserves": money_reserves}}),
+            "units": pl.DataFrame([{
+                "id": "a1", "owner": "AAA", "strength": 100.0,
+                "current_region_id": 1, "latitude": 0.0, "longitude": 0.0,
+                "is_moving": False, "engagement_mode": "", "training_level": "Recruit",
+                "training_state": "", "training_progress": 0.0,
+                "training_transition_id": "", "training_facility_id": "",
+                "training_location_region_id": 0, "unit_lifecycle": "available",
+                "unit_domain": "land", "design_id": "",
+            }]),
+            "unit_training_facilities": pl.DataFrame([{
+                "id": "site-a", "country_id": "AAA", "region_id": 1,
+                "supported_domains": ["land"], "capacity": 1,
+                "instructor_count": 1, "enabled": True,
+            }]),
         }
 
     def _war_candidate_tables(self) -> dict[str, pl.DataFrame]:

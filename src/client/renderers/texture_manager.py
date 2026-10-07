@@ -1,5 +1,6 @@
 import arcade
 import numpy as np
+import time
 from pathlib import Path
 from typing import Dict, Tuple, Optional, List, Set, Any
 from PIL import Image
@@ -24,12 +25,16 @@ class TextureManager:
         self.map_texture: Optional[arcade.gl.Texture] = None
         self.terrain_texture: Optional[arcade.gl.Texture] = None
         self.lookup_texture: Optional[arcade.gl.Texture] = None
+        self.previous_lookup_texture: Optional[arcade.gl.Texture] = None
         
         # --- LUT Data (Overlays) ---
         self.lut_data = np.full((self.lut_dim * self.lut_dim, 4), 0, dtype=np.uint8)
         
         # --- Color Mapping State ---
         self._active_color_map: Dict[int, Tuple[int, ...]] = {}
+        self._previous_lut_data = self.lut_data.copy()
+        self._transition_started_at: float | None = None
+        self._transition_duration_seconds = 0.25
         
         # --- Selection State ---
         self.multi_select_dense_ids: Set[int] = set()
@@ -228,12 +233,57 @@ class TextureManager:
             filter=(self.ctx.NEAREST, self.ctx.NEAREST),
         )
         self.lookup_texture.write(self.lut_data.tobytes()) # type: ignore
+        self.previous_lookup_texture = self.ctx.texture(
+            (self.lut_dim, self.lut_dim),
+            components=4,
+            filter=(self.ctx.NEAREST, self.ctx.NEAREST),
+        )
+        self.previous_lookup_texture.write(self.lut_data.tobytes())
 
     def update_overlay(self, color_map: Dict[int, Tuple[int, ...]]) -> None:
-        self._active_color_map = color_map
+        if color_map == self._active_color_map:
+            return
+
+        self._previous_lut_data = self._visible_lut_data()
+        if self.previous_lookup_texture is not None:
+            self.previous_lookup_texture.write(self._previous_lut_data.tobytes())
+            self._transition_started_at = time.perf_counter()
+        else:
+            self._transition_started_at = None
+
+        self._active_color_map = dict(color_map)
         self._rebuild_lut_array()
         if self.lookup_texture:
             self.lookup_texture.write(self.lut_data.tobytes())
+
+    def overlay_transition_progress(self, now: float | None = None) -> float:
+        if self._transition_started_at is None:
+            return 1.0
+
+        current_time = time.perf_counter() if now is None else now
+        linear_progress = min(
+            1.0,
+            max(0.0, (current_time - self._transition_started_at) / self._transition_duration_seconds),
+        )
+        if linear_progress >= 1.0:
+            self._transition_started_at = None
+        return linear_progress
+
+    def _visible_lut_data(self) -> np.ndarray:
+        if self._transition_started_at is None:
+            return self.lut_data.copy()
+
+        linear_progress = self.overlay_transition_progress()
+        if linear_progress >= 1.0:
+            return self.lut_data.copy()
+        progress = linear_progress * linear_progress * (3.0 - 2.0 * linear_progress)
+
+        # Snapshot the displayed blend before retargeting so quick mode changes stay visually continuous.
+        blended = (
+            self._previous_lut_data.astype(np.float32) * (1.0 - progress)
+            + self.lut_data.astype(np.float32) * progress
+        )
+        return np.rint(blended).astype(np.uint8)
 
     def update_selection(self, multi_select_dense_ids: Set[int]) -> None:
         self.prev_multi_select_dense_ids = self.multi_select_dense_ids.copy()
@@ -247,6 +297,9 @@ class TextureManager:
         if self.lookup_texture:
             self.lookup_texture.use(1)
             program["u_lookup_texture"] = 1
+        if self.previous_lookup_texture:
+            self.previous_lookup_texture.use(3)
+            program["u_previous_lookup_texture"] = 3
         if self.terrain_texture:
             self.terrain_texture.use(2)
             program["u_terrain_texture"] = 2

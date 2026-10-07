@@ -1,8 +1,10 @@
 # Tasks: Multi-Process IPC Architecture & Session Proxy
 
-**Feature**: Multi-Process IPC Architecture & Session Proxy  
-**Feature Path**: `specs/001-ipc-multi-process-architecture`  
-**Status**: In Progress  
+**Feature**: Multi-Process IPC Architecture & Session Proxy
+
+**Feature Path**: `specs/001-ipc-multi-process-architecture`
+
+**Status**: Implementation complete; interactive framerate acceptance remains open
 
 ---
 
@@ -20,8 +22,8 @@
 
 Goal: Validate environment configuration, process spawn flags, and IPC dependencies.
 
-- [ ] T001 Verify `multiprocessing.set_start_method('spawn')` and freeze support in [main.py](file:///c:/ProgramData/DEV/OpenPower/main.py)
-- [ ] T002 [P] Verify PyArrow IPC streaming serialization support in [src/server/state.py](file:///c:/ProgramData/DEV/OpenPower/src/server/state.py)
+- [X] T001 Verify `multiprocessing.set_start_method('spawn')` and freeze support in `main.py`.
+- [X] T002 [P] Verify Polars Arrow IPC table encoding/decoding through `StateSnapshotEncoder` and `StateSnapshotDecoder` in `src/shared/snapshots.py`.
 
 ---
 
@@ -29,9 +31,9 @@ Goal: Validate environment configuration, process spawn flags, and IPC dependenc
 
 Goal: Establish the 3-queue communication architecture (`action_queue`, `state_queue`, `progress_queue`).
 
-- [ ] T003 Ensure `action_queue`, `state_queue`, and `progress_queue` instantiation in [src/client/client_session.py](file:///c:/ProgramData/DEV/OpenPower/src/client/client_session.py)
-- [ ] T004 Implement zero-copy Arrow IPC serialization in `GameState.to_ipc()` and `GameState.from_ipc()` in [src/server/state.py](file:///c:/ProgramData/DEV/OpenPower/src/server/state.py)
-- [ ] T005 Implement background daemon process launcher `run_server_process` in [src/server/server_process.py](file:///c:/ProgramData/DEV/OpenPower/src/server/server_process.py)
+- [X] T003 Ensure action, state, progress, and snapshot-ack queue instantiation in `src/server/launcher.py`.
+- [X] T004 Implement acknowledged full/delta table-wise Arrow IPC snapshot encoding and decoding behind `GameState.to_ipc()` and `GameState.from_ipc()` in `src/shared/state.py` and `src/shared/snapshots.py`.
+- [X] T005 Implement background daemon process launcher `run_server_process` in `src/server/server_process.py`.
 
 ---
 
@@ -39,11 +41,11 @@ Goal: Establish the 3-queue communication architecture (`action_queue`, `state_q
 
 Goal: Execute 10 TPS simulation loop in background process while client proxy polls state snapshots at 30Hz without UI frame drops.
 
-- [ ] T006 [P] [US1] Implement `GameAction` command base class and action handlers in [src/shared/actions.py](file:///c:/ProgramData/DEV/OpenPower/src/shared/actions.py)
-- [ ] T007 [P] [US1] Implement `GameEvent` signal classes (`EventNewDay`, `EventNewHour`, `EventRealSecond`) in [src/shared/events.py](file:///c:/ProgramData/DEV/OpenPower/src/shared/events.py)
-- [ ] T008 [US1] Implement 10 TPS simulation loop pacing with adaptive sleep in [src/server/server_process.py](file:///c:/ProgramData/DEV/OpenPower/src/server/server_process.py)
-- [ ] T009 [US1] Implement 30Hz state queue polling and queue draining in [src/client/client_session.py](file:///c:/ProgramData/DEV/OpenPower/src/client/client_session.py)
-- [ ] T010 [US1] Implement background process lifecycle shutdown and join handling in `ClientSessionProxy.shutdown()` in [src/client/client_session.py](file:///c:/ProgramData/DEV/OpenPower/src/client/client_session.py)
+- [X] T006 [P] [US1] Implement the `GameAction` command base class and semantic action handlers in `src/shared/actions.py` and registered simulation systems.
+- [X] T007 [P] [US1] Implement `GameEvent` signal classes and persistent domain-event journaling in `src/shared/events.py`.
+- [X] T008 [US1] Implement 10 TPS fixed-step pacing with bounded catch-up and adaptive sleep in `src/server/server_process.py`.
+- [X] T009 [US1] Implement 30Hz snapshot polling, queue draining, and sequence acknowledgements in `src/client/client_session.py`.
+- [X] T010 [US1] Implement background process shutdown, bounded join, and terminate fallback in `ClientSessionProxy.shutdown()`.
 
 ---
 
@@ -51,5 +53,5 @@ Goal: Execute 10 TPS simulation loop in background process while client proxy po
 
 Goal: Verify framerate decoupling and audit zero-zombie process termination.
 
-- [ ] T011 Audit progress queue diagnostics rendering during engine startup in [src/client/views/server_boot_view.py](file:///c:/ProgramData/DEV/OpenPower/src/client/views/server_boot_view.py)
-- [ ] T012 Run quickstart validation scenario to verify 60+ FPS UI rendering decoupled from background simulation tick loop in [specs/001-ipc-multi-process-architecture/quickstart.md](file:///c:/ProgramData/DEV/OpenPower/specs/001-ipc-multi-process-architecture/quickstart.md)
+- [X] T011 Audit progress queue diagnostics rendering during engine startup in `src/client/views/server_boot_view.py` and the MainWindow startup flow.
+- [ ] T012 Run quickstart validation scenario to verify 60+ FPS UI rendering decoupled from background simulation tick loop in [specs/001-ipc-multi-process-architecture/quickstart.md](file:///c:/ProgramData/DEV/OpenPower/specs/001-ipc-multi-process-architecture/quickstart.md) (live sample recorded at 59–60 FPS; sustained 60+ remains unverified)

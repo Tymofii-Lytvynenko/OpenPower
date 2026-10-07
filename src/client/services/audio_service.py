@@ -1,6 +1,13 @@
-import arcade
+import logging
+import math
 from pathlib import Path
 from typing import Optional
+
+import arcade
+
+
+logger = logging.getLogger(__name__)
+
 
 class AudioService:
     """
@@ -17,12 +24,15 @@ class AudioService:
         """
         Plays a music track. If the same track is already playing, it does nothing.
         """
-        if not file_path.exists():
-            print(f"[Audio] Error: File not found: {file_path}")
+        path = Path(file_path)
+        if not path.exists():
+            logger.warning("Music track does not exist: %s", path)
             return
 
+        normalized_path = path.resolve()
+
         # Don't restart if it's the same track
-        if self.current_track_path == str(file_path) and self.is_playing():
+        if self.current_track_path == str(normalized_path) and self.is_playing():
             return
 
         # Stop previous track
@@ -30,36 +40,44 @@ class AudioService:
 
         try:
             # Load and play
-            print(f"[Audio] Playing: {file_path.name}")
-            self.current_player = arcade.load_sound(file_path)
+            player = arcade.load_sound(path)
             
             # play_sound returns a player object we must keep a reference to
-            self.current_stream = arcade.play_sound(
-                self.current_player, 
+            stream = arcade.play_sound(
+                player,
                 volume=self.volume, 
                 loop=loop
             )
-            self.current_track_path = str(file_path)
+            self.current_player = player
+            self.current_stream = stream
+            self.current_track_path = str(normalized_path)
             
         except Exception as e:
-            print(f"[Audio] Playback Failed: {e}")
+            logger.warning("Music playback failed for %s: %s", path, e)
+            self.current_player = None
+            self.current_stream = None
             self.current_track_path = None
 
     def stop_music(self):
         """Stops currently playing music."""
-        if self.current_stream:
+        stream = self.current_stream
+        if stream is not None:
             try:
-                arcade.stop_sound(self.current_stream)
-            except Exception:
-                pass # Stream might already be dead
-            self.current_stream = None
-            self.current_player = None # Release resource
+                arcade.stop_sound(stream)
+            except Exception as exc:
+                logger.debug("Audio stream had already stopped: %s", exc)
+        self.current_stream = None
+        self.current_player = None
+        self.current_track_path = None
 
     def set_volume(self, volume: float):
         """Sets volume (0.0 to 1.0)."""
-        self.volume = max(0.0, min(1.0, volume))
+        volume = float(volume)
+        self.volume = max(0.0, min(1.0, volume)) if math.isfinite(volume) else 0.0
         if self.current_stream:
             self.current_stream.volume = self.volume
 
     def is_playing(self) -> bool:
-        return self.current_stream is not None and self.current_stream.playing
+        return self.current_stream is not None and bool(
+            getattr(self.current_stream, "playing", False)
+        )

@@ -65,7 +65,7 @@ TREATY_DEFINITIONS: dict[str, TreatyDefinition] = {
         two_sided=False,
         multi_member=True,
         long_term=True,
-        effects=("mutual_defense", "stationing_rights"),
+        effects=("mutual_defense", "stationing_rights", "military_intelligence_sharing"),
         description="Members defend one another and may station units on fellow members' territory.",
     ),
     "military_trespassing_right": _definition(
@@ -158,6 +158,15 @@ TREATY_DEFINITIONS: dict[str, TreatyDefinition] = {
         effects=("common_market_priority",),
         description="Members satisfy domestic resource needs from the group before the regular market clears.",
     ),
+    "mobility_agreement": _definition(
+        "mobility_agreement",
+        "Mobility agreement",
+        two_sided=True,
+        multi_member=True,
+        long_term=True,
+        effects=("migration_mobility_access",),
+        description="Members grant one another explicit civilian migration access subject to national quotas.",
+    ),
     "economic_aid": _definition(
         "economic_aid",
         "Economic aid",
@@ -219,6 +228,7 @@ TREATY_TYPE_ALIASES: dict[str, str] = {
     "debt_assumption": "assume_foreign_debt",
     "weapon_trade": "weapons_trade",
     "weapon_trade_embargo": "weapons_trade_embargo",
+    "free_movement": "mobility_agreement",
 }
 
 

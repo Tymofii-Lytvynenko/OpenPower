@@ -40,6 +40,7 @@ class GameLayout:
 
         self.feed_presenter = FeedPresenter()
         self.central_bar = CentralBar(
+            open_ai_cb=lambda: self.panel_manager.set_visible("OBJECTIVES", True),
             open_statistics_cb=lambda: self.panel_manager.set_visible("DATA_INSPECTOR", True),
             open_mail_cb=lambda: self.panel_manager.set_visible("MAIL", True),
             open_news_cb=lambda: self.panel_manager.set_visible("NEWS_LOG", True),
@@ -53,6 +54,7 @@ class GameLayout:
             open_mail_cb=lambda: self.panel_manager.set_visible("MAIL", True),
             open_news_cb=lambda: self.panel_manager.set_visible("NEWS_LOG", True),
             open_settings_cb=lambda: self.panel_manager.set_visible("SETTINGS", True),
+            open_history_cb=lambda: self.panel_manager.set_visible("HISTORY", True),
         )
         self.toggle_bar = ToggleBar(self.panel_manager)
         self.context_menu = ContextMenu(

@@ -4,7 +4,7 @@ import sys
 import os
 import multiprocessing as mp
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 # 1. Setup Python Path
 ROOT_DIR = Path(__file__).parent.resolve()
@@ -19,6 +19,49 @@ def profiling_enabled(environment: dict[str, str] | None = None) -> bool:
         "yes",
         "on",
     }
+
+
+def configure_multiprocessing() -> None:
+    """Prepare the process model required by frozen Windows application builds."""
+    mp.freeze_support()
+    mp.set_start_method("spawn", force=True)
+
+
+def export_profile_html(profiler: Any, output_path: Path) -> Path | None:
+    if profiler is None or not profiler.last_session:
+        return None
+    output_path.write_text(profiler.output_html(), encoding="utf-8")
+    return output_path
+
+
+def create_local_session(config, *, save_name=None, player_tag=None):
+    """Compose server process and client proxy at the application boundary."""
+    from src.client.client_session import ClientSessionProxy
+    from src.server.launcher import spawn_local_server
+
+    bundle = spawn_local_server(config, save_name=save_name, player_tag=player_tag)
+    try:
+        return ClientSessionProxy(
+            map_data=bundle.map_data,
+            action_queue=bundle.action_queue,
+            state_queue=bundle.state_queue,
+            progress_queue=bundle.progress_queue,
+            snapshot_ack_queue=bundle.snapshot_ack_queue,
+            process=bundle.process,
+        )
+    except BaseException:
+        process = bundle.process
+        if process.is_alive():
+            process.terminate()
+        process.join(timeout=5.0)
+        for channel in (
+            bundle.action_queue,
+            bundle.state_queue,
+            bundle.progress_queue,
+            bundle.snapshot_ack_queue,
+        ):
+            channel.close()
+        raise
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -51,7 +94,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # 4. Start the Window
     # The Window now owns the NavigationService
-    window = MainWindow(config)
+    window = MainWindow(config, session_factory=create_local_session)
 
     # 5. Kickoff
     # window.setup() uses NavigationService to show the LoadingView
@@ -63,14 +106,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     finally:
         if profiler is not None:
             profiler.stop()
-            if profiler.last_session:
-                output_path = ROOT_DIR / "profile_results.html"
-                output_path.write_text(profiler.output_html(), encoding="utf-8")
+            output_path = export_profile_html(profiler, ROOT_DIR / "profile_results.html")
+            if output_path is not None:
                 print(f"Saved {output_path}")
     return 0
 
 
 if __name__ == "__main__":
-    mp.freeze_support()
-    mp.set_start_method("spawn", force=True)
+    configure_multiprocessing()
     raise SystemExit(main())

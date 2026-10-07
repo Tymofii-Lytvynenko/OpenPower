@@ -22,3 +22,7 @@
 ### 3. Server Process Pacing & Loop Timing
 - **Decision**: Fixed 10 TPS (100ms interval) using `time.perf_counter()` and dynamic `time.sleep()`.
 - **Rationale**: Provides sufficient simulation resolution for geopolitical macroeconomic trends, demographic steps, and unit movements while keeping background CPU load under 5%.
+
+## Open Runtime Throughput Follow-up
+
+The end-to-end launcher command test showed load-sensitive command completion under the expanded world systems. One run took 41.18 seconds and missed its 30-second command-result window (`tick=6`, no result in the latest client snapshot); an immediate isolated rerun passed in 41.90 seconds with the command applied at tick 7. These wall times include world startup and do not isolate command latency, so they are evidence of a throughput/latency risk rather than a stable benchmark. No algorithm optimization was attempted in this pass; profile the simulation tick and command-to-result latency before choosing a target, then keep any optimization within the agreed three-iteration limit.

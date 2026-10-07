@@ -46,6 +46,7 @@ class ProjectedUnit:
     local_position: tuple[float, float, float] = (0.0, 0.0, 0.0)
     stack_index: int = 0
     stack_count: int = 1
+    stack_strength: int = 0
 
     def contains(self, screen_x: float, screen_y: float) -> bool:
         half_w = self.width * 0.5
@@ -660,6 +661,9 @@ class UnitProjectionService:
     def _apply_stack_offsets(self, units: list[ProjectedUnit]) -> None:
         groups: dict[tuple[int, int], list[ProjectedUnit]] = {}
         for unit in units:
+            unit.stack_index = 0
+            unit.stack_count = 1
+            unit.stack_strength = int(unit.strength)
             key = (round(unit.screen_x / 24.0), round(unit.screen_y / 24.0))
             groups.setdefault(key, []).append(unit)
 
@@ -668,9 +672,11 @@ class UnitProjectionService:
                 continue
 
             midpoint = (len(group) - 1) * 0.5
+            stack_strength = sum(int(unit.strength) for unit in group)
             for index, unit in enumerate(group):
                 offset = (index - midpoint) * min(14.0, unit.width * 0.36)
                 unit.screen_x += offset
                 unit.screen_y += abs(index - midpoint) * 2.0
                 unit.stack_index = index
                 unit.stack_count = len(group)
+                unit.stack_strength = stack_strength

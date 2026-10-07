@@ -11,6 +11,7 @@ from src.client.renderers.sphere_mesh import SphereMesh
 from src.client.renderers.base_renderer import BaseRenderer
 from src.client.controllers.camera_controller import CameraController
 from src.client.renderers.texture_manager import TextureManager
+from src.client.renderers.planar_map_renderer import PlanarMapRenderer
 from src.client.utils.picking_utils import PickingUtils
 from src.core.cache_service import CacheService
 from src.core.paths import ProjectPaths
@@ -48,6 +49,8 @@ class MapRenderer(BaseRenderer):
         self._overlay_enabled: bool = True
         self._overlay_opacity: float = 0.90
         self.globe_radius: float = 1.0
+        self.projection_mode = "globe"
+        self._planar_renderer: Optional[PlanarMapRenderer] = None
 
         # --- GL RESOURCES ---
         self.program: Optional[arcade.gl.Program] = None
@@ -80,6 +83,8 @@ class MapRenderer(BaseRenderer):
         self._set_uniform_if_present("u_map_texture", 0)
         self._set_uniform_if_present("u_lookup_texture", 1)
         self._set_uniform_if_present("u_terrain_texture", 2)
+        self._set_uniform_if_present("u_previous_lookup_texture", 3)
+        self._set_uniform_if_present("u_overlay_transition", 1.0)
 
         self.texture_manager.set_uniforms(self.program)
         
@@ -97,6 +102,36 @@ class MapRenderer(BaseRenderer):
     def set_overlay_style(self, enabled: bool, opacity: float):
         self._overlay_enabled = enabled
         self._overlay_opacity = opacity
+
+    def set_projection_mode(self, mode: str) -> None:
+        if mode not in {"globe", "planar"}:
+            raise ValueError(f"Unsupported map projection: {mode}")
+        if mode == "planar" and self._planar_renderer is None:
+            self._planar_renderer = PlanarMapRenderer(
+                self.ctx,
+                self.texture_manager,
+                self.width,
+                self.height,
+            )
+        self.projection_mode = mode
+
+    def pan_planar(self, delta_x: float, delta_y: float) -> None:
+        if self.projection_mode == "planar" and self._planar_renderer is not None:
+            self._planar_renderer.pan(delta_x, delta_y)
+
+    def zoom_planar_at(self, screen_x: float, screen_y: float, scroll_steps: int) -> None:
+        if self.projection_mode != "planar" or self._planar_renderer is None:
+            return
+        self._planar_renderer.zoom_at(
+            screen_x,
+            screen_y,
+            scroll_steps,
+            self.window.get_size(),
+        )
+
+    def focus_planar_pixel(self, pixel_x: float, pixel_y: float) -> None:
+        if self.projection_mode == "planar" and self._planar_renderer is not None:
+            self._planar_renderer.focus_pixel(pixel_x, pixel_y)
 
     def update_overlay(self, color_map: Dict[int, Tuple[int, ...]]):
         self.texture_manager.update_overlay(color_map)
@@ -123,6 +158,17 @@ class MapRenderer(BaseRenderer):
         self.texture_manager.update_selection(set())
 
     def draw(self):
+        if self.projection_mode == "planar":
+            if self._planar_renderer is None:
+                return
+            self._planar_renderer.draw(
+                self.window.get_size(),
+                overlay_enabled=self._overlay_enabled,
+                opacity=self._overlay_opacity,
+                selected_dense_id=self.single_select_dense_id,
+            )
+            return
+
         if self.program is None or self.sphere is None or self.sphere.geo is None:
             return
         
@@ -147,6 +193,10 @@ class MapRenderer(BaseRenderer):
         mode_int = 1 if self._overlay_enabled else 0
         self._set_uniform_if_present("u_overlay_mode", mode_int)
         self._set_uniform_if_present("u_opacity", self._overlay_opacity)
+        self._set_uniform_if_present(
+            "u_overlay_transition",
+            self.texture_manager.overlay_transition_progress(),
+        )
         
         self.sphere.geo.render(self.program)
         self._disable_rendering_state()
@@ -171,6 +221,11 @@ class MapRenderer(BaseRenderer):
         w, h = self.window.get_size()
         if w <= 0 or h <= 0:
             return None
+
+        if self.projection_mode == "planar":
+            if self._planar_renderer is None:
+                return None
+            return self._planar_renderer.screen_to_pixel(sx, sy, (w, h))
 
         self.camera.update_matrices(w, h)
         vp_matrix, model_matrix = self.camera.get_cached_matrices()

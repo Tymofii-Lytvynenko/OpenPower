@@ -1,5 +1,8 @@
+import math
+
+import numpy as np
 import polars as pl
-from imgui_bundle import imgui
+from imgui_bundle import imgui, implot
 
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.panel_context import PanelRenderContext
@@ -10,6 +13,21 @@ from src.shared.actions import ActionUpdateResourcePolicy
 
 class ResourcesPanel:
     """Resources directory backed by live data and policy actions."""
+
+    RESOURCE_LEDGER_COLUMNS = frozenset(
+        {
+            "country_id",
+            "game_resource_id",
+            "category",
+            "production_usd",
+            "consumption_usd",
+            "trade_usd",
+            "balance_usd",
+        }
+    )
+    TRADE_NETWORK_COLUMNS = frozenset(
+        {"exporter_id", "importer_id", "game_resource_id", "trade_value_usd"}
+    )
 
     def __init__(self):
         self.selected_resource = None
@@ -24,6 +42,11 @@ class ResourcesPanel:
         self.draft_status = 0
         self.draft_tax = 0
         self.current_policy_key = None
+        self._flow_cache_ledger: pl.DataFrame | None = None
+        self._flow_cache_trade: pl.DataFrame | None = None
+        self._flow_cache_country: str | None = None
+        self._flow_cache_frame: pl.DataFrame | None = None
+        self._panel_diagnostic: str | None = None
 
     def render(self, state, context: PanelRenderContext) -> bool:
         target_tag = context.target_tag
@@ -188,8 +211,8 @@ class ResourcesPanel:
                         imgui.table_next_row()
                         imgui.table_next_column()
                         imgui.text_disabled("No resource data available.")
-            except Exception:
-                pass
+            except (pl.exceptions.PolarsError, KeyError, TypeError, ValueError) as exc:
+                imgui.text_disabled(f"Resource ledger data is invalid: {exc}")
 
             imgui.end_table()
         imgui.end_child()
@@ -240,6 +263,14 @@ class ResourcesPanel:
 
     def _render_controls(self, state, target_tag, is_own):
         self._sync_policy_from_state(state, target_tag)
+        ledger = state.tables.get("resource_ledger")
+        ledger_required = {"country_id", "game_resource_id", "production_usd", "balance_usd"}
+        if self.selected_resource and ledger is not None:
+            missing = ledger_required.difference(ledger.columns)
+            if missing:
+                self._panel_diagnostic = (
+                    "Resource ledger is missing columns: " + ", ".join(sorted(missing))
+                )
 
         imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.colors.bg_input)
         if not is_own or not self.selected_resource:
@@ -248,9 +279,11 @@ class ResourcesPanel:
         pct_gdp_str, mkt_share_str, avail_str = "-- %", "-- %", "0 M"
         res_name = "Select a Resource"
 
-        if self.selected_resource and "resource_ledger" in state.tables and "countries" in state.tables:
+        if self._panel_diagnostic:
+            imgui.text_disabled(self._panel_diagnostic)
+
+        if self.selected_resource and ledger is not None and "countries" in state.tables and not self._panel_diagnostic:
             res_name = self.selected_resource.replace("_", " ").upper()
-            ledger = state.tables["resource_ledger"]
             countries = state.tables["countries"]
 
             c_row = ledger.filter(
@@ -262,7 +295,7 @@ class ResourcesPanel:
                 avail_str = self._fmt_money(c_bal, abbreviate=True).replace("$ ", "")
 
                 country_data = countries.filter(pl.col("id") == target_tag)
-                if not country_data.is_empty() and country_data["gdp"][0]:
+                if not country_data.is_empty() and "gdp" in country_data.columns and country_data["gdp"][0]:
                     pct_gdp_str = f"{(c_prod / country_data['gdp'][0]) * 100:.2f} %"
 
                 w_row = ledger.filter(pl.col("game_resource_id") == self.selected_resource)
@@ -316,6 +349,7 @@ class ResourcesPanel:
         imgui.pop_style_color()
 
     def _sync_policy_from_state(self, state, target_tag):
+        self._panel_diagnostic = None
         if not self.selected_resource:
             return
 
@@ -328,25 +362,32 @@ class ResourcesPanel:
         tax_rate = 0.0
 
         if "domestic_production" in state.tables:
-            try:
-                production = state.get_table("domestic_production")
-                if {"country_id", "game_resource_id"}.issubset(set(production.columns)):
-                    row = production.filter(
-                        (pl.col("country_id") == target_tag)
-                        & (pl.col("game_resource_id") == self.selected_resource)
-                    )
-                    if not row.is_empty():
-                        if "is_gov_controlled" in row.columns:
-                            val = row["is_gov_controlled"][0]
-                            is_gov_controlled = bool(val) if val is not None else False
-                        if "is_legal" in row.columns:
-                            val = row["is_legal"][0]
-                            is_legal = bool(val) if val is not None else True
-                        if "tax_rate" in row.columns:
-                            val = row["tax_rate"][0]
+            production = state.get_table("domestic_production")
+            required = {"country_id", "game_resource_id"}
+            if not required.issubset(production.columns):
+                missing = ", ".join(sorted(required.difference(production.columns)))
+                self._panel_diagnostic = f"Domestic production is missing columns: {missing}."
+            else:
+                row = production.filter(
+                    (pl.col("country_id") == target_tag)
+                    & (pl.col("game_resource_id") == self.selected_resource)
+                )
+                if not row.is_empty():
+                    if "is_gov_controlled" in row.columns:
+                        val = row["is_gov_controlled"][0]
+                        is_gov_controlled = bool(val) if val is not None else False
+                    if "is_legal" in row.columns:
+                        val = row["is_legal"][0]
+                        is_legal = bool(val) if val is not None else True
+                    if "tax_rate" in row.columns:
+                        val = row["tax_rate"][0]
+                        try:
                             tax_rate = float(val) if val is not None else 0.0
-            except Exception:
-                pass
+                            if not math.isfinite(tax_rate):
+                                raise ValueError("tax_rate must be finite")
+                        except (TypeError, ValueError, OverflowError) as exc:
+                            self._panel_diagnostic = f"Domestic production tax rate is invalid: {exc}"
+                            tax_rate = 0.0
 
         self.draft_management = 1 if is_gov_controlled else 0
         self.draft_status = 0 if is_legal else 1
@@ -355,69 +396,182 @@ class ResourcesPanel:
 
     def _render_market_flow_summary(self, state, target_tag):
         w, h = imgui.get_content_region_avail().x, imgui.get_content_region_avail().y
-        imgui.push_style_color(imgui.Col_.child_bg, (0.02, 0.02, 0.02, 1.0))
+        imgui.push_style_color(imgui.Col_.child_bg, (0.035, 0.045, 0.06, 0.88))
         imgui.begin_child("MarketFlowSummary", (w, h), child_flags=imgui.ChildFlags_.borders)
+        try:
+            imgui.text_colored(GAMETHEME.colors.accent, "RESOURCE MARKET FLOW")
+            imgui.separator()
+            imgui.text_wrapped(
+                "Production, consumption, imports, exports, and balance by resource. "
+                "Trade flows are not the diplomatic TRADE panel."
+            )
+            imgui.dummy((0, 6))
 
-        imgui.text_colored(GAMETHEME.colors.accent, "RESOURCE MARKET FLOW")
-        imgui.separator()
-        imgui.text_wrapped(
-            "Resource import and export flows generated by the economy simulation. "
-            "This is not the diplomatic TRADE panel."
-        )
-        imgui.dummy((0, 6))
+            try:
+                flows = self._resource_flow_frame(state, target_tag)
+            except ValueError as exc:
+                imgui.text_disabled(str(exc))
+                return
 
-        if "trade_network" not in state.tables:
-            imgui.text_disabled("Market flow data has not been generated yet.")
+            self._render_flow_metric_cards(flows)
+            imgui.dummy((0, 4))
+            self._render_market_balance_plot(flows)
+            self._render_market_flow_table(flows)
+        finally:
             imgui.end_child()
             imgui.pop_style_color()
+
+    def _resource_flow_frame(self, state, target_tag: str) -> pl.DataFrame:
+        ledger = state.tables.get("resource_ledger")
+        if ledger is None:
+            raise ValueError("Resource market data requires the resource_ledger table.")
+        missing = self.RESOURCE_LEDGER_COLUMNS.difference(ledger.columns)
+        if missing:
+            raise ValueError(
+                "resource_ledger is missing required columns: " + ", ".join(sorted(missing))
+            )
+
+        trade = state.tables.get("trade_network")
+        if (
+            ledger is self._flow_cache_ledger
+            and trade is self._flow_cache_trade
+            and target_tag == self._flow_cache_country
+            and self._flow_cache_frame is not None
+        ):
+            return self._flow_cache_frame
+
+        country_ledger = ledger.filter(pl.col("country_id") == target_tag) if target_tag else ledger
+        production = country_ledger.group_by("game_resource_id").agg(
+            pl.col("production_usd").sum().alias("production_usd"),
+            pl.col("consumption_usd").sum().alias("consumption_usd"),
+            pl.col("trade_usd").sum().alias("ledger_trade_usd"),
+            pl.col("balance_usd").sum().alias("balance_usd"),
+        )
+
+        if trade is None:
+            trade_flows = pl.DataFrame(
+                schema={"game_resource_id": pl.Utf8, "exports": pl.Float64, "imports": pl.Float64}
+            )
+        else:
+            trade_missing = self.TRADE_NETWORK_COLUMNS.difference(trade.columns)
+            if trade_missing:
+                raise ValueError(
+                    "Trade network is missing required columns: "
+                    + ", ".join(sorted(trade_missing))
+                )
+            exports = trade.filter(pl.col("exporter_id") == target_tag).group_by(
+                "game_resource_id"
+            ).agg(pl.col("trade_value_usd").sum().alias("exports"))
+            imports = trade.filter(pl.col("importer_id") == target_tag).group_by(
+                "game_resource_id"
+            ).agg(pl.col("trade_value_usd").sum().alias("imports"))
+            trade_flows = exports.join(
+                imports, on="game_resource_id", how="full", coalesce=True
+            )
+
+        flows = (
+            production.join(trade_flows, on="game_resource_id", how="full", coalesce=True)
+            .with_columns(
+                pl.col("production_usd").fill_null(0.0),
+                pl.col("consumption_usd").fill_null(0.0),
+                pl.col("ledger_trade_usd").fill_null(0.0),
+                pl.col("balance_usd").fill_null(0.0),
+                pl.col("exports").fill_null(0.0),
+                pl.col("imports").fill_null(0.0),
+            )
+            .with_columns((pl.col("exports") - pl.col("imports")).alias("net_trade_usd"))
+            .with_columns(pl.col("balance_usd").abs().alias("_abs_balance"))
+            .sort(["_abs_balance", "game_resource_id"], descending=[True, False])
+            .drop("_abs_balance")
+        )
+
+        self._flow_cache_ledger = ledger
+        self._flow_cache_trade = trade
+        self._flow_cache_country = target_tag
+        self._flow_cache_frame = flows
+        return flows
+
+    def _render_flow_metric_cards(self, flows: pl.DataFrame) -> None:
+        values = [
+            ("PRODUCTION", "production_usd", GAMETHEME.colors.positive),
+            ("CONSUMPTION", "consumption_usd", GAMETHEME.colors.warning),
+            ("IMPORTS", "imports", GAMETHEME.colors.info),
+            ("EXPORTS", "exports", GAMETHEME.colors.accent),
+            ("BALANCE", "balance_usd", GAMETHEME.colors.positive),
+        ]
+        gap = 4.0
+        card_width = max(60.0, (imgui.get_content_region_avail().x - gap * 4) / 5)
+        for index, (label, column, color) in enumerate(values):
+            if index:
+                imgui.same_line(0.0, gap)
+            total = flows.get_column(column).sum() if column in flows.columns else 0.0
+            amount = float(total) if total is not None else 0.0
+            imgui.push_style_color(imgui.Col_.child_bg, (0.08, 0.10, 0.13, 0.82))
+            imgui.begin_child(
+                f"ResourceMetric##{label}",
+                (card_width, 50),
+                child_flags=imgui.ChildFlags_.borders,
+            )
+            imgui.text_disabled(label)
+            imgui.text_colored(color, self._fmt_money(amount, abbreviate=True))
+            imgui.end_child()
+            imgui.pop_style_color()
+
+    def _render_market_balance_plot(self, flows: pl.DataFrame) -> None:
+        if flows.is_empty():
+            imgui.text_disabled("No resource ledger or market-flow rows are available.")
+            return
+
+        visible = flows.head(8)
+        resource_names = [
+            str(value or "Unknown").replace("_", " ").title()
+            for value in visible.get_column("game_resource_id").to_list()
+        ]
+        x_values = np.arange(len(resource_names), dtype=np.float64)
+        series = (
+            ("Production", "production_usd", -0.32),
+            ("Consumption", "consumption_usd", -0.16),
+            ("Imports", "imports", 0.0),
+            ("Exports", "exports", 0.16),
+            ("Balance", "balance_usd", 0.32),
+        )
+        if not implot.begin_plot("Resource balances##ResourcePanel", imgui.ImVec2(-1.0, 210.0)):
             return
 
         try:
-            trade = state.get_table("trade_network")
-            if trade.is_empty():
-                imgui.text_disabled("No active resource market flows.")
-                imgui.end_child()
-                imgui.pop_style_color()
-                return
+            implot.setup_axes("Resource", "USD")
+            implot.setup_axis_ticks(implot.ImAxis_.x1, x_values.tolist(), resource_names)
+            for label, column, shift in series:
+                y_values = np.asarray(visible.get_column(column).to_list(), dtype=np.float64)
+                implot.plot_bars(label, x_values + shift, y_values, 0.14)
+        finally:
+            implot.end_plot()
 
-            exports = trade.filter(pl.col("exporter_id") == target_tag).group_by("game_resource_id").agg(
-                pl.col("trade_value_usd").sum().alias("exports")
-            )
-            imports = trade.filter(pl.col("importer_id") == target_tag).group_by("game_resource_id").agg(
-                pl.col("trade_value_usd").sum().alias("imports")
-            )
-            flows = (
-                exports
-                .join(imports, on="game_resource_id", how="full", coalesce=True)
-                .with_columns([
-                    pl.col("exports").fill_null(0.0),
-                    pl.col("imports").fill_null(0.0),
-                ])
-                .with_columns((pl.col("exports") - pl.col("imports")).alias("net"))
-                .sort("net", descending=True)
-            )
+    def _render_market_flow_table(self, flows: pl.DataFrame) -> None:
+        if flows.is_empty():
+            return
+        if not imgui.begin_table(
+            "MarketFlowSummaryTable",
+            4,
+            imgui.TableFlags_.row_bg | imgui.TableFlags_.borders_inner_h,
+        ):
+            return
 
-            if flows.is_empty():
-                imgui.text_disabled("No active resource market flows for this country.")
-            elif imgui.begin_table("MarketFlowSummaryTable", 4, imgui.TableFlags_.row_bg | imgui.TableFlags_.borders_inner_h):
-                imgui.table_setup_column("RESOURCE", imgui.TableColumnFlags_.width_stretch)
-                imgui.table_setup_column("EXPORT", imgui.TableColumnFlags_.width_fixed, 90)
-                imgui.table_setup_column("IMPORT", imgui.TableColumnFlags_.width_fixed, 90)
-                imgui.table_setup_column("NET", imgui.TableColumnFlags_.width_fixed, 90)
-                imgui.table_headers_row()
-
-                for row in flows.head(8).iter_rows(named=True):
-                    net = float(row.get("net") or 0.0)
-                    color = GAMETHEME.colors.positive if net >= 0 else GAMETHEME.colors.negative
-                    imgui.table_next_row()
-                    imgui.table_next_column(); imgui.text(str(row.get("game_resource_id") or "Unknown").replace("_", " ").title())
-                    imgui.table_next_column(); Prims.right_align_text(self._fmt_money(row.get("exports") or 0.0, True))
-                    imgui.table_next_column(); Prims.right_align_text(self._fmt_money(row.get("imports") or 0.0, True))
-                    imgui.table_next_column(); Prims.right_align_text(self._fmt_money(net, True), color)
-
-                imgui.end_table()
-        except Exception:
-            imgui.text_disabled("Unable to render resource market flow summary.")
-
-        imgui.end_child()
-        imgui.pop_style_color()
+        imgui.table_setup_column("RESOURCE", imgui.TableColumnFlags_.width_stretch)
+        imgui.table_setup_column("EXPORT", imgui.TableColumnFlags_.width_fixed, 90)
+        imgui.table_setup_column("IMPORT", imgui.TableColumnFlags_.width_fixed, 90)
+        imgui.table_setup_column("NET", imgui.TableColumnFlags_.width_fixed, 90)
+        imgui.table_headers_row()
+        for row in flows.head(8).iter_rows(named=True):
+            net = float(row.get("net_trade_usd") or 0.0)
+            color = GAMETHEME.colors.positive if net >= 0 else GAMETHEME.colors.negative
+            imgui.table_next_row()
+            imgui.table_next_column()
+            imgui.text(str(row.get("game_resource_id") or "Unknown").replace("_", " ").title())
+            imgui.table_next_column()
+            Prims.right_align_text(self._fmt_money(row.get("exports") or 0.0, True))
+            imgui.table_next_column()
+            Prims.right_align_text(self._fmt_money(row.get("imports") or 0.0, True))
+            imgui.table_next_column()
+            Prims.right_align_text(self._fmt_money(net, True), color)
+        imgui.end_table()

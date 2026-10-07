@@ -32,3 +32,4 @@
 ## Notes
 
 - Feature specification complete and validated against OpenPower Constitution.
+- Review update (2026-10-06): Added route-access, domain, group-order, and naval landing requirements; confirmed they preserve the existing movement-duration and readiness contracts.

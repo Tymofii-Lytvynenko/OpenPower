@@ -84,7 +84,8 @@ class TimeSystem(ISystem, ICheckpointedSystem):
         if self.real_sec_timer >= 1.0:
             # Calculate how many in-game minutes passed since the last pulse
             # If paused, this will naturally be 0.
-            minutes_passed = t.total_minutes - self.last_event_total_minutes
+            # A paused heartbeat must not report stale elapsed simulation time from startup or save-load.
+            minutes_passed = 0 if t.is_paused else t.total_minutes - self.last_event_total_minutes
             game_seconds = minutes_passed * 60
 
             state.events.append(EventRealSecond(

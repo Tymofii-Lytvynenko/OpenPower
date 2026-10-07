@@ -1,11 +1,15 @@
 import hashlib
+import logging
 import threading
 import os
-import shutil
 import numpy as np
+import zipfile
 from pathlib import Path
 from typing import Optional, Any, Dict
 from src.core.paths import ProjectPaths
+
+
+logger = logging.getLogger(__name__)
 
 class CacheService:
     """
@@ -133,15 +137,26 @@ class CacheService:
         if not path.exists():
             return None
         try:
-            return np.load(path)
-        except Exception as e:
-            print(f"[CacheService] Archive load failed {path.name}: {e}")
+            with np.load(path, allow_pickle=False) as archive:
+                return {name: archive[name].copy() for name in archive.files}
+        except (OSError, ValueError, EOFError, zipfile.BadZipFile) as exc:
+            logger.warning("Cache archive %s is unreadable and will be regenerated: %s", path, exc)
             return None
 
     def save_numpy_archive(self, path: Path, **kwargs):
-        """Saves compressed .npz archive."""
+        """Saves compressed .npz archives using an atomic replacement."""
+        temporary_path = path.with_name(f"{path.name}.tmp.npz")
         try:
-            np.savez_compressed(path, **kwargs)
-            # print(f"[CacheService] Archived: {path.name}")
-        except Exception as e:
-            print(f"[CacheService] Archive save failed {path.name}: {e}")
+            np.savez_compressed(temporary_path, **kwargs)
+            os.replace(temporary_path, path)
+        except (OSError, TypeError, ValueError) as exc:
+            logger.error("Could not write cache archive %s: %s", path, exc)
+            if temporary_path.exists():
+                try:
+                    temporary_path.unlink()
+                except OSError as cleanup_error:
+                    logger.warning(
+                        "Could not remove temporary cache archive %s: %s",
+                        temporary_path,
+                        cleanup_error,
+                    )

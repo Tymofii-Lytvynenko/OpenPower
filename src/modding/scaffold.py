@@ -51,6 +51,7 @@ def scaffold_mod(
             f"name = {json.dumps(title, ensure_ascii=False)}\n"
             'version = "0.1.0"\n'
             "api_version = 1\n"
+            'min_engine_version = "0.1.0"\n'
             f"dependencies = [{dependency_literal}]\n"
         ),
         "registration.py": (

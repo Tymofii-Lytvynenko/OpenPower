@@ -35,6 +35,8 @@ Expected outcomes:
 
 The render benchmark must warm up both paths, collect the same number of repeated baseline and 100-battle samples, compare their medians, and report both medians plus the calculated percentage overhead. The snapshot/presenter test remains a separate transport regression and is not accepted as evidence of frame-time overhead.
 
+In headless validation, the benchmark's overlay-free baseline is the existing CPU unit-projection pass for 100 ordinary billboards; the feature sample adds 100 battle-anchor projections, label placement, and no-op ImGui draw-command dispatch. This is a comparable CPU-path diagnostic, not a measurement of the complete GPU-backed client frame. A result from this proxy cannot pass SC-007; verify the five-percent frame-time target in the running client with the same scene and record the real frame medians separately.
+
 If the project environment does not provide `.venv`, run the same command with `python -m pytest` after installing the test dependencies.
 
 ## Manual map validation
@@ -57,6 +59,28 @@ If the project environment does not provide `.venv`, run the same command with `
 
 ## Validation results
 
-Record automated benchmark measurements, the globe-matrix result, the user-acceptance totals, and the final pass/fail decision here during implementation. Do not mark the feature complete while required evidence is missing.
+On 2026-10-07, the focused anchor, projection, renderer, performance, combat,
+status, and snapshot suite reported `28 passed in 0.97s`. The latest
+repository-wide automated suite reported `684 passed, 16 skipped, 116 warnings,
+190 subtests passed in 162.89s`; the warnings are the existing Pyglet
+`ctypes._pointer_type_cache` deprecation warning.
+
+Three repeated warmed headless CPU-proxy runs measured overlay-free / 100-battle
+medians of `1.166 / 7.812 ms` (`570.16%`), `1.184 / 7.911 ms` (`568.35%`), and
+`1.175 / 7.660 ms` (`551.77%`). The median run measured `1.175 / 7.812 ms` and
+`568.35%` overhead. This proxy intentionally excludes the rest of the
+GPU-backed client frame and discards draw commands; it is diagnostic evidence,
+not a pass or substitute for in-client SC-007 measurement. Renderer inspection
+found revision-cached table normalization, batched anchor projection, and
+bounded spatial occupancy; no repeated per-frame Polars conversion or
+all-pairs rectangle scan remains. Record the elevated proxy cost as a follow-up
+performance issue, but do not treat this CPU-only ratio as the actual frame-time
+gate or spend optimization iterations without an in-client profile.
+
+Automated globe projection tests cover the yaw/pitch/zoom/seam matrix. The
+interactive globe scenarios, real frame-time gate, and blinded 200-judgment
+Passive/Active protocol remain open and require a running client and human
+participants; the feature is not fully empirically accepted until those results
+are recorded.
 
 Refer to [data-model.md](data-model.md) for anchor and lifecycle semantics and [contracts/battle-visualization.md](contracts/battle-visualization.md) for the renderer input/visibility contract.

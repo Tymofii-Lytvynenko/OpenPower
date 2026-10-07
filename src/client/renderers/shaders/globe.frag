@@ -29,12 +29,14 @@ out vec4 out_color;
 uniform sampler2D u_terrain_texture;
 uniform sampler2D u_map_texture;
 uniform sampler2D u_lookup_texture;
+uniform sampler2D u_previous_lookup_texture;
 
 // Uniforms
 uniform float u_lut_dim;
 uniform int   u_selected_id;
 uniform int   u_overlay_mode; // 0=Terrain, 1=Political
 uniform float u_opacity;
+uniform float u_overlay_transition;
 
 // Environment
 uniform vec3  u_light_dir;
@@ -54,7 +56,7 @@ int decode_id(vec3 rgb) {
 
 // Map ID to LUT UV coordinates
 // Why: Maps a linear ID to 2D UV coordinates for the data lookup texture.
-vec4 get_overlay_data(int dense_id) {
+vec2 get_lookup_uv(int dense_id) {
     float dim = u_lut_dim;
     float x = float(dense_id % int(dim));
     float y = float(dense_id / int(dim));
@@ -63,7 +65,7 @@ vec4 get_overlay_data(int dense_id) {
     // Uses vec2(0.5) instead of 0.5 to prevent crashes on strict drivers (e.g. MacOS)
     vec2 uv = (vec2(x, y) + vec2(0.5)) / vec2(dim);
     
-    return texture(u_lookup_texture, uv);
+    return uv;
 }
 
 // Atmospheric rim light.
@@ -98,7 +100,14 @@ void main() {
     // We fetch this ONCE here. The results are reused for both overlay coloring AND selection logic.
     vec4 map_data = texture(u_map_texture, uv);
     int dense_id = decode_id(map_data.rgb);
-    vec4 overlay_data = get_overlay_data(dense_id);
+    vec2 lookup_uv = get_lookup_uv(dense_id);
+    vec4 current_overlay_data = texture(u_lookup_texture, lookup_uv);
+    vec4 previous_overlay_data = texture(u_previous_lookup_texture, lookup_uv);
+    vec4 overlay_data = mix(
+        previous_overlay_data,
+        current_overlay_data,
+        smoothstep(0.0, 1.0, u_overlay_transition)
+    );
 
     // D. Political Overlay Logic
     // Only apply if mode is active AND the region has valid data (alpha > 0)
@@ -125,7 +134,7 @@ void main() {
     
     // 2. If not, check if it's part of a multi-select group (stored in overlay alpha)
     if (!is_selected) {
-        is_selected = (overlay_data.a > 0.95); 
+        is_selected = (current_overlay_data.a > 0.95);
     }
 
     // 3. Apply Glow (The "New Style")

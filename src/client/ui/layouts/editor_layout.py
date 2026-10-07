@@ -1,12 +1,21 @@
 from imgui_bundle import imgui
+from typing import Callable, Optional
 from src.client.ui.core.theme import GAMETHEME
 
 class EditorLayout:
-    def __init__(self, net_client, viewport_ctrl):
+    def __init__(
+        self,
+        net_client,
+        viewport_ctrl,
+        on_projection_change: Optional[Callable[[str], None]] = None,
+    ):
         self.net = net_client
         self.viewport_ctrl = viewport_ctrl
+        self.on_projection_change = on_projection_change
         self.current_layer_label = "Political"
         self.layer_map = {"Political": "political", "Terrain": "terrain"}
+        self.current_projection_label = "Globe"
+        self.projection_map = {"Globe": "globe", "Planar": "planar"}
 
     def get_current_render_mode(self):
         return self.layer_map.get(self.current_layer_label, "political")
@@ -27,6 +36,13 @@ class EditorLayout:
                     for label in self.layer_map:
                         if imgui.selectable(label, label == self.current_layer_label)[0]:
                             self.current_layer_label = label
+                    imgui.end_combo()
+                if imgui.begin_combo("Projection", self.current_projection_label):
+                    for label, mode in self.projection_map.items():
+                        if imgui.selectable(label, label == self.current_projection_label)[0]:
+                            self.current_projection_label = label
+                            if self.on_projection_change is not None:
+                                self.on_projection_change(mode)
                     imgui.end_combo()
                 imgui.end_menu()
             imgui.end_main_menu_bar()

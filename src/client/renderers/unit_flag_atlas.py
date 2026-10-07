@@ -47,6 +47,13 @@ class UnitFlagAtlas:
         self._texture_id: int = 0
         self._entries: dict[str, FlagAtlasEntry] = {}
         self._owners_key: frozenset[str] = frozenset()
+        self._slot_by_owner: dict[str, int] = {}
+        self._atlas_columns = 0
+        self._atlas_capacity = 0
+        self._resized_flag_cache: dict[
+            str,
+            tuple[tuple[Path, int | None, int | None], Image.Image],
+        ] = {}
         self._error_printed = False
 
     @property
@@ -68,7 +75,10 @@ class UnitFlagAtlas:
         if requested.issubset(self._owners_key) and self._texture_id > 0:
             return
 
-        self._build_atlas(self._owners_key | requested)
+        owners = self._owners_key | requested
+        if self._texture_id > 0 and self._append_new_owners(owners):
+            return
+        self._build_atlas(owners)
 
     def draw_flag(
         self,
@@ -102,15 +112,22 @@ class UnitFlagAtlas:
         tags = sorted(owners | {self._fallback_tag})
         cell_w = FLAG_ATLAS_CELL_WIDTH + FLAG_ATLAS_PADDING * 2
         cell_h = FLAG_ATLAS_CELL_HEIGHT + FLAG_ATLAS_PADDING * 2
-        columns = max(1, ceil(sqrt(len(tags))))
-        rows = ceil(len(tags) / columns)
+        slot_by_owner = dict(self._slot_by_owner)
+        for tag in tags:
+            if tag not in slot_by_owner:
+                slot_by_owner[tag] = len(slot_by_owner)
+        requested_capacity = 1 << (len(slot_by_owner) - 1).bit_length()
+        requested_capacity = max(requested_capacity, self._atlas_capacity)
+        columns = max(1, ceil(sqrt(requested_capacity)))
+        rows = ceil(requested_capacity / columns)
         atlas_w = columns * cell_w
         atlas_h = rows * cell_h
 
         atlas = Image.new("RGBA", (atlas_w, atlas_h), (0, 0, 0, 0))
         entries = {}
 
-        for index, tag in enumerate(tags):
+        for tag in tags:
+            index = slot_by_owner[tag]
             col = index % columns
             row = index // columns
             x = col * cell_w + FLAG_ATLAS_PADDING
@@ -134,9 +151,79 @@ class UnitFlagAtlas:
         self._texture_id = self._extract_texture_id(texture)
         self._entries = entries
         self._owners_key = owners
+        self._slot_by_owner = slot_by_owner
+        self._atlas_columns = columns
+        self._atlas_capacity = columns * rows
+
+    def _append_new_owners(self, owners: frozenset[str]) -> bool:
+        """Upload new cells in reserved atlas space without re-packing existing UVs."""
+        texture = self._texture
+        if (
+            texture is None
+            or not callable(getattr(texture, "write", None))
+            or self._atlas_columns < 1
+        ):
+            return False
+
+        tags = owners | {self._fallback_tag}
+        new_tags = sorted(tags.difference(self._slot_by_owner))
+        if not new_tags:
+            self._owners_key = owners
+            return True
+        if len(self._slot_by_owner) + len(new_tags) > self._atlas_capacity:
+            return False
+
+        cell_w = FLAG_ATLAS_CELL_WIDTH + FLAG_ATLAS_PADDING * 2
+        cell_h = FLAG_ATLAS_CELL_HEIGHT + FLAG_ATLAS_PADDING * 2
+        new_entries: dict[str, FlagAtlasEntry] = {}
+        new_slots: dict[str, int] = {}
+        for tag in new_tags:
+            slot = len(self._slot_by_owner) + len(new_slots)
+            col = slot % self._atlas_columns
+            row = slot // self._atlas_columns
+            x = col * cell_w
+            y = row * cell_h
+            flag = self._load_resized_flag(tag)
+            cell = Image.new("RGBA", (cell_w, cell_h), (0, 0, 0, 0))
+            cell.paste(flag, (FLAG_ATLAS_PADDING, FLAG_ATLAS_PADDING), flag)
+            try:
+                texture.write(
+                    cell.tobytes(),
+                    viewport=(x, y, cell_w, cell_h),
+                )
+            except Exception as exc:
+                print(
+                    "[UnitFlagAtlas] Partial atlas update failed; "
+                    f"rebuilding the atlas: {exc}"
+                )
+                return False
+            new_entries[tag] = FlagAtlasEntry(
+                (x + FLAG_ATLAS_PADDING) / (self._atlas_columns * cell_w),
+                (y + FLAG_ATLAS_PADDING) / ((self._atlas_capacity // self._atlas_columns) * cell_h),
+                (x + FLAG_ATLAS_PADDING + FLAG_ATLAS_CELL_WIDTH)
+                / (self._atlas_columns * cell_w),
+                (y + FLAG_ATLAS_PADDING + FLAG_ATLAS_CELL_HEIGHT)
+                / ((self._atlas_capacity // self._atlas_columns) * cell_h),
+            )
+            new_slots[tag] = slot
+
+        self._entries.update(new_entries)
+        self._slot_by_owner.update(new_slots)
+        self._owners_key = owners
+        return True
 
     def _load_resized_flag(self, tag: str) -> Image.Image:
         path = self._resolve_flag_path(tag)
+        try:
+            stat = path.stat()
+            source_signature = (path, stat.st_mtime_ns, stat.st_size)
+        except OSError:
+            source_signature = (path, None, None)
+
+        cached = self._resized_flag_cache.get(tag)
+        if cached is not None and cached[0] == source_signature:
+            return cached[1]
+
         try:
             with Image.open(path) as image:
                 source = image.convert("RGBA")
@@ -152,6 +239,8 @@ class UnitFlagAtlas:
         x = (FLAG_ATLAS_CELL_WIDTH - resized.width) // 2
         y = (FLAG_ATLAS_CELL_HEIGHT - resized.height) // 2
         output.paste(resized, (x, y), resized)
+        # Mod-added owners rebuild the atlas, but unchanged flag files need not be decoded and resized again.
+        self._resized_flag_cache[tag] = (source_signature, output)
         return output
 
     def _resolve_flag_path(self, tag: str) -> Path:

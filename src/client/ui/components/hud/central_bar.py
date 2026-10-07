@@ -47,8 +47,6 @@ class HudMetrics:
 class CentralBar:
     """Compact bottom HUD composed from measured ImGui controls."""
 
-    AI_POPUP_ID = "AISettingsStubPopup"
-
     def __init__(
         self,
         open_ai_cb=None,
@@ -379,11 +377,9 @@ class CentralBar:
         if ai_clicked:
             if self._open_ai_cb:
                 self._open_ai_cb()
-            else:
-                imgui.open_popup(self.AI_POPUP_ID)
         if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled):
             tooltip = (
-                "AI delegation settings (coming soon)"
+                "Campaign objectives and AI delegation"
                 if self.is_own
                 else "AI delegation is available for the player country"
             )
@@ -405,21 +401,6 @@ class CentralBar:
 
         imgui.pop_style_color()
         imgui.pop_style_var()
-        self._render_ai_stub()
-
-    def _render_ai_stub(self) -> None:
-        if not imgui.begin_popup(self.AI_POPUP_ID):
-            return
-
-        imgui.text("AI DELEGATION")
-        imgui.separator()
-        imgui.text_disabled("Choose which player-country areas AI may manage.")
-        imgui.begin_disabled()
-        for label in ("Economy", "Diplomacy", "Military", "Research"):
-            imgui.checkbox(f"{label}##ai-delegation", False)
-        imgui.end_disabled()
-        imgui.text_disabled("Coming soon")
-        imgui.end_popup()
 
     def _render_time_section(
         self,

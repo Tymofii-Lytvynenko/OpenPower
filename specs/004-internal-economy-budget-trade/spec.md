@@ -54,5 +54,5 @@ As a national economic manager, I want an economic simulation featuring dynamic 
 
 ## Assumptions & Dependencies
 
-- **Assumption**: `RESOURCE_MAPPING` in `src/shared/economy_meta.py` categorizes all 37 resource types into Raw Materials, Energy, Industrial Materials, Finished Goods, and Services.
+- **Assumption**: The resource catalog contains 36 resource types across Raw Materials, Energy, Industrial Materials, Finished Goods, and Services.
 - **Dependency**: `EventRealSecond` events from `base.time` trigger real-second heartbeats.

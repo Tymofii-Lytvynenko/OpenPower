@@ -112,6 +112,23 @@ class CameraController:
         self.yaw = -lon - (np.pi / 2.0) 
         self.pitch = lat
 
+    def look_at_pixel_fraction(
+        self,
+        x_fraction: float,
+        y_fraction: float,
+        texture_width: float,
+        texture_height: float,
+    ) -> None:
+        """Center the camera on a normalized map location across any texture size."""
+        width = float(texture_width)
+        height = float(texture_height)
+        self.look_at_pixel_coords(
+            float(x_fraction) * width,
+            float(y_fraction) * height,
+            width,
+            height,
+        )
+
     def sync_with_arcade(self, arcade_cam):
         """Compatibility stub. Not used in 3D mode."""
         pass

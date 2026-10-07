@@ -33,8 +33,8 @@ As a player, I want a campaign to define my country, political sphere, objective
 
 - **FR-001**: A campaign scenario MUST define selectable actors, starting setup, political or sphere scope, objective set, deadlines, win conditions, loss conditions, and sandbox policy.
 - **FR-002**: Scenario setup MUST apply country, party or sphere control, initial relations, starting military or economic state, and enabled rules exactly once at campaign start.
-- **FR-003**: Objectives MUST support control of regions, conquest of countries, treaty or alliance membership, resource requirements, GDP-per-capita thresholds, strategic-weapon construction or use, and resource-share thresholds.
-- **FR-004**: Every objective MUST define actor, condition, target, quantity or threshold, hold duration where needed, deadline, progress rule, completion status, failure status, and evidence.
+- **FR-003**: Objectives MUST support control of regions, conquest of countries, treaty or alliance membership, resource requirements, GDP-per-capita and population/development thresholds, strategic-weapon construction or use, and resource-share thresholds.
+- **FR-004**: Every objective MUST define actor, condition, target, quantity or threshold, hold duration where needed, deadline, progress rule, completion status, failure status, and evidence. Scenario data MAY declare authoritative failure predicates for an objective.
 - **FR-005**: Objective evaluation MUST consume authoritative outputs from territory, diplomacy, economy, resources, research, military, strategic, demographics, and politics systems and MUST NOT reimplement their calculations.
 - **FR-006**: Objective progress MUST show current value, target value, remaining amount, time held, deadline, and the event or state that last changed it.
 - **FR-007**: The system MUST support objective states pending, active, completed, failed, expired, cancelled, and blocked, with explicit transition reasons.

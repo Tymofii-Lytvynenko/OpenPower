@@ -1,4 +1,4 @@
-import time
+from threading import Event
 from dataclasses import dataclass
 from pathlib import Path
 from src.shared.protocols import SessionPort
@@ -7,6 +7,7 @@ from src.core.paths import ProjectPaths
 # UPDATED: Import Core Data class instead of Shared Atlas
 from src.core.map_data import RegionMapData
 from src.client.services.network_client_service import NetworkClient
+from src.client.tasks.session_startup import check_cancelled
 
 @dataclass
 class EditorContext:
@@ -36,12 +37,17 @@ class EditorLoadingTask:
         # LoadingTask Protocol
         self.progress: float = 0.0
         self.status_text: str = "Preparing Editor..."
+        self._cancel_event = Event()
+
+    def cancel(self) -> None:
+        self._cancel_event.set()
 
     def run(self) -> EditorContext:
         """
         Executed in background thread by LoadingView.
         """
         # 1. Locate Map Assets
+        check_cancelled(self._cancel_event)
         self.status_text = "Locating map assets..."
         self.progress = 0.1
         
@@ -50,7 +56,8 @@ class EditorLoadingTask:
         
         # Brief sleep ensures the UI thread has a chance to render the text update
         # before the heavy CPU blocking operation starts.
-        time.sleep(0.1) 
+        self._cancel_event.wait(0.1)
+        check_cancelled(self._cancel_event)
 
         # 2. Load Region Data (Heavy CPU Work)
         self.status_text = "Processing Region Data (CV2)..."
@@ -60,16 +67,19 @@ class EditorLoadingTask:
         # This is safe to run in a thread because it touches no OpenGL context.
         # It just does math on pixels.
         map_data = RegionMapData(str(map_path))
+        check_cancelled(self._cancel_event)
         
         # 3. Initialize Network
         self.status_text = "Connecting to Session..."
         self.progress = 0.8
         
+        check_cancelled(self._cancel_event)
         net_client = NetworkClient(self.session)
         
         # 4. Finalize
         self.status_text = "Finalizing..."
         self.progress = 1.0
+        check_cancelled(self._cancel_event)
         
         return EditorContext(
             map_path=map_path,
@@ -93,8 +103,7 @@ class EditorLoadingTask:
         if candidate and candidate.exists():
             return candidate
             
-        # Fallback to root (Critical error usually, but we return a path to fail gracefully later)
-        return self.config.project_root / "missing_map_placeholder.png"
+        raise FileNotFoundError("Technical region map asset was not found in configured data or asset paths.")
 
     def _resolve_terrain_path(self) -> Path:
         """

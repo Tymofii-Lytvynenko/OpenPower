@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import math
+
 from imgui_bundle import icons_fontawesome_6, imgui
 
 from src.client.renderers.flag_renderer import FlagRenderer
+from src.shared.actions import ActionRespondToRandomEvent, ActionSetRandomEventControls
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.theme import GAMETHEME, with_alpha
@@ -35,14 +38,14 @@ class NewsPanel:
         self._selected_category: EventCategory | None = None
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        del context
         with WindowManager.window("EVENT FEED", x=1120, y=120, w=700, h=320) as is_open:
             if not is_open:
                 return False
-            self._render_content(state)
+            self._render_content(state, context)
             return True
 
-    def _render_content(self, state) -> None:
+    def _render_content(self, state, context: PanelRenderContext) -> None:
+        self._render_event_controls(state, context)
         all_items = self._presenter.items(state)
         counts = {category: 0 for category in EventCategory}
         for item in all_items:
@@ -61,7 +64,7 @@ class NewsPanel:
         )
         if visible_items:
             for item in visible_items:
-                self._render_item(item)
+                self._render_item(item, context)
         else:
             draw_empty_state("No events match the selected category.")
         imgui.end_child()
@@ -72,8 +75,8 @@ class NewsPanel:
         imgui.end_child()
         imgui.pop_style_var()
 
-    def _render_item(self, item: EventFeedItem) -> None:
-        row_height = 30.0
+    def _render_item(self, item: EventFeedItem, context: PanelRenderContext) -> None:
+        row_height = 54.0 if item.response_options and item.status == "active" else 30.0
         available_width = imgui.get_content_region_avail().x
         local_start = imgui.get_cursor_pos()
         screen_start = imgui.get_cursor_screen_pos()
@@ -117,6 +120,21 @@ class NewsPanel:
         if imgui.is_item_hovered():
             self._render_item_tooltip(item)
 
+        if item.response_options and item.status == "active" and context.net_client is not None:
+            imgui.set_cursor_pos((local_start.x + 44.0, local_start.y + 31.0))
+            for option_index, (response_id, cost) in enumerate(item.response_options):
+                if option_index:
+                    imgui.same_line()
+                if imgui.small_button(f"{response_id} · {cost:,.0f}##{item.id}-{response_id}"):
+                    context.net_client.send_action(
+                        ActionRespondToRandomEvent(
+                            player_id=context.net_client.player_id,
+                            event_id=item.id.removeprefix("instance:"),
+                            response_id=response_id,
+                            country_tag=item.country_tag,
+                        )
+                    )
+
         separator_y = screen_start.y + row_height
         draw_list.add_line(
             (screen_start.x + 8.0, separator_y),
@@ -142,6 +160,102 @@ class NewsPanel:
             if imgui.is_item_hovered():
                 suffix = "; click again to show all" if is_active else ""
                 imgui.set_tooltip(f"{tooltip}: {counts[category]}{suffix}")
+
+    @staticmethod
+    def _render_event_controls(state, context: PanelRenderContext) -> None:
+        client = context.net_client
+        if client is None:
+            return
+
+        enabled = NewsPanel._read_bool(state.globals.get("random_events_enabled"), True)
+        if imgui.button(f"Random events: {'ON' if enabled else 'OFF'}"):
+            client.send_action(
+                ActionSetRandomEventControls(
+                    player_id=client.player_id,
+                    enabled=not enabled,
+                )
+            )
+        imgui.same_line()
+        multiplier = NewsPanel._read_frequency_multiplier(
+            state.globals.get("random_event_frequency_multiplier")
+        )
+        if imgui.small_button(f"−##event_frequency_down"):
+            client.send_action(
+                ActionSetRandomEventControls(
+                    player_id=client.player_id,
+                    frequency_multiplier=max(0.0, round(multiplier - 0.25, 2)),
+                )
+            )
+        imgui.same_line()
+        imgui.text(f"Frequency {multiplier:.2f}×")
+        imgui.same_line()
+        if imgui.small_button(f"+##event_frequency_up"):
+            client.send_action(
+                ActionSetRandomEventControls(
+                    player_id=client.player_id,
+                    frequency_multiplier=min(4.0, round(multiplier + 0.25, 2)),
+                )
+            )
+        seed = NewsPanel._read_seed(
+            state.globals.get("random_event_seed"), state.determinism.seed
+        )
+        imgui.same_line()
+        if imgui.small_button(f"−##event_seed_down"):
+            client.send_action(
+                ActionSetRandomEventControls(
+                    player_id=client.player_id,
+                    seed=max(0, seed - 1),
+                )
+            )
+        imgui.same_line()
+        imgui.text(f"Seed {seed}")
+        imgui.same_line()
+        if imgui.small_button(f"+##event_seed_up"):
+            client.send_action(
+                ActionSetRandomEventControls(
+                    player_id=client.player_id,
+                    seed=min((1 << 63) - 1, seed + 1),
+                )
+            )
+
+        imgui.separator()
+        controls = state.tables.get("random_event_controls")
+        if controls is None or controls.is_empty():
+            return
+        for control in controls.sort("category").iter_rows(named=True):
+            category = str(control.get("category") or "")
+            category_enabled = NewsPanel._read_bool(control.get("enabled"), True)
+            imgui.same_line()
+            if imgui.small_button(
+                f"{category.title()}: {'ON' if category_enabled else 'OFF'}##event-category-{category}"
+            ):
+                client.send_action(
+                    ActionSetRandomEventControls(
+                        player_id=client.player_id,
+                        category=category,
+                        category_enabled=not category_enabled,
+                    )
+                )
+
+    @staticmethod
+    def _read_bool(value: object, default: bool) -> bool:
+        return value if isinstance(value, bool) else default
+
+    @staticmethod
+    def _read_frequency_multiplier(value: object) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return 1.0
+        return max(0.0, min(4.0, parsed)) if math.isfinite(parsed) else 1.0
+
+    @staticmethod
+    def _read_seed(value: object, fallback: int) -> int:
+        try:
+            parsed = int(value) if value is not None else int(fallback)
+        except (TypeError, ValueError, OverflowError):
+            parsed = int(fallback)
+        return max(0, min((1 << 63) - 1, parsed))
 
     @staticmethod
     def _render_item_tooltip(item: EventFeedItem) -> None:

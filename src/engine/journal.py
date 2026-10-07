@@ -21,6 +21,7 @@ class DomainEventJournal:
                     event_id=runtime.next_id("event", tick),
                     tick=tick,
                     source="simulation",
+                    game_minute=int(state.time.total_minutes),
                 )
             )
         return tuple(captured)

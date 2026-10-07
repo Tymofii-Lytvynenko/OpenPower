@@ -62,6 +62,18 @@ class TestCountryOptions(unittest.TestCase):
 
 
 class TestGameLayoutCountrySwitch(unittest.TestCase):
+    def test_ai_button_opens_campaign_overview_with_delegation_controls(self) -> None:
+        panel_manager = MagicMock()
+        with (
+            patch.object(game_layout_module, "PanelManager", return_value=panel_manager),
+            patch.object(game_layout_module, "build_game_panel_specs", return_value=[]),
+            patch.object(game_layout_module, "CentralBar") as central_bar,
+        ):
+            GameLayout(MagicMock(), "UKR", MagicMock())
+
+        central_bar.call_args.kwargs["open_ai_cb"]()
+        panel_manager.set_visible.assert_called_once_with("OBJECTIVES", True)
+
     def test_applies_dropdown_choice_to_panels_and_viewport_in_same_frame(self) -> None:
         layout = GameLayout.__new__(GameLayout)
         layout.local_player_tag = "UKR"

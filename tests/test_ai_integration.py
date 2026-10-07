@@ -107,7 +107,7 @@ class TestAISameTickIntegration(unittest.TestCase):
         countries = state.get_table("countries")
         ai_country = countries.filter(pl.col("id") == "AAA").row(0, named=True)
         player_country = countries.filter(pl.col("id") == "PLAYER").row(0, named=True)
-        self.assertAlmostEqual(ai_country["personal_income_tax_rate"], 0.25)
+        self.assertAlmostEqual(ai_country["personal_income_tax_rate"], 0.22)
         self.assertAlmostEqual(player_country["personal_income_tax_rate"], 0.20)
 
         queued = state.get_table("production_orders").filter(

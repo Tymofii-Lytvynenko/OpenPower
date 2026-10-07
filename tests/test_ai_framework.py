@@ -38,6 +38,10 @@ class _InvalidPolicy(_Policy):
         return pl.DataFrame(self.rows)
 
 
+class _ScopedDiplomacyPolicy(_Policy):
+    id = "diplomacy"
+
+
 class TestDeclarativeAIFramework(unittest.TestCase):
     def test_rank_quota_and_conflict_deduplication_are_deterministic(self):
         rows = [
@@ -138,6 +142,83 @@ class TestDeclarativeAIFramework(unittest.TestCase):
         selected = scheduled_countries(countries, context, 2).collect()
 
         self.assertEqual(selected["country_id"].to_list(), ["BBB"])
+
+    def test_delegated_country_is_scheduled_but_only_within_declared_ai_authority(self):
+        rows = [
+            self._row("PLAYER", "budget", 0.9, "budget-action", 1, "delegated_budget"),
+            self._row("PLAYER", "diplomacy", 0.9, "diplomacy-action", 1, "not_delegated"),
+            self._row("BBB", "budget", 0.8, "ai_budget", 1, "ordinary_ai"),
+        ]
+        context = AITableContext(
+            tables={"countries": pl.DataFrame({"id": ["PLAYER", "BBB"]})},
+            day_ordinal=1,
+            total_minutes=1440,
+            date_text="2001-01-02 00:00",
+            player_tag="PLAYER",
+            delegated_domains={"PLAYER": frozenset({"economy"})},
+        )
+
+        result = DeclarativeAIFramework(_Policy(rows)).evaluate(context)
+
+        self.assertEqual(result.decisions["country_id"].to_list(), ["BBB", "PLAYER"])
+        self.assertEqual(result.decisions["domain"].to_list(), ["budget", "budget"])
+
+        countries = pl.DataFrame(
+            {"id": ["PLAYER", "BBB"], "is_playable": [True, True]}
+        ).lazy()
+        scheduled = scheduled_countries(countries, context, 1).collect()
+        self.assertEqual(scheduled["country_id"].to_list(), ["BBB", "PLAYER"])
+
+    def test_sphere_delegation_limits_diplomacy_to_treaty_members_and_treaty_id(self):
+        rows = [
+            {**self._row("PLAYER", "diplomacy", 0.9, "member-proposal", 1, "allowed"),
+             "policy_id": "diplomacy", "action_kind": "create_treaty", "target_country": "CAN"},
+            {**self._row("PLAYER", "diplomacy", 0.8, "outside-proposal", 1, "blocked"),
+             "policy_id": "diplomacy", "action_kind": "create_treaty", "target_country": "MEX"},
+            {**self._row("PLAYER", "diplomacy", 0.7, "member-response", 1, "allowed"),
+             "policy_id": "diplomacy", "action_kind": "respond_treaty", "source_country": "CAN", "treaty_id": "pending-1"},
+            {**self._row("PLAYER", "diplomacy", 0.6, "sphere-join", 1, "allowed"),
+             "policy_id": "diplomacy", "action_kind": "join_treaty", "treaty_id": "trade-union"},
+            {**self._row("PLAYER", "diplomacy", 0.5, "outside-join", 1, "blocked"),
+             "policy_id": "diplomacy", "action_kind": "join_treaty", "treaty_id": "other-treaty"},
+        ]
+        for row in rows:
+            row["quota"] = 10
+        context = AITableContext(
+            tables={"countries": pl.DataFrame({"id": ["PLAYER"]})},
+            day_ordinal=1,
+            total_minutes=1440,
+            date_text="2001-01-02 00:00",
+            player_tag="PLAYER",
+            delegated_domains={"PLAYER": frozenset({"diplomacy"})},
+            delegated_targets={"PLAYER": frozenset({"CAN"})},
+            delegated_treaty_ids={"PLAYER": frozenset({"trade-union"})},
+        )
+
+        result = DeclarativeAIFramework(_ScopedDiplomacyPolicy(rows)).evaluate(context)
+
+        self.assertEqual(
+            set(result.decisions["conflict_key"].to_list()),
+            {"member-proposal", "member-response", "sphere-join"},
+        )
+
+    def test_sphere_scope_filters_before_policy_quota_ranking(self):
+        rows = [
+            {**self._row("PLAYER", "diplomacy", 0.6, "member-proposal", 1, "allowed"),
+             "policy_id": "diplomacy", "action_kind": "create_treaty", "target_country": "CAN"},
+            {**self._row("PLAYER", "diplomacy", 1.0, "outside-proposal", 1, "blocked"),
+             "policy_id": "diplomacy", "action_kind": "create_treaty", "target_country": "MEX"},
+        ]
+        context = AITableContext(
+            tables={"countries": pl.DataFrame({"id": ["PLAYER"]})},
+            day_ordinal=1, total_minutes=1440, date_text="2001-01-02 00:00",
+            player_tag="PLAYER", delegated_domains={"PLAYER": frozenset({"diplomacy"})},
+            delegated_targets={"PLAYER": frozenset({"CAN"})},
+        )
+
+        result = DeclarativeAIFramework(_ScopedDiplomacyPolicy(rows)).evaluate(context)
+
+        self.assertEqual(result.decisions["conflict_key"].to_list(), ["member-proposal"])
 
     def _row(
         self,

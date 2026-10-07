@@ -124,6 +124,12 @@ class WorldSchemaRegistry:
         registered = list(schema.columns)
         extras = [column for column in normalized.columns if column not in schema.columns]
         selection = registered + extras if schema.preserve_extra_columns else registered
+        if (
+            normalized.columns == selection
+            and all(normalized.schema[name] == schema.columns[name].dtype for name in registered)
+        ):
+            return normalized
+
         return normalized.select(
             [
                 pl.col(column_name).cast(schema.columns[column_name].dtype).alias(column_name)

@@ -40,6 +40,13 @@ class GameSettingsContent:
         imgui.same_line()
         imgui.text_colored(GAMETHEME.colors.accent, current_icon)
 
+        reduce_motion = bool(getattr(self._settings_service.settings, "reduce_motion", False))
+        changed, reduce_motion = imgui.checkbox("Reduce motion", reduce_motion)
+        if changed:
+            setter = getattr(self._settings_service, "set_reduce_motion", None)
+            if callable(setter):
+                setter(reduce_motion)
+
         imgui.dummy((0, 6))
         self._render_windowed_resolution_row()
         imgui.dummy((0, 4))

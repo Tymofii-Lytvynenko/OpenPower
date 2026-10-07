@@ -135,3 +135,5 @@ class ClientSessionProxy:
         self.process.join(timeout=2.0)
         if self.process.is_alive():
             self.process.terminate()
+            # Termination is asynchronous; reap the process before returning to the UI.
+            self.process.join(timeout=2.0)

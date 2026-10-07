@@ -32,3 +32,4 @@
 ## Notes
 
 - Reviewed against the existing research, designs, units, readiness, battle resolution, production, intelligence, and persistence boundaries.
+- Review update (2026-10-06): Added the default role catalog, fixed-versus-variable characteristics, training effects, readiness factors, and intelligence sharing rules; checklist criteria remain satisfied.

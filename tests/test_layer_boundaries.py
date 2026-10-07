@@ -1,5 +1,6 @@
 import os
 import ast
+import os
 import unittest
 from pathlib import Path
 
@@ -41,13 +42,49 @@ class TestLayerBoundaries(unittest.TestCase):
                             if node.module:
                                 self.assert_module_import(node.module, file_path)
 
+    def test_migration_feature_keeps_simulation_and_presentation_layers_separate(self):
+        simulation_files = [
+            self.project_root / "modules/base/systems/demographics/migration_policy.py",
+            self.project_root / "modules/base/systems/demographics/migration_system.py",
+        ]
+        presentation_files = [
+            self.project_root / "src/client/ui/panels/migration_presenter.py",
+            self.project_root / "src/client/ui/panels/migration_panel.py",
+        ]
+        for path in [*simulation_files, *presentation_files]:
+            self.assertTrue(path.is_file(), f"Migration layer module is missing: {path}")
+
+        for path in simulation_files:
+            modules = self._imported_modules(path)
+            self.assertFalse(
+                any(name.startswith(("src.client", "src.server")) for name in modules),
+                f"Gameplay module imports a forbidden layer: {path}",
+            )
+
+        for path in presentation_files:
+            modules = self._imported_modules(path)
+            self.assertFalse(
+                any(name.startswith("modules.") for name in modules),
+                f"Client module imports gameplay implementation: {path}",
+            )
+
+    @staticmethod
+    def _imported_modules(path):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        modules = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                modules.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                modules.add(node.module)
+        return modules
+
     def assert_client_import(self, module_name, file_path):
-        # Client cannot import src.server internals (except spawn_local_server)
-        if "src.server" in module_name or "server" in module_name:
-            # We only allow imports from src.server.launcher
-            allowed = "src.server.launcher"
-            if "src.server" in module_name and not module_name.startswith(allowed):
-                self.fail(f"Layer Boundary Violation: Client file '{file_path}' imports forbidden server module '{module_name}'")
+        if module_name.startswith("src.server"):
+            self.fail(
+                f"Layer Boundary Violation: Client file '{file_path}' "
+                f"imports server implementation '{module_name}'"
+            )
 
     def assert_module_import(self, module_name, file_path):
         # Gameplay modules depend only on shared contracts, never engine internals.

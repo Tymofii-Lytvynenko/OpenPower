@@ -8,8 +8,14 @@ from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.primitives import UIPrimitives as Prims
 from src.client.ui.panels.politics.presenter import PoliticsPresenter
+from src.client.ui.panels.politics.recognition_presenter import RecognitionPresenter
 from src.client.ui.panels.shared.panel_widgets import draw_empty_state, draw_required_tables
-from src.shared.actions import ActionJoinTreaty, ActionLeaveTreaty, ActionRespondTreaty
+from src.shared.actions import (
+    ActionCastRecognitionVote,
+    ActionJoinTreaty,
+    ActionLeaveTreaty,
+    ActionRespondTreaty,
+)
 from src.shared.treaties import normalize_country_tags
 
 
@@ -18,6 +24,7 @@ class LiveTreatiesPanel:
 
     def __init__(self, open_editor_cb=None) -> None:
         self._presenter = PoliticsPresenter()
+        self._recognition_presenter = RecognitionPresenter()
         self._open_editor_cb = open_editor_cb
         self._selected_treaty_id = ""
         self._selected_pending_id = ""
@@ -42,6 +49,8 @@ class LiveTreatiesPanel:
         self._render_pending_table(pending)
         imgui.separator()
         self._render_actions(state, context, country_tag, active, pending)
+        imgui.separator()
+        self._render_recognition(state, context, country_tag)
 
     def _render_active_table(self, active: list[dict]) -> None:
         if not active:
@@ -111,3 +120,53 @@ class LiveTreatiesPanel:
                 imgui.same_line()
                 if imgui.button("JOIN", (120.0, 28.0)):
                     context.net_client.send_action(ActionJoinTreaty(context.net_client.player_id, self._selected_treaty_id, country_tag))
+
+    def _render_recognition(self, state, context: PanelRenderContext, country_tag: str) -> None:
+        cases = self._recognition_presenter.cases_for_country(state, country_tag)
+        imgui.text("UN RECOGNITION COUNCIL")
+        if not cases:
+            draw_empty_state("No completed annexation is awaiting or has received a recognition vote.")
+            return
+
+        for case in cases:
+            imgui.push_id(str(case["id"]))
+            imgui.text(
+                f"Region {case['region_id']} · {case['claimant_id']} / former owner {case['former_owner_id']}"
+            )
+            imgui.text(
+                f"{case['status'].replace('_', ' ').title()} · "
+                f"Yes {case['yes_votes']} / No {case['no_votes']} / Abstain {case['abstain_votes']} "
+                f"of {len(case['eligible_voters'])} eligible"
+            )
+            if case["my_status"]:
+                imgui.text(f"Your country's status: {case['my_status'].replace('_', ' ').title()}")
+            elif case["my_vote"]:
+                imgui.text(f"Your current vote: {case['my_vote'].title()}")
+            elif case["status"] == "pending" and country_tag in case["eligible_voters"]:
+                imgui.text(f"Voting deadline: {case['days_remaining']} game days remaining")
+
+            client = context.net_client
+            can_vote = (
+                case["status"] == "pending"
+                and case["days_remaining"] > 0
+                and country_tag in case["eligible_voters"]
+                and context.is_own_country
+                and client is not None
+            )
+            if can_vote:
+                for index, vote in enumerate(("yes", "no", "abstain")):
+                    if index:
+                        imgui.same_line()
+                    if imgui.small_button(f"{vote.title()}##{vote}"):
+                        client.send_action(
+                            ActionCastRecognitionVote(
+                                player_id=client.player_id,
+                                case_id=case["id"],
+                                country_tag=country_tag,
+                                vote=vote,
+                            )
+                        )
+            if case["reason"]:
+                imgui.text_disabled(case["reason"])
+            imgui.separator()
+            imgui.pop_id()

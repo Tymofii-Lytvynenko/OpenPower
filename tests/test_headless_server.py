@@ -1,8 +1,10 @@
 import multiprocessing as mp
 import queue
+import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from src.client.client_session import ClientSessionProxy
 from src.engine.simulator import Engine
@@ -12,9 +14,31 @@ from src.server.session import GameSession
 from src.shared.actions import ActionSetPaused
 from src.shared.config import GameConfig
 from src.shared.state import GameState
+from src.server import launcher
 
 
 class TestHeadlessServer(unittest.TestCase):
+    def test_missing_mod_dependency_fails_before_world_data_loading(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            project_root = Path(temp_dir)
+            module_dir = project_root / "modules" / "broken"
+            module_dir.mkdir(parents=True)
+            (module_dir / "mod.toml").write_text(
+                '\nid = "broken"\nname = "Broken"\nversion = "0.1.0"\ndependencies = ["missing"]\n',
+                encoding="utf-8",
+            )
+            (project_root / "mods.json").write_text(
+                '{"active_mods": ["broken"]}\n',
+                encoding="utf-8",
+            )
+            config = GameConfig(project_root)
+
+            with patch("src.server.session.DataLoader") as data_loader:
+                with self.assertRaisesRegex(RuntimeError, "Missing dependency: 'missing'"):
+                    GameSession.create_headless(config)
+
+            data_loader.assert_not_called()
+
     def test_game_session_starts_headlessly_and_serializes_state(self):
         project_root = Path(__file__).resolve().parent.parent
         config = GameConfig(project_root)
@@ -53,9 +77,9 @@ class TestHeadlessServer(unittest.TestCase):
         )
 
         try:
-            deadline = time.monotonic() + 60.0
+            ready_deadline = time.monotonic() + 60.0
             ready = False
-            while time.monotonic() < deadline and not ready:
+            while time.monotonic() < ready_deadline and not ready:
                 try:
                     status, _, message = proxy.progress_queue.get(timeout=0.5)
                 except queue.Empty:
@@ -65,14 +89,17 @@ class TestHeadlessServer(unittest.TestCase):
                 ready = status == "READY"
             self.assertTrue(ready)
 
-            while time.monotonic() < deadline and proxy.state is None:
+            # Slow world bootstrap must not consume the snapshot and command assertion windows.
+            state_deadline = time.monotonic() + 30.0
+            while time.monotonic() < state_deadline and proxy.state is None:
                 proxy.tick(0.0)
                 time.sleep(0.05)
             self.assertIsNotNone(proxy.state)
 
             command_id = proxy.receive_action(ActionSetPaused("launcher-smoke", True))
             command_result = None
-            while time.monotonic() < deadline and command_result is None:
+            command_deadline = time.monotonic() + 30.0
+            while time.monotonic() < command_deadline and command_result is None:
                 proxy.tick(0.0)
                 if proxy.state is not None:
                     command_result = next(
@@ -85,7 +112,15 @@ class TestHeadlessServer(unittest.TestCase):
                     )
                 time.sleep(0.05)
 
-            self.assertIsNotNone(command_result)
+            self.assertIsNotNone(
+                command_result,
+                msg=(
+                    f"Server process alive={bundle.process.is_alive()}, "
+                    f"exitcode={bundle.process.exitcode}, "
+                    f"tick={proxy.state.globals.get('tick') if proxy.state else None}, "
+                    f"results={proxy.state.journal.command_results[-3:] if proxy.state else None}"
+                ),
+            )
             self.assertEqual(command_result["status"], "executed")
             self.assertTrue(proxy.state.time.is_paused)
         finally:
@@ -93,6 +128,30 @@ class TestHeadlessServer(unittest.TestCase):
             if bundle.process.is_alive():
                 bundle.process.terminate()
                 bundle.process.join(timeout=5.0)
+            self.assertFalse(bundle.process.is_alive())
+
+    def test_launcher_reaps_server_when_client_map_loading_fails(self):
+        process = Mock()
+        process.is_alive.return_value = True
+        config = Mock()
+        config.get_data_dirs.return_value = []
+        config.get_asset_path.return_value = Path("missing-map.png")
+
+        with (
+            patch.object(launcher.mp, "Queue", return_value=Mock()),
+            patch.object(launcher.mp, "Process", return_value=process),
+            patch.object(
+                launcher,
+                "RegionMapData",
+                side_effect=MemoryError("map allocation failed"),
+            ),
+        ):
+            with self.assertRaisesRegex(MemoryError, "map allocation failed"):
+                launcher.spawn_local_server(config)
+
+        process.start.assert_called_once_with()
+        process.terminate.assert_called_once_with()
+        process.join.assert_called_once_with(timeout=5.0)
 
     def test_run_server_process_boots_in_a_separate_process(self):
         project_root = Path(__file__).resolve().parent.parent

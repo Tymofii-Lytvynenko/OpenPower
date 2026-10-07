@@ -170,7 +170,7 @@ description: "Dependency-ordered implementation tasks for Tactical Combat Resolu
 - [X] T057 [P] Add deterministic replay comparison helpers for canonical Polars rows and ordered domain events in `tests/test_tactical_combat_fixtures.py` (SC-001).
 - [X] T058 [P] Audit new military code comments for English-only rationale and self-documenting names in the feature-owned military files.
 - [X] T059 Run focused readiness, order, allied-battle, battle-status, occupation, and snapshot tests from `specs/101-tactical-combat-resolution/quickstart.md`.
-- [X] T060 Run the complete `unittest` discovery suite and the existing combat/engagement regression command; the feature suite passes, while the full discovery run has two reproducible headless-server `multiprocessing` failures (`WinError 5` from the environment before server startup), recorded in the verification handoff.
+- [X] T060 Run the complete `unittest` discovery suite and the existing combat/engagement regression command; the earlier restricted full-discovery run had two headless-server `multiprocessing` failures (`WinError 5`) before application startup, recorded in the verification handoff. Latest targeted discovery for `test_headless_server.py` passes 4/4 and full repository pytest passes (592 tests).
 - [X] T061 Run the quickstart scenarios through the deterministic headless fixtures and focused test command; all feature scenarios pass.
 - [X] T062 [P] Add bounded headless snapshot codec round-trip coverage independent of graphics and network I/O in `tests/test_client_snapshot_performance.py`; the client update-loop budget is verified by T074.
 
@@ -287,7 +287,7 @@ View tests and occupation tests each run sequentially within their shared files,
 
 - All tasks T001–T075 are checked off only after their files and tests are verified.
 - Every user story passes its independent test criteria.
-- The feature test suite, 100-engagement smoke scenario, bounded client snapshot-consumption check, and deterministic replay gate pass without client blocking or swallowed failures; the two full-discovery headless-server failures are isolated to the environment's denied Windows multiprocessing pipe creation and do not reach application startup.
+- The feature test suite, 100-engagement smoke scenario, bounded client snapshot-consumption check, and deterministic replay gate pass without client blocking or swallowed failures. The two full-discovery headless-server failures were observed in an earlier restricted run; the latest targeted `unittest` discovery for `test_headless_server.py` passes 4/4 in 51.51 seconds, and the full repository `pytest` suite passes with 592 tests, 7 opt-in skips, and 190 subtests in 147.27 seconds (2026-10-07).
 
 ## Phase 9: Convergence
 

@@ -1,36 +1,39 @@
 import arcade
+import threading
+from queue import Empty, Queue
 from typing import Optional, TYPE_CHECKING
 
 from src.shared.config import GameConfig
 from src.client.services.navigation_service import NavigationService
 from src.client.services.imgui_service import ImGuiService
 from src.client.services.game_settings_service import GameSettingsService
-
-# The launcher lives in the server layer and handles process spawning;
-# the window only needs to call it and hold the resulting proxy.
-from src.server.launcher import spawn_local_server
+from src.client.interfaces.session_factory import ClientSessionPort, SessionFactory
 
 if TYPE_CHECKING:
     from src.client.renderers.map_renderer import MapRenderer
 
 
 class MainWindow(arcade.Window):
-    def __init__(self, config: GameConfig):
+    def __init__(self, config: GameConfig, session_factory: SessionFactory):
         super().__init__(1280, 720, "OpenPower Engine", resizable=True)
         self.switch_to()
         self.game_config = config
         self.set_minimum_size(800, 600)
         self.settings = GameSettingsService.from_path(config.user_data_dir / "settings.json")
         self.settings.apply_display(self)
+        self.session_factory = session_factory
 
         font_path = config.get_asset_path("fonts/main_font.ttf")
         if not font_path or not font_path.exists():
             font_path = None
-        self.imgui = ImGuiService(self, font_path=font_path)
+        self.imgui = ImGuiService(self, font_path=font_path, enable_implot=True)
 
         self.nav = NavigationService(self)
-        self.session: Optional["ClientSessionProxy"] = None
+        self.session: Optional[ClientSessionPort] = None
         self.shared_renderer: Optional["MapRenderer"] = None
+        self._boot_result_queue: Queue[tuple[str, object]] = Queue()
+        self._boot_closing = threading.Event()
+        self._boot_thread: threading.Thread | None = None
 
     def _sync_geo_language_to_session(self) -> None:
         session = self.session
@@ -48,65 +51,65 @@ class MainWindow(arcade.Window):
 
         from src.client.views.server_boot_view import ServerBootView
         self.show_view(ServerBootView(self.game_config))
+        self.boot_progress = 0.05
+        self.boot_status = "Loading map index..."
+        arcade.schedule(self._check_server_boot, 1 / 60)
+        self._boot_thread = threading.Thread(
+            target=self._create_boot_session,
+            name="openpower-session-startup",
+            daemon=True,
+        )
+        self._boot_thread.start()
 
-        def check_server_boot(delta_time):
-            if self.session is None:
-                return
+    def _create_boot_session(self) -> None:
+        try:
+            session = self.session_factory(self.game_config)
+        except Exception as exc:
+            self._boot_result_queue.put(("ERROR", exc))
+            return
 
-            # Poll the progress queue from the background process
-            while not self.session.progress_queue.empty():
-                msg_type, progress, text = self.session.progress_queue.get_nowait()
+        if self._boot_closing.is_set():
+            session.shutdown()
+            return
+        self._boot_result_queue.put(("SESSION", session))
 
-                if msg_type == "PROGRESS":
-                    self.boot_progress = float(progress)
-                    self.boot_status = text
-                    print(f"[Loading] {text} ({progress*100}%)")
+    def _check_server_boot(self, _delta_time: float) -> None:
+        if self._boot_closing.is_set():
+            return
 
-                elif msg_type == "READY":
-                    print("[Window] Engine Ready! Server connected.")
-                    arcade.unschedule(check_server_boot)
-                    self.boot_progress = 1.0
-                    self.boot_status = "Engine ready."
-
-                    # Fetch initial state
-                    self.session.tick(0)
-                    self._sync_geo_language_to_session()
-                    self.nav.show_main_menu(self.session, self.game_config)
-
-                elif msg_type == "ERROR":
-                    print(f"[Window] FATAL SERVER ERROR: {text}")
-                    self.boot_error = text
-                    self.boot_status = "Server boot failed."
-                    arcade.unschedule(check_server_boot)
-
-        def start_client_proxy(delta_time):
-            arcade.unschedule(start_client_proxy)
-            print("[Window] Booting Client Proxy...")
-            self.boot_progress = 0.05
-            self.boot_status = "Loading map index..."
-
+        if self.session is None:
             try:
-                # spawn_local_server creates the IPC channels, boots the
-                # background process, and loads map data - all in one call.
-                from src.client.client_session import ClientSessionProxy
-                bundle = spawn_local_server(self.game_config)
-                self.session = ClientSessionProxy(
-                    map_data=bundle.map_data,
-                    action_queue=bundle.action_queue,
-                    state_queue=bundle.state_queue,
-                    progress_queue=bundle.progress_queue,
-                    snapshot_ack_queue=bundle.snapshot_ack_queue,
-                    process=bundle.process,
-                )
-            except Exception as exc:
-                self.boot_error = str(exc)
-                self.boot_status = "Client proxy failed."
+                result_type, result = self._boot_result_queue.get_nowait()
+            except Empty:
                 return
+            if result_type == "ERROR":
+                self.boot_error = str(result)
+                self.boot_status = "Client proxy failed."
+                arcade.unschedule(self._check_server_boot)
+                return
+            self.session = result  # type: ignore[assignment]
 
-            arcade.schedule(check_server_boot, 1 / 60)
+        try:
+            msg_type, progress, text = self.session.progress_queue.get_nowait()
+        except Empty:
+            return
 
-        # Delay one frame so the boot screen paints before any blocking setup work.
-        arcade.schedule(start_client_proxy, 0.1)
+        if msg_type == "PROGRESS":
+            self.boot_progress = float(progress)
+            self.boot_status = str(text)
+        elif msg_type == "READY":
+            arcade.unschedule(self._check_server_boot)
+            self.boot_progress = 1.0
+            self.boot_status = "Engine ready."
+            self.session.tick(0.0)
+            self._sync_geo_language_to_session()
+            self.nav.show_main_menu(self.session, self.game_config)
+        elif msg_type == "ERROR":
+            failed_session, self.session = self.session, None
+            self.boot_error = str(text)
+            self.boot_status = "Server boot failed."
+            arcade.unschedule(self._check_server_boot)
+            threading.Thread(target=failed_session.shutdown, daemon=True).start()
 
     def on_resize(self, width: int, height: int):
         super().on_resize(width, height)
@@ -126,7 +129,10 @@ class MainWindow(arcade.Window):
             self._sync_geo_language_to_session()
 
     def on_close(self):
+        self._boot_closing.set()
+        arcade.unschedule(self._check_server_boot)
         if self.session:
             print("[Window] Shutting down Server Process...")
             self.session.shutdown()
+        self.imgui.shutdown()
         super().on_close()

@@ -1,5 +1,6 @@
-from typing import Protocol, Any
+from typing import Protocol, Any, runtime_checkable
 
+@runtime_checkable
 class LoadingTask(Protocol):
     """
     Interface for any long-running operation that needs a UI.
@@ -12,4 +13,8 @@ class LoadingTask(Protocol):
         The heavy blocking function. 
         Returns data to be passed to the next view.
         """
+        ...
+
+    def cancel(self) -> None:
+        """Request cooperative cancellation at the next safe checkpoint."""
         ...

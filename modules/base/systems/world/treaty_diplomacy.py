@@ -34,6 +34,8 @@ from src.shared.events import (
     EventTreatyProposed,
     EventTreatyRefused,
     EventWarStarted,
+    EventWarEnded,
+    EventTreatyLifecycleChanged,
 )
 from src.shared.state import GAME_EPOCH, GameState
 from src.shared.treaties import (
@@ -112,7 +114,7 @@ class DiplomacySystem(ISystem):
     """Processes treaty commands and publishes deterministic gameplay effects."""
 
     access = SystemAccess(
-        reads=frozenset({'countries', 'regions', 'units', 'countries_relations', 'countries_treaties', 'countries_wars', 'pending_treaties', 'treaty_effects', 'annexation_claims'}),
+        reads=frozenset({'countries', 'regions', 'units', 'countries_relations', 'countries_treaties', 'countries_wars', 'pending_treaties', 'treaty_effects', 'annexation_claims', 'coalition_pacts'}),
         writes=frozenset({'countries_relations', 'countries_treaties', 'countries_wars', 'pending_treaties', 'treaty_effects', 'annexation_claims', 'messages', 'news_items', 'regions'}),
         handles=frozenset(
             {
@@ -355,6 +357,10 @@ class DiplomacySystem(ISystem):
             "target_country_id": self._tag(proposal.get("target_country_id")),
         }
         treaties = self._append(treaties, TREATY_SCHEMA, record)
+        state.events.append(EventTreatyLifecycleChanged(
+            str(record["id"]), treaty_type, "activated", tuple(sorted(members)),
+            int(state.time.total_minutes), "All required parties accepted the agreement.",
+        ))
         relations = self._apply_activation_relations(relations, treaty_type, members)
         treaties, wars, relations, messages, news, claims = self._apply_punctual_effect(
             state, record, treaties, wars, relations, messages, news, claims
@@ -398,6 +404,11 @@ class DiplomacySystem(ISystem):
         if not definition.two_sided:
             updated["side_a"] = updated["members"]
         treaties = self._replace_row(treaties, TREATY_SCHEMA, str(action.treaty_id), updated)
+        state.events.append(EventTreatyLifecycleChanged(
+            str(action.treaty_id), str(row.get("type") or ""), "member_joined",
+            tuple(sorted(set(members) | {candidate})), int(state.time.total_minutes),
+            f"{candidate} met the open membership conditions.",
+        ))
         messages = self._append_message(
             state, messages, candidate, "diplomacy", "Treaty membership accepted",
             f"You automatically joined {row.get('name') or row.get('id')} after meeting its conditions.",
@@ -426,6 +437,10 @@ class DiplomacySystem(ISystem):
         else:
             updated = {**row, "members": list(remaining), "suspended_members": []}
             treaties = self._replace_row(treaties, TREATY_SCHEMA, str(action.treaty_id), updated)
+        state.events.append(EventTreatyLifecycleChanged(
+            str(action.treaty_id), str(row.get("type") or ""), "member_expelled",
+            tuple(sorted(remaining)), int(state.time.total_minutes), f"{member} was removed by the sponsor.",
+        ))
         messages = self._append_message(
             state, messages, member, "diplomacy", "Treaty membership ended",
             f"You were removed from {row.get('name') or row.get('id')} by its sponsor.",
@@ -461,6 +476,10 @@ class DiplomacySystem(ISystem):
             if not treaty_definition(row.get("type")).two_sided:
                 updated["side_a"] = list(remaining)
             treaties = self._replace_row(treaties, TREATY_SCHEMA, str(action.treaty_id), updated)
+        state.events.append(EventTreatyLifecycleChanged(
+            str(action.treaty_id), str(row.get("type") or ""), "member_left",
+            tuple(sorted((set(members) - {member}))), int(state.time.total_minutes), f"{member} left the agreement.",
+        ))
         messages = self._append_message(
             state, messages, member, "diplomacy", "Treaty membership ended",
             f"You left {row.get('name') or row.get('id')}.",
@@ -489,6 +508,20 @@ class DiplomacySystem(ISystem):
             return wars, relations, messages, news
         side_a = self._expand_allies(treaties, attacker)
         side_b = self._expand_allies(treaties, defender)
+        pacts = state.tables.get("coalition_pacts")
+        if pacts is not None:
+            for pact in pacts.to_dicts():
+                if (
+                    str(pact.get("status") or "").lower() != "active"
+                    or not bool(pact.get("mutual_defense", True))
+                ):
+                    continue
+                target_country = self._tag(pact.get("primary_target_country_id"))
+                members = set(self._tags(pact.get("member_country_ids")))
+                if attacker == target_country and defender in members:
+                    side_b.update(members)
+                elif defender == target_country and attacker in members:
+                    side_a.update(members)
         side_a.discard(defender)
         side_b.discard(attacker)
         side_a -= (side_a & side_b) - {attacker}
@@ -562,6 +595,10 @@ class DiplomacySystem(ISystem):
             )
             return wars, relations, messages, news
         wars = wars.filter(pl.col("id") != str(action.war_id))
+        participants = tuple(sorted(set(self._tags(row.get("side_a"))) | set(self._tags(row.get("side_b")))))
+        state.events.append(EventWarEnded(
+            str(action.war_id), leader_a, leader_b, participants, "peace", int(state.time.total_minutes),
+        ))
         relation_deltas = {
             pair: 15.0
             for left in self._tags(row.get("side_a"))
@@ -688,7 +725,7 @@ class DiplomacySystem(ISystem):
                 for tag in members:
                     bonus = 0.01 + 0.04 * (output[tag] / total)
                     rows.append(self._effect(treaty_id, tag, effect, bonus, member_payload))
-            elif effect in {"common_market_priority", "weapons_market_access", "stationing_rights", "transit_rights"}:
+            elif effect in {"common_market_priority", "weapons_market_access", "stationing_rights", "transit_rights", "military_intelligence_sharing", "migration_mobility_access"}:
                 for tag in members:
                     peers = tuple(member for member in members if member != tag)
                     rows.append(self._effect(treaty_id, tag, effect, 1.0, json.dumps(peers)))

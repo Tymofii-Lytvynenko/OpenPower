@@ -3,6 +3,7 @@ from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
 from src.shared.actions import ActionAnnexRegion, ActionOccupyRegion, ActionSetRegionOwner
+from src.shared.events import EventTerritoryOwnershipChanged
 
 class TerritorySystem(ISystem):
     access = SystemAccess(
@@ -51,6 +52,23 @@ class TerritorySystem(ISystem):
 
         for action in relevant_actions:
             if isinstance(action, (ActionAnnexRegion, ActionSetRegionOwner)):
+                matches = regions.filter(pl.col("id") == action.region_id)
+                previous_owner = (
+                    str(matches.item(0, "owner") or "").strip().upper()
+                    if not matches.is_empty() and "owner" in matches.columns
+                    else ""
+                )
+                new_owner = str(action.new_owner_tag or "").strip().upper()
+                if previous_owner and new_owner and previous_owner != new_owner:
+                    state.events.append(
+                        EventTerritoryOwnershipChanged(
+                            region_id=int(action.region_id),
+                            previous_owner=previous_owner,
+                            owner=new_owner,
+                            source=type(action).__name__,
+                            at_minute=int(state.time.total_minutes),
+                        )
+                    )
                 # Change Owner AND Controller
                 regions = regions.with_columns(
                     pl.when(pl.col("id") == action.region_id)

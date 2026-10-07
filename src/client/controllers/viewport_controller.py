@@ -70,6 +70,30 @@ class ViewportController:
                 use_percentile=True,
                 steps=10
             ),
+            "war_exhaustion": GradientMapMode(
+                mode_name="War Exhaustion",
+                column_name="war_exhaustion",
+                fallback_to_country=True,
+                steps=10,
+            ),
+            "aggressive_expansion": GradientMapMode(
+                mode_name="Expansion Threat",
+                column_name="aggressive_expansion",
+                fallback_to_country=True,
+                steps=10,
+            ),
+            "coalition_memberships": GradientMapMode(
+                mode_name="Defensive Coalition Memberships",
+                column_name="coalition_membership_count",
+                fallback_to_country=True,
+                steps=5,
+            ),
+            "active_wars": GradientMapMode(
+                mode_name="Active Wars",
+                column_name="active_war_count",
+                fallback_to_country=True,
+                steps=5,
+            ),
             "money_reserves": GradientMapMode(
                 mode_name="Money Reserves",
                 column_name="money_reserves",
@@ -210,12 +234,15 @@ class ViewportController:
             cx = row["center_x"][0]
             cy = row["center_y"][0]
 
-            # Use the new 3D method
-            self.cam.look_at_pixel_coords(
-                cx, cy, 
-                self.renderer.width, 
-                self.renderer.height
-            )
+            if self.renderer.projection_mode == "planar":
+                self.renderer.focus_planar_pixel(cx, cy)
+            else:
+                self.cam.look_at_pixel_coords(
+                    cx,
+                    cy,
+                    self.renderer.width,
+                    self.renderer.height,
+                )
             
             # Force selection
             self.select_region_by_id(region_id)
@@ -230,13 +257,17 @@ class ViewportController:
         pass
 
     def on_mouse_drag(self, x: float, y: float, dx: float, dy: float, buttons: int):
-        # Handle 3D rotation via the controller
         if buttons & arcade.MOUSE_BUTTON_RIGHT:
-            self.cam.drag(dx, dy)
+            if self.renderer.projection_mode == "planar":
+                self.renderer.pan_planar(dx, dy)
+            else:
+                self.cam.drag(dx, dy)
 
     def on_mouse_scroll(self, x: int, y: int, scroll_x: int, scroll_y: int):
-        # Handle 3D zoom via the controller
-        self.cam.zoom_scroll(scroll_y)
+        if self.renderer.projection_mode == "planar":
+            self.renderer.zoom_planar_at(x, y, scroll_y)
+        else:
+            self.cam.zoom_scroll(scroll_y)
 
     # --- SELECTION LOGIC ---
     def focus_on_country(self, country_tag: str | None) -> Optional[int]:
@@ -276,12 +307,15 @@ class ViewportController:
             )
         if centroid is not None:
             world_x, world_y = centroid
-            self.cam.look_at_pixel_coords(
-                world_x,
-                self.renderer.height - world_y,
-                self.renderer.width,
-                self.renderer.height,
-            )
+            if self.renderer.projection_mode == "planar":
+                self.renderer.focus_planar_pixel(world_x, self.renderer.height - world_y)
+            else:
+                self.cam.look_at_pixel_coords(
+                    world_x,
+                    self.renderer.height - world_y,
+                    self.renderer.width,
+                    self.renderer.height,
+                )
 
         self._commit_selection(
             representative_region_id,

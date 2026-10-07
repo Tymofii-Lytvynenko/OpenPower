@@ -7,13 +7,13 @@ from typing import Optional
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.renderers.unit_renderer import UnitRenderer
 from src.client.renderers.event_renderer import EventRenderer
+from src.client.renderers.battle_effect_renderer import BattleEffectRenderer
 from src.client.ui.components.hud.unit_context_menu import UnitContextMenu
 from src.client.ui.layouts.game_layout import GameLayout
 from src.client.ui.panels.unit_details_window import UnitDetailsWindow
 from src.client.controllers.camera_controller import CameraController
 from src.client.controllers.unit_interaction_controller import UnitInteractionController
 from src.client.controllers.viewport_controller import ViewportController
-from src.client.ui.core.theme import GAMETHEME
 
 
 class GameView(BaseImGuiView):
@@ -67,6 +67,12 @@ class GameView(BaseImGuiView):
             globe_radius=self.renderer.globe_radius,
         )
         self.event_renderer = EventRenderer(
+            camera=self.cam_ctrl,
+            map_width=self.renderer.width,
+            map_height=self.renderer.height,
+            globe_radius=self.renderer.globe_radius,
+        )
+        self.battle_effect_renderer = BattleEffectRenderer(
             camera=self.cam_ctrl,
             map_width=self.renderer.width,
             map_height=self.renderer.height,
@@ -137,6 +143,8 @@ class GameView(BaseImGuiView):
 
     def on_selection_changed(self, region_id: int | None):
         self.selected_region_id = region_id
+        if region_id is not None:
+            self.layout.panel_manager.set_visible("REGIONAL_INFRASTRUCTURE", True)
 
     def on_draw(self):
         # ImGui and batched overlays can leave a clipping rectangle active. It must be
@@ -180,10 +188,21 @@ class GameView(BaseImGuiView):
             visible_owners=visible_owners,
             show_engagement_zones=self.viewport_ctrl.show_engagement_zones,
             presentation_total_minutes=presentation_total_minutes,
+            viewer_country_tag=self.viewport_ctrl.selected_country_tag or self.player_tag,
         )
 
         # Draw random event placards above affected regions
         self.event_renderer.render(state)
+
+        settings_service = getattr(self.window, "settings", None)
+        reduce_motion = bool(
+            getattr(getattr(settings_service, "settings", None), "reduce_motion", False)
+        )
+        self.battle_effect_renderer.render(
+            state,
+            presentation_total_minutes,
+            reduce_motion=reduce_motion,
+        )
 
         try:
             self.layout.render(

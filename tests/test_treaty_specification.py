@@ -22,7 +22,7 @@ class TreatySpecificationTest(unittest.TestCase):
             "cultural_exchanges", "noble_cause", "research_partnership",
             "human_development_collaboration", "economic_partnership", "common_market",
             "economic_aid", "assume_foreign_debt", "economic_embargo", "weapons_trade",
-            "weapons_trade_embargo",
+            "weapons_trade_embargo", "mobility_agreement",
         }
         self.assertEqual(set(TREATY_DEFINITIONS), expected)
         self.assertTrue(TREATY_DEFINITIONS["alliance"].long_term)
@@ -96,6 +96,19 @@ class TreatySpecificationTest(unittest.TestCase):
         self.assertEqual(set(effects["effect"].to_list()), {"research_capacity_bonus"})
         self.assertTrue(all(value > 0 for value in effects["value"].to_list()))
         self.assertTrue(all(value > 0 for value in state.get_table("countries")["treaty_maintenance"].to_list()[:2]))
+
+    def test_mobility_agreement_publishes_explicit_peer_access(self) -> None:
+        state = self._state()
+        self._propose(state, treaty_type="mobility_agreement", members=["USA", "CAN"])
+        proposal_id = state.get_table("pending_treaties")["id"][0]
+        self._respond(state, proposal_id, "CAN")
+
+        effects = state.get_table("treaty_effects").filter(
+            pl.col("effect") == "migration_mobility_access"
+        )
+        self.assertEqual(effects.height, 2)
+        self.assertEqual(set(effects["country_id"].to_list()), {"USA", "CAN"})
+        self.assertTrue(all(effect["value"] == 1.0 for effect in effects.to_dicts()))
 
     def _propose(
         self,

@@ -10,8 +10,8 @@ class BootstrapSystem(ISystem):
     """
 
     access = SystemAccess(
-        reads=frozenset({'countries', 'regions', 'countries_treaties', 'countries_wars'}),
-        writes=frozenset({'country_governments', 'country_laws', 'messages', 'news_items', 'objectives', 'research_tracks', 'unit_designs', 'strategic_weapons'}),
+        reads=frozenset({'countries', 'regions', 'countries_treaties', 'countries_wars', 'migration_policies'}),
+        writes=frozenset({'country_governments', 'country_laws', 'migration_policies', 'messages', 'news_items', 'objectives', 'research_tracks', 'unit_designs', 'strategic_weapons'}),
         phase=SystemPhase.BOOTSTRAP,
     )
 
@@ -29,6 +29,43 @@ class BootstrapSystem(ISystem):
         govs = state.get_table("country_governments")
         if govs is None or govs.is_empty():
             self._seed_all_content(state)
+        self._seed_migration_policies(state)
+
+    def _seed_migration_policies(self, state: GameState) -> None:
+        countries = state.tables.get("countries")
+        policies = state.tables.get("migration_policies")
+        if countries is None or policies is None or countries.is_empty():
+            return
+        known = {
+            self._tag(country_id)
+            for country_id in policies.get_column("country_id").to_list()
+        }
+        records = [
+            {
+                "country_id": country_id,
+                "migration_policy": "managed",
+                "border_policy": "managed",
+                "entry_rate": 0.5,
+                "exit_rate": 0.5,
+                "asylum_rate": 0.25,
+                "family_reunification_rate": 0.5,
+                "skilled_worker_preference": 0.0,
+                "enforcement_strength": 0.5,
+                "effective_at_minute": 0,
+                "updated_at_minute": max(0, int(state.time.total_minutes)),
+                "source": "default",
+            }
+            for country_id in sorted(
+                {self._tag(value) for value in countries["id"].to_list()}
+            )
+            if country_id and country_id not in known
+        ]
+        if records:
+            additions = pl.DataFrame(records, schema=policies.schema, strict=False)
+            state.update_table(
+                "migration_policies",
+                pl.concat([policies, additions], how="vertical_relaxed"),
+            )
 
     def _seed_all_content(self, state: GameState) -> None:
         print("[BootstrapSystem] Seeding gameplay content tables...")
@@ -64,7 +101,11 @@ class BootstrapSystem(ISystem):
             
         wpn_rows = self._build_strategic_weapons(state)
         if wpn_rows:
-            state.update_table("strategic_weapons", pl.DataFrame(wpn_rows))
+            weapon_table = state.tables.get("strategic_weapons")
+            state.update_table(
+                "strategic_weapons",
+                pl.DataFrame(wpn_rows, schema=None if weapon_table is None else weapon_table.schema, strict=False),
+            )
 
     def _build_country_governments(self, state: GameState) -> list[dict[str, Any]]:
         countries = state.tables.get("countries")
@@ -303,6 +344,9 @@ class BootstrapSystem(ISystem):
             ("air", "Air superiority"),
             ("naval", "Fleet sustainment"),
             ("strategic", "Strategic deterrence"),
+            ("strategic_program", "Strategic program"),
+            ("strategic_weapons", "Strategic weapons"),
+            ("strategic_defense", "Missile defense"),
         )
         for row in countries.iter_rows(named=True):
             country_id = str(row["id"])
@@ -355,6 +399,7 @@ class BootstrapSystem(ISystem):
                         "display_name": display_name,
                         "quality": max(0.20, min(0.95, quality + (development * 0.20))),
                         "cost": cost,
+                        "maintenance_cost": 0.0,
                         "speed": speed,
                         "firepower": firepower,
                     }
@@ -368,6 +413,10 @@ class BootstrapSystem(ISystem):
             return []
 
         rows: list[dict[str, Any]] = []
+        profiles = self._strategic_weapon_profiles(state)
+        weapon_classes = ["icbm"]
+        if "slbm" in profiles:
+            weapon_classes.append("slbm")
         for row in countries.iter_rows(named=True):
             country_id = str(row["id"])
             if not self._is_playable(row):
@@ -381,18 +430,54 @@ class BootstrapSystem(ISystem):
             elif military_count >= 350_000 and reserves >= 5_000_000_000:
                 quantity = 4
 
-            rows.append(
-                {
-                    "id": f"{country_id}-strategic",
+            for weapon_class in weapon_classes:
+                profile = profiles.get(weapon_class, {})
+                if profile.get("enabled") is False:
+                    continue
+
+                default_quantity = quantity if weapon_class == "icbm" else 0
+                initial_quantity = max(0, int(profile.get("initial_quantity", default_quantity)))
+                default_ready = int(initial_quantity * 0.75) if weapon_class == "icbm" else 0
+                initial_ready = min(initial_quantity, max(0, int(profile.get("initial_ready", default_ready))))
+                payload_cap = min(10, max(1, int(profile.get("max_payload_level", 1) or 1)))
+                payload_level = min(payload_cap, max(1, int(profile.get("payload_level", 1) or 1)))
+                rows.append({
+                    "id": f"{country_id}-strategic" if weapon_class == "icbm" else f"{country_id}-{weapon_class}",
                     "country_id": country_id,
-                    "weapon_type": "Ballistic missiles",
-                    "quantity": quantity,
-                    "ready": int(quantity * 0.75),
+                    "weapon_type": profile.get(
+                        "weapon_type",
+                        "Ballistic missiles" if weapon_class == "icbm" else "Submarine-launched ballistic missiles",
+                    ),
+                    "quantity": initial_quantity,
+                    "ready": initial_ready,
                     "defense_rating": max(0.05, min(0.95, self._as_ratio(row.get("budget_research_ratio"), 0.1) * 1.8)),
-                }
-            )
+                    "weapon_class": weapon_class,
+                    "range_km": max(0.0, float(profile.get("range_km", 12000.0 if weapon_class == "icbm" else 0.0))),
+                    "payload_level": payload_level,
+                    "max_payload_level": payload_cap,
+                    "required_research_level": max(1, int(profile.get("required_research_level", 1) or 1)),
+                    "operational": bool(profile.get("operational", True)),
+                    "launch_cost": max(0.0, float(profile.get("launch_cost", 0.0) or 0.0)),
+                    "flight_minutes": max(0, int(profile.get("flight_minutes", 0) or 0)),
+                    "readiness_minutes": max(0, int(profile.get("readiness_minutes", 60) or 0)),
+                    "production_cost": max(0.0, float(profile.get("production_cost", 0.0) or 0.0)),
+                    "production_minutes": max(0, int(profile.get("production_minutes", 0) or 0)),
+                })
 
         return rows
+
+    def _strategic_weapon_profiles(self, state: GameState) -> dict[str, dict[str, Any]]:
+        profiles: dict[str, dict[str, Any]] = {}
+        for setting in ("strategic_weapon_production_profiles", "strategic_weapon_profiles"):
+            configured = state.globals.get(setting, {})
+            if not isinstance(configured, dict):
+                continue
+            for weapon_class, profile in configured.items():
+                normalized_class = str(weapon_class).strip().lower()
+                if normalized_class not in {"icbm", "slbm"} or not isinstance(profile, dict):
+                    continue
+                profiles.setdefault(normalized_class, {}).update(profile)
+        return profiles
 
     def _home_regions_by_country(self, regions: pl.DataFrame | None) -> dict[str, int]:
         if regions is None or regions.is_empty() or not {"id", "owner"}.issubset(set(regions.columns)):
@@ -450,6 +535,9 @@ class BootstrapSystem(ISystem):
         if number > 1.0:
             number /= 100.0
         return max(0.0, min(1.0, number))
+
+    def _tag(self, value: Any) -> str:
+        return str(value or "").strip().upper()
 
     def _is_playable(self, row: dict[str, Any]) -> bool:
         value = row.get("is_playable", True)

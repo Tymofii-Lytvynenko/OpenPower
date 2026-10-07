@@ -20,14 +20,18 @@ from src.client.ui.panels.military.unit_production_panel import UnitProductionPa
 from src.client.ui.panels.military.unit_research_panel import UnitResearchPanel
 from src.client.ui.panels.military.war_list_panel import WarListPanel
 from src.client.ui.panels.military_panel import MilitaryPanel
+from src.client.ui.panels.migration_panel import MigrationPanel
 from src.client.ui.panels.politics.constitutional_form_panel import ConstitutionalFormPanel
 from src.client.ui.panels.politics.internal_laws_panel import InternalLawsPanel
+from src.client.ui.panels.politics.political_overview_panel import PoliticalOverviewPanel
 from src.client.ui.panels.politics.treaties_panel import TreatiesPanel
 from src.client.ui.panels.politics.treaty_editor_panel import TreatyEditorPanel
 from src.client.ui.panels.politics_panel import PoliticsPanel
 from src.client.ui.panels.region_inspector import RegionInspectorPanel
+from src.client.ui.panels.region_infrastructure_panel import RegionInfrastructurePanel
 from src.client.ui.panels.resources_panel import ResourcesPanel
 from src.client.ui.panels.service.console_panel import ConsolePanel
+from src.client.ui.panels.service.history_panel import HistoryPanel
 from src.client.ui.panels.service.mail_panel import MailPanel
 from src.client.ui.panels.service.news_panel import NewsPanel
 from src.client.ui.panels.service.objectives_panel import ObjectivesPanel
@@ -48,7 +52,7 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             title="Politics",
             category="politics",
             factory=lambda: PoliticsPanel(
-                open_constitution_cb=lambda: open_panel("CONSTITUTIONAL_FORM"),
+                open_constitution_cb=lambda: open_panel("POLITICAL_OVERVIEW"),
                 open_laws_cb=lambda: open_panel("INTERNAL_LAWS"),
                 open_treaties_cb=lambda: open_panel("TREATIES"),
             ),
@@ -90,9 +94,36 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             id="DEM",
             title="Demographics",
             category="society",
-            factory=DemographicsPanel,
+            # Keep navigation in the HUD manager while the panel remains presentation-only.
+            factory=lambda: DemographicsPanel(
+                open_migration_policy_cb=lambda: open_panel("MIGRATION"),
+                open_social_programs_cb=lambda: open_panel("BUDGET"),
+            ),
             icon=icons_fontawesome_6.ICON_FA_PEOPLE_GROUP,
             color=GAMETHEME.colors.demographics,
+        ),
+        PanelSpec(
+            id="MIGRATION",
+            title="Migration",
+            category="society",
+            factory=MigrationPanel,
+            icon=icons_fontawesome_6.ICON_FA_PEOPLE_GROUP,
+            color=GAMETHEME.colors.demographics,
+        ),
+        PanelSpec(
+            id="REGIONAL_INFRASTRUCTURE",
+            title="Regional Infrastructure",
+            category="economy",
+            factory=RegionInfrastructurePanel,
+            icon=icons_fontawesome_6.ICON_FA_ROAD,
+            color=GAMETHEME.colors.economy,
+        ),
+        PanelSpec(
+            id="POLITICAL_OVERVIEW",
+            title="Political Overview",
+            category="politics",
+            factory=PoliticalOverviewPanel,
+            show_in_toggle_bar=False,
         ),
         PanelSpec(
             id="CONSTITUTIONAL_FORM",
@@ -249,6 +280,14 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             category="service",
             factory=NewsPanel,
             show_in_toggle_bar=False,
+        ),
+        PanelSpec(
+            id="HISTORY",
+            title="History & Analytics",
+            category="service",
+            factory=HistoryPanel,
+            icon=icons_fontawesome_6.ICON_FA_CHART_LINE,
+            color=GAMETHEME.colors.info,
         ),
         PanelSpec(
             id="OBJECTIVES",

@@ -75,70 +75,9 @@ class LoadGameView(BaseImGuiView):
 
     def _load_selected_save(self):
         print(f"Loading {self.selected_save_name}...")
+        from src.client.tasks.load_game_task import LoadGameTask
 
-        class SaveLoadTask:
-            def __init__(self, window, config, save_name):
-                self.window = window
-                self.config = config
-                self.save_name = save_name
-                self.progress = 0.0
-                self.status_text = "Preparing to load..."
-
-            def run(self):
-                import time
-                # 1. Shut down existing session proxy if it exists
-                self.status_text = "Stopping current simulation..."
-                self.progress = 0.1
-                if hasattr(self.window, "session") and self.window.session:
-                    self.window.session.shutdown()
-
-                # 2. Spawn a new server process via the launcher factory
-                self.status_text = f"Initializing load for {self.save_name}..."
-                self.progress = 0.2
-                from src.server.launcher import spawn_local_server
-                from src.client.client_session import ClientSessionProxy
-                bundle = spawn_local_server(self.config, save_name=self.save_name)
-                new_session = ClientSessionProxy(
-                    map_data=bundle.map_data,
-                    action_queue=bundle.action_queue,
-                    state_queue=bundle.state_queue,
-                    progress_queue=bundle.progress_queue,
-                    snapshot_ack_queue=bundle.snapshot_ack_queue,
-                    process=bundle.process,
-                )
-
-                # 3. Read progress from new_session.progress_queue
-                while True:
-                    try:
-                        status, p, text = new_session.progress_queue.get(timeout=10.0)
-                        if status == "PROGRESS":
-                            self.progress = 0.2 + p * 0.6
-                            self.status_text = f"Server: {text}"
-                        elif status == "READY":
-                            self.progress = 0.8
-                            self.status_text = "Server process ready."
-                            break
-                        elif status == "ERROR":
-                            raise RuntimeError(text)
-                    except Exception as e:
-                        raise RuntimeError(f"Failed to initialize simulation server for loading: {e}")
-
-                # 4. Wait for first state update
-                self.status_text = "Synchronizing game state..."
-                self.progress = 0.9
-
-                start_time = time.perf_counter()
-                while new_session.get_state_snapshot() is None:
-                    new_session.tick(0.0)
-                    if time.perf_counter() - start_time > 5.0:
-                        raise TimeoutError("Timed out waiting for loaded game state.")
-                    time.sleep(0.05)
-
-                self.progress = 1.0
-                self.status_text = "Ready."
-                return new_session
-
-        task = SaveLoadTask(self.window, self.config, self.selected_save_name)
+        task = LoadGameTask(self.window, self.config, self.selected_save_name)
 
         def on_success(session):
             self.window.session = session

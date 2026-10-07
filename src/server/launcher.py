@@ -60,9 +60,16 @@ def spawn_local_server(
     # Load the region map image for the client-side pixel-picking renderer.
     # This runs in the main process because RegionMapData uses OpenCV/NumPy
     # which is safe to call here (no OpenGL context required).
-    map_path = _resolve_map_path(config)
-    print(f"[Launcher] Loading UI map data from: {map_path}")
-    map_data = RegionMapData(str(map_path))
+    try:
+        map_path = _resolve_map_path(config)
+        print(f"[Launcher] Loading UI map data from: {map_path}")
+        map_data = RegionMapData(str(map_path))
+    except BaseException:
+        # A failed client-map load must not leave the already-started server orphaned.
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5.0)
+        raise
 
     return ServerProcessBundle(
         map_data=map_data,

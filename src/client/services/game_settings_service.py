@@ -38,6 +38,7 @@ class GameSettings:
     fullscreen_mode_width: int = 1280
     fullscreen_mode_height: int = 720
     fullscreen_mode_rate: int = 60
+    reduce_motion: bool = False
 
 
 class GameSettingsRepository:
@@ -58,6 +59,7 @@ class GameSettingsRepository:
 
         return GameSettings(
             fullscreen=self._read_bool(payload, "fullscreen", False),
+            reduce_motion=self._read_bool(payload, "reduce_motion", False),
             language_code=self._read_str(payload, "language_code", "en"),
             geo_language_code=self._read_str(payload, "geo_language_code", DEFAULT_GEO_LANGUAGE_CODE),
             windowed_width=self._read_int(payload, "windowed_width", 1280, minimum=800),
@@ -258,6 +260,15 @@ class GameSettingsService:
 
         if window is not None:
             self.apply_display(window)
+
+    def set_reduce_motion(self, enabled: bool) -> None:
+        """Persist the local presentation preference without touching world state."""
+
+        updated = replace(self._settings, reduce_motion=bool(enabled))
+        if updated == self._settings:
+            return
+        self._settings = updated
+        self._save()
 
     def toggle_fullscreen(self, window) -> None:
         self.set_fullscreen(not self._settings.fullscreen, window)

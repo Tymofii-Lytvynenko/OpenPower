@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Any, Optional, TYPE_CHECKING
 
 from imgui_bundle import imgui
@@ -8,11 +9,17 @@ from imgui_bundle import imgui
 from src.client.controllers.camera_controller import CameraController
 from src.client.renderers.unit_batch_renderer import UnitBatchRenderer
 from src.client.renderers.unit_flag_atlas import UnitFlagAtlas
+from src.client.renderers.globe_overlay_projection import GlobeOverlayProjection
 from src.client.renderers.unit_projection import (
     PreparedUnitProjectionData,
     ProjectedUnit,
     RegionAnchor,
     UnitProjectionService,
+)
+from src.client.renderers.unit_route_overlay import (
+    UnitRouteOverlay,
+    sample_route_waypoints,
+    selected_unit_route_overlays,
 )
 from src.client.ui.core.primitives import UIPrimitives, UnitCompositionRow
 from src.client.ui.core.theme import GAMETHEME
@@ -77,6 +84,7 @@ class UnitRenderer:
         globe_radius: float,
     ):
         self._projection = UnitProjectionService(camera, map_width, map_height, globe_radius)
+        self._route_projection = GlobeOverlayProjection(camera, map_width, map_height, globe_radius)
         self._camera = camera
         self._geo_projection = EquirectangularProjection(map_width, map_height)
         self._flags = UnitFlagAtlas()
@@ -94,6 +102,8 @@ class UnitRenderer:
         self._flag_owners: frozenset[str] = frozenset()
         self._filtered_units_cache_key: tuple | None = None
         self._filtered_units_cache: Any = None
+        self._route_overlay_cache_key: tuple | None = None
+        self._route_overlay_cache: list[UnitRouteOverlay] = []
 
     @property
     def billboards(self) -> list[ProjectedUnit]:
@@ -110,6 +120,7 @@ class UnitRenderer:
         visible_owners: Optional[set[str]] = None,
         show_engagement_zones: bool = True,
         presentation_total_minutes: float | None = None,
+        viewer_country_tag: str | None = None,
     ) -> None:
         window = imgui.get_io().display_size
         width = int(window.x)
@@ -126,6 +137,14 @@ class UnitRenderer:
             units_signature,
             presentation_total_minutes,
         )
+        selected_ids = {str(unit_id) for unit_id in (selected_unit_ids or ())}
+        if selected_unit_id:
+            selected_ids.add(str(selected_unit_id))
+        ordered_selected_ids = (
+            ([str(selected_unit_id)] if selected_unit_id else [])
+            + sorted(selected_ids - ({str(selected_unit_id)} if selected_unit_id else set()))
+        )
+        route_overlays = self._get_selected_route_overlays(state, ordered_selected_ids, viewer_country_tag)
         batch_drawn = self._batch.render(self._billboards, self._flags, width, height)
         has_zone_targets = show_engagement_zones and any(
             unit.unit_id == selected_unit_id
@@ -136,9 +155,9 @@ class UnitRenderer:
         needs_imgui_overlay = (
             not batch_drawn
             or has_zone_targets
-            or self._has_active_battles(state)
             or drag_preview is not None
             or selection_rect is not None
+            or bool(route_overlays)
             or any(
                 self._unit_needs_imgui_overlay(unit, selected_unit_id, selected_unit_ids, hovered_unit_id)
                 for unit in self._billboards
@@ -159,6 +178,7 @@ class UnitRenderer:
 
         if imgui.begin("##UnitOverlay", None, flags)[0]:
             draw_list = imgui.get_window_draw_list()
+            self._draw_selected_routes(draw_list, route_overlays, width, height)
             if show_engagement_zones:
                 self._draw_engagement_zones(
                     draw_list,
@@ -168,8 +188,6 @@ class UnitRenderer:
                     selected_unit_ids,
                     hovered_unit_id,
                 )
-            self._draw_battle_markers(state, draw_list, height)
-
             for unit in self._billboards:
                 if batch_drawn:
                     self._draw_unit_overlay(
@@ -200,42 +218,117 @@ class UnitRenderer:
 
         imgui.end()
 
-    def _draw_battle_markers(self, state: Optional["GameState"], draw_list: Any, window_height: int) -> None:
-        """Draw active battle markers from authoritative battle/unit rows."""
-        if state is None or "battles" not in state.tables or "units" not in state.tables:
-            return
-        battles = state.tables["battles"]
-        units = state.tables["units"]
-        if battles.is_empty() or units.is_empty() or "region_id" not in units.columns:
-            return
-        unit_positions = {}
-        for unit in self._billboards:
-            unit_positions.setdefault(int(unit.current_region_id), []).append(unit)
-        for battle in battles.to_dicts():
-            status = str(battle.get("status") or "").lower()
-            if status not in {"active", "stalemate"}:
-                continue
-            candidates = unit_positions.get(int(battle.get("region_id") or 0), [])
-            if not candidates:
-                continue
-            x = sum(unit.screen_x for unit in candidates) / len(candidates)
-            y = window_height - (sum(unit.screen_y for unit in candidates) / len(candidates)) - 18.0
-            fill_color = (0.85, 0.18, 0.18, 0.92) if status == "active" else (0.85, 0.55, 0.12, 0.92)
-            outline_color = (1.0, 0.75, 0.25, 0.95) if status == "active" else (1.0, 0.9, 0.35, 0.95)
-            draw_list.add_circle_filled((x, y), 7.0, imgui.get_color_u32(fill_color), 24)
-            draw_list.add_circle((x, y), 9.0, imgui.get_color_u32(outline_color), 24, 1.5)
-            draw_list.add_text((x - 3.0, y - 7.0), imgui.get_color_u32((1.0, 1.0, 1.0, 1.0)), "!")
-
-    def _has_active_battles(self, state: Optional["GameState"]) -> bool:
-        if state is None or "battles" not in state.tables:
-            return False
-        battles = state.tables["battles"]
-        if battles.is_empty() or "status" not in battles.columns:
-            return False
-        return any(
-            str(status or "").lower() in {"active", "stalemate"}
-            for status in battles["status"].to_list()
+    def _get_selected_route_overlays(
+        self,
+        state: Optional["GameState"],
+        selected_ids: list[str],
+        viewer_country_tag: str | None,
+    ) -> list[UnitRouteOverlay]:
+        revisions = getattr(state, "table_revisions", {}) if state is not None else {}
+        revision_names = (
+            "units",
+            "unit_movement_routes",
+            "regions",
+            "countries_treaties",
+            "countries_wars",
         )
+        cache_key = (
+            tuple(selected_ids),
+            str(viewer_country_tag or "").strip().upper(),
+            tuple((name, int(revisions.get(name, 0))) for name in revision_names),
+        )
+        if cache_key != self._route_overlay_cache_key:
+            self._route_overlay_cache = selected_unit_route_overlays(
+                state,
+                selected_ids,
+                viewer_country_tag,
+            )
+            self._route_overlay_cache_key = cache_key
+        return self._route_overlay_cache
+
+    def _draw_selected_routes(
+        self,
+        draw_list: Any,
+        overlays: list[UnitRouteOverlay],
+        window_width: int,
+        window_height: int,
+    ) -> None:
+        for overlay in overlays:
+            samples = sample_route_waypoints(overlay.waypoints)
+            geographic_points = [(point.latitude, point.longitude) for point in samples]
+            projected = self._route_projection.project_anchors(
+                geographic_points,
+                window_width,
+                window_height,
+            )
+            visible: list[tuple[int, float, float]] = []
+            previous: tuple[float, float] | None = None
+            for index, point in enumerate(projected):
+                if point is None:
+                    previous = None
+                    continue
+                screen_point = (point.screen_x, window_height - point.screen_y)
+                visible.append((index, *screen_point))
+                if previous is not None:
+                    self._draw_route_segment(
+                        draw_list,
+                        previous,
+                        screen_point,
+                        overlay.color,
+                        overlay.dash_lengths,
+                    )
+                previous = screen_point
+
+            if visible:
+                label_index = min(2, len(visible) - 1)
+                _, anchor_x, anchor_y = visible[label_index]
+                label = overlay.label if overlay.status_label == "In transit" else f"{overlay.label} · {overlay.status_label}"
+                label_size = imgui.calc_text_size(label)
+                label_x = anchor_x + 8.0
+                label_y = anchor_y - float(label_size.y) - 5.0
+                draw_list.add_rect_filled(
+                    (label_x - 4.0, label_y - 2.0),
+                    (label_x + float(label_size.x) + 4.0, label_y + float(label_size.y) + 2.0),
+                    imgui.get_color_u32((0.03, 0.04, 0.06, 0.82)),
+                    3.0,
+                )
+                draw_list.add_text(
+                    (label_x, label_y),
+                    imgui.get_color_u32(overlay.color),
+                    label,
+                )
+
+    def _draw_route_segment(
+        self,
+        draw_list: Any,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        color: tuple[float, float, float, float],
+        dash_lengths: tuple[float, float] | None,
+    ) -> None:
+        color_u32 = imgui.get_color_u32(color)
+        if dash_lengths is None:
+            draw_list.add_line(start, end, color_u32, 2.5)
+            return
+
+        delta_x = end[0] - start[0]
+        delta_y = end[1] - start[1]
+        segment_length = math.hypot(delta_x, delta_y)
+        if segment_length <= 1e-6:
+            return
+        dash_length, gap_length = dash_lengths
+        cursor = 0.0
+        while cursor < segment_length:
+            dash_end = min(segment_length, cursor + dash_length)
+            start_fraction = cursor / segment_length
+            end_fraction = dash_end / segment_length
+            draw_list.add_line(
+                (start[0] + delta_x * start_fraction, start[1] + delta_y * start_fraction),
+                (start[0] + delta_x * end_fraction, start[1] + delta_y * end_fraction),
+                color_u32,
+                2.5,
+            )
+            cursor = dash_end + gap_length
 
     def get_unit_at(self, screen_x: float, screen_y: float) -> Optional[ProjectedUnit]:
         for unit in reversed(self._billboards):
@@ -384,9 +477,21 @@ class UnitRenderer:
 
         if units.is_empty():
             filtered = units
-        elif visible_owners is not None and "owner" in units.columns:
+        elif "unit_lifecycle" in units.columns or (visible_owners is not None and "owner" in units.columns):
             import polars as pl
-            filtered = units.filter(pl.col("owner").is_in(list(visible_owners)))
+            filters = []
+            if visible_owners is not None and "owner" in units.columns:
+                filters.append(pl.col("owner").is_in(list(visible_owners)))
+            if "unit_lifecycle" in units.columns:
+                filters.append(~pl.col("unit_lifecycle").is_in([
+                    "deployment_queued",
+                    "deployment_transit",
+                    "deployment_blocked",
+                    "in_transit",
+                    "route_blocked",
+                    "training",
+                ]))
+            filtered = units.filter(pl.all_horizontal(filters))
         else:
             filtered = units
 
@@ -647,7 +752,13 @@ class UnitRenderer:
                 self._draw_readiness_label(draw_list, unit, left, bottom + 10)
 
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
-            self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
+            self._draw_stack_badge(
+                draw_list,
+                right - 3,
+                top - 7,
+                unit.stack_count,
+                unit.stack_strength,
+            )
 
         if is_primary_selected:
             self._draw_unit_composition_plate(draw_list, unit, right, top, window_width, window_height)
@@ -694,7 +805,13 @@ class UnitRenderer:
                 self._draw_readiness_label(draw_list, unit, left, bottom + 10)
 
         if unit.stack_count > 1 and unit.stack_index == unit.stack_count - 1:
-            self._draw_stack_badge(draw_list, right - 3, top - 7, unit.stack_count)
+            self._draw_stack_badge(
+                draw_list,
+                right - 3,
+                top - 7,
+                unit.stack_count,
+                unit.stack_strength,
+            )
 
         if is_primary_selected:
             self._draw_unit_composition_plate(draw_list, unit, right, top, window_width, window_height)
@@ -814,19 +931,31 @@ class UnitRenderer:
         x: float,
         y: float,
         count: int,
+        total_strength: int,
     ) -> None:
-        text = str(count)
+        text = f"{count} · {total_strength:,}"
         text_size = imgui.calc_text_size(text)
-        radius = max(8.0, text_size.x * 0.5 + 5.0)
-        draw_list.add_circle_filled(
-            imgui.ImVec2(x, y),
-            radius,
+        width = text_size.x + 10.0
+        height = max(18.0, text_size.y + 6.0)
+        left = x - width * 0.5
+        top = y - height * 0.5
+        right = left + width
+        bottom = top + height
+        rounding = height * 0.5
+        # The original round count badge clipped combined strength labels at common sizes.
+        draw_list.add_rect_filled(
+            (left, top),
+            (right, bottom),
             imgui.get_color_u32(GAMETHEME.colors.bg_popup),
+            rounding,
         )
-        draw_list.add_circle(
-            imgui.ImVec2(x, y),
-            radius,
+        draw_list.add_rect(
+            (left, top),
+            (right, bottom),
             imgui.get_color_u32(GAMETHEME.colors.text_main),
+            rounding,
+            0,
+            1.0,
         )
         draw_list.add_text(
             (x - text_size.x * 0.5, y - text_size.y * 0.5),

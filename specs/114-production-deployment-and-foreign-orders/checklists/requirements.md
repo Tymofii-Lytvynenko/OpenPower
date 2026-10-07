@@ -32,3 +32,4 @@
 ## Notes
 
 - Reviewed against the existing production, design, unit-market, movement, diplomacy, economy, and persistence boundaries.
+- Review update (2026-10-06): Added capacity and queue defaults, deployment/transit availability, foreign-order pricing and acceptance, and used-market rules; checklist criteria remain satisfied.

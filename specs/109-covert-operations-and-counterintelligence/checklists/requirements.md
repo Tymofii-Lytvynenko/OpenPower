@@ -32,3 +32,4 @@
 ## Notes
 
 - Reviewed against the existing military, diplomacy, politics, budget, notification, snapshot, and persistence boundaries.
+- Review update (2026-10-06): Added domestic counterintelligence coverage, transit gating, and confidence-preserving allied intelligence rules; checklist criteria remain satisfied.

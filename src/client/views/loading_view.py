@@ -20,16 +20,30 @@ class LoadingView(arcade.View):
         
         # Threading Logic
         self.thread = threading.Thread(target=self._worker, daemon=True)
+        self._worker_started = False
         self.is_finished = False
         self.result = None
         self.error = None
 
         self._finalizing_frame_rendered = False 
+        self._failure_reported = False
+        self._completion_started = False
+        self._active = False
 
     def on_show_view(self):
+        self._active = True
         # We use a transparent/dark bg so it looks nice if the renderer is missing
         self.window.background_color = (10, 10, 10, 255)
-        self.thread.start()
+        if not self._worker_started:
+            self.thread.start()
+            self._worker_started = True
+
+    def on_hide_view(self):
+        self._active = False
+        if not self._completion_started:
+            cancel = getattr(self.task, "cancel", None)
+            if callable(cancel):
+                cancel()
 
     def _worker(self):
         try:
@@ -40,13 +54,20 @@ class LoadingView(arcade.View):
             self.is_finished = True
 
     def on_update(self, delta_time: float):
+        if not self._active:
+            return
         self.window.imgui.update_time(delta_time)
 
         # If thread is done...
         if self.is_finished:
             if self.error:
-                if self.on_failure: self.on_failure(self.error)
-                else: raise self.error
+                if not self._failure_reported:
+                    self._failure_reported = True
+                    if self.on_failure:
+                        self.on_failure(self.error)
+                    else:
+                        raise self.error
+                return
             else:
                 # Delay switching by 1 frame to allow "100%" text to render
                 if not self._finalizing_frame_rendered:
@@ -56,6 +77,9 @@ class LoadingView(arcade.View):
                     return 
 
                 # Switch Views
+                if self._completion_started:
+                    return
+                self._completion_started = True
                 next_view = self.on_success(self.result)
                 if next_view:
                     self.window.show_view(next_view)

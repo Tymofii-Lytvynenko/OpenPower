@@ -78,7 +78,7 @@ class OrderReadinessTest(unittest.TestCase):
         military.update(state, 0)
         self.assertEqual(state.get_table("unit_pending_orders").to_dicts(), pending_before)
 
-    def test_invalid_orders_still_release_stable_fortification(self) -> None:
+    def test_invalid_orders_preserve_stable_fortification(self) -> None:
         for action in (
             ActionMoveUnit("USA", "USA-1", 999, 0.0, 0.0),
             ActionAttackUnit("USA", "USA-1", "missing"),
@@ -90,7 +90,7 @@ class OrderReadinessTest(unittest.TestCase):
             MilitarySystem().update(state, 0)
             state.current_actions = [action]
             MilitarySystem().update(state, 0)
-            self.assertEqual(state.get_table("units")["readiness_status"][0], "ready")
+            self.assertEqual(state.get_table("units")["readiness_status"][0], "fortified")
 
 
 if __name__ == "__main__":

@@ -14,7 +14,11 @@ class DataInspectorPanel:
     """
     def __init__(self):
         self.selected_key = None
-        self.row_limit = 50 
+        self.search_text = ""
+        self._sort_columns: tuple[tuple[str, bool], ...] = ()
+        self._display_source: pl.DataFrame | None = None
+        self._display_signature: tuple | None = None
+        self._display_frame: pl.DataFrame | None = None
 
     def render(self, state, context: PanelRenderContext) -> bool:
         # Replaces BasePanel logic with Context Manager
@@ -81,9 +85,6 @@ class DataInspectorPanel:
                 imgui.same_line()
                 imgui.text_disabled("|")
                 imgui.same_line()
-                imgui.set_next_item_width(150)
-                _, self.row_limit = imgui.slider_int("Row Limit", self.row_limit, 10, 1000)
-                imgui.same_line()
                 imgui.text_colored(GAMETHEME.colors.info, f"Shape: {data.shape}")
             
             elif dataclasses.is_dataclass(data):
@@ -110,33 +111,99 @@ class DataInspectorPanel:
                 self._render_generic_object(target_data)
 
     def _render_dataframe(self, df: pl.DataFrame):
-        """Renders Polars DataFrame."""
+        """Render a searchable, sortable, virtualized Polars DataFrame."""
         columns = df.columns
         num_cols = len(columns)
-        
+
         if num_cols == 0:
             imgui.text_disabled("Empty DataFrame.")
             return
+
+        imgui.set_next_item_width(240)
+        _, self.search_text = imgui.input_text("Search", self.search_text)
+        imgui.same_line()
+        imgui.text_disabled(f"{df.height:,} rows")
 
         flags = (imgui.TableFlags_.scroll_y | 
                  imgui.TableFlags_.borders | 
                  imgui.TableFlags_.row_bg | 
                  imgui.TableFlags_.resizable | 
                  imgui.TableFlags_.reorderable | 
-                 imgui.TableFlags_.hideable)
+                 imgui.TableFlags_.hideable |
+                 imgui.TableFlags_.sortable)
 
         if imgui.begin_table("DfGrid", num_cols, flags):
             for col in columns:
                 imgui.table_setup_column(col)
             imgui.table_headers_row()
-
-            display_df = df.head(self.row_limit)
-            for row in display_df.iter_rows():
-                imgui.table_next_row()
-                for val in row:
-                    imgui.table_next_column()
-                    self._draw_value(val)
+            self._update_sort_from_imgui(columns)
+            display_df = self._display_data_frame(df)
+            clipper = imgui.ListClipper()
+            clipper.begin(display_df.height)
+            while clipper.step():
+                for row_index in range(clipper.display_start, clipper.display_end):
+                    imgui.table_next_row()
+                    for val in display_df.row(row_index):
+                        imgui.table_next_column()
+                        self._draw_value(val)
             imgui.end_table()
+
+    def _update_sort_from_imgui(self, columns: list[str]) -> None:
+        sort_specs = imgui.table_get_sort_specs()
+        if sort_specs is None or not sort_specs.specs_dirty:
+            return
+
+        parsed_specs: list[tuple[int, str, bool]] = []
+        for index in range(sort_specs.specs_count):
+            spec = sort_specs.get_specs(index)
+            column_index = int(spec.column_index)
+            if not 0 <= column_index < len(columns):
+                continue
+
+            direction = spec.get_sort_direction()
+            if direction == imgui.SortDirection_.ascending:
+                parsed_specs.append((int(spec.sort_order), columns[column_index], True))
+            elif direction == imgui.SortDirection_.descending:
+                parsed_specs.append((int(spec.sort_order), columns[column_index], False))
+
+        self._sort_columns = tuple(
+            (column, ascending)
+            for _, column, ascending in sorted(parsed_specs)
+        )
+        sort_specs.specs_dirty = False
+
+    def _display_data_frame(self, df: pl.DataFrame) -> pl.DataFrame:
+        query = self.search_text.strip().casefold()
+        signature = (query, self._sort_columns)
+        if self._display_source is df and self._display_signature == signature:
+            return self._display_frame if self._display_frame is not None else df
+
+        result = df
+        if query and df.columns:
+            search_columns = [
+                pl.col(column)
+                .cast(pl.String, strict=False)
+                .fill_null("")
+                .str.to_lowercase()
+                .str.contains(query, literal=True)
+                for column in df.columns
+            ]
+            result = result.filter(pl.any_horizontal(search_columns))
+
+        sort_columns = [(column, ascending) for column, ascending in self._sort_columns if column in result.columns]
+        if sort_columns:
+            result = result.sort(
+                by=[column for column, _ in sort_columns],
+                descending=[not ascending for _, ascending in sort_columns],
+                nulls_last=True,
+                maintain_order=True,
+            )
+
+        # State snapshots are immutable DataFrames; retain the source object so cache identity cannot be recycled.
+        self._display_source = df
+        self._display_signature = signature
+        self._display_frame = result
+        return result
 
     def _render_dataclass(self, obj):
         """Renders a Python Dataclass as a 2-column table."""

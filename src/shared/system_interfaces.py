@@ -16,10 +16,12 @@ class SystemPhase(IntEnum):
     STRATEGY = 40
     RANDOM_EVENTS = 41
     DIPLOMACY = 50
+    MIGRATION = 55
     POLITICS = 60
     RESEARCH = 61
     TRADE = 62
     ECONOMY = 70
+    ECONOMIC_HEALTH = 71
     MILITARY = 80
     BUDGET = 81
     COMBAT = 82

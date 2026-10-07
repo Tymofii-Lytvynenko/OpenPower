@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import List
 
@@ -74,3 +75,36 @@ class GameConfig:
             if path.exists():
                 return path
         return self.modules_dir / "base" / "assets" / subpath
+
+    def load_localization(self, locale: str) -> dict[str, str]:
+        """Merge flat JSON localization catalogs from base through active mods."""
+
+        normalized_locale = str(locale or "").strip()
+        if (
+            not normalized_locale
+            or normalized_locale in {".", ".."}
+            or "/" in normalized_locale
+            or "\\" in normalized_locale
+        ):
+            raise ValueError("Locale must be a filename-safe identifier such as 'en-US'.")
+
+        layer_ids = ["base", *(mod_id for mod_id in self.active_mods if mod_id != "base")]
+        translations: dict[str, str] = {}
+        for mod_id in layer_ids:
+            catalog_path = self.modules_dir / mod_id / "assets" / "localization" / f"{normalized_locale}.json"
+            if not catalog_path.is_file():
+                continue
+            try:
+                with catalog_path.open("r", encoding="utf-8") as handle:
+                    catalog = json.load(handle)
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError(f"Invalid localization catalog: {catalog_path}") from exc
+            if not isinstance(catalog, dict) or any(
+                not isinstance(key, str) or not isinstance(value, str)
+                for key, value in catalog.items()
+            ):
+                raise ValueError(
+                    f"Localization catalog must map string keys to string values: {catalog_path}"
+                )
+            translations.update(catalog)
+        return translations

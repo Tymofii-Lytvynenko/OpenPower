@@ -53,6 +53,7 @@ class EngagementMvpTest(unittest.TestCase):
         self.assertEqual(battles.height, 1)
         self.assertEqual(battles["mode"][0], "positional")
         self.assertEqual(battles["status"][0], "active")
+        self.assertEqual(battles["anchor_source"][0], "contact")
 
     def test_reissued_route_escalates_positional_battle_to_assault(self) -> None:
         state = self._state()
@@ -67,6 +68,7 @@ class EngagementMvpTest(unittest.TestCase):
         self.military.update(state, 0.0)
         self.combat.update(state, 0.0)
 
+        first_battle = state.get_table("battles").to_dicts()[0]
         state.current_actions = [
             ActionMoveUnit("tester", "usa-1", 2, 0.0, 10.0)
         ]
@@ -78,6 +80,12 @@ class EngagementMvpTest(unittest.TestCase):
         self.assertLess(units["usa-1"]["strength"], 100)
         self.assertLess(units["can-1"]["strength"], 100)
         self.assertEqual(state.get_table("battles")["mode"][0], "assault")
+        second_battle = state.get_table("battles").to_dicts()[0]
+        self.assertEqual(second_battle["id"], first_battle["id"])
+        self.assertEqual(
+            (second_battle["anchor_latitude"], second_battle["anchor_longitude"]),
+            (first_battle["anchor_latitude"], first_battle["anchor_longitude"]),
+        )
 
     def test_direct_attack_starts_assault_and_resolves_immediately(self) -> None:
 
@@ -102,6 +110,10 @@ class EngagementMvpTest(unittest.TestCase):
         self.assertLess(units_after_combat["usa-1"]["strength"], 100)
         self.assertLess(units_after_combat["can-1"]["strength"], 100)
         self.assertEqual(state.get_table("battles")["mode"][0], "assault")
+        losses = state.get_table("battle_casualty_records").to_dicts()
+        self.assertEqual({row["country_id"] for row in losses}, {"USA", "CAN"})
+        self.assertEqual({row["unit_type"] for row in losses}, {"army"})
+        self.assertTrue(all(row["losses"] > 0 for row in losses))
 
     def _state(self) -> GameState:
         factory = UnitFactory()

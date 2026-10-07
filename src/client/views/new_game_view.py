@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Optional
 
 from src.client.views.base_view import BaseImGuiView
 from src.client.services.network_client_service import NetworkClient
+from src.client.services.campaign_selection import filter_selectable_countries, preview_campaign_scenario
 from src.client.ui.core.composer import UIComposer
 from src.client.ui.core.theme import GAMETHEME
 from src.shared.config import GameConfig
@@ -27,7 +28,15 @@ class NewGameView(BaseImGuiView):
         self.ui = UIComposer(GAMETHEME)
         
         self.selected_country_id: Optional[str] = None
-        self.playable_countries = self._fetch_playable_countries()
+        self.all_playable_countries = self._fetch_playable_countries()
+        self.campaign_scenarios = self._fetch_campaign_scenarios()
+        self.selected_scenario_id: Optional[str] = (
+            str(self.campaign_scenarios[0].get("id")) if self.campaign_scenarios else None
+        )
+        self.playable_countries = filter_selectable_countries(
+            self.all_playable_countries,
+            self._selected_scenario(),
+        )
 
         # --- USE SHARED RENDERER ---
         if self.window.shared_renderer:
@@ -97,6 +106,32 @@ class NewGameView(BaseImGuiView):
         except KeyError:
             return pl.DataFrame()
 
+    def _fetch_campaign_scenarios(self) -> list[dict]:
+        try:
+            state = self.net.get_state()
+            table = state.tables.get("campaign_scenarios")
+            if table is None or table.is_empty():
+                return []
+            return [row for row in table.to_dicts() if bool(row.get("enabled", True))]
+        except (AttributeError, KeyError):
+            return []
+
+    def _selected_scenario(self) -> dict | None:
+        return next(
+            (row for row in self.campaign_scenarios if str(row.get("id") or "") == self.selected_scenario_id),
+            None,
+        )
+
+    def _select_scenario(self, scenario_id: str) -> None:
+        self.selected_scenario_id = scenario_id
+        self.playable_countries = filter_selectable_countries(
+            self.all_playable_countries,
+            self._selected_scenario(),
+        )
+        eligible_ids = {str(value).strip().upper() for value in self.playable_countries["id"].to_list()}
+        if str(self.selected_country_id or "").strip().upper() not in eligible_ids:
+            self.selected_country_id = None
+
     def on_show_view(self):
         pass
 
@@ -144,7 +179,11 @@ class NewGameView(BaseImGuiView):
                         imgui.set_item_default_focus()
 
             else:
-                imgui.text_disabled("No countries loaded.")
+                imgui.text_disabled(
+                    "No eligible countries are available for this scenario."
+                    if self._selected_scenario() is not None
+                    else "No countries loaded."
+                )
             imgui.end_child()
             
             imgui.same_line()
@@ -152,6 +191,41 @@ class NewGameView(BaseImGuiView):
             # Right Column: Details
             imgui.begin_group()
             imgui.dummy((300, 0)) # Spacing
+            imgui.text("Campaign scenario")
+            imgui.begin_child("CampaignScenarioList", (300, 150), True)
+            for scenario in self.campaign_scenarios:
+                scenario_id = str(scenario.get("id") or "")
+                title = str(scenario.get("title") or scenario_id)
+                if imgui.selectable(
+                    f"{title}##scenario-{scenario_id}",
+                    self.selected_scenario_id == scenario_id,
+                )[0]:
+                    self._select_scenario(scenario_id)
+            if not self.campaign_scenarios:
+                imgui.text_disabled("No enabled scenarios are available.")
+            imgui.end_child()
+            selected_scenario = next(
+                (row for row in self.campaign_scenarios if str(row.get("id")) == self.selected_scenario_id),
+                None,
+            )
+            if selected_scenario is not None:
+                preview = preview_campaign_scenario(selected_scenario)
+                imgui.push_text_wrap_pos(0.0)
+                imgui.text_wrapped(str(selected_scenario.get("description") or ""))
+                imgui.pop_text_wrap_pos()
+                imgui.text_disabled(f"Scope: {preview.scope}")
+                imgui.text_disabled(f"Enabled rules: {', '.join(preview.enabled_rules) or 'none'}")
+                if preview.max_duration_minutes > 0:
+                    imgui.text_disabled(f"Campaign deadline: {preview.max_duration_minutes} minute(s) after start")
+                for objective in preview.objectives[:3]:
+                    imgui.bullet_text(f"{objective.title} — {objective.deadline}")
+                if len(preview.objectives) > 3:
+                    imgui.text_disabled(f"And {len(preview.objectives) - 3} more objective(s)")
+                imgui.text_disabled(
+                    "Sandbox continuation enabled" if selected_scenario.get("sandbox_allowed", True)
+                    else "Scenario outcome ends this campaign"
+                )
+            imgui.separator()
             if self.selected_country_id:
                 imgui.text_colored(GAMETHEME.colors.accent, f"Selected: {self.selected_country_id}")
                 imgui.separator()
@@ -180,7 +254,7 @@ class NewGameView(BaseImGuiView):
             avail_w = imgui.get_content_region_avail().x
             imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + avail_w - 150)
             
-            if self.selected_country_id:
+            if self.selected_country_id and self.selected_scenario_id:
                 if imgui.button("START CAMPAIGN", (150, 40)):
                     self._start_game()
             else:
@@ -232,7 +306,7 @@ class NewGameView(BaseImGuiView):
         )
 
     def _start_game(self):
-        if not self.selected_country_id: return
+        if not self.selected_country_id or not self.selected_scenario_id: return
         
         from src.client.tasks.new_game_task import NewGameTask, NewGameContext
 
@@ -246,7 +320,12 @@ class NewGameView(BaseImGuiView):
             )
             return None
 
-        task = NewGameTask(self.window, self.config, self.selected_country_id)
+        task = NewGameTask(
+            self.window,
+            self.config,
+            self.selected_country_id,
+            self.selected_scenario_id,
+        )
         self.nav.show_loading(task, on_success=on_task_complete)
 
     def on_game_mouse_drag(self, x, y, dx, dy, buttons, modifiers):

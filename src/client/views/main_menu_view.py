@@ -39,10 +39,14 @@ class MainMenuView(BaseImGuiView):
 
             # BIGGER GLOBE: Set default distance closer (was 4.5, now 2.3)
             self.cam_ctrl = CameraController(distance=2.3)
-
-            self.cam_ctrl.look_at_pixel_coords(
-                12000, 2400,
-                16000, 8000 # TODO: Replace with dynamic map size
+            # Keep the original framing proportional when a mod uses a different map size.
+            map_width = session.map_data.width
+            map_height = session.map_data.height
+            self.cam_ctrl.look_at_pixel_fraction(
+                0.75,
+                0.30,
+                map_width,
+                map_height,
             )
 
             map_path = None

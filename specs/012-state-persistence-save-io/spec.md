@@ -6,7 +6,7 @@
 As a player saving and loading grand strategy campaigns, I want fast, atomic, corruption-proof save file creation (compressed Parquet format) and 3-phase static world data ingestion (TSVs and TOML blueprints), so that game progress is preserved safely and starting new games or restoring saves is near-instant.
 
 ### Acceptance Scenarios
-1. **Atomic Save File Writes (`SaveWriter`)**: **Given** an active campaign, **When** `save_game(save_name)` executes, **Then** all Polars DataFrames are serialized to Parquet in a temporary folder (`user_data/saves/<name>_tmp/`) and metadata is written to `meta.json` before performing an atomic directory replace (`shutil.rmtree` + `temp_path.rename`).
+1. **Atomic Save File Writes (`SaveWriter`)**: **Given** an active campaign, **When** `save_game(save_name)` executes, **Then** all Polars DataFrames are serialized to Parquet and metadata is written to `meta.json` in a unique staging directory on the save filesystem. A completed staging directory replaces the slot by rename; an existing slot is first retained as a hidden backup and restored if installation fails. Orphaned backups remain discoverable and loadable after process interruption.
 2. **Reflection-Driven Save Restoration (`SaveStateLoader`)**: **Given** a save directory, **When** `load(save_name)` executes, **Then** reflection matches `GameState` dataclass fields to `.parquet` files and `meta.json` primitives, reconstructing `GameState` with 100% fidelity.
 3. **3-Phase Static World Ingestion (`StaticAssetLoader`)**: **Given** static game assets, **When** starting a new campaign (`compile_initial_state`), **Then** datasets load in strict order:
    - **Phase 1: Definitions**: `modules/{mod}/data/definitions/*.toml` loaded into `def_*` Polars tables.
@@ -30,7 +30,9 @@ Static File Ingestion (StaticAssetLoader)
 
 Save Persistence Pipeline (SaveWriter / SaveStateLoader)
 ├── user_data/saves/<save_name>/meta.json          ──> Primitives, globals, TimeData
-└── user_data/saves/<save_name>/tables/*.parquet   ──> Compressed Polars DataFrames
+├── user_data/saves/<save_name>/*.parquet           ──> Persistent DataFrame fields
+└── user_data/saves/<save_name>/tables/*.parquet    ──> Keyed GameState tables
+    Hidden staging and backup directories are used only during replacement; a backup remains readable if commit is interrupted.
 ```
 
 ## Success Criteria

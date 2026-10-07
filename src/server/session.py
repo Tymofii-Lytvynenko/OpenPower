@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from pathlib import Path
 from typing import Callable, Optional
 
 from src.core.map_data import RegionMapData
@@ -13,7 +12,11 @@ from src.server.command_policy import authorize_country_scope, validate_finite_p
 from src.server.io.data_export_manager import DataExporter
 from src.server.io.data_load_manager import DataLoader
 from src.server.io.save_writer import SaveWriter
-from src.server.state_migrations import migrate_tactical_combat_state, validate_tactical_combat_state
+from src.server.state_migrations import (
+    migrate_political_state,
+    migrate_tactical_combat_state,
+    validate_tactical_combat_state,
+)
 from src.shared.actions import ActionSaveGame, GameAction
 from src.shared.commands import CommandEnvelope, CommandStatus, command_id_for
 from src.shared.config import GameConfig
@@ -44,7 +47,10 @@ class GameSession:
         self.schemas = schema_registry or WorldSchemaRegistry()
         self.state = initial_state
 
+        # Repair additive tactical columns before validation and schema capture;
+        # otherwise a legacy battle row would be frozen with nullable anchors.
         migrate_tactical_combat_state(self.state)
+        migrate_political_state(self.state)
         migration_issues = validate_tactical_combat_state(self.state)
         if migration_issues:
             raise RuntimeError(

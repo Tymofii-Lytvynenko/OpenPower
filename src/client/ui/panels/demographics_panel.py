@@ -1,3 +1,6 @@
+import math
+from typing import Callable
+
 import polars as pl
 from imgui_bundle import imgui
 
@@ -8,6 +11,26 @@ from src.client.ui.core.panel_context import PanelRenderContext
 
 
 class DemographicsPanel:
+    def __init__(
+        self,
+        open_migration_policy_cb: Callable[[], None] | None = None,
+        open_social_programs_cb: Callable[[], None] | None = None,
+    ) -> None:
+        self._open_migration_policy_cb = open_migration_policy_cb
+        self._open_social_programs_cb = open_social_programs_cb
+
+    def open_migration_policy(self) -> bool:
+        if self._open_migration_policy_cb is None:
+            return False
+        self._open_migration_policy_cb()
+        return True
+
+    def open_social_programs(self) -> bool:
+        if self._open_social_programs_cb is None:
+            return False
+        self._open_social_programs_cb()
+        return True
+
     def render(self, state, context: PanelRenderContext) -> bool:
         with WindowManager.window("DEMOGRAPHICS", x=10, y=350, w=240, h=480) as is_open:
             if not is_open:
@@ -63,14 +86,7 @@ class DemographicsPanel:
         # Development Metrics
         Prims.header("DEVELOPMENT")
         
-        human_dev_index = 0.0
-        if "countries_dem" in state.tables:
-            try:
-                dem_df = state.tables["countries_dem"]
-                row = dem_df.filter(pl.col("id") == target_tag)
-                if not row.is_empty():
-                    human_dev_index = float(row["human_dev"][0])
-            except: pass
+        human_dev_index = self._human_development_index(state, target_tag)
 
         Prims.meter("HDI Score", human_dev_index, GAMETHEME.colors.info)
         
@@ -78,7 +94,31 @@ class DemographicsPanel:
         
         # Action Buttons
         if is_own:
-            if imgui.button("MIGRATION POLICY", (-1, 30)): pass
-            if imgui.button("SOCIAL PROGRAMS", (-1, 30)): pass
+            if self._open_migration_policy_cb is not None and imgui.button("MIGRATION POLICY", (-1, 30)):
+                self.open_migration_policy()
+            if self._open_social_programs_cb is not None and imgui.button("SOCIAL PROGRAMS", (-1, 30)):
+                self.open_social_programs()
         else:
             imgui.text_disabled("Internal Policies Restricted")
+
+    @staticmethod
+    def _human_development_index(state, target_tag: str) -> float:
+        # The loader merges countries_dem.tsv into countries rather than exposing a separate runtime table.
+        countries = state.tables.get("countries")
+        if countries is None or not {"id", "human_dev"}.issubset(countries.columns):
+            return 0.0
+
+        row = countries.filter(
+            pl.col("id").cast(pl.String, strict=False) == str(target_tag)
+        ).select("human_dev").head(1)
+        if row.is_empty():
+            return 0.0
+
+        value = row.item()
+        try:
+            score = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return 0.0
+        if not math.isfinite(score):
+            return 0.0
+        return max(0.0, min(1.0, score))

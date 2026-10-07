@@ -15,8 +15,7 @@ class EditorView(BaseImGuiView):
         super().__init__()
         
         self.net = context.net_client
-        self.imgui: ImGuiService = ImGuiService(self.window)
-        self.layout = EditorLayout(self.net, None)
+        self.imgui: ImGuiService = ImGuiService(self.window, enable_implot=False)
         
         # 1. Camera
         self.cam_ctrl = CameraController()
@@ -27,6 +26,11 @@ class EditorView(BaseImGuiView):
             map_img_path=context.map_path, 
             terrain_img_path=context.terrain_path,
             map_data=context.map_data
+        )
+        self.layout = EditorLayout(
+            self.net,
+            None,
+            on_projection_change=self.renderer.set_projection_mode,
         )
         
         self.world_cam = arcade.Camera2D()

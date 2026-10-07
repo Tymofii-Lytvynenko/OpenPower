@@ -1,7 +1,9 @@
+import logging
 from pathlib import Path
 
 # Absolute path to the directory containing this file
 ROOT = Path(__file__).parent
+logger = logging.getLogger(__name__)
 
 
 class ShaderRegistry:
@@ -15,8 +17,17 @@ class ShaderRegistry:
 
     @classmethod
     def load_bundle(cls, vert_path: Path, frag_path: Path) -> dict:
-        """Helper to read shader files into strings for Arcade."""
-        return {
-            "vertex_shader": vert_path.read_text(),
-            "fragment_shader": frag_path.read_text()
-        }
+        """Read an explicit vertex/fragment pair and identify missing sources clearly."""
+        sources = {}
+        for shader_type, path in (
+            ("vertex", Path(vert_path)),
+            ("fragment", Path(frag_path)),
+        ):
+            try:
+                sources[f"{shader_type}_shader"] = path.read_text(encoding="utf-8")
+            except FileNotFoundError as exc:
+                logger.error("Missing %s shader source: %s", shader_type, path.resolve())
+                raise FileNotFoundError(
+                    f"Missing {shader_type} shader source: {path.resolve()}"
+                ) from exc
+        return sources

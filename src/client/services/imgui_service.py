@@ -1,7 +1,7 @@
 import arcade
 from pathlib import Path
 from typing import Optional
-from imgui_bundle import imgui
+from imgui_bundle import imgui, implot
 from imgui_bundle.python_backends.opengl_backend_programmable import ProgrammablePipelineRenderer as OpenGL3Backend
 
 from src.client.ui.core.font_loader import FontLoader
@@ -20,12 +20,19 @@ class ImGuiService:
         3. Reporting whether ImGui has 'captured' an input event to prevent fall-through.
     """
 
-    def __init__(self, window: arcade.Window, font_path: Optional[Path] = None):
+    def __init__(
+        self,
+        window: arcade.Window,
+        font_path: Optional[Path] = None,
+        *,
+        enable_implot: bool = False,
+    ):
         self.window = window
         self.window.switch_to()
         
         # Create a dedicated ImGui context
         self._context = imgui.create_context()
+        self._plot_context = implot.create_context() if enable_implot else None
         self.io = imgui.get_io()
         
         # Enable Docking and Keyboard Nav
@@ -92,6 +99,10 @@ class ImGuiService:
 
     def new_frame(self):
         """Prepares the ImGui context using the actual stored delta time."""
+        imgui.set_current_context(self._context)
+        if self._plot_context is not None:
+            implot.set_current_context(self._plot_context)
+
         if self._frame_started:
             imgui.end_frame()
 
@@ -114,6 +125,10 @@ class ImGuiService:
         if not self._frame_started:
             return
 
+        imgui.set_current_context(self._context)
+        if self._plot_context is not None:
+            implot.set_current_context(self._plot_context)
+
         imgui.render()
         draw_data = imgui.get_draw_data()
         self.renderer.render(draw_data)
@@ -131,6 +146,21 @@ class ImGuiService:
             glDisable(GL_SCISSOR_TEST)
 
         self._frame_started = False
+
+    def shutdown(self) -> None:
+        """Release plotting and ImGui contexts in dependency order."""
+        if self._frame_started:
+            imgui.set_current_context(self._context)
+            imgui.end_frame()
+            self._frame_started = False
+
+        if self._plot_context is not None:
+            implot.destroy_context(self._plot_context)
+            self._plot_context = None
+
+        if self._context is not None:
+            imgui.destroy_context(self._context)
+            self._context = None
 
     # --- Input Handling (Returns True if ImGui captured the event) ---
 

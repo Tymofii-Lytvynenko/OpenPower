@@ -32,3 +32,4 @@
 ## Notes
 
 - Reviewed against the existing tactical battle resolution, readiness, movement, occupation, alliance, and battle-visualization boundaries.
+- Review update (2026-10-06): Added battle summaries, force-type commands, retreat return flow, and military-control occupation semantics; checklist criteria remain satisfied.

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import copy
 import heapq
+import logging
 import traceback
 from dataclasses import dataclass
-from graphlib import CycleError
+from graphlib import CycleError, TopologicalSorter
 from typing import Any, Dict, Iterable, List
 
 from src.shared.actions import GameAction
@@ -16,6 +17,8 @@ from src.shared.system_state import (
     runtime_state_contract,
     validate_runtime_state_contract,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -90,32 +93,35 @@ class Engine:
             )
             raise RuntimeError(f"Simulation graph has missing dependencies: {details}")
 
-        dependents: dict[str, set[str]] = {system_id: set() for system_id in dependencies}
-        indegree = {system_id: len(required) for system_id, required in dependencies.items()}
-        for system_id, required in dependencies.items():
-            for dependency_id in required:
-                dependents[dependency_id].add(system_id)
+        sorter = TopologicalSorter(dependencies)
+        try:
+            sorter.prepare()
+        except CycleError as exc:
+            cycle = exc.args[1] if len(exc.args) > 1 else ()
+            cycle_ids = sorted({str(system_id) for system_id in cycle if system_id is not None})
+            LOGGER.critical("Circular simulation dependency detected: %s", cycle_ids)
+            raise CycleError(
+                f"Circular simulation dependency detected: {cycle_ids}", cycle_ids
+            ) from exc
 
         ready: list[tuple[int, str]] = []
-        for system_id, count in indegree.items():
-            if count == 0:
-                heapq.heappush(ready, (system_access(self.systems_map[system_id]).phase, system_id))
-
+        for system_id in sorter.get_ready():
+            heapq.heappush(ready, (system_access(self.systems_map[system_id]).phase, system_id))
         sorted_ids: list[str] = []
-        while ready:
+        while sorter.is_active():
+            if not ready:
+                raise RuntimeError("Topological sorter reported active nodes without a ready system.")
             _, system_id = heapq.heappop(ready)
             sorted_ids.append(system_id)
-            for dependent_id in sorted(dependents[system_id]):
-                indegree[dependent_id] -= 1
-                if indegree[dependent_id] == 0:
-                    heapq.heappush(
-                        ready,
-                        (system_access(self.systems_map[dependent_id]).phase, dependent_id),
-                    )
-
-        if len(sorted_ids) != len(self.systems_map):
-            unresolved = sorted(system_id for system_id, count in indegree.items() if count)
-            raise CycleError("Circular simulation dependency detected", unresolved)
+            sorter.done(system_id)
+            for ready_system_id in sorter.get_ready():
+                heapq.heappush(
+                    ready,
+                    (
+                        system_access(self.systems_map[ready_system_id]).phase,
+                        ready_system_id,
+                    ),
+                )
 
         self.execution_order = [self.systems_map[system_id] for system_id in sorted_ids]
         print(f"[Engine] Graph resolved. Execution Order: {sorted_ids}")

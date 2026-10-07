@@ -16,6 +16,7 @@ As a national leader, I want to recruit, train, deploy, and defend covert cells,
 6. **Defend against a cell**: **Given** a target country has domestic security and counterintelligence capacity, **When** an incoming mission is prepared or executed, **Then** detection and interception probability reflects the defender’s capacity and the attacker’s concealment.
 7. **Track covert activity**: **Given** a cell or mission changes state, **When** the player opens the covert overview, **Then** the player sees known cells, assignments, preparation, upkeep, confidence, detection, and the latest outcome without exposing information that the target has not discovered.
 8. **Persist hidden state**: **Given** cells, missions, and detection information exist, **When** the game is saved, loaded, or replayed, **Then** hidden information and pending mission outcomes remain consistent.
+9. **Use domestic counterintelligence coverage**: **Given** a country has active covert cells assigned to domestic security, **When** foreign operations are prepared or executed against it, **Then** those cells improve defensive detection according to configured coverage, population, and diminishing-return rules without guaranteeing interception.
 
 ### Edge Cases
 
@@ -23,6 +24,7 @@ As a national leader, I want to recruit, train, deploy, and defend covert cells,
 - A cell is captured during preparation; the mission is cancelled or exposed according to its configured capture rule.
 - A target changes owner, government, or war status before execution; target validity and diplomatic consequences are reevaluated at the execution boundary.
 - A cell lacks communications or transit access; it cannot advance beyond the corresponding lifecycle state.
+- A cell assigned to a foreign target is still in transit; it cannot prepare a mission or contribute target-country intelligence until arrival and activation.
 - A mission is submitted twice; only one active mission may consume the cell and the second action is rejected.
 - A failed mission must not reveal secret information to the target unless the configured detection result says it was exposed.
 - A legacy save contains no covert-cell records; the system starts with no cells and does not invent intelligence.
@@ -49,6 +51,9 @@ As a national leader, I want to recruit, train, deploy, and defend covert cells,
 - **FR-017**: Identical covert state, time, ordered actions, and deterministic seed MUST produce identical preparation, detection, and mission outcomes.
 - **FR-018**: Cells, missions, hidden discoveries, capture results, and pending deadlines MUST survive save/load, snapshot synchronization, and replay.
 - **FR-019**: The system MUST process only active cells, pending missions, and affected counterintelligence links when no covert state changed elsewhere.
+- **FR-020**: Foreign cell assignments MUST use the military movement access and route rules. A cell in transit MUST NOT execute missions, provide active target intelligence, or count as deployed counterintelligence in the destination.
+- **FR-021**: Active cells assigned to domestic security MUST contribute to counterintelligence coverage. Coverage MUST be bounded below certainty and use scenario-configurable population scaling and diminishing returns so additional cells do not provide linear, unlimited protection.
+- **FR-022**: Intelligence gathered about foreign military forces MUST carry confidence and freshness derived from available communications and active intelligence coverage in the force owner's country. Eligible allies MAY receive the best information permitted by the sharing rules; they MUST NOT receive a more certain estimate than the source country holds.
 
 ## Key Entities & Data Model
 
@@ -71,6 +76,8 @@ This feature activates the existing covert-cell and covert-mission concepts. It 
 - **SC-005**: A player can inspect all owned cells, pending missions, upkeep, target, preparation status, and known results from the covert overview within 30 seconds.
 - **SC-006**: Save/load during recruitment, training, preparation, and execution preserves the same next outcome and hidden-information boundaries.
 - **SC-007**: Processing 5,000 active cells and 1,000 pending missions completes within 500 milliseconds in a controlled benchmark when unrelated countries are unchanged.
+- **SC-008**: In controlled scenarios, an in-transit cell contributes no active target coverage, and a domestic-security assignment improves but never guarantees detection.
+- **SC-009**: Shared force intelligence preserves the source confidence and freshness limits across eligible allies and does not reveal information to ineligible countries.
 
 ## Assumptions & Dependencies
 
@@ -78,4 +85,5 @@ This feature activates the existing covert-cell and covert-mission concepts. It 
 - **Assumption**: Mission outcomes use deterministic seeded variation, not untracked randomness.
 - **Assumption**: The first release models aggregate covert capability rather than individual agents, travel animations, or real-world operational procedures.
 - **Dependency**: Existing country authority, budget, relations, war, politics, strategic-weapon, notification, snapshot, and persistence contracts remain authoritative.
+- **Dependency**: Foreign covert-cell transit uses the military movement and access contract; foreign force intelligence uses the capability-matrix confidence and sharing contract.
 - **Dependency**: Military, economic, political, and diplomatic effects are emitted to their existing systems rather than recalculated inside covert operations.

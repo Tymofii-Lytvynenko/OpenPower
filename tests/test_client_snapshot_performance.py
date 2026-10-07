@@ -68,7 +68,10 @@ class ClientSnapshotPerformanceTest(unittest.TestCase):
         started = time.perf_counter()
         restored = StateSnapshotDecoder().decode(packet)
         presenter = MilitaryPresenter()
-        views = [presenter.battle_status(restored, f"battle-{index:03d}") for index in range(100)]
+        views = [
+            presenter.battle_status(restored, f"battle-{index:03d}", f"USA{index:03d}")
+            for index in range(100)
+        ]
         elapsed = time.perf_counter() - started
         self.assertLessEqual(elapsed, 0.10)
         self.assertTrue(all(view is not None for view in views))
