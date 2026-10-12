@@ -202,6 +202,12 @@ class ForeignOrderSystem(ISystem):
 
     def _deliver_due_orders(self, state, orders):
         now = int(state.time.total_minutes)
+        if not any(
+            order.get("status") == "in_production"
+            and now >= int(order.get("due_at_minute") or 0)
+            for order in orders
+        ):
+            return
         countries_frame = state.tables.get("countries")
         if countries_frame is None or "units" not in state.tables:
             return
@@ -213,6 +219,12 @@ class ForeignOrderSystem(ISystem):
         existing_ids = {str(row.get("id") or "") for row in units}
         route_frame = state.tables.get("unit_movement_routes")
         routes = [] if route_frame is None else route_frame.to_dicts()
+        adjacency = state.tables.get("region_adjacency")
+        has_geo_coordinates = regions is not None and {
+            "latitude",
+            "longitude",
+        }.issubset(regions.columns)
+        prepared_graph = None
         for order in orders:
             if order.get("status") != "in_production" or now < int(order.get("due_at_minute") or 0):
                 continue
@@ -252,14 +264,33 @@ class ForeignOrderSystem(ISystem):
                     order.update(reason=reason, updated_at_minute=now)
                     self._publish(state, order)
                 continue
-            region_rows = regions.to_dicts()
-            adjacency = state.tables.get("region_adjacency")
+            if prepared_graph is None:
+                prepared_graph = self._route_planner.prepare(regions, adjacency)
             access_context = self._access.for_country(state, buyer)
+
+            def segment_minutes(left, right):
+                left_id = int(left.get("id") or 0)
+                right_id = int(right.get("id") or 0)
+                edge_key = (left_id, right_id) if left_id < right_id else (right_id, left_id)
+                distance = (
+                    prepared_graph.edge_distance_km.get(edge_key)
+                    if has_geo_coordinates
+                    else None
+                )
+                return (
+                    self._duration.estimate_from_distance(distance)
+                    if distance is not None
+                    else self._duration.estimate_between(self._coordinate(left), self._coordinate(right))
+                )
+
             route = self._route_planner.plan(
-                int(origin.get("id") or 0), int(destination.get("id") or 0), region_rows,
-                None if adjacency is None else adjacency.to_dicts(),
+                int(origin.get("id") or 0),
+                int(destination.get("id") or 0),
+                prepared_graph.region_by_id.values(),
+                adjacency,
                 lambda row, final: self._foreign_route_access(access_context, buyer, seller, row, final),
-                segment_cost=lambda left, right: self._duration.estimate_between(self._coordinate(left), self._coordinate(right)),
+                segment_cost=segment_minutes,
+                prepared_graph=prepared_graph,
             )
             if not route.is_valid:
                 if order.get("reason") != route.rejection_reason:
@@ -281,9 +312,23 @@ class ForeignOrderSystem(ISystem):
             new_unit = self._unit_factory.create(unit_id, buyer, unit_type, quantity, int(origin.get("id") or 0), geo, now, design_id=str(order.get("design_id")), training_level="Recruit")
             target_geo = self._coordinate(destination)
             first_region_id = route.region_ids[1] if len(route.region_ids) > 1 else int(destination.get("id") or 0)
-            first_region = next((row for row in region_rows if int(row.get("id") or 0) == first_region_id), destination)
+            first_region = prepared_graph.region_by_id.get(first_region_id, destination)
             first_geo = self._coordinate(first_region)
-            duration = self._duration.estimate_between(geo, first_geo)
+            first_edge_key = (
+                (int(origin.get("id") or 0), first_region_id)
+                if int(origin.get("id") or 0) < first_region_id
+                else (first_region_id, int(origin.get("id") or 0))
+            )
+            first_edge_distance = (
+                prepared_graph.edge_distance_km.get(first_edge_key)
+                if has_geo_coordinates
+                else None
+            )
+            duration = (
+                self._duration.estimate_from_distance(first_edge_distance)
+                if first_edge_distance is not None
+                else self._duration.estimate_between(geo, first_geo)
+            )
             new_unit.update(
                 production_order_id="", foreign_order_id=str(order["id"]), original_cost=cost,
                 source_region_id=int(origin.get("id") or 0),
@@ -327,18 +372,39 @@ class ForeignOrderSystem(ISystem):
             state.update_table("unit_movement_routes", pl.DataFrame(routes, schema=route_frame.schema))
 
     def _refresh_delivery_status(self, state, orders):
+        active_orders = [
+            order for order in orders
+            if str(order.get("status") or "") in {"in_transit", "blocked"}
+        ]
+        if not active_orders:
+            return
         units_table = state.tables.get("units")
         if units_table is None:
             return
-        units = {str(row.get("id") or ""): row for row in units_table.to_dicts()}
+        unit_ids = sorted({
+            str(value)
+            for order in active_orders
+            for value in order.get("unit_ids") or []
+            if str(value)
+        })
+        if not unit_ids:
+            return
+        relevant_units = units_table.filter(
+            pl.col("id").cast(pl.Utf8, strict=False).fill_null("").is_in(unit_ids)
+        )
+        units = {str(row.get("id") or ""): row for row in relevant_units.to_dicts()}
         routes_table = state.tables.get("unit_movement_routes")
-        routes = {} if routes_table is None else {
-            str(row.get("unit_id") or ""): row for row in routes_table.to_dicts()
-        }
+        routes = {}
+        if routes_table is not None and "unit_id" in routes_table.columns:
+            relevant_routes = routes_table.filter(
+                pl.col("unit_id").cast(pl.Utf8, strict=False).fill_null("").is_in(unit_ids)
+            )
+            routes = {
+                str(row.get("unit_id") or ""): row
+                for row in relevant_routes.to_dicts()
+            }
         now = int(state.time.total_minutes)
-        for order in orders:
-            if str(order.get("status") or "") not in {"in_transit", "blocked"}:
-                continue
+        for order in active_orders:
             unit_ids = [str(value) for value in order.get("unit_ids") or []]
             if not unit_ids:
                 continue

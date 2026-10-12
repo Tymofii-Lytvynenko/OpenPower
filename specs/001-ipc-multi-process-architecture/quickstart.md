@@ -16,6 +16,8 @@ To verify the multi-process architecture end-to-end:
 ```powershell
 .venv\Scripts\python.exe -m pytest `
   tests/test_game_state_ipc.py `
+  tests/test_snapshot_protocol.py `
+  tests/test_snapshot_inbox.py `
   tests/test_client_snapshot_performance.py `
   tests/test_command_pipeline.py `
   tests/test_runtime_architecture.py `
@@ -26,6 +28,8 @@ To verify the multi-process architecture end-to-end:
 ```
 
 Recorded result on the current Windows/Python 3.14 workspace: `18 passed in 30.33s`. This covers full/delta snapshot IPC, command dispatch, spawn startup, server/client interaction, and process teardown. Snapshot bounds are asserted in `tests/test_client_snapshot_performance.py`: 2,000 tactical rows under 2 MB and under 1.5 seconds; 100 engagement summaries under 100 ms for headless decode/presentation.
+
+The snapshot tests also cover the protocol-version-3 append tail for `history_snapshots`, the full-table fallback after compaction, overlap-safe decoding, and state immutability after publication.
 
 ## Validation Scenarios
 
@@ -45,4 +49,6 @@ Recorded result on the current Windows/Python 3.14 workspace: `18 passed in 30.3
 1. Close the application window via `X` or exit menu.
 2. Check Task Manager to confirm both processes exit cleanly without zombie `python.exe` background tasks remaining.
 
-**Manual status (2026-10-06):** Launched `.venv\Scripts\python.exe -u main.py`, reached the main menu, and started a single-player session at speed 1. The HUD advanced from `2001-01-01 02:12` to `2001-01-02 00:31` while the client stayed interactive; country selection, speed controls, and a map drag responded. Windows process inspection showed the client and a distinct child server process. The live FPS overlay samples were `60, 60, 59, 60, 59, 60`; this confirms the decoupled UI kept rendering during simulation, but does not pass the sustained 60+ FPS criterion because sub-60 samples occurred. Closing the window stopped both processes. Keep T012 open until a sustained in-client 60+ FPS measurement is recorded.
+**Manual status (2026-10-06):** Launched `.venv\Scripts\python.exe -u main.py`, reached the main menu, and started a single-player session at speed 1. The HUD advanced from `2001-01-01 02:12` to `2001-01-02 00:31` while the client stayed interactive; country selection, speed controls, and a map drag responded. Windows process inspection showed the client and a distinct child server process. The live FPS overlay samples were `60, 60, 59, 60, 59, 60`; this confirms the decoupled UI kept rendering during simulation, but does not pass the sustained 60+ FPS criterion because sub-60 samples occurred. Closing the window stopped both processes.
+
+**Latest short observation (2026-10-08):** The playtest report records 240 frame intervals with a 23.5 ms median, 52.2 ms p95, and 119.9 ms maximum while panels and screenshot inspection were active. Snapshot decoding now runs off the render callback, but this short sample still does not meet the 60+ FPS gate. T012 remains open pending a sustained live measurement.

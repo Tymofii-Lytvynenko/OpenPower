@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from typing import Optional, Any
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.ui.core.composer import UIComposer
 from src.client.ui.components.hud.panel_manager import PanelManager

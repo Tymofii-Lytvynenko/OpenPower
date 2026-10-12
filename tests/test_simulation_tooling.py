@@ -13,6 +13,7 @@ from src.simulation.actions import build_action_registry
 from src.simulation.comparison import DeterminismComparisonRunner
 from src.simulation.fingerprint import state_fingerprint
 from src.simulation.runner import SimulationRunConfig, SimulationRunReport
+from src.simulation.serialization import dumps_line
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -33,6 +34,12 @@ class TestSimulationTooling(unittest.TestCase):
 
         right.globals["tick"] = 1
         self.assertNotEqual(state_fingerprint(left), state_fingerprint(right))
+
+    def test_scalar_serialization_remains_canonical(self):
+        self.assertEqual(
+            dumps_line({"finite": 1.5, "nan": float("nan"), "text": "ok"}),
+            b'{"finite":1.5,"nan":null,"text":"ok"}',
+        )
 
     def test_action_registry_keeps_qualified_names_when_short_names_collide(self):
         collision_action = make_dataclass(

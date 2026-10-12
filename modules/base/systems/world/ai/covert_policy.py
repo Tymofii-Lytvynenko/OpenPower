@@ -40,7 +40,9 @@ class CovertOperationsPolicy:
     cadence_days = 7
 
     def build_candidates(self, context: AITableContext) -> pl.LazyFrame:
-        scheduled = country_frame(context, self.cadence_days).collect().to_dicts()
+        scheduled = country_frame(context, self.cadence_days).select("country_id").collect()
+        if scheduled.is_empty():
+            return empty_candidates(_CANDIDATE_SCHEMA)
         country_table = context.table("countries")
         regions_table = context.table("regions")
         cells_table = context.table("covert_cells")
@@ -48,76 +50,281 @@ class CovertOperationsPolicy:
         if any(table is None for table in (country_table, regions_table, cells_table, missions_table)):
             return empty_candidates(_CANDIDATE_SCHEMA)
 
-        countries = country_table.collect().to_dicts()
-        regions = regions_table.collect().to_dicts()
-        cells = cells_table.collect().to_dicts()
-        missions = missions_table.collect().to_dicts()
-        relations_table = context.table("countries_relations")
-        relations = [] if relations_table is None else relations_table.collect().to_dicts()
-        treaties_table = context.table("countries_treaties")
-        treaties = [] if treaties_table is None else treaties_table.collect().to_dicts()
-        allied_pairs = self._allied_pairs(treaties)
-        country_by_id = {self._tag(row.get("id")): row for row in countries}
-        owned_regions = {
-            self._tag(row.get("owner"))
-            for row in regions
-            if self._tag(row.get("owner"))
-        }
-        active_cells_by_owner: dict[str, list[dict[str, Any]]] = {}
-        for cell in cells:
-            owner = self._tag(cell.get("country_id"))
-            if owner and str(cell.get("status") or "").lower() not in {"retired", "lost", "captured"}:
-                active_cells_by_owner.setdefault(owner, []).append(cell)
-        active_missions = {
-            str(row.get("cell_id") or "")
-            for row in missions
-            if str(row.get("status") or "").lower() in _ACTIVE_MISSION_STATES
-        }
+        scheduled_ids = scheduled.get_column("country_id").drop_nulls().unique().to_list()
+        countries = country_table.collect()
+        country_columns = set(countries.columns)
+        if "id" not in country_columns:
+            return empty_candidates(_CANDIDATE_SCHEMA)
+        funds = (
+            countries.select(
+                pl.col("id").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_uppercase().alias("country_id"),
+                (
+                    pl.when(pl.col("money_reserves").cast(pl.Float64, strict=False).is_finite())
+                    .then(pl.col("money_reserves").cast(pl.Float64, strict=False))
+                    .otherwise(0.0)
+                    if "money_reserves" in country_columns
+                    else pl.lit(0.0)
+                ).alias("funds"),
+            )
+            .join(scheduled, on="country_id", how="inner")
+        )
+        owned_regions = (
+            regions_table.collect()
+            .select(pl.col("owner").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_uppercase().alias("country_id"))
+            .filter(pl.col("country_id").is_not_null() & (pl.col("country_id") != ""))
+            .unique()
+        )
+        all_cells = cells_table.collect()
+        active_cells = self._active_cell_frame(all_cells, scheduled_ids)
+        active_missions = self._active_mission_frame(missions_table.collect())
+        active_cells = active_cells.join(
+            active_missions,
+            left_on="cell_id",
+            right_on="active_cell_id",
+            how="anti",
+        )
+        all_active_cells = self._active_cell_frame(all_cells, scheduled_ids)
+        active_cell_counts = all_active_cells.group_by("country_id").agg(
+            pl.len().alias("active_cell_count")
+        )
 
-        candidates: list[dict[str, Any]] = []
+        relations_table = context.table("countries_relations")
+        treaties_table = context.table("countries_treaties")
+        treaties = pl.DataFrame() if treaties_table is None else treaties_table.collect()
+        allied_pairs = self._allied_pairs_from_frame(treaties)
         creation_cost = max(0.0, self._finite(context.globals.get("covert_cell_creation_cost", 10.0)))
         training_points = max(1.0, self._finite(context.globals.get("covert_training_points_per_level", 100.0)))
         training_cost = training_points * max(0.0, self._finite(context.globals.get("covert_training_cost_per_point", 0.1)))
         mission_cost = max(0.0, self._finite(context.globals.get("covert_mission_cost", 2.0)))
         mission_risk = MISSION_PROFILES[_MISSION_TYPE][0]
+        cell_candidates = self._cell_candidates(
+            active_cells,
+            funds,
+            training_points,
+            training_cost,
+            mission_cost,
+            mission_risk,
+        )
+        candidates = [
+            self._candidate(
+                str(row["country_id"]),
+                str(row["action_kind"]),
+                str(row["reason_code"]),
+                float(row["utility"]),
+                cell_id=str(row.get("cell_id") or ""),
+                target_country_id=str(row.get("target_country_id") or ""),
+                training_points=float(row.get("training_points") or 0.0),
+                mission_type=str(row.get("mission_type") or ""),
+            )
+            for row in cell_candidates.to_dicts()
+        ]
 
-        for scheduled_country in sorted(scheduled, key=lambda row: self._tag(row.get("country_id"))):
-            owner = self._tag(scheduled_country.get("country_id"))
-            country = country_by_id.get(owner)
-            if not owner or country is None:
-                continue
-            funds = self._finite(country.get("money_reserves"))
-            owned_cells = sorted(
-                active_cells_by_owner.get(owner, ()),
-                key=lambda row: str(row.get("id") or ""),
+        creation_owners = (
+            funds.join(active_cell_counts, on="country_id", how="left")
+            .with_columns(pl.col("active_cell_count").fill_null(0))
+            .filter(
+                (pl.col("active_cell_count") == 0)
+                & (pl.col("funds") >= creation_cost)
             )
-            candidate = self._cell_action(
-                owner,
-                funds,
-                owned_cells,
-                active_missions,
-                training_points,
-                training_cost,
-                mission_cost,
-                mission_risk,
+            .join(owned_regions, on="country_id", how="inner")
+            .join(
+                cell_candidates.select("country_id").unique(),
+                on="country_id",
+                how="anti",
             )
-            if candidate is None and not owned_cells and funds >= creation_cost and owner in owned_regions:
-                target = self._choose_target(owner, countries, relations, allied_pairs, owned_regions)
-                if target:
-                    candidate = self._candidate(
-                        owner,
-                        "create_cell",
-                        "establish_covert_capability",
-                        0.45,
-                        target_country_id=target,
-                        cell_name="Government Intelligence Cell",
-                    )
-            if candidate is not None:
-                candidates.append(candidate)
+            .select("country_id")
+        )
+        if not creation_owners.is_empty():
+            relation_by_pair = self._index_relations(
+                pl.DataFrame() if relations_table is None else relations_table.collect()
+            )
+            creation_targets = self._creation_targets(
+                creation_owners,
+                countries,
+                owned_regions,
+                allied_pairs,
+                relation_by_pair,
+            )
+            candidates.extend(
+                self._candidate(
+                    str(row["country_id"]),
+                    "create_cell",
+                    "establish_covert_capability",
+                    0.45,
+                    target_country_id=str(row["target_country_id"]),
+                    cell_name="Government Intelligence Cell",
+                )
+                for row in creation_targets.to_dicts()
+            )
 
         if not candidates:
             return empty_candidates(_CANDIDATE_SCHEMA)
+        candidates.sort(key=lambda row: self._tag(row.get("country_id")))
         return pl.DataFrame(candidates).lazy()
+
+    @staticmethod
+    def _active_cell_frame(cells: pl.DataFrame, scheduled_ids: list[str]) -> pl.DataFrame:
+        columns = set(cells.columns)
+        if not {"id", "country_id"}.issubset(columns):
+            return pl.DataFrame(schema={"cell_id": pl.Utf8, "country_id": pl.Utf8})
+        expressions = [
+            pl.col("id").cast(pl.Utf8).alias("cell_id"),
+            pl.col("country_id").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_uppercase().alias("country_id"),
+            (pl.col("status").cast(pl.Utf8).fill_null("") if "status" in columns else pl.lit("")).alias("status"),
+            (pl.col("skill_level").cast(pl.Utf8).fill_null("Recruit") if "skill_level" in columns else pl.lit("Recruit")).alias("skill_level"),
+            (pl.col("target_country_id").cast(pl.Utf8).fill_null("").str.to_uppercase() if "target_country_id" in columns else pl.lit("")).alias("target_country_id"),
+            (pl.col("location_country_id").cast(pl.Utf8).fill_null("").str.to_uppercase() if "location_country_id" in columns else pl.lit("")).alias("location_country_id"),
+            (pl.col("communications_ready").cast(pl.Boolean, strict=False).fill_null(False) if "communications_ready" in columns else pl.lit(True)).alias("communications_ready"),
+            (pl.col("assignment").cast(pl.Utf8).fill_null("unassigned") if "assignment" in columns else pl.lit("unassigned")).alias("assignment"),
+        ]
+        return (
+            cells.select(expressions)
+            .filter(
+                pl.col("country_id").is_in(scheduled_ids)
+                & ~pl.col("status").str.to_lowercase().is_in(["retired", "lost", "captured"])
+            )
+            .sort(["country_id", "cell_id"])
+        )
+
+    @staticmethod
+    def _active_mission_frame(missions: pl.DataFrame) -> pl.DataFrame:
+        if not {"cell_id", "status"}.issubset(missions.columns):
+            return pl.DataFrame(schema={"active_cell_id": pl.Utf8})
+        return (
+            missions.filter(pl.col("status").cast(pl.Utf8).fill_null("").str.to_lowercase().is_in(list(_ACTIVE_MISSION_STATES)))
+            .select(pl.col("cell_id").cast(pl.Utf8).alias("active_cell_id"))
+            .unique()
+        )
+
+    def _cell_candidates(
+        self,
+        cells: pl.DataFrame,
+        funds: pl.DataFrame,
+        training_points: float,
+        training_cost: float,
+        mission_cost: float,
+        mission_risk: float,
+    ) -> pl.DataFrame:
+        if cells.is_empty():
+            return pl.DataFrame(schema={"country_id": pl.Utf8, "cell_id": pl.Utf8, "action_kind": pl.Utf8, "reason_code": pl.Utf8, "utility": pl.Float64, "target_country_id": pl.Utf8, "training_points": pl.Float64, "mission_type": pl.Utf8})
+        skill_rows = cells.select("skill_level").unique().to_series().to_list()
+        mission_skills = [
+            str(skill)
+            for skill in skill_rows
+            if skill != "Recruit" and skill_profile(str(skill)).max_mission_risk >= mission_risk
+        ]
+        eligible = (
+            cells.join(funds, on="country_id", how="inner")
+            .filter(pl.col("status").str.to_lowercase().is_in(["active", "idle"]))
+            .with_columns(
+                pl.when(pl.col("skill_level") == "Recruit")
+                .then(pl.lit("train_cell"))
+                .otherwise(pl.lit("start_mission"))
+                .alias("action_kind"),
+                pl.when(pl.col("skill_level") == "Recruit")
+                .then(pl.lit("prepare_cell"))
+                .otherwise(pl.lit("collect_bounded_intelligence"))
+                .alias("reason_code"),
+                pl.when(pl.col("skill_level") == "Recruit")
+                .then(pl.lit(0.7))
+                .otherwise(pl.lit(0.65))
+                .alias("utility"),
+            )
+            .filter(
+                ((pl.col("action_kind") == "train_cell") & (pl.col("funds") >= training_cost))
+                | (
+                    (pl.col("action_kind") == "start_mission")
+                    & pl.col("skill_level").is_in(mission_skills)
+                    & (pl.col("funds") >= mission_cost)
+                    & (pl.col("target_country_id") != "")
+                    & (pl.col("location_country_id").str.to_uppercase() == pl.col("target_country_id").str.to_uppercase())
+                    & pl.col("communications_ready")
+                    & pl.col("assignment").is_in(["unassigned", "espionage"])
+                )
+            )
+            .sort(["country_id", "cell_id"])
+            .unique(subset="country_id", keep="first", maintain_order=True)
+            .with_columns(
+                pl.when(pl.col("action_kind") == "train_cell")
+                .then(pl.lit(training_points))
+                .otherwise(pl.lit(0.0))
+                .alias("training_points"),
+                pl.when(pl.col("action_kind") == "start_mission")
+                .then(pl.lit(_MISSION_TYPE))
+                .otherwise(pl.lit(""))
+                .alias("mission_type"),
+            )
+        )
+        return eligible.select(
+            "country_id", "cell_id", "action_kind", "reason_code", "utility",
+            "target_country_id", "training_points", "mission_type",
+        )
+
+    def _creation_targets(
+        self,
+        owners: pl.DataFrame,
+        countries: pl.DataFrame,
+        owned_regions: pl.DataFrame,
+        allied_pairs: set[tuple[str, str]],
+        relation_by_pair: Mapping[tuple[str, str], list[float]],
+    ) -> pl.DataFrame:
+        country_ids = (
+            countries.select(pl.col("id").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_uppercase().alias("target_country_id"))
+            .join(owned_regions.rename({"country_id": "target_country_id"}), on="target_country_id", how="inner")
+            .filter(pl.col("target_country_id") != "")
+            .unique()
+        )
+        pairs = owners.join(country_ids, how="cross").filter(
+            pl.col("country_id") != pl.col("target_country_id")
+        )
+        if allied_pairs:
+            allied_frame = pl.DataFrame(
+                sorted(allied_pairs),
+                schema={"country_id": pl.Utf8, "target_country_id": pl.Utf8},
+                orient="row",
+            )
+            pairs = pairs.join(allied_frame, on=["country_id", "target_country_id"], how="anti")
+        pairs = pairs.with_columns(pl.lit(0.0).alias("relation"))
+        relation_rows = [
+            {"country_id": source, "target_country_id": target, "relation": value}
+            for (source, target), values in relation_by_pair.items()
+            for value in values
+        ]
+        relation_rows.extend(
+            {"country_id": target, "target_country_id": source, "relation": value}
+            for (source, target), values in relation_by_pair.items()
+            for value in values
+        )
+        if relation_rows:
+            relation_scores = (
+                pl.DataFrame(relation_rows)
+                .group_by(["country_id", "target_country_id"])
+                .agg(pl.col("relation").mean())
+            )
+            pairs = pairs.drop("relation").join(
+                relation_scores,
+                on=["country_id", "target_country_id"],
+                how="left",
+            ).with_columns(pl.col("relation").fill_null(0.0))
+        return (
+            pairs.sort(["country_id", "relation", "target_country_id"], maintain_order=True)
+            .unique(subset="country_id", keep="first", maintain_order=True)
+            .select("country_id", "target_country_id")
+        )
+
+    @staticmethod
+    def _allied_pairs_from_frame(treaties: pl.DataFrame) -> set[tuple[str, str]]:
+        required = {"status", "treaty_type", "members"}
+        if not required.issubset(treaties.columns):
+            return set()
+        status = pl.col("status").cast(pl.Utf8).fill_null("").str.to_lowercase()
+        alliances = treaties.filter(
+            status.is_in(["", "active"])
+            & (pl.col("treaty_type").cast(pl.Utf8).fill_null("").str.to_lowercase() == "alliance")
+        ).select("members").to_dicts()
+        return CovertOperationsPolicy._allied_pairs(
+            [{"status": "active", "treaty_type": "alliance", "members": row["members"]} for row in alliances]
+        )
 
     def resolve_action(self, row: Mapping[str, Any]) -> GameAction | None:
         owner = str(row.get("country_id") or "")
@@ -184,19 +391,34 @@ class CovertOperationsPolicy:
             )
         return None
 
+    def _index_relations(
+        self, relations: list[dict[str, Any]] | pl.DataFrame
+    ) -> dict[tuple[str, str], list[float]]:
+        relation_by_pair: dict[tuple[str, str], list[float]] = {}
+        if isinstance(relations, pl.DataFrame):
+            required = {"source", "target", "value"}
+            if not required.issubset(relations.columns):
+                return relation_by_pair
+            rows = relations.select("source", "target", "value").iter_rows(named=False)
+        else:
+            rows = (
+                (row.get("source"), row.get("target"), row.get("value"))
+                for row in relations
+            )
+        for source, target, value in rows:
+            left, right = self._tag(source), self._tag(target)
+            if left and right:
+                relation_by_pair.setdefault((left, right), []).append(self._finite(value))
+        return relation_by_pair
+
     def _choose_target(
         self,
         owner: str,
         countries: list[dict[str, Any]],
-        relations: list[dict[str, Any]],
+        relation_by_pair: Mapping[tuple[str, str], list[float]],
         allied_pairs: set[tuple[str, str]],
         owned_regions: set[str],
     ) -> str:
-        relation_by_pair: dict[tuple[str, str], list[float]] = {}
-        for row in relations:
-            left, right = self._tag(row.get("source")), self._tag(row.get("target"))
-            if left and right:
-                relation_by_pair.setdefault((left, right), []).append(self._finite(row.get("value")))
         eligible = []
         for country in countries:
             target = self._tag(country.get("id"))

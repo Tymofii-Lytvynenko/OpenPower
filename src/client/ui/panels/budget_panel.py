@@ -1,7 +1,8 @@
 import math
 
 import polars as pl
-from imgui_bundle import imgui, icons_fontawesome_6
+from imgui_bundle import icons_fontawesome_6
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.primitives import UIPrimitives as Prims
@@ -85,7 +86,15 @@ class BudgetPanel:
 
         flags = imgui.WindowFlags_.menu_bar
         
-        with WindowManager.window("BUDGET MENU", x=300, y=100, w=480, h=780, flags=flags) as is_open:
+        with WindowManager.window(
+            "BUDGET MENU",
+            x=300,
+            y=100,
+            w=480,
+            h=780,
+            flags=flags,
+            test_id="budget.panel",
+        ) as is_open:
             has_changes = self.draft_allocations != self.allocations
 
             # 1. Capture close signal
@@ -109,7 +118,11 @@ class BudgetPanel:
                     imgui.push_style_color(imgui.Col_.text, GAMETHEME.colors.text_dim)
                     imgui.push_style_color(imgui.Col_.button, (0, 0, 0, 0))
 
-                if imgui.button("apply"):
+                if Prims.button(
+                    "apply",
+                    test_id="budget.apply",
+                    enabled=has_changes and is_own,
+                ):
                     if net_client and is_own:
                         self._dispatch_budget_update(net_client, target_tag)
 
@@ -156,7 +169,11 @@ class BudgetPanel:
             imgui.text("Do you want to discard them and close?")
             imgui.dummy((0, 15))
             
-            if imgui.button("Discard & Close", (140, 30)):
+            if Prims.button(
+                "Discard & Close",
+                test_id="budget.close.discard",
+                size=(140, 30),
+            ):
                 self.draft_allocations = self.allocations.copy()
                 self.show_close_confirm = False
                 imgui.close_current_popup()
@@ -165,7 +182,7 @@ class BudgetPanel:
                 
             imgui.same_line()
             
-            if imgui.button("Cancel", (100, 30)):
+            if Prims.button("Cancel", test_id="budget.close.cancel", size=(100, 30)):
                 self.show_close_confirm = False
                 imgui.close_current_popup()
                 
@@ -292,7 +309,7 @@ class BudgetPanel:
             imgui.push_style_var(imgui.StyleVar_.frame_padding, (6, 1))
             imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.bg_input)
             popup_id = f"Budget details##{detail_key}"
-            if imgui.button(f"more##{detail_key}"):
+            if Prims.button("more", test_id=f"budget.details.{detail_key}"):
                 imgui.open_popup(popup_id)
             imgui.pop_style_color()
             imgui.pop_style_var()
@@ -336,7 +353,12 @@ class BudgetPanel:
         
         if not is_own: imgui.begin_disabled()
         
-        imgui.invisible_button(f"##drag_{col}", (slider_w, slider_h))
+        Prims.invisible_button(
+            (slider_w, slider_h),
+            test_id=f"budget.allocation.{col}",
+            label=f"{label} allocation slider",
+            enabled=is_own,
+        )
         if imgui.is_item_active():
             mouse_x = imgui.get_io().mouse_pos.x
             new_pct = max(0.0, min((mouse_x - p.x) / slider_w, 1.0))
@@ -375,8 +397,14 @@ class BudgetPanel:
         imgui.set_next_item_width(220)
         if not is_own:
             imgui.begin_disabled()
-        changed, percentage = imgui.slider_float(
-            "PERSONAL INCOME TAX RATE", current * 100.0, 0.0, 100.0, "%.0f%%"
+        changed, percentage = Prims.slider_float(
+            "PERSONAL INCOME TAX RATE",
+            current * 100.0,
+            0.0,
+            100.0,
+            "%.0f%%",
+            test_id="budget.income_tax_rate",
+            enabled=is_own,
         )
         if not is_own:
             imgui.end_disabled()

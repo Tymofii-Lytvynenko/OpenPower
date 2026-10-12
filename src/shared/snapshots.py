@@ -13,7 +13,7 @@ from src.shared.events import JournalState
 from src.shared.state import GameState, TimeData
 
 
-SNAPSHOT_PROTOCOL_VERSION = 2
+SNAPSHOT_PROTOCOL_VERSION = 3
 
 
 class SnapshotProtocolError(RuntimeError):
@@ -26,6 +26,7 @@ class _SnapshotDescriptor:
     table_names: frozenset[str]
     domain_event_count: int
     command_result_count: int
+    history_snapshots: pl.DataFrame | None
 
 
 def _serialize_frame(frame: pl.DataFrame) -> bytes:
@@ -66,6 +67,7 @@ class StateSnapshotEncoder:
             table_names=frozenset(state.tables),
             domain_event_count=len(state.journal.domain_events),
             command_result_count=len(state.journal.command_results),
+            history_snapshots=state.tables.get("history_snapshots"),
         )
         is_full = force_full or self._base is None
         if is_full:
@@ -83,6 +85,19 @@ class StateSnapshotEncoder:
             removed_tables = sorted(self._base.table_names - state.tables.keys())
             base_sequence = self.base_sequence
 
+        appended_tables: dict[str, Any] = {}
+        if not is_full and "history_snapshots" in table_names:
+            previous = self._base.history_snapshots
+            current = state.tables["history_snapshots"]
+            # History grows rapidly during play. Send only its append tail when
+            # compaction has not rewritten the acknowledged prefix.
+            if previous is not None and current.height >= previous.height and current.head(previous.height).equals(previous):
+                appended_tables["history_snapshots"] = {
+                    "offset": previous.height,
+                    "data": _serialize_frame(current.slice(previous.height)),
+                }
+                table_names.remove("history_snapshots")
+
         packet: dict[str, Any] = {
             "protocol_version": SNAPSHOT_PROTOCOL_VERSION,
             "kind": "full" if is_full else "delta",
@@ -93,6 +108,7 @@ class StateSnapshotEncoder:
                 for name in table_names
             },
             "removed_tables": removed_tables,
+            "appended_tables": appended_tables,
             "table_revisions": dict(state.table_revisions),
             "time": dataclasses.asdict(state.time),
             "globals": copy.deepcopy(state.globals),
@@ -160,11 +176,29 @@ class StateSnapshotDecoder:
                     f"Snapshot delta requires sequence {base_sequence}, "
                     f"client has {self.sequence}."
                 )
-            state = self.state
+            # Published snapshots may still be rendered while the next delta is decoded.
+            # Share immutable frames, but keep mutable containers owned by each snapshot.
+            state = GameState(
+                tables=dict(self.state.tables),
+                journal=JournalState(
+                    domain_events=list(self.state.journal.domain_events),
+                    command_results=list(self.state.journal.command_results),
+                ),
+            )
             for name, payload in packet["tables"].items():
                 state.tables[name] = _deserialize_frame(payload)
             for name in packet.get("removed_tables", []):
                 state.tables.pop(name, None)
+            for name, append in packet.get("appended_tables", {}).items():
+                existing = state.tables.get(name)
+                offset = int(append["offset"])
+                if existing is None or existing.height < offset:
+                    raise SnapshotProtocolError(f"Missing append prefix for table '{name}'.")
+                tail = _deserialize_frame(append["data"])
+                # Several deltas may share an acknowledgement base; overlap was
+                # already received and must not duplicate historical samples.
+                unseen = tail.slice(existing.height - offset)
+                state.tables[name] = pl.concat([existing, unseen], rechunk=False)
             state.time = TimeData(**packet["time"])
             state.globals = copy.deepcopy(packet["globals"])
             state.system_state = copy.deepcopy(packet.get("system_state", {}))
@@ -183,6 +217,7 @@ class StateSnapshotDecoder:
         else:
             raise SnapshotProtocolError(f"Unknown snapshot kind '{kind}'.")
 
+        self.state = state
         assert self.state is not None
         self.state._table_revisions = dict(packet.get("table_revisions", {}))
         self.sequence = int(packet["sequence"])

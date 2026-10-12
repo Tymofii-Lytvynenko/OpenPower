@@ -40,6 +40,14 @@
 - [ ] T012 Verify slider responsiveness at 60+ FPS and resource chart rendering in a live desktop session; record environment and results.
 - [ ] T013 Complete the manual checks in `quickstart.md` and update this task list with evidence.
 
+## Phase 6: Developer UI verification tooling
+
+- [X] T014 Add opt-in ImGui/ImPlot telemetry with stable semantic IDs, widget/region state, geometry, and source metadata in `src/client/ui/core/testability.py`, `instrumented_imgui.py`, and `instrumented_implot.py`.
+- [X] T015 Add a surface catalog, deterministic fixtures, journey runner, assertion driver, screenshots, and visual comparison under `src/client/ui/testing/`; add representative gameplay journeys under `tests/ui/`.
+- [X] T016 Add layout diagnostics for dimensions, bounds, duplicate IDs, clipping, and overlap in `src/client/ui/testing/layout_checks.py`.
+- [X] T017 Add the explicitly enabled live input bridge and hidden-window smoke verification in `src/client/ui/testing/live_bridge.py`, `live_smoke.py`, `tests/test_ui_testability.py`, and the recorded live-smoke evidence in `docs/PLAYTEST_REPORT.md`.
+- [X] T018 Document CLI operation, fixtures, semantic selectors, output artifacts, and the difference between recording-client dispatch checks and server/live acceptance in `docs/UI_TESTING.md`.
+
 ## Dependencies and execution order
 
 - Phases 1–4 are implemented independently over existing contracts; they were validated together because the resource chart and ImPlot lifecycle share the client frame service.

@@ -7,7 +7,7 @@ from typing import Any, Iterable, Optional
 
 import arcade
 from PIL import Image, ImageOps
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.core.paths import ProjectPaths
 

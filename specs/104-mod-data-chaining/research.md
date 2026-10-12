@@ -10,6 +10,10 @@ Assets continue to resolve from highest-priority active mod to the base fallback
 
 ## Performance gate SC-001
 
+## Layered identity profile evidence
+
+`StaticAssetLoader.load_country_identity_distribution()` reads the language and religion profile files through the active module chain, drops rows for countries not in the loaded world, rejects invalid/non-positive shares, and normalizes each accepted profile. A valid nonempty profile in a later layer replaces the earlier profile for the same country and identity dimension. The production `DataLoader` loads this table before schema initialization and bootstrap seeding. `tests/test_data_loader_mod_layering.py` covers layered replacement, normalized shares, and the unknown-year marker. Keyed extension tests also assert repeated keys collapse rather than multiply a region record.
+
 `tests/test_mod_data_chaining_performance.py` creates a deterministic 25-mod dependency chain. Each layer contributes records to the same world table; the scenario measures dependency resolution and Polars table merging after one warm-up, then checks load order, appended records, and highest-priority override behavior.
 
 | Samples (ms) | Median | Gate |

@@ -40,13 +40,38 @@ class StrategicWarfarePolicy:
         if doctrine != "retaliatory":
             return empty_candidates(_CANDIDATE_SCHEMA)
 
-        scheduled = country_frame(context, self.cadence_days).collect().to_dicts()
+        scheduled_frame = country_frame(context, self.cadence_days).select("country_id").collect()
+        if scheduled_frame.is_empty():
+            return empty_candidates(_CANDIDATE_SCHEMA)
         countries_table = context.table("countries")
         regions_table = context.table("regions")
         tracks_table = context.table("research_tracks")
         weapons_table = context.table("strategic_weapons")
         orders_table = context.table("strategic_launch_orders")
         if any(table is None for table in (countries_table, regions_table, tracks_table, weapons_table, orders_table)):
+            return empty_candidates(_CANDIDATE_SCHEMA)
+
+        scheduled_ids = scheduled_frame.get_column("country_id").drop_nulls().unique().to_list()
+        active_wars = active_war_pairs(context).collect()
+        if active_wars.is_empty():
+            return empty_candidates(_CANDIDATE_SCHEMA)
+        status_column = pl.col("status").cast(pl.Utf8).fill_null("").str.to_lowercase()
+        incoming_orders = orders_table.filter(
+            (status_column == "impact")
+            & pl.col("target_country_id").cast(pl.Utf8).str.to_uppercase().is_in(scheduled_ids)
+        ).select(
+            pl.col("country_id").cast(pl.Utf8).str.to_uppercase().alias("_opponent"),
+            pl.col("target_country_id").cast(pl.Utf8).str.to_uppercase().alias("_owner"),
+        )
+        active_pairs = active_wars.lazy().select(
+            pl.col("source_country").alias("_owner"),
+            pl.col("target_country").alias("_opponent"),
+        )
+        if incoming_orders.join(
+            active_pairs,
+            on=["_owner", "_opponent"],
+            how="inner",
+        ).collect().is_empty():
             return empty_candidates(_CANDIDATE_SCHEMA)
 
         countries = countries_table.collect().to_dicts()
@@ -76,7 +101,7 @@ class StrategicWarfarePolicy:
                 )
 
         opponents: dict[str, set[str]] = {}
-        for row in active_war_pairs(context).collect().to_dicts():
+        for row in active_wars.to_dicts():
             owner = self._tag(row.get("source_country"))
             opponent = self._tag(row.get("target_country"))
             if owner and opponent:
@@ -108,7 +133,7 @@ class StrategicWarfarePolicy:
         research_gate = bool(context.globals.get("strategic_research_gate_enabled", True))
         required_program_level = max(1, self._integer(context.globals.get("strategic_program_research_level", 1)))
         required_weapon_level = max(1, self._integer(context.globals.get("strategic_weapon_research_level", 1)))
-        for scheduled_country in sorted(scheduled, key=lambda row: self._tag(row.get("country_id"))):
+        for scheduled_country in scheduled_frame.sort("country_id").to_dicts():
             owner = self._tag(scheduled_country.get("country_id"))
             if not owner or owner not in country_by_id:
                 continue

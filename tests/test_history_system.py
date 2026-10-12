@@ -100,6 +100,57 @@ def test_history_records_authoritative_and_derived_metrics_without_changing_sour
     }
 
 
+def test_generic_history_measurements_preserve_aggregations_filters_and_relationships() -> None:
+    state = _state()
+    state.tables["measurement_fixture"] = pl.DataFrame({
+        "subject": ["USA", "USA", "USA", "CAN", "USA"],
+        "related": ["CAN", "CAN", "CAN", "MEX", "MEX"],
+        "value": [1.5, 3.5, None, 5.0, 100.0],
+        "include": ["yes", "yes", "yes", "yes", "no"],
+    })
+    definition = {
+        "source_table": "measurement_fixture",
+        "source_field": "value",
+        "subject_id_field": "subject",
+        "related_id_field": "related",
+        "filter_field": "include",
+        "filter_value": "yes",
+        "subject_type": "country",
+    }
+    expected = {
+        "sum": {"USA": 5.0, "CAN": 5.0},
+        "mean": {"USA": 2.5, "CAN": 5.0},
+        "max": {"USA": 3.5, "CAN": 5.0},
+        "last": {"USA": 3.5, "CAN": 5.0},
+        "count": {"USA": 3.0, "CAN": 1.0},
+    }
+
+    system = HistorySystem()
+    for aggregation, values_expected in expected.items():
+        values, _ = system._measure_definition(state, {**definition, "aggregation": aggregation})
+        assert values == values_expected
+
+    relationship_values, _ = system._measure_definition(
+        state,
+        {**definition, "aggregation": "sum", "subject_type": "relationship"},
+    )
+    assert relationship_values == {"CAN|USA": 5.0, "CAN|MEX": 5.0}
+
+
+def test_observation_defaults_are_built_once_and_compaction_waits_for_thresholds() -> None:
+    state = _state()
+    original_defaults = HistorySystem._row_defaults
+    with (
+        patch.object(HistorySystem, "_row_defaults", side_effect=original_defaults) as defaults,
+        patch.object(HistorySystem, "_compact_group", side_effect=AssertionError("compaction is not due")),
+    ):
+        HistorySystem().update(state, 0.0)
+        tables = [call.args[1] for call in defaults.call_args_list]
+        assert tables.count("history_snapshots") == 1
+        assert tables.count("history_series_state") == 1
+        assert state.tables["history_snapshots"].height > 20
+
+
 def test_history_aggregates_units_by_the_production_owner_field() -> None:
     state = _state()
     state.tables["units"] = pl.DataFrame({

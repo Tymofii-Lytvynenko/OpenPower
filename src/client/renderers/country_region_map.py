@@ -7,7 +7,7 @@ from typing import Any, Iterable, Optional
 
 import arcade
 import numpy as np
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 from PIL import Image
 
 from src.core.map_data import RegionMapData

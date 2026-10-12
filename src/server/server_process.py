@@ -80,9 +80,19 @@ def run_server_process(
 
         steps = clock.consume(elapsed)
         for fixed_delta in steps:
+            # A catch-up batch can contain expensive world updates. Consume
+            # controls between steps so pause and orders do not wait for all five.
+            for incoming in _drain_queue(action_queue):
+                if incoming == "SHUTDOWN":
+                    return
+                if isinstance(incoming, CommandEnvelope):
+                    session.receive_command(incoming)
+                elif incoming == "SAVE_MAP_CHANGES":
+                    session.save_map_changes()
+            if snapshot_ack_queue is not None:
+                for acknowledged_sequence in _drain_queue(snapshot_ack_queue):
+                    snapshots.acknowledge(int(acknowledged_sequence))
             session.tick(fixed_delta)
-
-        if steps:
             packet = snapshots.encode(session.state)
             try:
                 state_queue.put_nowait(packet)

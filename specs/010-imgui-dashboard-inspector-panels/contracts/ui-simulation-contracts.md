@@ -21,3 +21,13 @@
 - The engine simulation-step tick is not a calendar source.
 - Metric null/invalid fallbacks are `50.0`, `0.5`, `0.1`, and `50.0` for approval, HDI, corruption, and stability respectively.
 - Existing rights, stability, economic, migration, event, and war-exhaustion mechanics remain in force around the new baseline.
+
+## Developer UI test contracts
+
+- `UIRunTelemetry.frame()` is opt-in and scopes widget/region recording to one rendered frame. Outside that context, the instrumented ImGui/ImPlot facades preserve native calls.
+- A widget exposes semantic ID, native ID, type/label/value/options, visibility/enabled state, logical rectangle, parent region, and source location. Explicit IDs are recommended for repeated rows and controls that must remain addressable across source edits.
+- Journey selectors match exact IDs or declared label/type/source/region criteria. Multiple matches are an error. Journey assertions may check visibility, enabled/value/geometry and action type/count/fields.
+- Deterministic journey runs use supplied tables/globals, in-memory settings, and a recording client. They verify rendered controls and dispatched commands only; server resolution, campaign state, and OpenGL performance require separate evidence.
+- Geometry diagnostics fail on invalid/non-positive rectangles, off-screen windows, and duplicate native IDs; clipping and sibling overlap are warnings because scroll regions and overlays may be intentional.
+- The live bridge is disabled by default. When explicitly enabled, it accepts local commands only for visible, enabled interactive controls, deduplicates unique request IDs, and reports delivered versus interrupted input.
+- Test outputs are local artifacts: `report.json`, `actual.png`, optional `overlay.png`/`diff.png`, and `receipts.json`. Baselines are never updated automatically. Full operator instructions are in `docs/UI_TESTING.md`.

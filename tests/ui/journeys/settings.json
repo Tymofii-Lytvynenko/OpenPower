@@ -1,0 +1,10 @@
+{
+  "steps": [
+    {"op": "check", "target": {"label": "Reduce motion", "type": "checkbox"}, "value": true},
+    {"op": "assert", "target": {"label": "Reduce motion", "type": "checkbox"}, "value": true},
+    {"op": "input", "target": {"label": "Windowed resolution", "type": "input_int2"}, "value": [1600, 900]},
+    {"op": "assert", "target": {"label": "Windowed resolution", "type": "input_int2"}, "value": [1600, 900]},
+    {"op": "select", "target": {"label": "Fullscreen mode", "type": "combo"}, "value": 1},
+    {"op": "assert", "target": {"label": "Fullscreen mode", "type": "combo"}, "value": 1}
+  ]
+}

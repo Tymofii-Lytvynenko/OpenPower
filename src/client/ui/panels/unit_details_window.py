@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 import polars as pl
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.theme import GAMETHEME
@@ -77,19 +77,21 @@ class UnitDetailsPresenter:
         )
         remaining_minutes = max(0, eta_minute - int(state.time.total_minutes)) if transition_id else 0
         remaining_label = self._format_remaining(remaining_minutes) if transition_id else ""
-        quantity = max(1, int(unit.get("strength", 1) or 1))
+        personnel = max(0, int(unit.get("strength", 0) or 0))
+        quantity = max(0, int(unit.get("equipment_quantity", personnel) or 0))
+        unit_type = self._humanize_unit_type(str(unit.get("unit_type", "Infantry") or "Infantry"))
 
         entry = UnitRosterEntry(
-            troop_type="Infantry",
+            troop_type=unit_type,
             quantity=quantity,
-            name=f"{owner_name} personnel",
+            name=f"{owner_name} unit · {personnel:,} personnel".replace(",", " "),
             location=location_name,
             status=status,
         )
         return UnitDetailsViewModel(
             unit_id=unit_id,
             owner_name=owner_name,
-            unit_label=f"{owner_name} field unit",
+            unit_label=f"{owner_name} {unit_type}",
             entries=(entry,),
             readiness_status=readiness,
             readiness_target=target_machine.title(),
@@ -98,6 +100,9 @@ class UnitDetailsPresenter:
             readiness_remaining_minutes=remaining_minutes,
             readiness_remaining_label=remaining_label,
         )
+
+    def _humanize_unit_type(self, unit_type: str) -> str:
+        return " ".join(part.capitalize() for part in unit_type.replace("-", "_").split("_"))
 
     def _readiness_transition(self, state: "GameState", unit_id: str, transition_id: str) -> dict:
         transitions = state.tables.get("unit_readiness_transitions")
@@ -183,8 +188,6 @@ class UnitDetailsWindow:
 
             self._render_header(model)
             self._render_roster_table(model)
-            imgui.dummy((0.0, 12.0))
-            imgui.text_disabled("Only infantry is available for now.")
 
     def _render_header(self, model: UnitDetailsViewModel) -> None:
         imgui.text_disabled("UNIT TYPE")

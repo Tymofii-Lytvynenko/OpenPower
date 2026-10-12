@@ -5,7 +5,7 @@ from src.client.services.network_client_service import NetworkClient
 from src.client.ui.panels.region_inspector import RegionInspectorPanel
 from src.client.ui.core.composer import UIComposer
 from src.client.ui.core.theme import GAMETHEME
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 class BaseLayout:
     """
@@ -21,7 +21,7 @@ class BaseLayout:
         # State for the Right-Click Context Menu.
         self._menu_target_id: Optional[int] = None
         
-        # --- FIX: Додаємо прапорець для відкладеного відкриття ---
+        # Defer popup creation because input callbacks can run outside an ImGui frame.
         self._queued_popup_open: bool = False
         
         self.register_panel("INSPECTOR", RegionInspectorPanel(), visible=False)
@@ -41,7 +41,7 @@ class BaseLayout:
         This prevents crashing when called from an Input Event outside the render loop.
         """
         self._menu_target_id = region_id
-        # Замість прямого виклику open_popup, ми просимо зробити це на наступному кадрі
+        # Queue the request so open_popup runs inside the next render frame.
         self._queued_popup_open = True 
 
     def _render_fps_counter(self, fps: float):
@@ -78,11 +78,10 @@ class BaseLayout:
         Draws the popup content. 
         Also handles the queued 'open' command safely inside the render loop.
         """
-        # --- FIX: Обробляємо чергу тут, всередині ImGui Frame ---
+        # Process the queued request here, where an ImGui frame is active.
         if self._queued_popup_open:
             self.composer.open_popup("global_map_context")
             self._queued_popup_open = False
-        # -------------------------------------------------------
 
         if self.composer.begin_popup("global_map_context"):
             target_id = self._menu_target_id

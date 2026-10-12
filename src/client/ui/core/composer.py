@@ -1,7 +1,7 @@
 import arcade
 import ctypes  # Required for raw pointer handling in ImGui
 from typing import Optional
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.theme import UITheme
 from src.client.services.imgui_service import ImGuiService
 

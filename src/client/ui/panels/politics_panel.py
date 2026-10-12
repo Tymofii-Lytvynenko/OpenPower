@@ -1,4 +1,4 @@
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.primitives import UIPrimitives as Prims

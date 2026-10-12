@@ -136,7 +136,10 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             id="INTERNAL_LAWS",
             title="Internal Laws",
             category="politics",
-            factory=InternalLawsPanel,
+            factory=lambda: InternalLawsPanel(
+                open_politics_cb=lambda: open_panel("POLITICAL_OVERVIEW"),
+                open_migration_cb=lambda: open_panel("MIGRATION"),
+            ),
             show_in_toggle_bar=False,
         ),
         PanelSpec(

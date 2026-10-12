@@ -1,6 +1,10 @@
 import rtoml
 import polars as pl
 from pathlib import Path
+import re
+import math
+import hashlib
+import unicodedata
 from typing import List, Dict, Any, Optional
 from PIL import Image
 from src.shared.config import GameConfig
@@ -44,6 +48,10 @@ class StaticAssetLoader:
         # These are the physical actors and locations in the game.
         state.update_table("regions", self._load_regions())
         state.update_table("countries", self._load_countries())
+        state.update_table(
+            "country_identity_distribution",
+            self.load_country_identity_distribution(state.get_table("countries")),
+        )
         
         # PHASE 3: Load World State (Relations)
         # These are interactions or global conditions involving entities.
@@ -130,6 +138,105 @@ class StaticAssetLoader:
             main_df = main_df.with_columns(pl.col(num_cols).fill_null(0))
 
         return main_df
+
+    def load_country_identity_distribution(self, countries: pl.DataFrame) -> pl.DataFrame:
+        """Flattens bundled country identity estimates into a normalized runtime table."""
+        schema = {
+            "country_id": pl.Utf8,
+            "identity_type": pl.Utf8,
+            "identity_id": pl.Utf8,
+            "display_name": pl.Utf8,
+            "population_share": pl.Float64,
+            "source_name": pl.Utf8,
+            "source_year": pl.Int32,
+            "source_reference": pl.Utf8,
+            "source_note": pl.Utf8,
+            "is_other_bucket": pl.Boolean,
+        }
+        if countries.is_empty() or "id" not in countries.columns:
+            return pl.DataFrame(schema=schema)
+
+        valid_countries = {
+            str(country_id or "").strip().upper()
+            for country_id in countries.get_column("id").to_list()
+        }
+        profiles: dict[tuple[str, str], tuple[dict[str, float], dict[str, str], str]] = {}
+        files = (
+            ("language", "country_languages.toml", "country_languages"),
+            ("religion", "country_religions.toml", "country_religions"),
+        )
+
+        # Later mod layers replace the complete profile for a country, matching
+        # the precedence used for the base country's static TSV data.
+        for data_dir in self.config.get_data_dirs():
+            for identity_type, filename, section_name in files:
+                file_path = data_dir / "countries" / filename
+                if not file_path.is_file():
+                    continue
+                try:
+                    with file_path.open("r", encoding="utf-8") as handle:
+                        raw_profiles = rtoml.load(handle).get(section_name, {})
+                except Exception as error:
+                    raise RuntimeError(f"Failed to parse country identity data: {file_path}") from error
+                if not isinstance(raw_profiles, dict):
+                    continue
+                for country_id, values in raw_profiles.items():
+                    country = str(country_id or "").strip().upper()
+                    if country not in valid_countries or not isinstance(values, dict):
+                        continue
+                    parsed: dict[str, float] = {}
+                    display_names: dict[str, str] = {}
+                    for display_name, raw_share in values.items():
+                        name = str(display_name or "").strip()
+                        identity_id = self._identity_slug(name)
+                        try:
+                            share = float(raw_share)
+                        except (TypeError, ValueError, OverflowError):
+                            continue
+                        if not name or not identity_id or not math.isfinite(share) or not (share > 0.0):
+                            continue
+                        parsed[identity_id] = parsed.get(identity_id, 0.0) + share
+                        display_names[identity_id] = name
+                    if parsed:
+                        profiles[(identity_type, country)] = (parsed, display_names, filename)
+
+        rows: list[dict[str, Any]] = []
+        for (identity_type, country_id), (values, display_names, filename) in sorted(profiles.items()):
+            total = sum(values.values())
+            if not math.isfinite(total) or total <= 0.0:
+                continue
+            source_note = "Bundled gameplay estimate; the original census/source year is not recorded."
+            for identity_id, value in sorted(values.items()):
+                display_name = display_names.get(identity_id, identity_id.replace("_", " ").title())
+                rows.append(
+                    {
+                        "country_id": country_id,
+                        "identity_type": identity_type,
+                        "identity_id": identity_id,
+                        "display_name": display_name,
+                        "population_share": (value / total) * 100.0,
+                        "source_name": "OpenPower bundled estimate",
+                        "source_year": 0,
+                        "source_reference": filename,
+                        "source_note": source_note,
+                        "is_other_bucket": self._is_identity_other_bucket(identity_id),
+                    }
+                )
+        return pl.DataFrame(rows, schema=schema, strict=False)
+
+    @staticmethod
+    def _identity_slug(display_name: str) -> str:
+        normalized = unicodedata.normalize("NFKD", str(display_name or ""))
+        ascii_name = normalized.encode("ascii", "ignore").decode("ascii").lower()
+        slug = re.sub(r"[^a-z0-9]+", "_", ascii_name).strip("_")
+        if slug:
+            return slug
+        # Keep non-Latin labels addressable without losing their display text.
+        return f"group_{hashlib.sha1(str(display_name).encode('utf-8')).hexdigest()[:12]}"
+
+    @staticmethod
+    def _is_identity_other_bucket(identity_id: str) -> bool:
+        return identity_id in {"other", "others", "unspecified", "unclassified"}
 
     def _read_tsv(self, path: Path) -> pl.DataFrame:
         """

@@ -110,7 +110,8 @@ class DataLoader:
         print("[DataLoader] Compiling state (Hex-Key Mode)...")
         state = GameState()
 
-        definitions = StaticAssetLoader(self.config).load_definitions()
+        static_assets = StaticAssetLoader(self.config)
+        definitions = static_assets.load_definitions()
         for table_name, definition_df in definitions.items():
             state.update_table(f"def_{table_name}", definition_df)
 
@@ -134,6 +135,12 @@ class DataLoader:
 
         countries_df = self._load_countries(regions_df)
         state.update_table("countries", countries_df if not countries_df.is_empty() else pl.DataFrame())
+        # The production loader bypasses compile_initial_state; identity data must
+        # enter this path before schema initialization and the bootstrap system.
+        state.update_table(
+            "country_identity_distribution",
+            static_assets.load_country_identity_distribution(countries_df),
+        )
 
         for table_name, world_df in self._load_world_tables().items():
             print(f"[DataLoader] Loading world table: {table_name}")
@@ -360,8 +367,9 @@ class DataLoader:
         valid_layers = [df for df in layers if not df.is_empty() and set(keys).issubset(df.columns)]
         if not valid_layers:
             return pl.DataFrame()
-        if len(valid_layers) == 1:
+        if len(valid_layers) == 1 and not valid_layers[0].select(list(keys)).is_duplicated().any():
             return valid_layers[0]
+        # Duplicate extension keys must not multiply master rows during joins.
 
         tagged_layers = [
             df.with_columns(pl.lit(priority).alias("__layer_priority"))

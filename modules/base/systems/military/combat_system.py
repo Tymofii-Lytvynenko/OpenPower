@@ -1287,6 +1287,11 @@ class CombatSystem(ISystem):
 
             applied_losses = min(strength, row_losses)
             row["strength"] = strength - applied_losses
+            equipment_quantity = max(0, int(row.get("equipment_quantity") or 0))
+            if equipment_quantity > 0:
+                row["equipment_quantity"] = int(
+                    round(equipment_quantity * row["strength"] / strength)
+                )
             remaining_losses -= applied_losses
             remaining_strength -= strength
 

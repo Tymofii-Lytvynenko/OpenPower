@@ -72,7 +72,7 @@ class NewGameTask:
 
             def update_progress(progress: float, text: str) -> None:
                 self.progress = 0.1 + progress * 0.6
-                self.status_text = f"Server: {text}"
+                self.status_text = text
 
             new_session = create_session_until_ready(
                 self.window.session_factory,
@@ -103,7 +103,9 @@ class NewGameTask:
                     country_tag=self.player_tag,
                 )
             )
-            campaign_ready_deadline = time.perf_counter() + 5.0
+            # Campaign setup follows full-world bootstrap and queued fixed steps;
+            # the initial 5-second deadline could reject a healthy busy server.
+            campaign_ready_deadline = time.perf_counter() + 60.0
             campaign_started = False
             while time.perf_counter() < campaign_ready_deadline:
                 check_cancelled(self._cancel_event)

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+import copy
+from unittest.mock import patch
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -18,6 +20,24 @@ from tests.test_regional_infrastructure_fixtures import build_infrastructure_sta
 
 
 class RegionalInfrastructureSystemTest(unittest.TestCase):
+    def test_elapsed_frame_path_matches_row_path_with_occupation_and_maintenance(self):
+        from polars.testing import assert_frame_equal
+        state = build_infrastructure_state()
+        ensure_base_tables(state)
+        state.update_table("countries", state.get_table("countries").with_columns(
+            pl.lit(0.35).alias("budget_infra_ratio"), pl.lit(0.65).alias("budget_health_ratio"),
+            pl.lit(0.2).alias("budget_telecom_ratio"),
+        ))
+        InfrastructureSystem().update(state, 0.0)
+        state.time.total_minutes = 60
+        state.update_table("occupations", pl.DataFrame({"region_id": [101], "occupation_status": ["active"]}))
+        reference = copy.deepcopy(state)
+        InfrastructureSystem().update(state, 0.1)
+        with patch.object(InfrastructureSystem, "_can_refresh_read_models_without_mutable_rows", return_value=False):
+            InfrastructureSystem().update(reference, 0.1)
+        for name in ("regional_infrastructure", "regions", "countries"):
+            assert_frame_equal(state.get_table(name), reference.get_table(name), check_exact=False, rel_tol=1e-12, abs_tol=1e-12)
+
     def test_scenario_category_is_seeded_and_survives_the_vectorized_refresh_path(self):
         state = build_infrastructure_state()
         ensure_base_tables(state)

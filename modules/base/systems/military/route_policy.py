@@ -8,7 +8,10 @@ import math
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
+import polars as pl
+
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate
+from modules.base.systems.military.route_geometry import edge_distance_index
 
 
 @dataclass(frozen=True)
@@ -22,24 +25,69 @@ class RoutePlan:
         return not self.rejection_reason and bool(self.region_ids)
 
 
+@dataclass(frozen=True)
+class RegionRouteGraph:
+    """Topology prepared for multiple searches against the same region snapshot."""
+
+    region_by_id: dict[int, dict[str, Any]]
+    adjacency: dict[int, set[int]]
+    edge_distance_km: dict[tuple[int, int], float]
+    use_cached_geographic_cost: bool
+
+
 class MilitaryRoutePlanner:
     """Finds a least-cost legal path with stable tie-breaking."""
+
+    def prepare(
+        self,
+        regions: Iterable[dict[str, Any]] | pl.DataFrame | None,
+        adjacency_rows: Iterable[dict[str, Any]] | pl.DataFrame | None,
+        *,
+        region_rows: Iterable[dict[str, Any]] | None = None,
+    ) -> RegionRouteGraph:
+        rows = region_rows
+        if rows is None:
+            rows = (
+                regions.iter_rows(named=True)
+                if isinstance(regions, pl.DataFrame)
+                else regions or ()
+            )
+        region_by_id = {
+            self._integer(row.get("id")): row
+            for row in rows
+            if self._integer(row.get("id")) > 0
+        }
+        adjacency = self._adjacency(region_by_id, adjacency_rows)
+        coordinates = regions if isinstance(regions, pl.DataFrame) else None
+        return RegionRouteGraph(
+            region_by_id,
+            adjacency,
+            edge_distance_index(coordinates, adjacency),
+            coordinates is not None
+            and {"latitude", "longitude"}.issubset(coordinates.columns),
+        )
 
     def plan(
         self,
         source_region_id: int,
         destination_region_id: int,
-        regions: Iterable[dict[str, Any]],
-        adjacency_rows: Iterable[dict[str, Any]] | None,
+        regions: Iterable[dict[str, Any]] | pl.DataFrame,
+        adjacency_rows: Iterable[dict[str, Any]] | pl.DataFrame | None,
         can_enter: Callable[[dict[str, Any], bool], bool],
         segment_cost: Callable[[dict[str, Any], dict[str, Any]], float] | None = None,
         explicit_waypoints: Iterable[int] | None = None,
+        *,
+        prepared_graph: RegionRouteGraph | None = None,
     ) -> RoutePlan:
-        region_by_id = {
-            self._integer(row.get("id")): row
-            for row in regions
-            if self._integer(row.get("id")) > 0
-        }
+        if prepared_graph is not None:
+            region_by_id = prepared_graph.region_by_id
+        else:
+            region_rows = regions.iter_rows(named=True) if isinstance(regions, pl.DataFrame) else regions
+            region_by_id = {
+                self._integer(row.get("id")): row
+                for row in region_rows
+                if self._integer(row.get("id")) > 0
+            }
         source, destination = int(source_region_id), int(destination_region_id)
         if source not in region_by_id or destination not in region_by_id:
             return RoutePlan((), 0.0, "The source or destination region is invalid.")
@@ -48,15 +96,27 @@ class MilitaryRoutePlanner:
         if not can_enter(region_by_id[destination], True):
             return RoutePlan((), 0.0, "The destination does not permit this force to station.")
 
-        graph = self._adjacency(region_by_id, adjacency_rows)
+        # Reuse topology only; access checks and costs remain specific to each
+        # order so treaty changes and unit capabilities still affect routing.
+        graph = prepared_graph.adjacency if prepared_graph is not None else self._adjacency(region_by_id, adjacency_rows)
+        if segment_cost is not None:
+            default_cost = segment_cost
+        elif (
+            prepared_graph is None
+            or not prepared_graph.use_cached_geographic_cost
+            or not prepared_graph.edge_distance_km
+        ):
+            default_cost = self._geographic_cost
+        else:
+            default_cost = lambda left, right: self._prepared_geographic_cost(
+                prepared_graph, left, right
+            )
         if explicit_waypoints is not None:
             path = (source, *(self._integer(item) for item in explicit_waypoints), destination)
-            return self._validate_explicit(path, region_by_id, graph, can_enter, segment_cost)
+            return self._validate_explicit(path, region_by_id, graph, can_enter, default_cost)
         if not graph:
             path = (source, destination)
-            return self._validate_explicit(path, region_by_id, graph, can_enter, segment_cost)
-
-        default_cost = segment_cost or self._geographic_cost
+            return self._validate_explicit(path, region_by_id, graph, can_enter, default_cost)
         first = (source,)
         queue: list[tuple[float, tuple[int, ...], int]] = [(0.0, first, source)]
         best: dict[int, tuple[float, tuple[int, ...]]] = {source: (0.0, first)}
@@ -87,7 +147,7 @@ class MilitaryRoutePlanner:
         region_by_id: dict[int, dict[str, Any]],
         graph: dict[int, set[int]],
         can_enter: Callable[[dict[str, Any], bool], bool],
-        segment_cost: Callable[[dict[str, Any], dict[str, Any]], float] | None,
+        segment_cost: Callable[[dict[str, Any], dict[str, Any]], float],
     ) -> RoutePlan:
         if any(region_id not in region_by_id for region_id in path):
             return RoutePlan((), 0.0, "The route includes an invalid region.")
@@ -98,24 +158,38 @@ class MilitaryRoutePlanner:
             if not can_enter(region_by_id[region_id], final):
                 reason = "The destination does not permit this force to station." if final else "The route crosses a region without transit rights."
                 return RoutePlan((), 0.0, reason)
-        cost_fn = segment_cost or self._geographic_cost
-        cost = sum(self._valid_cost(cost_fn(region_by_id[left], region_by_id[right])) for left, right in zip(path, path[1:]))
+        cost = sum(
+            self._valid_cost(segment_cost(region_by_id[left], region_by_id[right]))
+            for left, right in zip(path, path[1:])
+        )
         return RoutePlan(path, cost)
 
     def _adjacency(
         self,
         region_by_id: dict[int, dict[str, Any]],
-        adjacency_rows: Iterable[dict[str, Any]] | None,
+        adjacency_rows: Iterable[dict[str, Any]] | pl.DataFrame | None,
     ) -> dict[int, set[int]]:
         graph: dict[int, set[int]] = {region_id: set() for region_id in region_by_id}
         has_edges = False
-        for row in adjacency_rows or ():
-            left = self._integer(row.get("region_id"))
-            right = self._integer(row.get("neighbor_region_id"))
+
+        def add_edge(left_value: Any, right_value: Any) -> None:
+            nonlocal has_edges
+            left = self._integer(left_value)
+            right = self._integer(right_value)
             if left in graph and right in graph and left != right:
                 graph[left].add(right)
                 graph[right].add(left)
                 has_edges = True
+
+        if isinstance(adjacency_rows, pl.DataFrame):
+            if {"region_id", "neighbor_region_id"}.issubset(adjacency_rows.columns):
+                for left, right in adjacency_rows.select(
+                    ["region_id", "neighbor_region_id"]
+                ).iter_rows():
+                    add_edge(left, right)
+        else:
+            for row in adjacency_rows or ():
+                add_edge(row.get("region_id"), row.get("neighbor_region_id"))
         for region_id, row in region_by_id.items():
             for neighbor in self._ids(row.get("adjacent_region_ids")):
                 if neighbor in graph and neighbor != region_id:
@@ -123,6 +197,20 @@ class MilitaryRoutePlanner:
                     graph[neighbor].add(region_id)
                     has_edges = True
         return graph if has_edges else {}
+
+    def _edge_key(self, left: dict[str, Any], right: dict[str, Any]) -> tuple[int, int]:
+        left_id = self._integer(left.get("id"))
+        right_id = self._integer(right.get("id"))
+        return (left_id, right_id) if left_id < right_id else (right_id, left_id)
+
+    def _prepared_geographic_cost(
+        self,
+        graph: RegionRouteGraph,
+        left: dict[str, Any],
+        right: dict[str, Any],
+    ) -> float:
+        distance = graph.edge_distance_km.get(self._edge_key(left, right))
+        return self._geographic_cost(left, right) if distance is None else distance
 
     def _geographic_cost(self, left: dict[str, Any], right: dict[str, Any]) -> float:
         if all(key in left and key in right for key in ("latitude", "longitude")):

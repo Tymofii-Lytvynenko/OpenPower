@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Optional
 
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.ui.core.composer import UIComposer
 

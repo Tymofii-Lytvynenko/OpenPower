@@ -50,7 +50,7 @@
 
 ## Decision: Incremental and vectorized updates
 
-**Decision**: Skip project, damage, and depreciation work when those inputs are not due; apply event damage only to affected categories; project broad profile and aggregate outputs with Polars, then write only rows whose materialized values changed.
+**Decision**: Skip project, damage, and depreciation work when those inputs are not due; apply event damage only to affected categories; project broad profile and aggregate outputs with Polars, then write only rows whose materialized values changed. When there are no active projects or damage events, the equivalent depreciation refresh uses column expressions; the mutable row path remains for active records.
 
 **Rationale**: The 100,000-category-record success criterion requires bounded work; Python pairwise region scans are not acceptable. The controlled benchmark confirms the incremental materialized-output path updates 1,000 changed profiles and 250 affected regional read models within the one-second limit.
 

@@ -12,7 +12,7 @@ Validate and order active module dependencies before runtime contributions or wo
 
 **Primary Dependencies**: Polars 1.36.1, rtoml, pytest; existing module API and schema/migration registries.
 
-**Storage**: `mods.json`, per-module `mod.toml`, layered `modules/<id>/data`, and `modules/<id>/assets`.
+**Storage**: `mods.json`, per-module `mod.toml`, layered `modules/<id>/data` (including `countries/country_languages.toml` and `countries/country_religions.toml`), and `modules/<id>/assets`.
 
 **Testing**: pytest unit/integration tests; opt-in deterministic 25-mod startup/merge benchmark.
 
@@ -24,7 +24,7 @@ Validate and order active module dependencies before runtime contributions or wo
 
 **Constraints**: Resolve prerequisites and compatibility before state allocation; child layers must preserve unrelated rows and fields; retain current schemas, module API, asset fallback, localization override, and system-registration behavior.
 
-**Scale/Scope**: Up to 25 active mods for the measured startup gate; dependency chains of 10+ layers; table overlays include region/country records and keyed world relations.
+**Scale/Scope**: Up to 25 active mods for the measured startup gate; dependency chains of 10+ layers; table overlays include region/country records, keyed world relations, and per-country language/religion profiles.
 
 ## Constitution Check
 
@@ -40,7 +40,7 @@ The current architecture remains the source of truth:
 - `src/shared/mods.py`: manifest model, discovery, compatibility validation, deterministic dependency ordering.
 - `src/shared/config.py`: active-chain paths, asset precedence, and base-to-child localization merge.
 - `src/engine/mod_manager.py`: compatibility/API validation and ordered runtime contribution composition.
-- `src/server/io/data_load_manager.py`, `src/server/io/static_loader.py`: non-destructive keyed table overlays and static definitions/world ingestion.
+- `src/server/io/data_load_manager.py`, `src/server/io/static_loader.py`: non-destructive keyed table overlays, static definitions/world ingestion, and layered country identity profiles.
 - `tests/test_mod_manager.py`, `tests/test_game_config.py`, `tests/test_data_loader_mod_layering.py`, `tests/test_mod_data_chaining_performance.py`: focused acceptance coverage.
 
 **Structure Decision**: Extend these existing components and their tests. Do not add a parallel mod registry, duplicate manifest parser, or client-side simulation authority.

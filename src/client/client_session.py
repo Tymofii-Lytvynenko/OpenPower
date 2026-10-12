@@ -2,7 +2,6 @@
 
 import multiprocessing as mp
 from collections import defaultdict
-from queue import Empty, Full
 from typing import Optional
 
 from src.core.map_data import RegionMapData
@@ -10,7 +9,7 @@ from src.client.services.client_game_clock import ClientGameClock
 from src.shared.actions import GameAction
 from src.shared.commands import CommandEnvelope, command_id_for
 from src.shared.events import EventSystemError
-from src.shared.snapshots import SnapshotProtocolError, StateSnapshotDecoder
+from src.client.services.snapshot_inbox import SnapshotInbox
 from src.shared.state import GameState
 
 
@@ -35,7 +34,7 @@ class ClientSessionProxy:
         self.system_errors: list[dict[str, object]] = []
         self._known_system_errors: set[tuple[str, str, int]] = set()
         self._command_sequences: dict[str, int] = defaultdict(int)
-        self._snapshots = StateSnapshotDecoder()
+        self._snapshot_inbox = SnapshotInbox(state_queue, snapshot_ack_queue)
         self._state_poll_accumulator = 0.0
         self._state_poll_interval = 1.0 / 30.0
         self._display_clock = ClientGameClock()
@@ -69,24 +68,10 @@ class ClientSessionProxy:
                 self._state_poll_interval,
             )
 
-        while True:
-            try:
-                packet = self.state_queue.get_nowait()
-            except Empty:
-                break
-
-            try:
-                self.state = self._snapshots.decode(packet)
-                self._display_clock.sync(self.state.time)
-            except SnapshotProtocolError as exc:
-                print(f"[ClientSessionProxy] Snapshot protocol error: {exc}")
-                continue
-
-            try:
-                self.snapshot_ack_queue.put_nowait(self._snapshots.sequence)
-            except Full:
-                pass
-
+        latest = self._snapshot_inbox.take_latest()
+        if latest is not None:
+            self.state = latest
+            self._display_clock.sync(self.state.time)
             self._hydrate_command_sequences()
             self._capture_system_errors()
 
@@ -131,6 +116,7 @@ class ClientSessionProxy:
         return self._display_clock.display_minutes
 
     def shutdown(self) -> None:
+        self._snapshot_inbox.close()
         self.action_queue.put("SHUTDOWN")
         self.process.join(timeout=2.0)
         if self.process.is_alive():

@@ -40,6 +40,7 @@
 - [X] T013 [US1] Make the opt-in workload benchmark assert the SC-002 target and document runtime/hardware context in `tests/test_military_movement_performance.py` and `specs/002-geo-military-movement-system/quickstart.md`.
 - [X] T014 Run all focused movement tests and the repository suite, then record actual outcomes in `specs/002-geo-military-movement-system/quickstart.md`.
 - [ ] T015 Run the live-client route/color, treaty-revalidation, and invasion scenarios from `specs/002-geo-military-movement-system/quickstart.md` and record results; requires an available client window.
+- [X] T016 Reuse prepared topology and coordinate indexes only within the current system update, while keeping access and unit-specific costs per route; cover map invalidation/equivalence in `modules/base/systems/military/route_policy.py`, `region_route_snapshot.py`, `region_travel_time.py`, `tests/test_region_route_snapshot.py`, `tests/test_region_travel_time.py`, and `tests/test_military_route_policy.py`. Integrated state hashes matched the baseline in `docs/SIMULATION_OPTIMIZATION_REPORT.md`.
 
 ## Dependencies & Execution Order
 

@@ -19,7 +19,7 @@ class FakeSession:
         for message in messages:
             self.progress_queue.put(message)
         self.tick = Mock()
-        self.state = None
+        self.state = SimpleNamespace(globals={})
         self.shutdown = Mock()
 
 
@@ -29,6 +29,7 @@ def _window(session_factory=None):
     window.session_factory = session_factory or Mock()
     window.session = None
     window.nav = Mock()
+    window.settings = SimpleNamespace(settings=SimpleNamespace(geo_language_code="en"))
     window.boot_progress = 0.0
     window.boot_status = "Preparing"
     window.boot_error = None
@@ -54,6 +55,19 @@ def test_setup_schedules_boot_progress_polling_at_sixty_hertz() -> None:
     schedule.assert_called_once_with(window._check_server_boot, 1 / 60)
     assert window._boot_thread is not None and not window._boot_thread.is_alive()
     factory.assert_called_once_with(window.game_config)
+
+
+def test_ready_waits_for_background_snapshot_before_navigation() -> None:
+    session = FakeSession([("READY", 1.0, "Ready")])
+    session.state = None
+    window = _window()
+    window._boot_result_queue.put(("SESSION", session))
+    with patch("src.client.window.arcade.unschedule"):
+        window._check_server_boot(1 / 60)
+        window.nav.show_main_menu.assert_not_called()
+        session.state = SimpleNamespace(globals={})
+        window._check_server_boot(1 / 60)
+    window.nav.show_main_menu.assert_called_once_with(session, window.game_config)
 
 
 def test_boot_queue_displays_progress_then_routes_on_ready_without_empty_probe() -> None:

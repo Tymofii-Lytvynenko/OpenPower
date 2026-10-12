@@ -259,6 +259,55 @@ class ActionUpdateInternalLaw(GameAction):
 
 
 @dataclass
+class ActionSetCountryIdentityPolicy(GameAction):
+    """Changes the legal recognition status of one language or religion group."""
+
+    country_tag: str
+    identity_type: str
+    identity_id: str
+    status: str
+
+
+@dataclass
+class ActionCreateTradeDeal(GameAction):
+    """Proposes a bilateral package of cash, territory, and research assets."""
+
+    source_country_tag: str
+    target_country_tag: str
+    offered_assets: list[dict[str, Any]] = field(default_factory=list)
+    requested_assets: list[dict[str, Any]] = field(default_factory=list)
+    expires_after_days: int = 30
+
+
+@dataclass
+class ActionCounterTradeDeal(GameAction):
+    """Replaces an incoming trade offer with a linked counteroffer."""
+
+    deal_id: str
+    counter_country_tag: str
+    offered_assets: list[dict[str, Any]] = field(default_factory=list)
+    requested_assets: list[dict[str, Any]] = field(default_factory=list)
+    expires_after_days: int = 30
+
+
+@dataclass
+class ActionRespondTradeDeal(GameAction):
+    """Accepts or rejects a pending bilateral trade package."""
+
+    deal_id: str
+    responder_country_tag: str
+    accept: bool
+
+
+@dataclass
+class ActionWithdrawTradeDeal(GameAction):
+    """Withdraws a pending offer created by the acting country."""
+
+    deal_id: str
+    source_country_tag: str
+
+
+@dataclass
 class ActionUpdateMigrationPolicy(GameAction):
     """
     Updates the migration and border posture for a country.

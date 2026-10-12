@@ -1,4 +1,4 @@
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.ui.components.hud.panel_manager import PanelManager
 from src.client.ui.core.primitives import UIPrimitives as Prims
@@ -32,7 +32,8 @@ class ToggleBar:
                 if index > 0:
                     imgui.same_line(0, 10)
 
-                if Prims.icon_toggle(entry.icon, entry.color, entry.visible):
+                if Prims.icon_toggle(entry.icon, entry.color, entry.visible,
+                                     test_id=f"hud.panel.{entry.id.lower()}", accessible_label=getattr(entry, "title", entry.id)):
                     self.manager.toggle(entry.id)
 
             imgui.end()

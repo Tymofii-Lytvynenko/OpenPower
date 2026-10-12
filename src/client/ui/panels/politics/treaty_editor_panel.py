@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.panel_context import PanelRenderContext

@@ -138,7 +138,7 @@ class MainMenuView(BaseImGuiView):
         self.ui.draw_title("SETTINGS")
         self._settings_content.render()
 
-        from imgui_bundle import imgui
+        from src.client.ui.core.instrumented_imgui import imgui
         imgui.dummy((0, 42))
         if self.ui.draw_menu_button("BACK"):
             self._show_settings = False

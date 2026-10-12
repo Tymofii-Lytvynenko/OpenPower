@@ -1,6 +1,6 @@
 from typing import Optional
 import polars as pl
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.services.network_client_service import NetworkClient
 from src.client.ui.components.hud.central_bar import CentralBar

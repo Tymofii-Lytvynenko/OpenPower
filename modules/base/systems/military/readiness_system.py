@@ -91,91 +91,148 @@ class ReadinessSystem(ISystem):
         # same server tick and is not overwritten by the stale local frame.
         transitions = self._ensure_transitions(state.tables.get(TRANSITIONS_TABLE))
         units = self._ensure_units(state.tables.get(UNITS_TABLE))
+        updated_units, updated_transitions = self._advance_transitions(state, units, transitions, now)
+        self._update_table_if_changed(state, UNITS_TABLE, updated_units)
+        self._update_table_if_changed(state, TRANSITIONS_TABLE, updated_transitions)
 
-        units_rows = units.to_dicts()
-        transition_rows = transitions.to_dicts()
-        by_unit = {str(row.get("unit_id") or ""): row for row in transition_rows}
-        for unit in units_rows:
-            unit_id = str(unit.get("id") or "")
-            transition = by_unit.get(unit_id)
-            if transition is None:
-                unit["readiness_progress"] = 0.0
-                unit["readiness_transition_id"] = ""
-                unit["readiness_eta_minute"] = 0
-                unit["readiness_status"] = self._policy.normalize(unit.get("readiness_status"))
-                continue
+    def _advance_transitions(
+        self,
+        state: GameState,
+        units: pl.DataFrame,
+        transitions: pl.DataFrame,
+        now: int,
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        if units.is_empty():
+            return units, transitions
 
-            if now >= int(transition.get("completes_at_minute") or now):
-                requested_target = self._policy.normalize(transition.get("target_status"))
-                staged = str(transition.get("stage") or "") == "parked_to_fortified"
-                target = READINESS_READY if staged else requested_target
-                unit["readiness_status"] = target
-                unit["readiness_progress"] = 1.0
-                unit["readiness_transition_id"] = ""
-                unit["readiness_eta_minute"] = 0
-                released_order_id = "" if staged else str(transition.get("pending_order_id") or "")
-                state.events.append(
-                    EventUnitReadinessCompleted(
-                        unit_id=unit_id,
-                        transition_id=str(transition.get("id") or ""),
-                        status=target,
-                        completed_at_minute=now,
-                        released_order_id=released_order_id,
-                    )
+        unit_keys = units.select(pl.col("id").alias("unit_key"))
+        matched = transitions.join(unit_keys, left_on="unit_id", right_on="unit_key", how="semi")
+        orphaned = transitions.join(unit_keys, left_on="unit_id", right_on="unit_key", how="anti")
+        due = matched.filter(pl.col("completes_at_minute").fill_null(now) <= now).join(
+            units.select(
+                pl.col("id").alias("due_unit_id"),
+                pl.col("owner").alias("due_owner"),
+            ),
+            left_on="unit_id",
+            right_on="due_unit_id",
+            how="left",
+        )
+        completed = due.to_dicts()
+        next_transitions: list[dict[str, Any]] = []
+        completed_ids = due.select("id").unique()
+
+        for transition in completed:
+            unit_id = str(transition.get("unit_id") or "")
+            transition_id = str(transition.get("id") or "")
+            staged = str(transition.get("stage") or "") == "parked_to_fortified"
+            target = READINESS_READY if staged else self._policy.normalize(transition.get("target_status"))
+            pending_order_id = str(transition.get("pending_order_id") or "")
+            state.events.append(
+                EventUnitReadinessCompleted(
+                    unit_id=unit_id,
+                    transition_id=transition_id,
+                    status=target,
+                    completed_at_minute=now,
+                    released_order_id="" if staged else pending_order_id,
                 )
-                transition_rows = [row for row in transition_rows if row is not transition]
-                # A two-stage parked -> fortified transition is represented as
-                # one user-visible request but two deterministic stages.
-                if staged:
-                    next_transition = self._new_transition(
-                        unit_id,
-                        READINESS_READY,
-                        READINESS_FORTIFIED,
-                        "ready_to_fortified",
-                        now,
-                        self._transition_duration_for_owner(
-                            state,
-                            str(unit.get("owner") or ""),
-                            self._policy.READY_TO_FORTIFIED_MINUTES,
-                        ),
-                    )
-                    # Keep the order attached to the request until the final
-                    # stage completes; otherwise a staged readiness order can
-                    # strand its pending movement or attack.
-                    next_transition["pending_order_id"] = str(transition.get("pending_order_id") or "")
-                    unit["readiness_status"] = READINESS_READY
-                    unit["readiness_progress"] = 0.0
-                    unit["readiness_transition_id"] = next_transition["id"]
-                    unit["readiness_eta_minute"] = next_transition["completes_at_minute"]
-                    transition_rows.append(next_transition)
-                    by_unit[unit_id] = next_transition
-                else:
-                    self._release_pending_order(state, unit_id, str(transition.get("pending_order_id") or ""))
-                    by_unit.pop(unit_id, None)
-                continue
-
-            started_at = transition.get("started_at_minute")
-            completes_at = transition.get("completes_at_minute")
-            unit["readiness_status"] = self._policy.normalize(transition.get("from_status"))
-            unit["readiness_progress"] = self._policy.progress(
-                int(started_at if started_at is not None else now),
-                int(completes_at if completes_at is not None else now),
-                now,
             )
-            transition["progress"] = unit["readiness_progress"]
-            unit["readiness_transition_id"] = str(transition.get("id") or "")
-            unit["readiness_eta_minute"] = int(completes_at if completes_at is not None else 0)
+            if staged:
+                next_transition = self._new_transition(
+                    unit_id,
+                    READINESS_READY,
+                    READINESS_FORTIFIED,
+                    "ready_to_fortified",
+                    now,
+                    self._transition_duration_for_owner(
+                        state,
+                        str(transition.get("due_owner") or ""),
+                        self._policy.READY_TO_FORTIFIED_MINUTES,
+                    ),
+                )
+                # Preserve the pending order through both stages so completion can release it.
+                next_transition["pending_order_id"] = pending_order_id
+                next_transitions.append(next_transition)
+            else:
+                self._release_pending_order(state, unit_id, pending_order_id)
 
-        self._update_table_if_changed(
-            state,
-            UNITS_TABLE,
-            self._frame_from_rows(units.schema, units_rows),
+        active = matched.join(completed_ids, on="id", how="anti")
+        if next_transitions:
+            active = pl.concat(
+                [
+                    active,
+                    pl.DataFrame(next_transitions, schema=TRANSITION_SCHEMA),
+                ],
+                how="vertical",
+            )
+        active = active.with_columns(
+            ((pl.lit(now) - pl.col("started_at_minute").fill_null(now))
+             / (pl.col("completes_at_minute").fill_null(now) - pl.col("started_at_minute").fill_null(now)).clip(lower_bound=1))
+            .clip(lower_bound=0.0, upper_bound=1.0)
+            .alias("progress")
         )
-        self._update_table_if_changed(
-            state,
-            TRANSITIONS_TABLE,
-            self._frame_from_rows(TRANSITION_SCHEMA, transition_rows),
+
+        unit_transitions = active.select(
+            pl.col("unit_id").alias("_readiness_unit_id"),
+            pl.col("from_status").alias("_readiness_from_status"),
+            pl.col("id").alias("_readiness_transition_id"),
+            pl.col("completes_at_minute").alias("_readiness_eta"),
+            pl.col("progress").alias("_readiness_progress"),
         )
+        completed_units = due.filter(pl.col("stage") != "parked_to_fortified").select(
+            pl.col("unit_id").alias("_completed_unit_id"),
+            pl.col("target_status").alias("_completed_status"),
+        )
+        completed_units = completed_units.with_columns(
+            pl.col("_completed_status").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_lowercase()
+        ).with_columns(
+            pl.when(pl.col("_completed_status").is_in(list(READINESS_STATUSES)))
+            .then(pl.col("_completed_status"))
+            .otherwise(pl.lit(READINESS_READY))
+            .alias("_completed_status")
+        )
+        updated_units = (
+            units.join(unit_transitions, left_on="id", right_on="_readiness_unit_id", how="left")
+            .join(completed_units, left_on="id", right_on="_completed_unit_id", how="left")
+            .with_columns(
+                pl.col("readiness_status").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_lowercase()
+                .alias("_normalized_original_status"),
+                pl.col("_readiness_from_status").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_lowercase()
+                .alias("_normalized_transition_status"),
+            )
+            .with_columns(
+                pl.when(pl.col("_readiness_transition_id").is_not_null())
+                .then(
+                    pl.when(pl.col("_normalized_transition_status").is_in(list(READINESS_STATUSES)))
+                    .then(pl.col("_normalized_transition_status"))
+                    .otherwise(pl.lit(READINESS_READY))
+                )
+                .when(pl.col("_completed_status").is_not_null())
+                .then(pl.col("_completed_status"))
+                .otherwise(
+                    pl.when(pl.col("_normalized_original_status").is_in(list(READINESS_STATUSES)))
+                    .then(pl.col("_normalized_original_status"))
+                    .otherwise(pl.lit(READINESS_READY))
+                )
+                .alias("readiness_status"),
+                pl.when(pl.col("_readiness_transition_id").is_null())
+                .then(pl.when(pl.col("_completed_status").is_not_null()).then(pl.lit(1.0)).otherwise(pl.lit(0.0)))
+                .otherwise(pl.col("_readiness_progress"))
+                .alias("readiness_progress"),
+                pl.col("_readiness_transition_id").fill_null("").alias("readiness_transition_id"),
+                pl.col("_readiness_eta").fill_null(0).alias("readiness_eta_minute"),
+            )
+            .drop(
+                "_readiness_from_status",
+                "_readiness_transition_id",
+                "_readiness_eta",
+                "_readiness_progress",
+                "_completed_status",
+                "_normalized_original_status",
+                "_normalized_transition_status",
+            )
+        )
+        updated_transitions = pl.concat([active, orphaned], how="vertical") if not orphaned.is_empty() else active
+        return updated_units, updated_transitions.select(list(TRANSITION_SCHEMA))
 
     def prepare_order(self, state: GameState, unit_id: str, pending_order_id: str = "") -> bool:
         """Prepare a validated order and report whether it may execute now.
@@ -190,17 +247,13 @@ class ReadinessSystem(ISystem):
         units = self._ensure_units(state.tables.get(UNITS_TABLE))
         transitions = self._ensure_transitions(state.tables.get(TRANSITIONS_TABLE))
         unit_key = str(unit_id)
-        rows = units.to_dicts()
-        unit = next((row for row in rows if str(row.get("id") or "") == unit_key), None)
+        unit_rows = units.filter(pl.col("id") == unit_key).head(1).to_dicts()
+        unit = unit_rows[0] if unit_rows else None
         if unit is None:
             return False
 
         current = self._policy.normalize(unit.get("readiness_status"))
-        existing = [
-            row
-            for row in transitions.to_dicts()
-            if str(row.get("unit_id") or "") == unit_key
-        ]
+        existing = transitions.filter(pl.col("unit_id") == unit_key).head(1).to_dicts()
         if current == READINESS_READY and not existing:
             return True
 
@@ -208,34 +261,34 @@ class ReadinessSystem(ISystem):
             existing_target = self._policy.normalize(existing[0].get("target_status"))
             if current == READINESS_PARKED and existing_target == READINESS_READY:
                 if pending_order_id:
-                    updated_rows = [
-                        {
-                            **row,
-                            "pending_order_id": str(pending_order_id),
-                        }
-                        if str(row.get("unit_id") or "") == unit_key
-                        else row
-                        for row in transitions.to_dicts()
-                    ]
-                    state.update_table(
-                        TRANSITIONS_TABLE,
-                        self._frame_from_rows(TRANSITION_SCHEMA, updated_rows),
+                    updated = transitions.with_columns(
+                        pl.when(pl.col("unit_id") == unit_key)
+                        .then(pl.lit(str(pending_order_id)))
+                        .otherwise(pl.col("pending_order_id"))
+                        .alias("pending_order_id")
                     )
+                    state.update_table(TRANSITIONS_TABLE, updated)
                 return False
             # A movement/attack order supersedes a pending fortification or a
             # stale transition target, but only after the order was validated.
             self.cancel_transition_for_unit(state, unit_key, "order_posture_release")
             units = self._ensure_units(state.tables.get(UNITS_TABLE))
-            rows = units.to_dicts()
-            unit = next(row for row in rows if str(row.get("id") or "") == unit_key)
+            unit_rows = units.filter(pl.col("id") == unit_key).head(1).to_dicts()
+            if not unit_rows:
+                return False
+            unit = unit_rows[0]
             current = self._policy.normalize(unit.get("readiness_status"))
 
         if current == READINESS_FORTIFIED:
-            unit["readiness_status"] = READINESS_READY
-            unit["readiness_progress"] = 0.0
-            unit["readiness_transition_id"] = ""
-            unit["readiness_eta_minute"] = 0
-            state.update_table(UNITS_TABLE, self._frame_from_rows(units.schema, rows))
+            state.update_table(
+                UNITS_TABLE,
+                self._set_unit_fields(units, unit_key, {
+                    "readiness_status": READINESS_READY,
+                    "readiness_progress": 0.0,
+                    "readiness_transition_id": "",
+                    "readiness_eta_minute": 0,
+                }),
+            )
             return True
 
         transition = self._policy.transition(current, READINESS_READY)
@@ -251,18 +304,23 @@ class ReadinessSystem(ISystem):
             transition.duration_minutes,
         )
         transition_row["pending_order_id"] = str(pending_order_id or "")
-        updated_rows = [
-            row
-            for row in transitions.to_dicts()
-            if str(row.get("unit_id") or "") != unit_key
-        ]
-        updated_rows.append(transition_row)
-        unit["readiness_status"] = current
-        unit["readiness_progress"] = 0.0
-        unit["readiness_transition_id"] = transition_row["id"]
-        unit["readiness_eta_minute"] = transition_row["completes_at_minute"]
-        state.update_table(UNITS_TABLE, self._frame_from_rows(units.schema, rows))
-        state.update_table(TRANSITIONS_TABLE, self._frame_from_rows(TRANSITION_SCHEMA, updated_rows))
+        updated_transitions = pl.concat(
+            [
+                transitions.filter(pl.col("unit_id") != unit_key),
+                pl.DataFrame([transition_row], schema=TRANSITION_SCHEMA),
+            ],
+            how="vertical",
+        )
+        state.update_table(
+            UNITS_TABLE,
+            self._set_unit_fields(units, unit_key, {
+                "readiness_status": current,
+                "readiness_progress": 0.0,
+                "readiness_transition_id": transition_row["id"],
+                "readiness_eta_minute": transition_row["completes_at_minute"],
+            }),
+        )
+        state.update_table(TRANSITIONS_TABLE, updated_transitions)
         state.events.append(
             EventUnitReadinessStarted(
                 unit_id=unit_key,
@@ -278,31 +336,32 @@ class ReadinessSystem(ISystem):
 
     def cancel_transition_for_unit(self, state: GameState, unit_id: str, reason: str) -> None:
         transitions = self._ensure_transitions(state.tables.get(TRANSITIONS_TABLE))
-        rows = transitions.to_dicts()
-        canceled = [row for row in rows if str(row.get("unit_id") or "") == str(unit_id)]
+        unit_key = str(unit_id)
+        canceled = transitions.filter(pl.col("unit_id") == unit_key).head(1).to_dicts()
         if not canceled:
             return
-        remaining = [row for row in rows if str(row.get("unit_id") or "") != str(unit_id)]
-        units = self._ensure_units(state.tables.get(UNITS_TABLE)).to_dicts()
+        remaining = transitions.filter(pl.col("unit_id") != unit_key)
+        units = self._ensure_units(state.tables.get(UNITS_TABLE))
+        unit_rows = units.filter(pl.col("id") == unit_key).head(1).to_dicts()
         now = int(state.time.total_minutes)
-        for unit in units:
-            if str(unit.get("id") or "") != str(unit_id):
-                continue
-            status = self._policy.normalize(unit.get("readiness_status"))
-            unit["readiness_transition_id"] = ""
-            unit["readiness_progress"] = 0.0
-            unit["readiness_eta_minute"] = 0
+        if unit_rows:
+            status = self._policy.normalize(unit_rows[0].get("readiness_status"))
             state.events.append(
                 EventUnitReadinessCanceled(
-                    unit_id=str(unit_id),
+                    unit_id=unit_key,
                     transition_id=str(canceled[0].get("id") or ""),
                     status=status,
                     canceled_at_minute=now,
                     reason=reason,
                 )
             )
-        state.update_table(UNITS_TABLE, self._frame_from_rows(self._ensure_units(state.tables.get(UNITS_TABLE)).schema, units))
-        state.update_table(TRANSITIONS_TABLE, self._frame_from_rows(TRANSITION_SCHEMA, remaining))
+            units = self._set_unit_fields(units, unit_key, {
+                "readiness_transition_id": "",
+                "readiness_progress": 0.0,
+                "readiness_eta_minute": 0,
+            })
+            state.update_table(UNITS_TABLE, units)
+        state.update_table(TRANSITIONS_TABLE, remaining)
         pending = state.tables.get(PENDING_TABLE)
         if pending is not None and not pending.is_empty() and "unit_id" in pending.columns:
             state.update_table(PENDING_TABLE, pending.filter(pl.col("unit_id") != str(unit_id)))
@@ -310,8 +369,9 @@ class ReadinessSystem(ISystem):
     def _request_transition(self, state: GameState, units: pl.DataFrame, transitions: pl.DataFrame, action: ActionSetUnitReadiness, now: int) -> None:
         if str(action.target_status or "").strip().lower() not in READINESS_STATUSES:
             return
-        rows = units.to_dicts()
-        unit = next((row for row in rows if str(row.get("id") or "") == str(action.unit_id)), None)
+        unit_key = str(action.unit_id)
+        unit_rows = units.filter(pl.col("id") == unit_key).head(1).to_dicts()
+        unit = unit_rows[0] if unit_rows else None
         actor_id = str(action.player_id or "").strip()
         owner_id = str(unit.get("owner") or "").strip() if unit is not None else ""
         if unit is None or (
@@ -321,40 +381,48 @@ class ReadinessSystem(ISystem):
             return
         current = self._policy.normalize(unit.get("readiness_status"))
         target = self._policy.normalize(action.target_status)
-        existing = [row for row in transitions.to_dicts() if str(row.get("unit_id") or "") == str(action.unit_id)]
+        existing = transitions.filter(pl.col("unit_id") == unit_key).head(1).to_dicts()
         if existing and self._policy.normalize(existing[0].get("target_status")) == target:
             return
         if existing:
-            self.cancel_transition_for_unit(state, action.unit_id, "replaced")
+            self.cancel_transition_for_unit(state, unit_key, "replaced")
         transition = self._policy.transition(current, target)
         if transition is None:
-            unit["readiness_status"] = current
-            unit["readiness_progress"] = 0.0
-            unit["readiness_transition_id"] = ""
-            unit["readiness_eta_minute"] = 0
-            state.update_table(UNITS_TABLE, self._frame_from_rows(units.schema, rows))
+            state.update_table(UNITS_TABLE, self._set_unit_fields(units, unit_key, {
+                "readiness_status": current,
+                "readiness_progress": 0.0,
+                "readiness_transition_id": "",
+                "readiness_eta_minute": 0,
+            }))
             return
         duration = self._transition_duration_for_owner(state, owner_id, transition.duration_minutes)
         if duration <= 0:
-            unit["readiness_status"] = target
-            unit["readiness_progress"] = 1.0
-            unit["readiness_transition_id"] = ""
-            unit["readiness_eta_minute"] = 0
-            state.update_table(UNITS_TABLE, self._frame_from_rows(units.schema, rows))
+            state.update_table(UNITS_TABLE, self._set_unit_fields(units, unit_key, {
+                "readiness_status": target,
+                "readiness_progress": 1.0,
+                "readiness_transition_id": "",
+                "readiness_eta_minute": 0,
+            }))
             state.events.append(EventUnitReadinessCompleted(str(action.unit_id), f"readiness-{action.unit_id}-{now}", target, now))
             return
 
         transition_row = self._new_transition(
             str(action.unit_id), current, target, transition.stage, now, duration
         )
-        updated_rows = [row for row in transitions.to_dicts() if str(row.get("unit_id") or "") != str(action.unit_id)]
-        updated_rows.append(transition_row)
-        unit["readiness_status"] = current
-        unit["readiness_progress"] = 0.0
-        unit["readiness_transition_id"] = transition_row["id"]
-        unit["readiness_eta_minute"] = transition_row["completes_at_minute"]
-        state.update_table(UNITS_TABLE, self._frame_from_rows(units.schema, rows))
-        state.update_table(TRANSITIONS_TABLE, self._frame_from_rows(TRANSITION_SCHEMA, updated_rows))
+        updated_transitions = pl.concat(
+            [
+                transitions.filter(pl.col("unit_id") != unit_key),
+                pl.DataFrame([transition_row], schema=TRANSITION_SCHEMA),
+            ],
+            how="vertical",
+        )
+        state.update_table(UNITS_TABLE, self._set_unit_fields(units, unit_key, {
+            "readiness_status": current,
+            "readiness_progress": 0.0,
+            "readiness_transition_id": transition_row["id"],
+            "readiness_eta_minute": transition_row["completes_at_minute"],
+        }))
+        state.update_table(TRANSITIONS_TABLE, updated_transitions)
         state.events.append(
             EventUnitReadinessStarted(
                 unit_id=str(action.unit_id),
@@ -401,14 +469,35 @@ class ReadinessSystem(ISystem):
         state.update_table(name, frame)
         return True
 
+    @staticmethod
+    def _set_unit_fields(
+        units: pl.DataFrame,
+        unit_id: str,
+        values: dict[str, Any],
+    ) -> pl.DataFrame:
+        return units.with_columns(
+            [
+                pl.when(pl.col("id") == unit_id)
+                .then(pl.lit(value).cast(units.schema[column], strict=False))
+                .otherwise(pl.col(column))
+                .alias(column)
+                for column, value in values.items()
+            ]
+        )
+
     def _release_pending_order(self, state: GameState, unit_id: str, pending_order_id: str) -> None:
         pending = state.tables.get(PENDING_TABLE)
-        if pending is None or pending.is_empty():
+        if pending is None or pending.is_empty() or not {"unit_id", "status"}.issubset(pending.columns):
             return
-        rows = pending.to_dicts()
-        released = next((row for row in rows if str(row.get("unit_id") or "") == unit_id and str(row.get("status") or "queued") == "queued"), None)
-        if released is None:
+        indexed = pending.with_row_index("_pending_row_order")
+        selected = indexed.filter(
+            (pl.col("unit_id").cast(pl.Utf8) == unit_id)
+            & pl.col("status").cast(pl.Utf8).fill_null("").replace("", "queued").eq("queued")
+        ).head(1)
+        if selected.is_empty():
             return
+        row_order = int(selected.get_column("_pending_row_order")[0])
+        released = selected.drop("_pending_row_order").to_dicts()[0]
         order_type = str(released.get("order_type") or "")
         player_id = str(released.get("player_id") or "server")
         if order_type == "move":
@@ -420,8 +509,8 @@ class ReadinessSystem(ISystem):
         elif order_type == "attack":
             from src.shared.actions import ActionAttackUnit
             state.current_actions.append(ActionAttackUnit(player_id, unit_id, str(released.get("target_unit_id") or "")))
-        remaining = [row for row in rows if row is not released]
-        state.update_table(PENDING_TABLE, self._frame_from_rows(PENDING_SCHEMA, remaining))
+        remaining = indexed.filter(pl.col("_pending_row_order") != row_order).drop("_pending_row_order")
+        state.update_table(PENDING_TABLE, remaining)
 
     def _ensure_units(self, units: pl.DataFrame | None) -> pl.DataFrame:
         schema = {
@@ -450,10 +539,6 @@ class ReadinessSystem(ISystem):
                 default: Any = 0 if dtype in (pl.Int64, pl.Float64) else ""
                 transitions = transitions.with_columns(pl.lit(default).cast(dtype).alias(column))
         return transitions.select([pl.col(column).cast(dtype) for column, dtype in TRANSITION_SCHEMA.items()])
-
-    def _frame_from_rows(self, schema: dict[str, pl.DataType], rows: list[dict[str, Any]]) -> pl.DataFrame:
-        return pl.DataFrame(rows, schema=schema) if rows else pl.DataFrame(schema=schema)
-
 
 def cancel_readiness_for_contact(state: GameState, unit_ids: list[str], reason: str = "combat_contact") -> None:
     """Cancel transitions for units that entered contact before completion."""

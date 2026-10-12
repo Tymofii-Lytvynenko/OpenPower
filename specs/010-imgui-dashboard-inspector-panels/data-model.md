@@ -27,3 +27,9 @@ The plot is a projection of `trade_network`, not a new stored model:
 ## Political stability model
 
 For a weekly update, baseline target is `clip(0.7 * approval + 0.3 * HDI - corruption, 0, 100)`. Null/missing/invalid values use approval `50.0`, HDI `0.5`, corruption `0.1`, and stability `50.0`. The baseline then passes through existing explicit political modifiers before stability moves by 5%, cast to integer to preserve the established game-state type.
+
+## Ephemeral UI test telemetry
+
+UI verification adds no persisted simulation table. During an opted-in telemetry frame, region records represent windows/children/containers with semantic ID, label, visibility, logical rectangle, parent, kind, and source. Widget records add native ImGui ID, type, value/options/components, enabled/visible state, interaction flag, and source location. IDs can be explicitly supplied for durable journeys or derived from source/function/container context for unkeyed controls. Reports, screenshots, overlays, fixture inputs, receipts, and optional diffs are test artifacts outside `GameState`.
+
+`UITestDriver` resolves exact IDs or selectors over label/type/source/region and fails on ambiguity. Journey steps operate on recorded controls and can assert their state, geometry, and dispatched action. A recording client verifies dispatch, not server simulation. The optional live bridge targets only visible/enabled interactive controls and persists request receipts for deduplication across view changes.

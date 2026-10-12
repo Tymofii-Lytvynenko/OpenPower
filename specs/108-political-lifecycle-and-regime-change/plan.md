@@ -4,7 +4,7 @@
 
 ## Summary
 
-Activate the existing country government and law seed data as an authoritative, deterministic lifecycle. Keep political rules inside the base module, expose intent through shared actions, persist state in versioned Polars tables, and publish effects/events for existing budget, economy, migration, military, diplomacy, and client systems to consume.
+Activate the existing country government and law seed data as an authoritative, deterministic lifecycle, and compose in country language/religion identity policy. Keep political rules inside the base module, expose intent through shared actions, persist state in versioned Polars tables, and publish effects/events for existing budget, economy, migration, military, diplomacy, and client systems to consume.
 
 ## Technical Context
 
@@ -16,7 +16,7 @@ Activate the existing country government and law seed data as an authoritative, 
 **Project Type**: Modular desktop simulation with headless server process
 **Performance Goals**: Incremental unchanged political state for 10,000 countries under 500 ms; no full-world scans on unchanged updates
 **Constraints**: Preserve existing ownership, stability drift, economy, migration, military, treaties, action ordering, and passive-client boundaries; deterministic replay; no random choices without persisted seeded state
-**Scale/Scope**: All countries, government forms, laws, parties, elections, domestic political crises, save/load, and one overview projection
+**Scale/Scope**: All countries, government forms, laws, parties, elections, domestic political crises, language/religion policy profiles, save/load, and the existing political/internal-laws views
 
 ## Constitution Check
 
@@ -84,4 +84,8 @@ See [data-model.md](data-model.md) and [contracts/political-lifecycle.md](contra
 
 ## Performance Evidence
 
-The controlled steady-state check in `tests/test_political_performance.py` warms a 10,000-country political state, then measures three unchanged updates. The median was **0.001 s** (2026-10-07, Windows project virtual environment), and table revisions remained stable. Cold initialization and the full-repository suite are separate, still-open validation items.
+The controlled steady-state check in `tests/test_political_performance.py` warms a 10,000-country political state, then measures three unchanged updates. The median was **0.001 s** (2026-10-07, Windows project virtual environment), and table revisions remained stable. The benchmark does not measure cold initialization; the historical repository-wide result is recorded in `tasks.md` and `quickstart.md`.
+
+## Language and religion identity policy extension
+
+`StaticAssetLoader` loads normalized bundled estimates before bootstrap; `BootstrapSystem` copies them into mutable `country_identity_groups`; `IdentityPolicySystem` owns authorized status actions, daily composition shifts, signals, political effects, events, and history. `src/client/ui/panels/politics/identity_policy_view.py` composes into the existing Internal Laws view. Multiplayer and population movement are outside this extension. See `data-model.md` and `contracts/political-lifecycle.md` for the runtime contract.

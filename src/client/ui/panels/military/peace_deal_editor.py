@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 import polars as pl
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.shared.actions import ActionRespondPeaceDeal, ActionSubmitPeaceDeal
 

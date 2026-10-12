@@ -13,7 +13,7 @@ Complete the existing ImGui dashboards and inspectors on the current client/serv
 **Language/Version**: Python 3.12 (project `.venv`)
 **Primary Dependencies**: Polars, imgui_bundle (Dear ImGui + ImPlot), Arcade
 **Storage**: Existing in-memory Polars `GameState.tables`; persistence contracts unchanged
-**Testing**: pytest; headless panel/system tests plus manual rendered-window checks
+**Testing**: pytest; headless panel/system tests, deterministic synthetic UI journeys, and manual rendered-window checks
 **Target Platform**: Windows desktop, OpenGL-backed Arcade client; headless server remains supported
 **Project Type**: Desktop grand-strategy game with client/server process boundary
 **Performance Goals**: 10,000-row Data Inspector gate <4 ms/frame; interactive dashboard target 60+ FPS
@@ -44,7 +44,7 @@ tests/test_resources_panel.py
 specs/010-imgui-dashboard-inspector-panels/
 ```
 
-**Structure Decision**: Modify the existing game client service and panels, the existing base politics system, and their focused pytest modules. No new runtime package or cross-layer interface is introduced. Feature evidence and pending empirical gates are recorded alongside this plan.
+**Structure Decision**: Modify the existing game client service and panels, the existing base politics system, and their focused pytest modules. No new game-runtime package or cross-layer simulation interface is introduced; UI automation lives in developer-support modules and is opt-in. Feature evidence and pending empirical gates are recorded alongside this plan.
 
 ## Design Decisions
 
@@ -56,3 +56,7 @@ specs/010-imgui-dashboard-inspector-panels/
 ## Complexity Tracking
 
 No constitution violations are introduced. Empirical UI timing depends on the rendered desktop/OpenGL path and is not established by headless tests; the measurement method and current status are tracked in `performance-log.md`.
+
+## Developer UI verification extension
+
+`src/client/ui/core/instrumented_imgui.py` and `instrumented_implot.py` expose opt-in telemetry through the existing facade. `src/client/ui/core/testability.py` records widget/region state, geometry, hierarchy, and source identity. `src/client/ui/testing/` contains the surface catalog, fixtures, journey runner, layout checks, screenshot overlay, visual comparison, and optional local live bridge. `tests/ui/` holds versioned fixtures and JSON journeys; `docs/UI_TESTING.md` is the operator guide. Telemetry frames are isolated from normal rendering; synthetic journeys verify dispatch only, while live OpenGL timing remains a separate gate.

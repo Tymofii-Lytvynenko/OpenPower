@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,7 +12,8 @@ import polars as pl
 
 from modules.base.schema import TABLE_KEYS
 from modules.base.systems.military.capability_catalog import canonical_role
-from modules.base.systems.military.military_system import MovementDurationPolicy
+from modules.base.systems.military.region_travel_time import RegionTravelTime
+from modules.base.systems.military.region_route_snapshot import RegionRouteSnapshot
 from modules.base.systems.military.authority_policy import player_controls_country
 from modules.base.systems.military.covert_policy import (
     SKILL_LEVELS,
@@ -80,6 +80,36 @@ class CovertOperationsSystem(ISystem):
         required = {"covert_cells", "covert_cell_routes", "covert_missions", "covert_findings", "covert_incidents"}
         if not required.issubset(state.tables):
             return
+        cells_frame = state.get_table("covert_cells")
+        missions_frame = state.get_table("covert_missions")
+        now = int(state.time.total_minutes)
+        elapsed_days = sum(
+            max(0.0, self._finite(event.game_seconds_passed)) / 86400.0
+            for event in state.events
+            if isinstance(event, EventRealSecond) and not event.is_paused
+        )
+        upkeep_boundary = not state.time.is_paused and any(isinstance(event, EventNewDay) for event in state.events)
+        has_actions = any(
+            isinstance(action, (
+                ActionCreateCovertCell,
+                ActionTrainCovertCell,
+                ActionStartCovertMission,
+                ActionSetCovertCellAssignment,
+                ActionRetireCovertCell,
+            ))
+            for action in state.current_actions
+        )
+        has_cell_motion = self._has_status(cells_frame, ["transit", "transit_blocked"])
+        has_training = self._has_status(cells_frame, ["training"]) and (
+            elapsed_days > 0.0 or self._has_due_training(cells_frame, now)
+        )
+        has_preparation = self._has_status(missions_frame, ["preparation"])
+        has_due_mission = self._has_due_missions(missions_frame, now)
+        has_mobilization = any(isinstance(event, EventUnitReadinessStarted) for event in state.events)
+        has_active_upkeep = upkeep_boundary and self._has_status(cells_frame, ["active", "idle"])
+        if not (has_actions or has_cell_motion or has_training or has_preparation or has_due_mission or has_mobilization or has_active_upkeep):
+            return
+
         cells = state.get_table("covert_cells").to_dicts()
         routes = state.get_table("covert_cell_routes").to_dicts()
         missions = state.get_table("covert_missions").to_dicts()
@@ -94,9 +124,14 @@ class CovertOperationsSystem(ISystem):
         original_governments = [dict(row) for row in governments]
         relations = state.tables.get("countries_relations")
         relation_rows = [] if relations is None else relations.to_dicts()
+        original_relation_rows = [dict(row) for row in relation_rows]
+        # Scope the lazy index to this update so later ticks see map changes and
+        # idle updates do not scan regions merely to populate a cache.
+        travel_time = RegionTravelTime(state.tables.get("regions"))
+        routing = RegionRouteSnapshot(state.tables.get("regions"), state.tables.get("region_adjacency"))
         for action in state.current_actions:
             if isinstance(action, ActionCreateCovertCell):
-                cells = self._create_cell(state, cells, country_rows, routes, action)
+                cells = self._create_cell(state, cells, country_rows, routes, action, travel_time, routing)
             elif isinstance(action, ActionTrainCovertCell):
                 self._train_cell(state, cells, country_rows, action)
             elif isinstance(action, ActionStartCovertMission):
@@ -106,21 +141,13 @@ class CovertOperationsSystem(ISystem):
             elif isinstance(action, ActionRetireCovertCell):
                 self._retire_cell(state, cells, action)
 
-        now = int(state.time.total_minutes)
-        elapsed_days = sum(
-            max(0.0, self._finite(event.game_seconds_passed)) / 86400.0
-            for event in state.events
-            if isinstance(event, EventRealSecond) and not event.is_paused
-        )
-        upkeep_boundary = not state.time.is_paused and any(isinstance(event, EventNewDay) for event in state.events)
         changed_countries = False
-        changed_units = False
         country_by_id = {self._tag(row.get("id")): row for row in country_rows}
         cell_by_id = {str(row.get("id")): row for row in cells}
         self._record_mobilization_signals(state, cells, country_by_id, findings, now)
         for cell in cells:
             if cell.get("status") in {"transit", "transit_blocked"}:
-                self._advance_cell_transit(state, cell, routes, now)
+                self._advance_cell_transit(state, cell, routes, now, travel_time, routing)
             elif cell.get("status") == "training":
                 self._advance_training(state, cell, elapsed_days)
             owner = self._tag(cell.get("country_id"))
@@ -133,6 +160,20 @@ class CovertOperationsSystem(ISystem):
                 elif upkeep:
                     cell["status"] = "dormant"
                     cell["last_known_status"] = "dormant: upkeep unpaid"
+
+        security_cell_counts = None
+        espionage_cell_counts = None
+        population_by_country = None
+        if any(
+            mission.get("status") == "executing"
+            and now >= int(mission.get("resolves_at_minute") or 0)
+            for mission in missions
+        ):
+            # Build mission coverage counts once in Polars instead of rescanning
+            # the complete covert-cell roster for every resolving mission.
+            cell_frame = pl.DataFrame(cells, schema=state.get_table("covert_cells").schema)
+            security_cell_counts, espionage_cell_counts = self._cell_metric_frames(cell_frame)
+            population_by_country = self._population_metric_frame(state.tables.get("regions"))
 
         for mission in missions:
             if mission.get("status") == "cleanup":
@@ -175,15 +216,20 @@ class CovertOperationsSystem(ISystem):
                 mission.update(status="cancelled", result="Mission conditions invalid at execution.", updated_at_minute=now)
                 continue
             target_regions = state.tables.get("regions")
-            if target_regions is not None and not any(
-                self._tag(row.get("owner")) == self._tag(target.get("id"))
-                or self._tag(row.get("controller")) == self._tag(target.get("id"))
-                for row in target_regions.to_dicts()
-            ):
+            target_id = self._tag(target.get("id"))
+            if target_regions is not None and not self._has_target_region(target_regions, target_id):
                 mission.update(status="cancelled", result="Target access or ownership is no longer valid.", updated_at_minute=now)
                 continue
             result, discovered, attributed, confidence, output = self._resolve(
-                state, cell, mission, target, cells, relation_rows
+                state,
+                cell,
+                mission,
+                target,
+                cells,
+                relation_rows,
+                security_cell_counts,
+                espionage_cell_counts,
+                population_by_country,
             )
             mission.update(
                 status="cleanup", result=result, discovered_by_target=discovered,
@@ -200,7 +246,6 @@ class CovertOperationsSystem(ISystem):
                 )
             if result == "success":
                 changed_countries = changed_countries or str(mission.get("mission_type", "")).startswith("civilian_sabotage")
-                changed_units = changed_units or mission.get("mission_type") == "military_sabotage"
             audience = [self._tag(mission.get("owner_country_id"))]
             if discovered:
                 audience.append(self._tag(mission.get("target_country_id")))
@@ -238,10 +283,102 @@ class CovertOperationsSystem(ISystem):
             state.update_table("countries", pl.DataFrame(country_rows, schema=countries.schema))
         if governments_frame is not None and governments != original_governments:
             state.update_table("country_governments", pl.DataFrame(governments, schema=governments_frame.schema))
-        if changed_units and "units" in state.tables:
-            self._write(state, "units", state.get_table("units").to_dicts())
-        if relations is not None and relation_rows != relations.to_dicts():
+        if relations is not None and relation_rows != original_relation_rows:
             state.update_table("countries_relations", pl.DataFrame(relation_rows, schema=relations.schema))
+
+    @staticmethod
+    def _has_status(frame: pl.DataFrame, statuses: list[str]) -> bool:
+        return "status" in frame.columns and not frame.filter(pl.col("status").is_in(statuses)).is_empty()
+
+    @staticmethod
+    def _has_due_missions(missions: pl.DataFrame, now: int) -> bool:
+        if missions.is_empty() or not {
+            "status",
+            "cleanup_until_minute",
+            "resolves_at_minute",
+        }.issubset(missions.columns):
+            return False
+        status = pl.col("status").cast(pl.Utf8).fill_null("")
+        cleanup_due = (status == "cleanup") & (pl.col("cleanup_until_minute").fill_null(0) <= now)
+        execution_due = (status == "executing") & (pl.col("resolves_at_minute").fill_null(0) <= now)
+        return not missions.filter(cleanup_due | execution_due).is_empty()
+
+    @staticmethod
+    def _has_due_training(cells: pl.DataFrame, now: int) -> bool:
+        if cells.is_empty() or not {"status", "training_completes_at_minute"}.issubset(cells.columns):
+            return False
+        status = pl.col("status").cast(pl.Utf8).fill_null("")
+        due = (status == "training") & (
+            pl.col("training_completes_at_minute").cast(pl.Int64, strict=False).fill_null(0) <= now
+        )
+        return not cells.filter(due).is_empty()
+
+    def _has_target_region(self, regions: pl.DataFrame, target_id: str) -> bool:
+        columns = [column for column in ("owner", "controller") if column in regions.columns]
+        if not columns:
+            return False
+        matches = [
+            pl.col(column).cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase() == target_id
+            for column in columns
+        ]
+        return not regions.filter(pl.any_horizontal(matches)).is_empty()
+
+    def _cell_metric_frames(self, cells: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
+        normalized = cells.with_columns(
+            pl.col("country_id").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase().alias("_country"),
+            pl.col("target_country_id").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase().alias("_target"),
+            pl.col("location_country_id").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase().alias("_location"),
+            pl.col("assignment").cast(pl.Utf8, strict=False).fill_null("").alias("_assignment"),
+            pl.col("status").cast(pl.Utf8, strict=False).fill_null("").alias("_status"),
+        )
+        security = (
+            normalized.filter(
+                (pl.col("_assignment") == "domestic_security")
+                & (pl.col("_status") == "active")
+                & (pl.col("_country") == pl.col("_location"))
+            )
+            .group_by("_country")
+            .agg(pl.len().cast(pl.Int64).alias("count"))
+            .rename({"_country": "country_id"})
+        )
+        espionage = (
+            normalized.filter(
+                (pl.col("_assignment") == "espionage")
+                & pl.col("_status").is_in(["active", "preparing"])
+            )
+            .group_by(["_country", "_target"])
+            .agg(pl.len().cast(pl.Int64).alias("count"))
+            .rename({"_country": "country_id", "_target": "target_country_id"})
+        )
+        return security, espionage
+
+    def _metric_count(self, metrics: pl.DataFrame | None, **keys: str) -> int:
+        value = self._metric_value(metrics, "count", **keys)
+        return int(value or 0)
+
+    def _metric_value(self, metrics: pl.DataFrame | None, value_column: str, **keys: str):
+        if metrics is None or metrics.is_empty():
+            return 0
+        filters = [pl.col(column) == value for column, value in keys.items()]
+        matches = metrics.filter(pl.all_horizontal(filters)).get_column(value_column)
+        return matches[0] if len(matches) else 0
+
+    def _population_metric_frame(self, regions: pl.DataFrame | None) -> pl.DataFrame:
+        population_column = next(
+            (column for column in ("population", "total_population") if regions is not None and column in regions.columns),
+            None,
+        )
+        if regions is None or "owner" not in regions.columns or population_column is None:
+            return pl.DataFrame(schema={"country_id": pl.Utf8, "population": pl.Float64})
+        value = pl.col(population_column).cast(pl.Float64, strict=False)
+        return (
+            regions.select(
+                pl.col("owner").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase().alias("country_id"),
+                pl.when(value.is_finite()).then(value).otherwise(0.0).alias("population"),
+            )
+            .group_by("country_id")
+            .agg(pl.col("population").sum())
+        )
 
     def _record_mobilization_signals(self, state, cells, countries_by_id, findings, now):
         readiness_rank = {"parked": 0, "ready": 1, "fortified": 2}
@@ -403,7 +540,7 @@ class CovertOperationsSystem(ISystem):
             })
             existing_ids.add(observation_id)
 
-    def _create_cell(self, state, cells, countries, routes, action):
+    def _create_cell(self, state, cells, countries, routes, action, travel_time: RegionTravelTime, routing: RegionRouteSnapshot):
         owner, target = self._tag(action.country_tag), self._tag(action.target_country_tag)
         if not owner or owner not in {self._tag(row.get("id")) for row in countries} or not self._authorized(state, action.player_id, owner):
             self._reject(state, action, "The issuer cannot create a cell for this country.")
@@ -422,16 +559,19 @@ class CovertOperationsSystem(ISystem):
         origin = target_region = None
         travel_minutes = 0
         if owner != target:
-            origin = self._country_home_region(state, owner)
-            target_region = self._country_home_region(state, target)
+            origin = self._country_home_region(state, owner, routing)
+            target_region = self._country_home_region(state, target, routing)
             if origin is None or target_region is None:
                 self._reject(state, action, "A valid origin or target deployment region is unavailable.")
                 return cells
-            route = self._plan_cell_route(state, owner, target, origin, target_region)
+            route = self._plan_cell_route(state, owner, target, origin, target_region, travel_time, routing)
             if not route.is_valid:
                 self._reject(state, action, route.rejection_reason or "No legal covert transit route is available.")
                 return cells
-            travel_minutes = self._route_duration_minutes(state, route.region_ids)
+            travel_minutes = sum(
+                travel_time.estimate_minutes(left, right)
+                for left, right in zip(route.region_ids, route.region_ids[1:])
+            )
         country["money_reserves"] = self._finite(country.get("money_reserves")) - cost
         transit = owner != target
         base_upkeep = max(0.0, self._finite(state.globals.get("covert_cell_upkeep", 0.25)))
@@ -453,7 +593,7 @@ class CovertOperationsSystem(ISystem):
             "last_known_status": "in transit" if transit else "recruited",
         })
         if transit and route is not None and origin is not None and target_region is not None:
-            first_leg_minutes = self._route_leg_minutes(state, route.region_ids[0], route.region_ids[1])
+            first_leg_minutes = travel_time.estimate_minutes(route.region_ids[0], route.region_ids[1])
             routes.append({
                 "cell_id": new_id, "owner_country_id": owner,
                 "source_region_id": int(origin.get("id") or 0),
@@ -464,7 +604,7 @@ class CovertOperationsSystem(ISystem):
             })
         return cells
 
-    def _advance_cell_transit(self, state, cell, routes, now):
+    def _advance_cell_transit(self, state, cell, routes, now, travel_time: RegionTravelTime, routing: RegionRouteSnapshot):
         cell_id = str(cell.get("id") or "")
         route = next((row for row in routes if str(row.get("cell_id") or "") == cell_id), None)
         if route is None:
@@ -478,7 +618,6 @@ class CovertOperationsSystem(ISystem):
         if regions is None:
             self._block_cell_transit(cell, route, "The region map is unavailable.", now)
             return
-        region_rows = regions.to_dicts()
         route_ids = [int(value) for value in route.get("route_region_ids") or []]
         route_index = max(0, int(route.get("route_index") or 0))
         current_region_id = route_ids[route_index] if route_index < len(route_ids) else 0
@@ -497,13 +636,13 @@ class CovertOperationsSystem(ISystem):
             return
 
         if str(route.get("status") or "") == "blocked":
-            plan = self._plan_cell_route_from_region(state, planner, access, owner, target, current_region_id, destination_id, region_rows)
+            plan = self._plan_cell_route_from_region(state, planner, access, owner, target, current_region_id, destination_id, routing, travel_time)
             if not plan.is_valid or len(plan.region_ids) < 2:
                 self._block_cell_transit(cell, route, plan.rejection_reason or "No legal route remains for the cell.", now)
                 return
             route.update(
                 route_region_ids=list(plan.region_ids), route_index=0,
-                arrival_at_minute=now + self._route_leg_minutes(state, plan.region_ids[0], plan.region_ids[1]),
+                arrival_at_minute=now + travel_time.estimate_minutes(plan.region_ids[0], plan.region_ids[1]),
                 status="in_transit", rejection_reason="", updated_at_minute=now,
             )
             cell.update(status="transit", communications_ready=True, last_known_status="in transit")
@@ -516,17 +655,16 @@ class CovertOperationsSystem(ISystem):
                 self._block_cell_transit(cell, route, "The remaining route is incomplete.", now)
                 return
             next_region_id = route_ids[next_index]
-            region_by_id = {int(row.get("id") or 0): row for row in region_rows}
-            next_region = region_by_id.get(next_region_id)
+            next_region = routing.region_by_id.get(next_region_id)
             final = next_region_id == destination_id
             if next_region is None or not self._cell_region_access(access_context, owner, target, next_region, final):
-                plan = self._plan_cell_route_from_region(state, planner, access, owner, target, current_region_id, destination_id, region_rows)
+                plan = self._plan_cell_route_from_region(state, planner, access, owner, target, current_region_id, destination_id, routing, travel_time)
                 if not plan.is_valid or len(plan.region_ids) < 2:
                     self._block_cell_transit(cell, route, plan.rejection_reason or "The next route segment lost access rights.", now)
                     return
                 route.update(
                     route_region_ids=list(plan.region_ids), route_index=0,
-                    arrival_at_minute=now + self._route_leg_minutes(state, plan.region_ids[0], plan.region_ids[1]),
+                    arrival_at_minute=now + travel_time.estimate_minutes(plan.region_ids[0], plan.region_ids[1]),
                     status="in_transit", rejection_reason="", updated_at_minute=now,
                 )
                 return
@@ -537,32 +675,25 @@ class CovertOperationsSystem(ISystem):
                 self._arrive_cell(cell, now)
                 return
             next_next_id = route_ids[route_index + 1] if route_index + 1 < len(route_ids) else destination_id
-            due_at += self._route_leg_minutes(state, current_region_id, next_next_id)
+            due_at += travel_time.estimate_minutes(current_region_id, next_next_id)
             route.update(route_index=route_index, arrival_at_minute=due_at, updated_at_minute=now)
 
-    def _plan_cell_route_from_region(self, state, planner, access, owner, target, source_id, destination_id, region_rows):
-        adjacency = state.tables.get("region_adjacency")
+    def _plan_cell_route_from_region(self, state, planner, access, owner, target, source_id, destination_id, routing: RegionRouteSnapshot, travel_time: RegionTravelTime):
         access_context = access.for_country(state, owner)
+        prepared_graph = routing.prepared_graph
+        travel_time.use_edge_distance_index(prepared_graph.edge_distance_km)
         return planner.plan(
-            source_id, destination_id, region_rows,
-            None if adjacency is None else adjacency.to_dicts(),
+            source_id, destination_id, prepared_graph.region_by_id.values(), None,
             lambda region, final: self._cell_region_access(access_context, owner, target, region, final),
-            segment_cost=lambda left, right: self._route_leg_minutes(state, int(left.get("id") or 0), int(right.get("id") or 0)),
+            segment_cost=lambda left, right: travel_time.estimate_minutes(int(left.get("id") or 0), int(right.get("id") or 0)),
+            prepared_graph=prepared_graph,
         )
 
-    def _plan_cell_route(self, state, owner, target, origin, destination):
-        regions = state.get_table("regions")
-        access = MovementAccessPolicy()
-        planner = MilitaryRoutePlanner()
-        adjacency = state.tables.get("region_adjacency")
-        access_context = access.for_country(state, owner)
-        return planner.plan(
-            int(origin.get("id") or 0), int(destination.get("id") or 0), regions.to_dicts(),
-            None if adjacency is None else adjacency.to_dicts(),
-            lambda region, final: self._cell_region_access(access_context, owner, target, region, final),
-            segment_cost=lambda left, right: self._route_leg_minutes(
-                state, int(left.get("id") or 0), int(right.get("id") or 0),
-            ),
+    def _plan_cell_route(self, state, owner, target, origin, destination, travel_time: RegionTravelTime, routing: RegionRouteSnapshot):
+        return self._plan_cell_route_from_region(
+            state, MilitaryRoutePlanner(), MovementAccessPolicy(), owner, target,
+            int(origin.get("id") or 0), int(destination.get("id") or 0),
+            routing, travel_time,
         )
 
     def _cell_region_access(self, access_context, owner, target, region, final):
@@ -570,28 +701,14 @@ class CovertOperationsSystem(ISystem):
             return True
         return access_context.can_station(region) if final else access_context.can_transit(region)
 
-    def _country_home_region(self, state, country):
+    def _country_home_region(self, state, country, routing: RegionRouteSnapshot):
         regions = state.tables.get("regions")
         if regions is None or regions.is_empty() or "owner" not in regions.columns:
             return None
-        owned = [row for row in regions.to_dicts() if self._tag(row.get("owner")) == country]
         governments = state.tables.get("country_governments")
         government = next((row for row in governments.to_dicts() if self._tag(row.get("country_id")) == country), None) if governments is not None else None
         capital = int(government.get("capital_region_id") or 0) if government else 0
-        return next((row for row in owned if int(row.get("id") or 0) == capital), None) or (min(owned, key=lambda row: int(row.get("id") or 0)) if owned else None)
-
-    def _route_duration_minutes(self, state, region_ids):
-        return sum(self._route_leg_minutes(state, left, right) for left, right in zip(region_ids, region_ids[1:]))
-
-    def _route_leg_minutes(self, state, source_id, target_id):
-        regions = state.tables.get("regions")
-        if regions is None:
-            return 1440
-        locations = MovementDurationPolicy().region_locations(regions)
-        source, target = locations.get(int(source_id)), locations.get(int(target_id))
-        if source is None or target is None:
-            return 1440
-        return MovementDurationPolicy().estimate_between(source, target)
+        return routing.home_region(country, capital)
 
     def _block_cell_transit(self, cell, route, reason, now):
         route.update(status="blocked", rejection_reason=reason, updated_at_minute=now)
@@ -714,20 +831,40 @@ class CovertOperationsSystem(ISystem):
         })
         return missions
 
-    def _resolve(self, state, cell, mission, target, all_cells, relation_rows):
+    def _resolve(
+        self,
+        state,
+        cell,
+        mission,
+        target,
+        all_cells,
+        relation_rows,
+        security_cell_counts: pl.DataFrame | None = None,
+        espionage_cell_counts: pl.DataFrame | None = None,
+        population_by_country: pl.DataFrame | None = None,
+    ):
         base_risk, base_detection, _ = MISSION_PROFILES[str(mission.get("mission_type"))]
         profile = skill_profile(cell.get("skill_level"))
         skill_index = SKILL_LEVELS.index(str(cell.get("skill_level") or "Recruit"))
         target_security = min(0.7, max(0.0, self._finite(target.get("security_upkeep")) / max(1.0, self._finite(target.get("gdp")) * 0.02)))
-        security_cell_count = sum(
-            1
-            for row in all_cells
-            if self._tag(row.get("country_id")) == self._tag(target.get("id"))
-            and row.get("assignment") == "domestic_security"
-            and row.get("status") == "active"
-            and self._tag(row.get("location_country_id")) == self._tag(target.get("id"))
+        target_id = self._tag(target.get("id"))
+        security_cell_count = (
+            self._metric_count(security_cell_counts, country_id=target_id)
+            if security_cell_counts is not None
+            else sum(
+                1
+                for row in all_cells
+                if self._tag(row.get("country_id")) == target_id
+                and row.get("assignment") == "domestic_security"
+                and row.get("status") == "active"
+                and self._tag(row.get("location_country_id")) == target_id
+            )
         )
-        population = self._country_population(state, self._tag(target.get("id")))
+        population = (
+            self._metric_value(population_by_country, "population", country_id=target_id)
+            if population_by_country is not None
+            else self._country_population(state, target_id)
+        )
         coverage = domestic_security_coverage(security_cell_count, population, state.globals)
         concealment = min(0.9, max(0.0, self._finite(cell.get("concealment"))))
         relation = self._relation_value(relation_rows, self._tag(mission.get("owner_country_id")), self._tag(target.get("id")))
@@ -755,14 +892,24 @@ class CovertOperationsSystem(ISystem):
             owner = self._tag(mission.get("owner_country_id"))
             target_id = self._tag(target.get("id"))
             countries = state.tables.get("countries")
-            observer = next((row for row in countries.to_dicts() if self._tag(row.get("id")) == owner), {}) if countries is not None else {}
-            telecom_budget = min(1.0, max(0.0, self._finite(observer.get("budget_telecom_ratio", 0.5))))
-            active_coverage = sum(
-                1 for row in all_cells
-                if self._tag(row.get("country_id")) == owner
-                and self._tag(row.get("target_country_id")) == target_id
-                and str(row.get("assignment") or "") == "espionage"
-                and str(row.get("status") or "") in {"active", "preparing"}
+            observer_budget = self._table_value_by_key(
+                countries, "id", owner, "budget_telecom_ratio", 0.5
+            )
+            telecom_budget = min(1.0, max(0.0, self._finite(observer_budget)))
+            active_coverage = (
+                self._metric_count(
+                    espionage_cell_counts,
+                    country_id=owner,
+                    target_country_id=target_id,
+                )
+                if espionage_cell_counts is not None
+                else sum(
+                    1 for row in all_cells
+                    if self._tag(row.get("country_id")) == owner
+                    and self._tag(row.get("target_country_id")) == target_id
+                    and str(row.get("assignment") or "") == "espionage"
+                    and str(row.get("status") or "") in {"active", "preparing"}
+                )
             )
             diminishing_coverage = 1.0 - (0.72 ** active_coverage)
             confidence *= 0.7 + 0.2 * telecom_budget + 0.1 * diminishing_coverage
@@ -777,7 +924,7 @@ class CovertOperationsSystem(ISystem):
                 "intelligence_coverage": coverage_band,
             }
         output = self._intelligence_snapshot(
-            state, target, mission, confidence, confidence_factors,
+            state, target, mission, confidence, confidence_factors, population_by_country,
         ) if result in {"success", "partial_success"} and "espionage" in str(mission.get("mission_type")) else {}
         if output:
             output["information_freshness"] = 0.5 + 0.5 * target_telecom
@@ -788,96 +935,173 @@ class CovertOperationsSystem(ISystem):
 
         region_id = 0
         route_frame = state.tables.get("covert_cell_routes")
-        if route_frame is not None and {"cell_id", "destination_region_id"}.issubset(route_frame.columns):
-            route = next(
-                (
-                    row
-                    for row in route_frame.to_dicts()
-                    if str(row.get("cell_id") or "") == str(cell.get("id") or "")
-                    and str(row.get("status") or "") in {"arrived", "in_transit"}
-                ),
-                None,
-            )
-            if route is not None:
-                region_id = int(route.get("destination_region_id") or 0)
+        if route_frame is not None and {"cell_id", "destination_region_id", "status"}.issubset(route_frame.columns):
+            route_match = route_frame.filter(
+                (pl.col("cell_id").cast(pl.Utf8, strict=False).fill_null("") == str(cell.get("id") or ""))
+                & pl.col("status").cast(pl.Utf8, strict=False).fill_null("").is_in(["arrived", "in_transit"])
+            ).select(pl.col("destination_region_id").cast(pl.Int64, strict=False)).head(1)
+            if not route_match.is_empty():
+                region_id = int(route_match.item() or 0)
         if region_id <= 0:
             governments = state.tables.get("country_governments")
             if governments is not None and {"country_id", "capital_region_id"}.issubset(governments.columns):
-                government = next(
-                    (
-                        row
-                        for row in governments.to_dicts()
-                        if self._tag(row.get("country_id")) == self._tag(target.get("id"))
-                    ),
-                    None,
+                capital = self._table_value_by_key(
+                    governments,
+                    "country_id",
+                    self._tag(target.get("id")),
+                    "capital_region_id",
+                    0,
                 )
-                if government is not None:
-                    region_id = int(government.get("capital_region_id") or 0)
+                region_id = int(capital or 0)
         regions = state.tables.get("regions")
         if regions is None or "id" not in regions.columns:
             return 1.0
-        region = next(
-            (row for row in regions.to_dicts() if int(row.get("id") or 0) == region_id),
-            None,
-        ) if region_id > 0 else None
-        if region is None:
-            target_id = self._tag(target.get("id"))
-            region = next(
-                (
-                    row
-                    for row in sorted(regions.to_dicts(), key=lambda item: int(item.get("id") or 0))
-                    if self._tag(row.get("owner")) == target_id
-                    or self._tag(row.get("controller")) == target_id
-                ),
-                None,
-            )
-        if region is None:
-            return 1.0
         column = "telecom_capacity" if "telecom_capacity" in regions.columns else "communications"
-        if column not in region:
+        if column not in regions.columns:
             return 1.0
-        return max(0.0, min(1.0, self._finite(region.get(column))))
+        region_value = None
+        if region_id > 0:
+            match = regions.filter(
+                pl.col("id").cast(pl.Int64, strict=False) == region_id
+            ).select(pl.col(column).cast(pl.Float64, strict=False)).head(1)
+            if not match.is_empty():
+                region_value = match.item()
+        if region_value is None:
+            target_id = self._tag(target.get("id"))
+            ownership_filters = [
+                pl.col(name).cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase() == target_id
+                for name in ("owner", "controller")
+                if name in regions.columns
+            ]
+            if ownership_filters:
+                match = (
+                    regions.with_columns(pl.col("id").cast(pl.Int64, strict=False).alias("_region_sort"))
+                    .filter(pl.any_horizontal(ownership_filters))
+                    .sort("_region_sort")
+                    .select(pl.col(column).cast(pl.Float64, strict=False))
+                    .head(1)
+                )
+                if not match.is_empty():
+                    region_value = match.item()
+        return 1.0 if region_value is None else max(0.0, min(1.0, self._finite(region_value)))
 
-    def _intelligence_snapshot(self, state, target, mission, confidence, confidence_factors=None):
+    def _table_value_by_key(self, frame, key_column, key, value_column, default=None):
+        if frame is None or not {key_column, value_column}.issubset(frame.columns):
+            return default
+        matches = frame.filter(
+            pl.col(key_column).cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase()
+            == str(key or "").strip().upper()
+        ).select(value_column).head(1)
+        return matches.item() if not matches.is_empty() else default
+
+    def _intelligence_snapshot(
+        self,
+        state,
+        target,
+        mission,
+        confidence,
+        confidence_factors=None,
+        population_by_country: pl.DataFrame | None = None,
+    ):
         category = str(mission.get("mission_type"))
+        country = self._tag(target.get("id"))
         if category == "military_espionage":
-            rows = state.tables.get("units")
-            owned = [] if rows is None else [row for row in rows.to_dicts() if self._tag(row.get("owner")) == self._tag(target.get("id"))]
+            units = state.tables.get("units")
+            owned = pl.DataFrame()
+            if units is not None and "owner" in units.columns:
+                owned = units.filter(
+                    pl.col("owner").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase() == country
+                )
+            unit_count = owned.height
+            if "readiness_status" in owned.columns:
+                ready_count = owned.filter(
+                    pl.col("readiness_status").cast(pl.Utf8, strict=False).fill_null("").is_in(["", "ready"])
+                ).height
+            else:
+                ready_count = unit_count
+
+            role_counts: dict[str, int] = {}
             design_table = state.tables.get("unit_designs")
-            designs = {} if design_table is None else {
-                str(row.get("id") or ""): row for row in design_table.to_dicts()
-            }
-            # Findings are durable observations, so retain aggregate roles without turning them into live roster access.
-            role_counts = Counter()
-            for unit in owned:
-                design = designs.get(str(unit.get("design_id") or ""), {})
-                role_name = design.get("class_name") or unit.get("unit_type") or "generic_unit"
-                role_counts[canonical_role(role_name)] += 1
+            if unit_count and "design_id" in owned.columns:
+                role_units = owned.select(
+                    pl.col("design_id").cast(pl.Utf8, strict=False).fill_null("").alias("_design_id"),
+                    pl.col("unit_type").cast(pl.Utf8, strict=False).fill_null("").alias("_unit_type")
+                    if "unit_type" in owned.columns else pl.lit("").alias("_unit_type"),
+                )
+                if design_table is not None and {"id", "class_name"}.issubset(design_table.columns):
+                    design_roles = (
+                        design_table.select(
+                            pl.col("id").cast(pl.Utf8, strict=False).fill_null("").alias("_design_id"),
+                            pl.col("class_name").cast(pl.Utf8, strict=False).fill_null("").alias("_class_name"),
+                        )
+                        .unique(subset=["_design_id"], keep="last", maintain_order=True)
+                    )
+                    role_units = role_units.join(design_roles, on="_design_id", how="left", maintain_order="left")
+                    class_name = pl.col("_class_name")
+                else:
+                    role_units = role_units.with_columns(pl.lit("").alias("_class_name"))
+                    class_name = pl.col("_class_name")
+                role_units = role_units.with_columns(
+                    pl.when(class_name != "")
+                    .then(class_name)
+                    .when(pl.col("_unit_type") != "")
+                    .then(pl.col("_unit_type"))
+                    .otherwise(pl.lit("generic_unit"))
+                    .alias("_role_name")
+                )
+                # Canonicalize only the small distinct role vocabulary, then aggregate all units in Polars.
+                distinct_roles = role_units.get_column("_role_name").unique().to_list()
+                role_lookup = pl.DataFrame({
+                    "_role_name": distinct_roles,
+                    "_role": [canonical_role(role) for role in distinct_roles],
+                })
+                grouped_roles = (
+                    role_units.join(role_lookup, on="_role_name", how="left")
+                    .group_by("_role")
+                    .agg(pl.len().alias("count"))
+                )
+                role_counts = {
+                    role: int(count)
+                    for role, count in grouped_roles.select("_role", "count").iter_rows()
+                }
             tracks = state.tables.get("research_tracks")
             production = state.tables.get("production_orders")
             weapons = state.tables.get("strategic_weapons")
-            country = self._tag(target.get("id"))
+            weapon_quantity = 0
+            if weapons is not None and {"country_id", "quantity"}.issubset(weapons.columns):
+                quantity = weapons.filter(
+                    pl.col("country_id").cast(pl.Utf8, strict=False).fill_null("") == country
+                ).select(pl.col("quantity").cast(pl.Int64, strict=False).fill_null(0).sum())
+                weapon_quantity = int(quantity.item() or 0)
             return {
-                "unit_count_estimate": len(owned),
-                "ready_count_estimate": sum(1 for row in owned if str(row.get("readiness_status") or "ready") == "ready"),
+                "unit_count_estimate": unit_count,
+                "ready_count_estimate": ready_count,
                 "unit_role_count_estimates": dict(sorted(role_counts.items())),
                 "research_track_count": 0 if tracks is None else tracks.filter(pl.col("country_id") == country).height,
                 "active_production_orders": 0 if production is None else production.filter((pl.col("country_id") == country) & pl.col("status").is_in(["queued", "paused"])).height,
-                "strategic_weapon_quantity_estimate": 0 if weapons is None else sum(int(row.get("quantity") or 0) for row in weapons.filter(pl.col("country_id") == country).to_dicts()),
+                "strategic_weapon_quantity_estimate": weapon_quantity,
                 "confidence": confidence,
                 "confidence_factors": dict(sorted((confidence_factors or {}).items())),
             }
         governments = state.tables.get("country_governments")
-        government = next((row for row in governments.to_dicts() if self._tag(row.get("country_id")) == self._tag(target.get("id"))), {}) if governments is not None else {}
+        government_type = self._table_value_by_key(
+            governments, "country_id", country, "government_type", "unknown"
+        )
         laws = state.tables.get("country_laws")
-        law_ids = [] if laws is None else [str(row.get("law_id") or "") for row in laws.filter(pl.col("country_id") == self._tag(target.get("id"))).head(10).to_dicts()]
+        law_ids = []
+        if laws is not None and {"country_id", "law_id"}.issubset(laws.columns):
+            law_ids = [
+                str(value or "")
+                for value in laws.filter(pl.col("country_id") == country).get_column("law_id").head(10).to_list()
+            ]
         regions = state.tables.get("regions")
-        population = 0.0
-        if regions is not None:
-            owned_regions = [row for row in regions.to_dicts() if self._tag(row.get("owner")) == self._tag(target.get("id"))]
-            population = sum(self._finite(row.get("population", row.get("total_population", 0.0))) for row in owned_regions)
+        population = (
+            self._metric_value(population_by_country, "population", country_id=country)
+            if population_by_country is not None
+            else self._country_population(state, country)
+        )
         return {
-            "government_estimate": str(government.get("government_type") or "unknown"),
+            "government_estimate": str(government_type or "unknown"),
             "economic_output_estimate": max(0.0, self._finite(target.get("gdp"))),
             "population_estimate": max(0.0, population),
             "budget_research_ratio_estimate": min(1.0, max(0.0, self._finite(target.get("budget_research_ratio")))),
@@ -892,12 +1116,29 @@ class CovertOperationsSystem(ISystem):
             if kind == "civilian_sabotage" and "economic_health" in target:
                 target["economic_health"] = max(0.0, min(1.0, self._finite(target.get("economic_health")) - 0.02 * scale))
             if kind == "military_sabotage" and "units" in state.tables:
-                rows = state.get_table("units").to_dicts()
-                target_units = sorted((row for row in rows if self._tag(row.get("owner")) == self._tag(target.get("id")) and int(row.get("strength") or 0) > 0), key=lambda row: str(row.get("id")))
-                if target_units:
-                    loss = max(1, int(round(int(target_units[0].get("strength") or 0) * 0.05 * scale)))
-                    target_units[0]["strength"] = max(0, int(target_units[0].get("strength") or 0) - loss)
-                    self._write(state, "units", rows)
+                units = state.get_table("units")
+                if {"id", "owner", "strength"}.issubset(units.columns):
+                    target_units = (
+                        units.filter(
+                            (pl.col("owner").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase() == self._tag(target.get("id")))
+                            & (pl.col("strength").cast(pl.Int64, strict=False).fill_null(0) > 0)
+                        )
+                        .with_columns(pl.col("id").cast(pl.Utf8, strict=False).fill_null("").alias("_sort_id"))
+                        .sort("_sort_id")
+                        .select("id", pl.col("strength").cast(pl.Int64, strict=False).fill_null(0))
+                        .head(1)
+                    )
+                    if not target_units.is_empty():
+                        unit_id = target_units.item(0, "id")
+                        strength = int(target_units.item(0, "strength") or 0)
+                        loss = max(1, int(round(strength * 0.05 * scale)))
+                        updated = units.with_columns(
+                            pl.when(pl.col("id") == unit_id)
+                            .then(pl.lit(max(0, strength - loss)).cast(units.schema["strength"]))
+                            .otherwise(pl.col("strength"))
+                            .alias("strength")
+                        )
+                        self._write_frame_if_changed(state, "units", updated)
         elif outcome in {"success", "partial_success"} and kind in {"assassination", "terrorism", "coup_attempt", "framing"}:
             government = next((row for row in governments if self._tag(row.get("country_id")) == self._tag(target.get("id"))), None)
             if government is not None:
@@ -919,21 +1160,21 @@ class CovertOperationsSystem(ISystem):
         owner = self._tag(mission.get("owner_country_id"))
         target = self._tag(mission.get("target_country_id"))
         title = str(mission.get("mission_type") or "Covert operation").replace("_", " ").title()
-        rows = table.to_dicts()
         owner_body = f"{title} against {target}: {result}. Attribution: {'confirmed' if attributed else 'unconfirmed'}."
         recipients = [(owner, owner_body)]
         if discovered:
             target_body = f"A covert incident was detected. Attribution: {owner if attributed else 'unknown'}. Details: {title}; outcome: {result}."
             recipients.append((target, target_body))
-        for recipient, body in recipients:
-            message_id = self._next_id("covert-message", rows)
-            rows.append({
+        additions = []
+        for index, (recipient, body) in enumerate(recipients, start=1):
+            message_id = self._next_id("covert-message", table.height + index - 1)
+            additions.append({
                 "id": message_id, "country_id": recipient, "category": "covert",
                 "subject": f"{title} {result.replace('_', ' ')}", "body": body,
                 "is_read": False, "created_at": str(int(state.time.total_minutes)),
             })
             state.events.append(EventMessageCreated(message_id, recipient, "covert"))
-        state.update_table("messages", pl.DataFrame(rows, schema=table.schema))
+        state.update_table("messages", pl.concat([table, pl.DataFrame(additions, schema=table.schema)], how="vertical"))
 
     def _country_population(self, state, country):
         regions = state.tables.get("regions")
@@ -942,11 +1183,10 @@ class CovertOperationsSystem(ISystem):
         population_column = next((name for name in ("population", "total_population") if name in regions.columns), None)
         if population_column is None:
             return 0.0
-        return sum(
-            self._finite(row.get(population_column))
-            for row in regions.to_dicts()
-            if self._tag(row.get("owner")) == country
-        )
+        value = regions.filter(
+            pl.col("owner").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase() == country
+        ).select(pl.col(population_column).cast(pl.Float64, strict=False).fill_null(0.0).sum())
+        return self._finite(value.item() if not value.is_empty() else 0.0)
 
     def _relation_value(self, rows, left, right):
         values = [

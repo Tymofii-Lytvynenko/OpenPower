@@ -1,5 +1,5 @@
 import arcade
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.views.base_view import BaseImGuiView
 from src.client.ui.core.composer import UIComposer

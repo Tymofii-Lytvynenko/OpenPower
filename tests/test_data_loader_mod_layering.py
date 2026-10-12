@@ -12,6 +12,12 @@ from src.shared.config import GameConfig
 
 
 class TestDataLoaderModLayering(unittest.TestCase):
+    def test_single_extension_layer_merges_duplicate_keys_without_multiplying_regions(self):
+        loader = DataLoader(GameConfig(Path(__file__).resolve().parent.parent))
+        extension = pl.DataFrame({"hex": ["#010203", "#010203"], "population": [10, 20], "label": ["Region", None]})
+        merged = loader._merge_layered_records([extension], keys=["hex"])
+        self.assertEqual(merged.to_dicts(), [{"hex": "#010203", "population": 20, "label": "Region"}])
+
     def setUp(self):
         self.temp_root = Path(__file__).resolve().parent.parent / ".temp"
         self.temp_root.mkdir(exist_ok=True)
@@ -101,7 +107,28 @@ class TestDataLoaderModLayering(unittest.TestCase):
             )
 
             config = GameConfig(project_root)
+            (project_root / "modules/base/data/countries/country_languages.toml").write_text(
+                '[country_languages.USA]\nEnglish = 60\nSpanish = 20\n'
+                '[country_languages.CAN]\nEnglish = 50\nFrench = 50\n'
+                '[country_languages.UNKNOWN]\nUnknown = 100\n', encoding="utf-8",
+            )
+            (project_root / "modules/expansion/data/countries/country_languages.toml").write_text(
+                '[country_languages.USA]\nEnglish = 90\nSpanish = 10\n', encoding="utf-8",
+            )
+            (project_root / "modules/base/data/countries/country_religions.toml").write_text(
+                '[country_religions.USA]\nChristian = 60\nOther = 40\n', encoding="utf-8",
+            )
             state = DataLoader(config).load_initial_state()
+
+            identities = state.get_table("country_identity_distribution")
+            self.assertEqual(identities.height, 6)
+            self.assertEqual(set(identities["country_id"].to_list()), {"USA", "CAN"})
+            english = identities.filter(
+                (pl.col("country_id") == "USA") & (pl.col("identity_id") == "english")
+            )
+            self.assertEqual(english.item(0, "population_share"), 90)
+            self.assertEqual(english.item(0, "source_year"), 0)
+            self.assertEqual(identities.filter(pl.col("identity_type") == "religion")["population_share"].sum(), 100)
 
             self.assertEqual(config.active_mods, ["base", "expansion"])
 

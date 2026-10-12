@@ -1,0 +1,167 @@
+{
+  "steps": [
+    {
+      "op": "input",
+      "target": "trade.offer.cash",
+      "value": 1000
+    },
+    {
+      "op": "click",
+      "target": "trade.offer.add_cash"
+    },
+    {
+      "op": "select",
+      "target": "trade.offer.region",
+      "value": "Lviv (3)"
+    },
+    {
+      "op": "click",
+      "target": "trade.offer.add_region"
+    },
+    {
+      "op": "click",
+      "target": "trade.offer.add_technology"
+    },
+    {
+      "op": "input",
+      "target": "trade.request.cash",
+      "value": 500
+    },
+    {
+      "op": "click",
+      "target": "trade.request.add_cash"
+    },
+    {
+      "op": "select",
+      "target": "trade.request.region",
+      "value": "Gdansk (4)"
+    },
+    {
+      "op": "click",
+      "target": "trade.request.add_region"
+    },
+    {
+      "op": "click",
+      "target": "trade.request.add_technology"
+    },
+    {
+      "op": "scroll",
+      "target": "trade.send"
+    },
+    {
+      "op": "click",
+      "target": "trade.send"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionCreateTradeDeal",
+      "fields": {
+        "source_country_tag": "UKR",
+        "target_country_tag": "POL",
+        "offered_assets": [
+          {
+            "type": "cash",
+            "amount": 1000
+          },
+          {
+            "type": "territory",
+            "region_id": 3
+          },
+          {
+            "type": "technology",
+            "branch": "land",
+            "level": 3
+          }
+        ],
+        "requested_assets": [
+          {
+            "type": "cash",
+            "amount": 500
+          },
+          {
+            "type": "territory",
+            "region_id": 4
+          },
+          {
+            "type": "technology",
+            "branch": "naval",
+            "level": 3
+          }
+        ]
+      }
+    },
+    {
+      "op": "click",
+      "target": "trade.deal.incoming-accept.accept"
+    },
+    {
+      "op": "scroll",
+      "target": "trade.deal.incoming-reject.reject"
+    },
+    {
+      "op": "click",
+      "target": "trade.deal.incoming-reject.reject"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionRespondTradeDeal",
+      "count": 2,
+      "fields": {
+        "deal_id": "incoming-reject",
+        "accept": false
+      }
+    },
+    {
+      "op": "scroll",
+      "target": "trade.deal.incoming-counter.counter"
+    },
+    {
+      "op": "click",
+      "target": "trade.deal.incoming-counter.counter"
+    },
+    {
+      "op": "scroll",
+      "target": "trade.send"
+    },
+    {
+      "op": "click",
+      "target": "trade.send"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionCounterTradeDeal",
+      "fields": {
+        "deal_id": "incoming-counter",
+        "counter_country_tag": "UKR",
+        "offered_assets": [
+          {
+            "type": "cash",
+            "amount": 1000
+          }
+        ],
+        "requested_assets": [
+          {
+            "type": "cash",
+            "amount": 500
+          }
+        ]
+      }
+    },
+    {
+      "op": "scroll",
+      "target": "trade.deal.outgoing.withdraw"
+    },
+    {
+      "op": "click",
+      "target": "trade.deal.outgoing.withdraw"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionWithdrawTradeDeal",
+      "fields": {
+        "deal_id": "outgoing",
+        "source_country_tag": "UKR"
+      }
+    }
+  ]
+}

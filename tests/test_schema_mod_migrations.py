@@ -204,10 +204,12 @@ class TestSchemaModMigrations(unittest.TestCase):
 
         self.assertEqual(manifests[0].api_version, 1)
         system_ids = {system.id for system in runtime.systems}
-        self.assertEqual(len(system_ids), 30)
+        self.assertEqual(len(system_ids), 32)
         self.assertIn("base.economic_health", system_ids)
         self.assertIn("base.migration", system_ids)
         self.assertIn("base.recognition", system_ids)
+        self.assertIn("base.identity_policy", system_ids)
+        self.assertIn("base.bilateral_trade", system_ids)
         self.assertIn("base.political_lifecycle", system_ids)
         self.assertIn("base.campaign", system_ids)
         self.assertIn("base.campaign_setup", system_ids)

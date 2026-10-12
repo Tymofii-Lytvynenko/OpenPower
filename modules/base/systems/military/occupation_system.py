@@ -53,42 +53,95 @@ class OccupationSystem(ISystem):
         existing = state.tables.get("occupations")
         if existing is not None and not any(isinstance(event, EventNewHour) for event in state.events):
             return
-        rows = existing.to_dicts() if existing is not None and not existing.is_empty() else []
-        by_region = {int(row.get("region_id") or 0): row for row in rows}
-        unit_rows = units.to_dicts()
         now = int(state.time.total_minutes)
-        for region in regions.to_dicts():
-            region_id = int(region.get("id") or 0)
-            controller = str(region.get("controller") or "").strip().upper()
-            owner = str(region.get("owner") or "").strip().upper()
-            if not controller or not owner or controller == owner:
-                continue
-            garrison = sum(
-                max(0, int(unit.get("strength") or 0))
-                for unit in unit_rows
-                if int(unit.get("current_region_id") or 0) == region_id
-                and str(unit.get("owner") or "").strip().upper() == controller
-                and not bool(unit.get("is_moving"))
+        current = existing if existing is not None else pl.DataFrame(schema=OCCUPATION_SCHEMA)
+        current = current.select(
+            [column for column in OCCUPATION_SCHEMA if column in current.columns]
+        )
+        for column, dtype in OCCUPATION_SCHEMA.items():
+            if column not in current.columns:
+                current = current.with_columns(pl.lit(None, dtype=dtype).alias(column))
+        current = current.select(
+            [
+                pl.col(column).cast(dtype, strict=False).alias(column)
+                for column, dtype in OCCUPATION_SCHEMA.items()
+            ]
+        ).with_row_index("_row_order").with_columns(pl.col("_row_order").cast(pl.Int64))
+
+        occupied = (
+            regions.with_row_index("_region_order")
+            .select(
+                pl.col("id").cast(pl.Int32, strict=False).fill_null(0).alias("region_id"),
+                pl.col("owner").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase().alias("_owner"),
+                pl.col("controller").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase().alias("controller_country_id"),
+                "_region_order",
             )
-            previous = by_region.get(region_id, {})
-            by_region[region_id] = {
-                "region_id": region_id,
-                "controller_country_id": controller,
-                "garrison_strength": garrison,
-                "resistance": 0.0,
-                "occupation_status": "active" if garrison > 0 else "contested",
-                "started_at_minute": int(
-                    previous.get("started_at_minute")
-                    if previous.get("started_at_minute") is not None
-                    else now
-                ),
-                "updated_at_minute": now,
-                "contested": garrison <= 0,
-            }
+            .filter(
+                (pl.col("_owner") != "")
+                & (pl.col("controller_country_id") != "")
+                & (pl.col("controller_country_id") != pl.col("_owner"))
+            )
+            .drop("_owner")
+        )
+        # Aggregate the roster once so every occupied region does not rescan all units.
+        garrisons = (
+            units.filter(~pl.col("is_moving").fill_null(False))
+            .select(
+                pl.col("current_region_id").cast(pl.Int32, strict=False).fill_null(0).alias("region_id"),
+                pl.col("owner").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase().alias("controller_country_id"),
+                pl.col("strength").cast(pl.Int64, strict=False).fill_null(0).clip(lower_bound=0).alias("_strength"),
+            )
+            .group_by(["region_id", "controller_country_id"])
+            .agg(pl.col("_strength").sum().alias("garrison_strength"))
+        )
+        updates = (
+            occupied.join(garrisons, on=["region_id", "controller_country_id"], how="left", maintain_order="left")
+            .join(
+                current.select("region_id", pl.col("started_at_minute").alias("_started_at_minute")),
+                on="region_id",
+                how="left",
+                maintain_order="left",
+            )
+            .with_columns(
+                pl.col("garrison_strength").fill_null(0).cast(pl.Int64),
+                pl.when(pl.col("_started_at_minute").is_null())
+                .then(pl.lit(now))
+                .otherwise(pl.col("_started_at_minute").cast(pl.Int64, strict=False))
+                .alias("started_at_minute"),
+                pl.lit(0.0).alias("resistance"),
+                pl.when(pl.col("garrison_strength").fill_null(0) > 0)
+                .then(pl.lit("active"))
+                .otherwise(pl.lit("contested"))
+                .alias("occupation_status"),
+                pl.lit(now).cast(pl.Int64).alias("updated_at_minute"),
+                (pl.col("garrison_strength").fill_null(0) <= 0).alias("contested"),
+            )
+            .drop("_started_at_minute")
+            .join(
+                current.select("region_id", "_row_order"),
+                on="region_id",
+                how="left",
+                maintain_order="left",
+            )
+            .with_columns(
+                pl.when(pl.col("_row_order").is_null())
+                .then(pl.lit(current.height) + pl.col("_region_order"))
+                .otherwise(pl.col("_row_order"))
+                .cast(pl.Int64)
+                .alias("_row_order")
+            )
+            .select([*OCCUPATION_SCHEMA, "_row_order"])
+        )
+        unchanged = current.join(
+            updates.select("region_id").unique(),
+            on="region_id",
+            how="anti",
+            maintain_order="left",
+        ).select([*OCCUPATION_SCHEMA, "_row_order"])
         frame = (
-            pl.DataFrame(list(by_region.values()), schema=OCCUPATION_SCHEMA)
-            if by_region
-            else pl.DataFrame(schema=OCCUPATION_SCHEMA)
+            pl.concat([unchanged, updates], how="vertical")
+            .sort("_row_order")
+            .select(list(OCCUPATION_SCHEMA))
         )
         self._update_table_if_changed(state, "occupations", frame)
 

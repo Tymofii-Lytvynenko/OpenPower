@@ -1,0 +1,91 @@
+{
+  "steps": [
+    {
+      "op": "assert",
+      "target": {
+        "label": "72.0%",
+        "type": "text"
+      },
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "identity.UKR.language.other.status",
+      "enabled": false
+    },
+    {
+      "op": "select",
+      "target": "identity.UKR.language.russian.status",
+      "value": "Restricted"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCountryIdentityPolicy",
+      "fields": {
+        "identity_type": "language",
+        "identity_id": "russian",
+        "status": "restricted",
+        "country_tag": "UKR"
+      }
+    },
+    {
+      "op": "click",
+      "target": "identity.UKR.language.ukrainian.details"
+    },
+    {
+      "op": "assert",
+      "target": {
+        "label": "Source year: Not recorded",
+        "type": "text"
+      },
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "identity.tab.religion"
+    },
+    {
+      "op": "assert",
+      "target": {
+        "label": "68.0%",
+        "type": "text"
+      },
+      "visible": true
+    },
+    {
+      "op": "select",
+      "target": "identity.UKR.religion.catholic.status",
+      "value": "Illegal"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCountryIdentityPolicy",
+      "count": 2,
+      "fields": {
+        "identity_type": "religion",
+        "identity_id": "catholic",
+        "status": "illegal"
+      }
+    },
+    {
+      "op": "assert",
+      "target": "identity.UKR.religion.other.status",
+      "enabled": false
+    },
+    {
+      "op": "scroll",
+      "target": "laws.open_migration"
+    },
+    {
+      "op": "assert",
+      "target": "laws.open_migration",
+      "enabled": true,
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "laws.open_politics",
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "steps": [
+    {"op": "input", "target": {"label": "Principal", "type": "input_float"}, "value": 2000000.0},
+    {"op": "assert", "target": {"label": "Principal", "type": "input_float"}, "value": 2000000.0},
+    {"op": "click", "target": {"label": "Creditor", "type": "begin_combo"}},
+    {"op": "click", "target": {"label": "POL", "type": "selectable"}},
+    {"op": "click", "target": {"label": "Request 12-monthly-payment financing", "type": "button"}},
+    {"op": "assert_action", "type": "ActionRequestDebtContract", "fields": {"principal": 2000000.0}}
+  ]
+}

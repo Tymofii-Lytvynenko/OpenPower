@@ -18,12 +18,14 @@ from modules.base.systems.military.research_program_system import ResearchProgra
 from modules.base.systems.military.strategic_warfare_system import StrategicWarfareSystem
 from modules.base.systems.politics.politics_system import PoliticsSystem
 from modules.base.systems.politics.political_lifecycle_system import PoliticalLifecycleSystem
+from modules.base.systems.politics.identity_policy_system import IdentityPolicySystem
 from modules.base.systems.world.ai_system import AISystem
 from modules.base.systems.world.bootstrap_system import BootstrapSystem
 from modules.base.systems.world.campaign_system import CampaignSetupSystem, CampaignSystem
 from modules.base.systems.world.history_system import HistorySystem
 from modules.base.systems.world.infrastructure_system import InfrastructureSystem
 from modules.base.systems.world.advanced_diplomacy_system import AdvancedDiplomacySystem
+from modules.base.systems.world.bilateral_trade_system import BilateralTradeSystem
 from modules.base.systems.world.diplomatic_balance_system import DiplomaticBalanceSystem
 from modules.base.systems.world.treaty_diplomacy import DiplomacySystem
 from modules.base.systems.world.random_events_system import RandomEventsSystem
@@ -43,6 +45,7 @@ def contribute():
         DiplomacySystem,
         DiplomaticBalanceSystem,
         RecognitionSystem,
+        IdentityPolicySystem,
         PoliticsSystem,
         PoliticalLifecycleSystem,
         PopulationSystem,
@@ -58,6 +61,7 @@ def contribute():
         TerritorySystem,
         AISystem,
         RandomEventsSystem,
+        BilateralTradeSystem,
         TradeSystem,
         ForeignOrderSystem,
         InternalEconomySystem,

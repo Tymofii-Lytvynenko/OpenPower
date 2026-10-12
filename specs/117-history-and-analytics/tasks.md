@@ -42,6 +42,7 @@
 - [X] T011 [US1] Add the opt-in 10-million-snapshot ranking gate in `tests/test_history_performance.py`; record the measured result and avoid extra tuning after the gate passes in `specs/117-history-and-analytics/research.md`.
 - [X] T012 [US1] Run focused history, IPC, persistence, and layer-boundary validation and record results in `specs/117-history-and-analytics/quickstart.md` and `specs/117-history-and-analytics/coverage.md`.
 - [ ] T013 [US1] Perform the desktop history workflow from `specs/117-history-and-analytics/quickstart.md` and record the human-visible 60-second cause-trail outcome in `specs/117-history-and-analytics/quickstart.md`.
+- [X] T014 [US1] Optimize repeated history sampling and compaction with update-scoped sample templates/series indexes and column-based candidate selection; verify table/state-hash parity and record integrated timing in `modules/base/systems/world/history_system.py` and `docs/SIMULATION_OPTIMIZATION_REPORT.md`.
 
 ## Dependencies
 

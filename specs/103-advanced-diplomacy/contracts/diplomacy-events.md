@@ -26,3 +26,13 @@
 - Process participants, clauses, and generated events in stable order; identical state plus identical inputs must yield identical ids, rows, and event order.
 - Malformed clauses and unauthorized actions are rejected without partial state changes.
 - Missing optional tables use schema-backed empty/default tables; invalid numeric values are bounded or rejected by the existing policy rather than converted to arbitrary gameplay state.
+
+## Bilateral trade commands and events
+
+- `ActionCreateTradeDeal`: authorized source country, target country, offered/requested asset arrays, and expiry duration in days (default 30, accepted range 1–365).
+- `ActionRespondTradeDeal`: pending deal ID, controlled recipient country, and accept/reject choice.
+- `ActionCounterTradeDeal`: incoming deal ID, controlled countering country, replacement packages, and a new bounded deadline. The original resolves as `countered`; the new deal stores reciprocal links.
+- `ActionWithdrawTradeDeal`: pending deal ID and controlled source country. Only its proposer may withdraw.
+- `EventDiplomaticTradeChanged`: deal ID, source/target IDs, lifecycle status, reason, and simulation minute. Territory-transfer settlement also emits `EventTerritoryOwnershipChanged` after state commit.
+
+The system rechecks authority, active-war exclusion, available cash, region ownership/occupation/minimum retained territory, and current research levels at creation and before acceptance. It validates the complete exchange before changing country reserves, region owners, capital fallback, or research tracks. Invalid or stale assets resolve with a reason and do not partially settle.

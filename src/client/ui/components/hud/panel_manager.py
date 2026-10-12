@@ -102,6 +102,11 @@ class PanelManager:
                 keep_open = entry.instance.render(state, context)
             except Exception:
                 logger.exception("Panel '%s' failed during render", entry.id)
+                from src.client.ui.core.testability import active_telemetry
+                import traceback
+                recorder = active_telemetry()
+                if recorder is not None:
+                    recorder.record_error(entry.id, traceback.format_exc())
                 continue
 
             if keep_open is False:

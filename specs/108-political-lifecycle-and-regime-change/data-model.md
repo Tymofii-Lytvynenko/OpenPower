@@ -40,6 +40,22 @@ Key: `id`. Stores country, crisis type, trigger and evidence, created/deadline/r
 
 Effects are bounded, typed, attributable outputs for existing dependents (tax, labor, migration, rights, economic behavior, domestic stability, military readiness). History rows record action/system source, previous/new values, cause, time, and result. Cause is `unknown` when no authoritative source record exists.
 
+## Language and religion identity
+
+### `country_identity_distribution` and `country_identity_groups`
+
+`country_identity_distribution` is the immutable normalized input projection from the layered `country_languages.toml` and `country_religions.toml` assets. Its identity key is `(country_id, identity_type, identity_id)`; fields include display name, share, source name/year/reference/note, and `is_other_bucket`. Only valid nonempty profiles for countries in the loaded world are materialized. Each profile is normalized to 100%. Unknown original source years remain `0` and are described as bundled gameplay estimates.
+
+`BootstrapSystem` seeds missing rows into `country_identity_groups` with legal status `legal`; policy updates modify this table while retaining share and source metadata. Rows are keyed by the same identity triple and contain `population_share`, `legal_status` (`official`, `legal`, `restricted`, `illegal`), `is_other_bucket`, source fields, `last_policy_change_minute`, and `last_updated_minute`. A profile supplied as `Other`, `Others`, `Unspecified`, or `Unclassified` is an aggregate bucket: it remains visible but cannot be targeted by policy actions.
+
+An identity-status action requires control of the country and a listed language/religion group. Restricting or banning a nonzero group is rejected if it would leave no other nonzero `official` or `legal` group in that same dimension. Rejections are journaled with a reason and do not mutate the profile.
+
+On an unpaused `EventNewDay`, each restricted group loses a fraction of its current share at an annual rate of 0.5%; an illegal group uses 2%. For elapsed days `d`, the fraction is `1 - (1 - annual_rate)^(d / 365.25)`. Removed share moves to the largest recognized group in the same dimension, with deterministic tie ordering by identity ID. The sum is preserved. This is a legal-pressure/identification approximation: it does not move people among regions or change national population.
+
+### `country_identity_signals` and political effects
+
+The signals row is keyed by `country_id` and stores language/religion group counts, averaged official/restricted/illegal shares, bounded policy pressure, and update minute. Each present dimension is computed separately; available dimensions are then averaged. `policy_pressure = clamp(illegal_share + 0.5 * restricted_share, 0, 100)`. For public rights, each dimension contributes `clamp((0.1 * official_share - 0.5 * restricted_share - illegal_share) / 100, -1, 1)`; the available-dimension mean is published as `public_rights`. Stability receives `-0.08 * policy_pressure` as a bounded attributable modifier. Identity changes also append `political_history` and emit policy/composition domain events.
+
 ## State bounds and ordering
 
 - Approval, stability, corruption, support, organization, turnout, and confidence are clamped to declared ranges; missing/non-finite input is normalized at the schema/system boundary.

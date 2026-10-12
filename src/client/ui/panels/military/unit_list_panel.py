@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.panel_context import PanelRenderContext
@@ -32,12 +32,13 @@ class UnitListPanel:
             return
 
         flags = imgui.TableFlags_.borders | imgui.TableFlags_.row_bg | imgui.TableFlags_.scroll_y | imgui.TableFlags_.sizing_stretch_prop
-        if not imgui.begin_table("unit_list_table", 7, flags, (0.0, 0.0)):
+        if not imgui.begin_table("unit_list_table", 8, flags, (0.0, 0.0)):
             return
 
         imgui.table_setup_column("UNIT")
         imgui.table_setup_column("TYPE", imgui.TableColumnFlags_.width_fixed, 130.0)
-        imgui.table_setup_column("STRENGTH", imgui.TableColumnFlags_.width_fixed, 90.0)
+        imgui.table_setup_column("PERSONNEL", imgui.TableColumnFlags_.width_fixed, 90.0)
+        imgui.table_setup_column("QTY", imgui.TableColumnFlags_.width_fixed, 70.0)
         imgui.table_setup_column("LOCATION")
         imgui.table_setup_column("STATUS", imgui.TableColumnFlags_.width_fixed, 90.0)
         imgui.table_setup_column("PROGRESS", imgui.TableColumnFlags_.width_fixed, 80.0)
@@ -52,6 +53,8 @@ class UnitListPanel:
             imgui.text(row.unit_type)
             imgui.table_next_column()
             imgui.text(f"{row.strength:,}".replace(",", " "))
+            imgui.table_next_column()
+            imgui.text(f"{row.quantity:,}".replace(",", " "))
             imgui.table_next_column()
             imgui.text(row.location)
             imgui.table_next_column()

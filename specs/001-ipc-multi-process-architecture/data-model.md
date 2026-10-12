@@ -5,7 +5,7 @@
 ### 1. `GameState` Container (`src/shared/state.py`)
 Central data structure containing all simulation tables and metadata.
 
-- `tables`: `Dict[str, pl.DataFrame]` — Dynamic collection of Polars DataFrames (`regions`, `countries`, `units`, `countries_relations`, `countries_treaties`, `countries_wars`, `domestic_production`, `resource_ledger`).
+- `tables`: `Dict[str, pl.DataFrame]` — Dynamic collection of Polars DataFrames; examples include `regions`, `countries`, `units`, `countries_relations`, `countries_treaties`, `countries_wars`, `domestic_production`, `resource_ledger`, and `history_snapshots`.
 - `time`: `TimeData` — Micro-component tracking game epoch progression.
 - `globals`: `Dict[str, Any]` — Simulation metadata (`tick`, `game_speed`).
 - `events`: `List[GameEvent]` — Transient event bus list cleared per tick.
@@ -28,7 +28,7 @@ Central data structure containing all simulation tables and metadata.
 ### 3. Acknowledged Arrow IPC Snapshot Payload (`GameState.to_ipc()`)
 ```json
 {
-  "protocol_version": 2,
+  "protocol_version": 3,
   "kind": "full",
   "sequence": 1,
   "base_sequence": 0,
@@ -42,6 +42,7 @@ Central data structure containing all simulation tables and metadata.
     "domestic_production": "<bytes>"
   },
   "removed_tables": [],
+  "appended_tables": {},
   "table_revisions": {"regions": 1, "countries": 1},
   "time": "<TimeData dataclass>",
   "globals": {
@@ -55,4 +56,10 @@ Central data structure containing all simulation tables and metadata.
 }
 ```
 
-Table payloads are Polars Arrow IPC byte buffers. The initial full snapshot carries all tables; later delta packets carry only changed table revisions, removed-table names, and journal additions relative to the last acknowledged base sequence. Delta packets carry `domain_events` and `command_results` instead of a full `journal` field.
+Table payloads are Polars Arrow IPC byte buffers. The initial full snapshot carries all tables; later delta packets carry changed table revisions, removed-table names, and journal additions relative to the last acknowledged base sequence. Protocol version 3 also supports append-only table tails. The sender uses this form for `history_snapshots` only while the acknowledged prefix matches; compaction or prefix replacement sends the whole changed table. An append payload records its offset from the acknowledged base so the decoder can skip overlap when several deltas share that base. Delta packets carry `domain_events` and `command_results` instead of a full `journal` field.
+
+Example delta append entry: `"appended_tables": {"history_snapshots": {"offset": 500, "data": "<Arrow IPC bytes>"}}`. Full snapshots do not carry append entries.
+
+### 4. Client snapshot inbox (`src/client/services/snapshot_inbox.py`)
+
+A daemon receiver thread reads `state_queue`, decodes full/delta packets in sequence, publishes the latest complete `GameState` behind a lock, and acknowledges successfully decoded sequence numbers. `ClientSessionProxy.update()` takes the latest published state at its 30Hz cadence and synchronizes the display clock on the client thread. Each decoded state has its own mutable table dictionary and journal lists; Polars frames may be shared because they are immutable, so a subsequent decode does not alter an already published snapshot. Closing the proxy stops and joins the inbox receiver.

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional, TYPE_CHECKING
 
 import numpy as np
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.controllers.camera_controller import CameraController
 from src.client.ui.core.theme import GAMETHEME

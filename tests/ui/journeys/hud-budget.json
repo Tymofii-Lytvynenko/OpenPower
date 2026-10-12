@@ -1,0 +1,13 @@
+{
+  "steps": [
+    {"op": "click", "target": "hud.panel.eco"},
+    {"op": "click", "target": "economy.budget_btn"},
+    {"op": "input", "target": "budget.income_tax_rate", "value": 35.0},
+    {"op": "drag", "target": "budget.allocation.budget_infra_ratio", "fraction": 0.7},
+    {"op": "click", "target": "budget.apply"},
+    {"op": "assert_action", "type": "ActionUpdateBudget", "fields": {
+      "country_tag": "UKR", "allocations.personal_income_tax_rate": 0.35,
+      "allocations.budget_infra_ratio": 0.7
+    }, "tolerance": 0.02}
+  ]
+}

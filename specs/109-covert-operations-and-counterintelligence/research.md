@@ -36,3 +36,7 @@ The controlled runtime was Python 3.14.1, Polars 1.36.1, Windows 11 build 26200,
 The final focused functional run passed **48 tests and 14 subtests** across covert lifecycle/resolution, AI policy/action integration, military presentation, and GameState IPC. New checks cover cell capacity/funding rejection, duplicate mission rejection, eight distinct deterministic mission profiles, pending-mission continuation through snapshot and save/load, and the rule that transit cells do not add counterintelligence coverage.
 
 Desktop acceptance criterion SC-005 (owner/target overview usability within 30 seconds) remains **unverified** because it requires live interactive-client acceptance. Headless tests do not establish that criterion; see open task T014.
+
+## Update-local shared route preparation
+
+Covert deployment and transit use the same `RegionRouteSnapshot` topology preparation and `RegionTravelTime` coordinate index as military movement. Both indexes are lazy and scoped to one `CovertOperationsSystem.update()`; route access, stationing, and segment decisions are still checked for each cell and refresh from the current map on the next update. The 2026-10-08 integrated 4,559-region scenario reduced covert-operations time on steps 2–3 from about 3.03 s to 0.27 s, with all table hashes and the canonical saved-state hash matching the baseline after three steps. This integrated result is separate from the isolated 5,000-cell SC-007 gate above and does not close the live overview usability task. See `docs/SIMULATION_OPTIMIZATION_REPORT.md`.

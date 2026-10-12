@@ -34,7 +34,7 @@ class LoadGameView(BaseImGuiView):
 
         if self.ui.begin_centered_panel("Load Game", screen_w, screen_h, w=500, h=600):
             self.ui.draw_title("LOAD GAME")
-            from imgui_bundle import imgui
+            from src.client.ui.core.instrumented_imgui import imgui
 
             # --- Save List ---
             imgui.begin_child("SaveList", (0, 400), True)

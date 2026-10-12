@@ -2,7 +2,7 @@
 
 ## 1. Action Queue Schema (`src/shared/actions.py`)
 
-All player intent dispatches implement the `GameAction` base class.
+Player intent is represented by `GameAction` subclasses. The client wraps each action in a `CommandEnvelope` before queue transport; this table lists representative gameplay actions, not the exhaustive action catalog.
 
 | Class Name | Constructor Signature | Primary Action Behavior |
 | :--- | :--- | :--- |
@@ -17,7 +17,7 @@ All player intent dispatches implement the `GameAction` base class.
 
 ## 2. Event Bus Schema (`src/shared/events.py`)
 
-Signals generated during simulation system ticks and delivered in `state.events`.
+Core time signals generated during simulation ticks and delivered in `state.events`. Domain-specific transient and journaled events are defined by their feature contracts.
 
 | Class Name | Attributes | Trigger Frequency |
 | :--- | :--- | :--- |
@@ -27,9 +27,11 @@ Signals generated during simulation system ticks and delivered in `state.events`
 
 ## 3. IPC Message Queue Contracts
 
-- **`action_queue`**: Enqueues `GameAction` objects or string control commands (`"SHUTDOWN"`, `"SAVE_MAP_CHANGES"`).
-- **`state_queue`**: Enqueues protocol-versioned Arrow IPC full snapshots and table deltas. Delta bases remain cumulative from the last acknowledged sequence if queue backpressure drops a packet.
+- **`action_queue`**: Enqueues `CommandEnvelope` objects containing `GameAction`, plus string control commands (`"SHUTDOWN"`, `"SAVE_MAP_CHANGES"`). The server drains it before ticking and between fixed steps in a catch-up batch.
+- **`state_queue`**: Enqueues protocol-versioned Arrow IPC full snapshots and table deltas. Protocol version 3 also supports append-only tails for `history_snapshots` while the acknowledged prefix is unchanged; compaction falls back to a changed-table replacement. Delta bases remain cumulative from the last acknowledged sequence if queue backpressure drops a packet.
 - **`progress_queue`**: Enqueues diagnostic tuples `(type_str, float_progress, status_str)`.
-- **`snapshot_ack_queue`**: Enqueues the latest decoded snapshot sequence so the server can advance the delta base.
+- **`snapshot_ack_queue`**: Enqueues decoded snapshot sequences so the server can advance the delta base only after successful reconstruction.
 
-`src/shared/snapshots.py` owns the full/delta packet format. Full packets include all current tables and journal state; deltas include changed table payloads, removed table names, and journal additions. `src/server/launcher.py` creates all four queues and `src/server/server_process.py` is their authoritative consumer/producer.
+`src/shared/snapshots.py` owns the protocol-versioned full/delta packet format. Full packets include all current tables and journal state; deltas include changed table payloads, removed table names, append tails, and journal additions. `src/client/services/snapshot_inbox.py` decodes packets away from the render callback and acknowledges them only after successful reconstruction. `src/server/launcher.py` creates all four queues and `src/server/server_process.py` is their authoritative consumer/producer.
+
+The server drains `snapshot_ack_queue` before ticking and between catch-up steps. It encodes and offers a snapshot after each completed fixed step; if the bounded state queue is full, the dropped packet does not advance the acknowledgement base, so subsequent deltas remain cumulative from the last successfully decoded sequence.

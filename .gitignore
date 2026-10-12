@@ -235,3 +235,6 @@ profile_results.html
 imgui.ini
 /DATA_SCHEMA.md
 /user_data
+
+# UI reports and screenshots are generated locally; checked-in baselines belong in tests/ui.
+/artifacts/ui/

@@ -38,3 +38,7 @@
 - Verify deterministic route selection, treaty/war changes, domain checks, readiness behavior, and route-leg arrival using integration tests.
 - Record the 10,000-unit movement/manpower benchmark separately from rendering and IPC measurements.
 - Keep human-visible map-color and route-inspection checks distinct from headless policy tests.
+
+## Update-local route preparation evidence
+
+The 2026-10-08 integrated simulation comparison prepared region topology and coordinate indexes once per system update and reused them for movement searches; it did not persist caches across updates. In the `energy_crisis` 4,559-region scenario, military-system time on steps 2–3 fell from 1.43–1.47 s to 0.67–0.68 s; every table hash and the canonical saved-state hash after three steps matched the baseline. New regression modules cover graph snapshot invalidation and travel-time indexing. This is integrated workload evidence, not a replacement for the separate 10,000-unit movement gate or the open desktop route-color acceptance. Details are in `docs/SIMULATION_OPTIMIZATION_REPORT.md`.

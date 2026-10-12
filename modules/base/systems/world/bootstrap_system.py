@@ -1,5 +1,9 @@
+import json
 import polars as pl
 from typing import Any
+
+from modules.base.systems.military.capability_catalog import get_role_profile, project_capabilities
+from modules.base.systems.military.unit_catalog import MILITARY_UNIT_TYPES
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.state import GameState
 
@@ -10,8 +14,8 @@ class BootstrapSystem(ISystem):
     """
 
     access = SystemAccess(
-        reads=frozenset({'countries', 'regions', 'countries_treaties', 'countries_wars', 'migration_policies'}),
-        writes=frozenset({'country_governments', 'country_laws', 'migration_policies', 'messages', 'news_items', 'objectives', 'research_tracks', 'unit_designs', 'strategic_weapons'}),
+        reads=frozenset({'countries', 'regions', 'countries_treaties', 'countries_wars', 'migration_policies', 'country_identity_distribution', 'country_identity_groups'}),
+        writes=frozenset({'country_governments', 'country_laws', 'migration_policies', 'country_identity_groups', 'messages', 'news_items', 'objectives', 'research_tracks', 'unit_designs', 'strategic_weapons'}),
         phase=SystemPhase.BOOTSTRAP,
     )
 
@@ -30,6 +34,51 @@ class BootstrapSystem(ISystem):
         if govs is None or govs.is_empty():
             self._seed_all_content(state)
         self._seed_migration_policies(state)
+        self._seed_country_identity_groups(state)
+
+    def _seed_country_identity_groups(self, state: GameState) -> None:
+        if state.globals.get("country_identity_groups_seeded"):
+            return
+        definitions = state.tables.get("country_identity_distribution")
+        groups = state.tables.get("country_identity_groups")
+        if definitions is None or groups is None or definitions.is_empty():
+            return
+
+        known = {
+            (
+                self._tag(row.get("country_id")),
+                str(row.get("identity_type") or "").strip().lower(),
+                str(row.get("identity_id") or "").strip().lower(),
+            )
+            for row in groups.iter_rows(named=True)
+        }
+        now = max(0, int(state.time.total_minutes))
+        additions = []
+        for row in definitions.iter_rows(named=True):
+            key = (
+                self._tag(row.get("country_id")),
+                str(row.get("identity_type") or "").strip().lower(),
+                str(row.get("identity_id") or "").strip().lower(),
+            )
+            if not all(key) or key in known:
+                continue
+            additions.append(
+                {
+                    **row,
+                    "legal_status": "legal",
+                    "last_policy_change_minute": 0,
+                    "last_updated_minute": now,
+                }
+            )
+        if additions:
+            state.update_table(
+                "country_identity_groups",
+                pl.concat(
+                    [groups, pl.DataFrame(additions, schema=groups.schema, strict=False)],
+                    how="vertical_relaxed",
+                ),
+            )
+        state.globals["country_identity_groups_seeded"] = True
 
     def _seed_migration_policies(self, state: GameState) -> None:
         countries = state.tables.get("countries")
@@ -375,37 +424,74 @@ class BootstrapSystem(ISystem):
         if countries is None or countries.is_empty() or "id" not in countries.columns:
             return []
 
-        design_templates = (
-            ("ground", "Army", "Standard Corps", 0.55, 12_000_000.0, 0.45, 0.60),
-            ("air", "Air Wing", "Interceptor Wing", 0.58, 48_000_000.0, 0.82, 0.72),
-            ("naval", "Fleet", "Escort Squadron", 0.52, 95_000_000.0, 0.38, 0.68),
-            ("strategic", "Command", "Deterrence Wing", 0.60, 140_000_000.0, 0.30, 0.80),
-        )
-
         rows: list[dict[str, Any]] = []
         for row in countries.iter_rows(named=True):
             country_id = str(row["id"])
             if not self._is_playable(row):
                 continue
 
-            development = self._as_ratio(row.get("human_dev"), 0.45)
-            for branch, class_name, display_name, quality, cost, speed, firepower in design_templates:
+            technology = self._military_technology_index(row)
+            for unit_type in MILITARY_UNIT_TYPES:
+                profile = get_role_profile(unit_type.role)
+                capabilities = self._country_unit_capabilities(profile, technology)
+                gun_damage = capabilities.get("gun_damage", 0.0)
+                missile_damage = capabilities.get("missile_damage", 0.0)
+                firepower = min(1.0, max(0.0, ((gun_damage + missile_damage) / 20.0) + (technology * 0.25)))
+                quantity = max(0, int(row.get(unit_type.quantity_column) or 0))
                 rows.append(
                     {
-                        "id": f"{country_id}-{branch}-standard",
+                        "id": f"{country_id}-{unit_type.role}-2001",
                         "country_id": country_id,
-                        "branch": branch,
-                        "class_name": class_name,
-                        "display_name": display_name,
-                        "quality": max(0.20, min(0.95, quality + (development * 0.20))),
-                        "cost": cost,
-                        "maintenance_cost": 0.0,
-                        "speed": speed,
+                        "branch": profile.domain,
+                        "class_name": unit_type.display_name,
+                        "display_name": f"{country_id} {unit_type.display_name} 2001",
+                        "starting_quantity_2001": quantity,
+                        "quality": technology,
+                        "cost": unit_type.unit_cost * (0.85 + (technology * 0.30)),
+                        "maintenance_cost": unit_type.maintenance_cost,
+                        "speed": capabilities.get("speed", 0.0),
                         "firepower": firepower,
+                        "domain": profile.domain,
+                        "capabilities_json": json.dumps(capabilities, sort_keys=True, separators=(",", ":")),
+                        "valid_targets_json": json.dumps(list(profile.valid_targets), separators=(",", ":")),
+                        "vulnerabilities_json": json.dumps(list(profile.vulnerabilities), separators=(",", ":")),
+                        "research_level": max(0, min(10, int(round(technology * 10.0)))),
+                        "research_requirements_json": "{}",
                     }
                 )
 
         return rows
+
+    def _military_technology_index(self, row: dict[str, Any]) -> float:
+        development = self._as_ratio(row.get("human_dev"), 0.45)
+        research = self._as_ratio(row.get("budget_research_ratio"), 0.10)
+        return max(0.35, min(0.98, 0.45 + (development * 0.50) + (research * 0.10)))
+
+    def _country_unit_capabilities(
+        self,
+        profile: Any,
+        technology: float,
+    ) -> dict[str, float]:
+        base = project_capabilities(profile)
+        multipliers = {
+            "speed": 0.75 + (technology * 0.25),
+            "maneuverability": 0.70 + (technology * 0.30),
+            "sensors": 0.55 + (technology * 0.45),
+            "gun_range": 0.75 + (technology * 0.25),
+            "gun_precision": 0.50 + (technology * 0.50),
+            "gun_damage": 0.70 + (technology * 0.30),
+            "missile_payload": 0.80 + (technology * 0.20),
+            "missile_range": 0.65 + (technology * 0.35),
+            "missile_precision": 0.50 + (technology * 0.50),
+            "missile_damage": 0.70 + (technology * 0.30),
+            "stealth": 0.70 + (technology * 0.30),
+            "countermeasures": 0.50 + (technology * 0.50),
+            "armor": 0.80 + (technology * 0.20),
+        }
+        return {
+            key: value * multipliers.get(key, 1.0)
+            for key, value in base.items()
+        }
 
     def _build_strategic_weapons(self, state: GameState) -> list[dict[str, Any]]:
         countries = state.tables.get("countries")
@@ -414,30 +500,26 @@ class BootstrapSystem(ISystem):
 
         rows: list[dict[str, Any]] = []
         profiles = self._strategic_weapon_profiles(state)
-        weapon_classes = ["icbm"]
-        if "slbm" in profiles:
-            weapon_classes.append("slbm")
+        weapon_classes = ("icbm", "slbm") if "slbm" in profiles else ("icbm",)
         for row in countries.iter_rows(named=True):
             country_id = str(row["id"])
             if not self._is_playable(row):
                 continue
 
-            military_count = float(row.get("military_count") or 0.0)
-            reserves = float(row.get("money_reserves") or 0.0)
-            quantity = 0
-            if military_count >= 700_000 and reserves >= 20_000_000_000:
-                quantity = 12
-            elif military_count >= 350_000 and reserves >= 5_000_000_000:
-                quantity = 4
+            land_missiles = max(0, int(row.get("military_strategic_missiles_quantity_2001") or 0))
+            missile_submarines = max(
+                0,
+                int(row.get("military_ballistic_missile_submarines_quantity_2001") or 0),
+            )
 
             for weapon_class in weapon_classes:
                 profile = profiles.get(weapon_class, {})
                 if profile.get("enabled") is False:
                     continue
 
-                default_quantity = quantity if weapon_class == "icbm" else 0
+                default_quantity = land_missiles if weapon_class == "icbm" else missile_submarines * 16
                 initial_quantity = max(0, int(profile.get("initial_quantity", default_quantity)))
-                default_ready = int(initial_quantity * 0.75) if weapon_class == "icbm" else 0
+                default_ready = int(initial_quantity * 0.75)
                 initial_ready = min(initial_quantity, max(0, int(profile.get("initial_ready", default_ready))))
                 payload_cap = min(10, max(1, int(profile.get("max_payload_level", 1) or 1)))
                 payload_level = min(payload_cap, max(1, int(profile.get("payload_level", 1) or 1)))

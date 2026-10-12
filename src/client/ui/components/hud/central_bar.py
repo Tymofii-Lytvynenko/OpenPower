@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from imgui_bundle import icons_fontawesome_6, imgui
+from imgui_bundle import icons_fontawesome_6
+from src.client.ui.core.instrumented_imgui import imgui
+from src.client.ui.core.testability import record_last_item
 
 from src.client.renderers.flag_renderer import FlagRenderer
 from src.client.ui.components.hud.country_selector import (
@@ -46,6 +48,11 @@ class HudMetrics:
 
 class CentralBar:
     """Compact bottom HUD composed from measured ImGui controls."""
+
+    def _button(self, label, size, test_id):
+        clicked = imgui.button(label, size)
+        record_last_item(test_id, label, "button")
+        return clicked
 
     def __init__(
         self,
@@ -129,6 +136,10 @@ class CentralBar:
                 self._switch_request = self.country_selector.render(state, self.active_tag)
             except Exception as exc:
                 print(f"[CentralBar] Render Error: {exc}")
+                from src.client.ui.core.testability import active_telemetry
+                recorder = active_telemetry()
+                if recorder is not None:
+                    recorder.record_error("CentralBar", str(exc))
             finally:
                 imgui.end()
 
@@ -328,7 +339,7 @@ class CentralBar:
         button_label = f"{display_name} {icons_fontawesome_6.ICON_FA_CARET_UP}##country"
         imgui.push_style_color(imgui.Col_.button, (0.20, 0.21, 0.21, 1.0))
         imgui.push_style_color(imgui.Col_.button_hovered, (0.30, 0.32, 0.31, 1.0))
-        if imgui.button(button_label, (metrics.country_button_width, metrics.top_row_height)):
+        if self._button(button_label, (metrics.country_button_width, metrics.top_row_height), "hud.country"):
             self.country_selector.open(
                 (section_screen_pos.x, section_screen_pos.y),
                 metrics.country_width,
@@ -355,11 +366,11 @@ class CentralBar:
             metrics.tab_height,
         )
         imgui.same_line()
-        if imgui.button("RELATIONS", (metrics.relations_width, metrics.tab_height)):
+        if self._button("RELATIONS", (metrics.relations_width, metrics.tab_height), "hud.relations"):
             if self._open_relations_cb:
                 self._open_relations_cb()
         imgui.same_line()
-        if imgui.button("MORE INFO", (metrics.more_info_width, metrics.tab_height)):
+        if self._button("MORE INFO", (metrics.more_info_width, metrics.tab_height), "hud.more_info"):
             if self._open_more_info_cb:
                 self._open_more_info_cb()
         imgui.pop_style_var(2)
@@ -371,7 +382,7 @@ class CentralBar:
 
         if not self.is_own:
             imgui.begin_disabled()
-        ai_clicked = imgui.button(icons_fontawesome_6.ICON_FA_BRAIN, button_size)
+        ai_clicked = self._button(icons_fontawesome_6.ICON_FA_BRAIN, button_size, "hud.objectives")
         if not self.is_own:
             imgui.end_disabled()
         if ai_clicked:
@@ -386,14 +397,14 @@ class CentralBar:
             imgui.set_tooltip(tooltip)
 
         imgui.same_line()
-        if imgui.button(icons_fontawesome_6.ICON_FA_CHART_LINE, button_size):
+        if self._button(icons_fontawesome_6.ICON_FA_CHART_LINE, button_size, "hud.statistics"):
             if self._open_statistics_cb:
                 self._open_statistics_cb()
         if imgui.is_item_hovered():
             imgui.set_tooltip("Statistics")
 
         imgui.same_line()
-        if imgui.button(icons_fontawesome_6.ICON_FA_ENVELOPE, button_size):
+        if self._button(icons_fontawesome_6.ICON_FA_ENVELOPE, button_size, "hud.mail"):
             if self._open_mail_cb:
                 self._open_mail_cb()
         if imgui.is_item_hovered():
@@ -410,9 +421,10 @@ class CentralBar:
         metrics: HudMetrics,
     ) -> None:
         imgui.push_style_color(imgui.Col_.button, (0.11, 0.12, 0.12, 1.0))
-        if imgui.button(
+        if self._button(
             icons_fontawesome_6.ICON_FA_HOURGLASS_HALF,
             (metrics.clock_width, metrics.control_height),
+            "hud.clock",
         ):
             self.show_speed_controls = not self.show_speed_controls
         imgui.pop_style_color()
@@ -464,7 +476,7 @@ class CentralBar:
         if is_paused:
             imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.interaction_active)
             imgui.push_style_color(imgui.Col_.button_hovered, GAMETHEME.colors.interaction_active)
-        if imgui.button("||", button_size):
+        if self._button("||", button_size, "hud.pause"):
             net.send_action(ActionSetPaused("local", not is_paused))
         if is_paused:
             imgui.pop_style_color(2)
@@ -475,7 +487,7 @@ class CentralBar:
             if is_active:
                 imgui.push_style_color(imgui.Col_.button, GAMETHEME.colors.interaction_active)
                 imgui.push_style_color(imgui.Col_.button_hovered, GAMETHEME.colors.interaction_active)
-            if imgui.button(str(speed), button_size):
+            if self._button(str(speed), button_size, f"hud.speed.{speed}"):
                 net.send_action(ActionSetPaused("local", False))
                 net.send_action(ActionSetGameSpeed("local", speed))
             if is_active:

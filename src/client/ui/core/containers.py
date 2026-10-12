@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from typing import Optional
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
+from src.client.ui.core.testability import semantic_region
 
 class WindowManager:
     """
@@ -10,11 +11,17 @@ class WindowManager:
     @staticmethod
     @contextmanager
     def window(title: str, x: float = 0, y: float = 0, w: float = 300, h: float = 400, 
-               closable: bool = True, flags=0):
+               closable: bool = True, flags=0, test_id: str | None = None):
         """
         Creates a standard panel window.
         Yields 'True' if the window is open and expanded.
         """
+        viewport = imgui.get_io().display_size
+        # Panels authored on a wide desktop must remain reachable on smaller
+        # viewports; overflowing content remains accessible through scrolling.
+        if viewport.x > 0 and viewport.y > 0:
+            w, h = min(w, viewport.x), min(h, viewport.y)
+            x, y = max(0, min(x, viewport.x - w)), max(0, min(y, viewport.y - h))
         imgui.set_next_window_pos((x, y), imgui.Cond_.first_use_ever)
         imgui.set_next_window_size((w, h), imgui.Cond_.first_use_ever)
         
@@ -24,10 +31,10 @@ class WindowManager:
         
         try:
             # Yield 'opened' state to caller so they know if 'X' was clicked
-            if expanded:
-                yield opened
+            if test_id is not None:
+                with semantic_region(test_id, title, visible=opened and expanded):
+                    yield opened
             else:
-                # Still yield opened state even if collapsed, so we can detect close
                 yield opened
         finally:
             imgui.end()

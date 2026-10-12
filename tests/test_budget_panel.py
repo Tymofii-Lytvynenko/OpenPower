@@ -6,6 +6,7 @@ import polars as pl
 import pytest
 
 import src.client.ui.panels.budget_panel as budget_panel_module
+import src.client.ui.core.primitives as primitives_module
 from src.client.ui.panels.budget_panel import BudgetPanel
 from src.shared.actions import ActionUpdateBudget
 
@@ -41,11 +42,13 @@ def test_budget_row_more_button_opens_its_own_details_popup(
     )
     right_align_text = Mock()
     monkeypatch.setattr(budget_panel_module, "imgui", imgui)
+    monkeypatch.setattr(primitives_module, "imgui", imgui)
     monkeypatch.setattr(budget_panel_module.Prims, "right_align_text", right_align_text)
 
     BudgetPanel()._draw_standard_row(label, value, has_more=True, detail_key=detail_key)
 
     popup_id = f"Budget details##{detail_key}"
+    imgui.button.assert_called_once_with(f"more###budget.details.{detail_key}")
     imgui.open_popup.assert_called_once_with(popup_id)
     imgui.begin_popup.assert_called_once_with(popup_id)
     imgui.text_wrapped.assert_called_once_with(
@@ -109,10 +112,11 @@ def test_personal_tax_slider_displays_and_stores_percent_while_action_uses_ratio
         slider_float=Mock(return_value=(True, 72.0)),
     )
     monkeypatch.setattr(budget_panel_module, "imgui", imgui)
+    monkeypatch.setattr(primitives_module, "imgui", imgui)
 
     panel._draw_income_tax_slider(is_own=True)
 
     imgui.slider_float.assert_called_once_with(
-        "PERSONAL INCOME TAX RATE", 20.0, 0.0, 100.0, "%.0f%%"
+        "PERSONAL INCOME TAX RATE###budget.income_tax_rate", 20.0, 0.0, 100.0, "%.0f%%"
     )
     assert panel.draft_allocations[panel.PERSONAL_INCOME_TAX_KEY] == 0.72

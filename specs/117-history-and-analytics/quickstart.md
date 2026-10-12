@@ -5,10 +5,10 @@ Run from the repository root with the project virtual environment active.
 ## Focused regressions
 
 ```powershell
-python -m pytest tests/test_history_system.py tests/test_history_panel.py tests/test_layer_boundaries.py tests/test_game_state_ipc.py -q
+python -m pytest tests/test_history_system.py tests/test_history_panel.py tests/test_layer_boundaries.py tests/test_game_state_ipc.py tests/test_snapshot_protocol.py -q
 ```
 
-This validates configured and derived measures, changed/due/missing observations, idempotent event evidence, relationship/battle timelines, common-boundary comparisons, unit safety, deterministic ranking/ties, retention/downsampling, UI query/render projections, layer placement, and state synchronization/save-load continuation.
+This validates configured and derived measures, changed/due/missing observations, idempotent event evidence, relationship/battle timelines, common-boundary comparisons, unit safety, deterministic ranking/ties, retention/downsampling, UI query/render projections, layer placement, state synchronization/save-load continuation, and version-3 append-tail synchronization for `history_snapshots`.
 
 ## 10-million-snapshot performance gate
 
@@ -23,7 +23,7 @@ The controlled workload has 10,000,000 observations across 200 country series. S
 
 - Focused command from the section above plus `tests/test_history_performance.py`, `tests/test_layer_boundaries.py`, `tests/test_game_state_ipc.py`, and `tests/test_save_writer_atomicity.py`: **40 passed, 1 skipped** in 3.92 seconds (2026-10-07, project virtual environment, Windows). The skip is the opt-in 10-million-snapshot test; its latest separately recorded measurement is 2.67 ms.
 - The save/load continuation test now confirms the history tables and deterministic samples match after IPC and disk persistence. Runtime-local `source_revision` counters may differ after loading because table revisions are reconstructed; they do not affect observations or gameplay.
-- SC-007 ranking latency passes at 2.67 ms. Aggregate retention/storage budget is not defined, and this benchmark does not measure 10-million-row recording/compaction; see the open measurement issue in `research.md`.
+- SC-007 ranking latency passes at 2.67 ms. Aggregate retention/storage budget is not defined, and neither the ranking benchmark nor the integrated optimization scenario measures 10-million-row recording/compaction; see the open measurement issue in `research.md`.
 - Desktop workflow: pending; no visible game session was available for human acceptance.
 
 ## Client acceptance

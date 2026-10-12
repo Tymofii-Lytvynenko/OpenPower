@@ -41,22 +41,41 @@ class BattleStrategyPolicy:
         if not controlled:
             return self._empty_candidates()
 
+        active_battle_frame = battles_frame.filter(
+            pl.col("status").cast(pl.Utf8).fill_null("").replace("", "active").str.strip_chars().str.to_lowercase().is_in(
+                ["active", "ongoing", "stalemate"]
+            )
+        ).select("id").collect()
         active_battles = {
-            str(row.get("id") or "")
-            for row in battles_frame.select("id", "status").collect().to_dicts()
-            if str(row.get("status") or "active").strip().lower() in {"active", "ongoing", "stalemate"}
+            str(value or "") for value in active_battle_frame.get_column("id").to_list()
         }
         if not active_battles:
             return self._empty_candidates()
 
-        unit_rows = units_frame.collect().to_dicts()
+        participant_rows = participants_frame.filter(
+            pl.col("battle_id").cast(pl.Utf8).is_in(active_battles)
+        ).collect().to_dicts()
+        participant_unit_ids = sorted({str(row.get("unit_id") or "") for row in participant_rows if row.get("unit_id")})
+        if not participant_unit_ids:
+            return self._empty_candidates()
+        unit_rows = (
+            units_frame.filter(pl.col("id").cast(pl.Utf8).is_in(participant_unit_ids))
+            .collect()
+            .to_dicts()
+        )
         unit_by_id = {str(row.get("id") or ""): row for row in unit_rows}
         regions_frame = context.table("regions")
         safe_region_ids = set()
         if regions_frame is not None:
             region_columns = set(regions_frame.collect_schema().names())
-            if "id" in region_columns:
-                for region in regions_frame.collect().to_dicts():
+            region_ids = sorted({int(row.get("current_region_id") or 0) for row in unit_rows if int(row.get("current_region_id") or 0) > 0})
+            if "id" in region_columns and region_ids:
+                region_frame = regions_frame.filter(pl.col("id").is_in(region_ids)).select(
+                    "id",
+                    *( [pl.col("owner")] if "owner" in region_columns else [pl.lit("").alias("owner")] ),
+                    *( [pl.col("controller")] if "controller" in region_columns else [pl.lit("").alias("controller")] ),
+                ).collect()
+                for region in region_frame.to_dicts():
                     region_owner = str(region.get("owner") or "").strip().upper()
                     controller = str(region.get("controller") or region_owner).strip().upper()
                     if region_owner or controller:
@@ -68,7 +87,9 @@ class BattleStrategyPolicy:
             if {"id", "money_reserves"}.issubset(country_columns):
                 reserves_by_country = {
                     str(row.get("id") or "").strip().upper(): max(0.0, self._finite(row.get("money_reserves")))
-                    for row in country_frame_data.select("id", "money_reserves").collect().to_dicts()
+                    for row in country_frame_data.filter(
+                        pl.col("id").cast(pl.Utf8).str.to_uppercase().is_in(sorted(controlled))
+                    ).select("id", "money_reserves").collect().to_dicts()
                 }
         reorganization_cost = max(0.0, self._finite(context.globals.get("battle_reorganization_cost_per_strength", 0.01)))
         cohesion_threshold = max(0.0, min(1.0, self._finite(context.globals.get("battle_ai_reorganize_cohesion_threshold", 0.4))))
@@ -80,7 +101,9 @@ class BattleStrategyPolicy:
             if {"unit_id", "status"}.issubset(posture_columns):
                 active_unit_ids = {
                     str(row.get("unit_id") or "")
-                    for row in existing_postures.select("unit_id", "status").collect().to_dicts()
+                    for row in existing_postures.filter(
+                        pl.col("unit_id").cast(pl.Utf8).is_in(participant_unit_ids)
+                    ).select("unit_id", "status").collect().to_dicts()
                     if str(row.get("status") or "").strip().lower()
                     in {"active", "retreating", "reorganizing", "returning"}
                 }
@@ -89,7 +112,6 @@ class BattleStrategyPolicy:
         blocked_groups: set[tuple[str, str, str, str]] = set()
         side_strengths: dict[tuple[str, str], float] = {}
         remaining_budget = dict(reserves_by_country)
-        participant_rows = participants_frame.collect().to_dicts()
         for participant in participant_rows:
             battle_id = str(participant.get("battle_id") or "")
             unit_id = str(participant.get("unit_id") or "")

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import math
 
-from imgui_bundle import icons_fontawesome_6, imgui
+from imgui_bundle import icons_fontawesome_6
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.renderers.flag_renderer import FlagRenderer
 from src.shared.actions import ActionRespondToRandomEvent, ActionSetRandomEventControls

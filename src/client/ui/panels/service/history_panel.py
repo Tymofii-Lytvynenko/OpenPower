@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 import polars as pl
 
 from src.client.ui.core.containers import WindowManager

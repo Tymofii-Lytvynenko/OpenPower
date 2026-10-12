@@ -60,5 +60,5 @@ single collect() pass (Rust backend)
 
 ## Assumptions & Dependencies
 
-- **Assumption**: `DeclarativeAIFramework` (`src/engine/ai_framework.py`) handles registration and single-pass DataFrame collection.
+- **Assumption**: `DeclarativeAIFramework` (`src/core/ai_framework.py`) handles registration and single-pass DataFrame collection; gameplay scoring policies remain in the base module.
 - **Dependency**: `AISystem` in `modules/base/systems/world/ai_system.py` wires scorers and injects actions into `state.current_actions`.

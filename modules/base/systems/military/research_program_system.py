@@ -21,8 +21,9 @@ from src.shared.state import GameState
 from src.shared.system_state import SYSTEM_STATE_HELPER
 from modules.base.systems.military.production_policy import (
     DEFAULT_PRODUCTION_COEFFICIENT,
-    allocate_production_capacity,
-    annual_production_capacity,
+    allocate_production_capacity_frame,
+    annual_production_capacity_frame,
+    initialize_production_order_work,
 )
 from modules.base.systems.military.capability_catalog import get_role_profile, project_capabilities
 from modules.base.systems.military.research_eligibility_policy import research_requirements_met
@@ -361,22 +362,42 @@ class ResearchProgramSystem(ISystem):
         countries = state.tables.get("countries")
         if tracks.is_empty() or countries is None or countries.is_empty():
             return
-        capacities = {
-            self._tag(row.get("id")): max(1.0, self._number(row.get("gdp")) * self._number(row.get("budget_research_ratio")))
-            for row in countries.to_dicts()
-        }
-        bonuses: dict[str, float] = {}
+
+        country_columns = set(countries.columns)
+        gdp = (
+            pl.col("gdp").cast(pl.Float64, strict=False).fill_null(0.0)
+            if "gdp" in country_columns
+            else pl.lit(0.0)
+        )
+        ratio = (
+            pl.col("budget_research_ratio").cast(pl.Float64, strict=False).fill_null(0.0)
+            if "budget_research_ratio" in country_columns
+            else pl.lit(0.0)
+        )
+        capacities = countries.select(
+            pl.col("id").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_uppercase().alias("_country"),
+            pl.when((gdp * ratio).is_finite())
+            .then(gdp * ratio)
+            .otherwise(0.0)
+            .clip(lower_bound=1.0)
+            .alias("_baseline_capacity"),
+        )
+        bonuses = pl.DataFrame(schema={"_country": pl.Utf8, "_capacity_bonus": pl.Float64})
         effects = state.tables.get("treaty_effects")
-        if effects is not None:
-            for effect in effects.filter(pl.col("effect") == "research_capacity_bonus").to_dicts():
-                country = self._tag(effect.get("country_id"))
-                bonuses[country] = bonuses.get(country, 0.0) + self._number(effect.get("value"))
-        rows = tracks.to_dicts()
-        levels_by_country: dict[str, dict[str, int]] = {}
-        for row in rows:
-            country = self._tag(row.get("country_id"))
-            branch = str(row.get("branch") or "").strip().lower()
-            levels_by_country.setdefault(country, {})[branch] = max(0, int(row.get("research_level") or 0))
+        if effects is not None and {"effect", "country_id", "value"}.issubset(effects.columns):
+            bonuses = (
+                effects.filter(pl.col("effect") == "research_capacity_bonus")
+                .select(
+                    pl.col("country_id").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_uppercase().alias("_country"),
+                    pl.when(pl.col("value").cast(pl.Float64, strict=False).is_finite())
+                    .then(pl.col("value").cast(pl.Float64, strict=False))
+                    .otherwise(0.0)
+                    .alias("_capacity_bonus"),
+                )
+                .group_by("_country")
+                .agg(pl.col("_capacity_bonus").sum())
+            )
+
         configured_prerequisites = state.globals.get("research_prerequisites", {})
         prerequisites = {
             "strategic_weapons": {"strategic_program": 1},
@@ -389,64 +410,135 @@ class ResearchProgramSystem(ISystem):
                         str(required_branch).strip().lower(): max(0, int(self._number(level)))
                         for required_branch, level in requirements.items()
                     }
-        for row in rows:
-            country = self._tag(row.get("country_id"))
-            branch = str(row.get("branch") or "").strip().lower()
-            unmet = [
-                (required_branch, level)
-                for required_branch, level in prerequisites.get(branch, {}).items()
-                if levels_by_country.get(country, {}).get(required_branch, 0) < level
-            ]
-            if unmet:
-                required_branch, level = unmet[0]
-                row["blocking_reason"] = f"Requires {required_branch} research level {level}."
-                continue
-            row["blocking_reason"] = ""
-            baseline = capacities.get(country, 1.0)
-            rate = (baseline + bonuses.get(country, 0.0)) / baseline
-            progress = max(0.0, self._number(row.get("progress"))) + rate * self._ratio(row.get("funding_ratio")) * fraction
-            completed_levels = int(progress)
-            row["research_level"] = max(0, int(row.get("research_level") or 0)) + completed_levels
-            row["progress"] = progress - completed_levels
-        state.update_table("research_tracks", self._frame(state, "research_tracks", rows))
+
+        prerequisite_rows = [
+            (branch, required_branch, level, requirement_order)
+            for branch, requirements in prerequisites.items()
+            for requirement_order, (required_branch, level) in enumerate(requirements.items())
+        ]
+        prerequisite_frame = pl.DataFrame(
+            prerequisite_rows,
+            schema={
+                "_branch": pl.Utf8,
+                "_required_branch": pl.Utf8,
+                "_required_level": pl.Int64,
+                "_requirement_order": pl.Int64,
+            },
+            orient="row",
+        )
+        working = tracks.with_row_index("_track_order").with_columns(
+            pl.col("country_id").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_uppercase().alias("_country"),
+            pl.col("branch").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_lowercase().alias("_branch"),
+            pl.col("research_level").cast(pl.Int64, strict=False).fill_null(0).clip(lower_bound=0).alias("_current_level"),
+            pl.col("progress").cast(pl.Float64, strict=False).fill_null(0.0).alias("_current_progress"),
+            pl.col("funding_ratio").cast(pl.Float64, strict=False).fill_null(0.0).clip(lower_bound=0.0, upper_bound=1.0).alias("_funding_ratio"),
+        )
+        levels = (
+            working.group_by(["_country", "_branch"])
+            .agg(pl.col("_current_level").max().alias("_completed_level"))
+        )
+        unmet = pl.DataFrame(
+            schema={"_track_order": pl.UInt32, "_blocking_reason": pl.Utf8}
+        )
+        if not prerequisite_frame.is_empty():
+            unmet = (
+                working.select("_track_order", "_country", "_branch")
+                .join(prerequisite_frame, left_on="_branch", right_on="_branch", how="inner")
+                .join(
+                    levels,
+                    left_on=["_country", "_required_branch"],
+                    right_on=["_country", "_branch"],
+                    how="left",
+                )
+                .filter(pl.col("_completed_level").fill_null(0) < pl.col("_required_level"))
+                .sort(["_track_order", "_requirement_order"])
+                .unique(subset="_track_order", keep="first", maintain_order=True)
+                .with_columns(
+                    pl.concat_str(
+                        [
+                            pl.lit("Requires "),
+                            pl.col("_required_branch"),
+                            pl.lit(" research level "),
+                            pl.col("_required_level").cast(pl.Utf8),
+                            pl.lit("."),
+                        ]
+                    ).alias("_blocking_reason")
+                )
+                .select("_track_order", "_blocking_reason")
+            )
+        updated = (
+            working.join(capacities, on="_country", how="left")
+            .join(bonuses, on="_country", how="left")
+            .join(unmet, on="_track_order", how="left")
+            .with_columns(
+                pl.col("_baseline_capacity").fill_null(1.0).alias("_baseline_capacity"),
+                pl.col("_capacity_bonus").fill_null(0.0).alias("_capacity_bonus"),
+                pl.when(pl.col("_current_progress").is_finite())
+                .then(pl.col("_current_progress").clip(lower_bound=0.0))
+                .otherwise(0.0)
+                .alias("_safe_progress"),
+            )
+            .with_columns(
+                (
+                    pl.col("_safe_progress")
+                    + ((pl.col("_baseline_capacity") + pl.col("_capacity_bonus")) / pl.col("_baseline_capacity"))
+                    * pl.col("_funding_ratio")
+                    * float(fraction)
+                ).alias("_advanced_progress")
+            )
+            .with_columns(
+                pl.when(pl.col("_blocking_reason").is_not_null())
+                .then(pl.col("research_level"))
+                .otherwise(pl.col("_current_level") + pl.col("_advanced_progress").cast(pl.Int64))
+                .alias("research_level"),
+                pl.when(pl.col("_blocking_reason").is_not_null())
+                .then(pl.col("progress"))
+                .otherwise(pl.col("_advanced_progress") - pl.col("_advanced_progress").cast(pl.Int64))
+                .alias("progress"),
+                pl.col("_blocking_reason").fill_null("").alias("blocking_reason"),
+            )
+            .select(list(tracks.columns))
+        )
+        if not tracks.equals(updated):
+            state.update_table("research_tracks", updated)
 
     def _advance_production(self, state: GameState, fraction: float) -> None:
         orders = state.get_table("production_orders")
         if orders.is_empty():
             return
-        rows = orders.to_dicts()
-        countries = state.tables.get("countries")
-        design_rows = state.tables.get("unit_designs")
-        designs = {} if design_rows is None else {
-            str(row.get("id") or ""): max(0.0, self._number(row.get("cost")))
-            for row in design_rows.to_dicts()
-        }
-        for row in rows:
-            if _finite(row.get("work_required")) <= 0.0:
-                unit_cost = _finite(row.get("unit_cost")) or designs.get(str(row.get("design_id") or ""), 0.0)
-                row["unit_cost"] = unit_cost
-                row["work_required"] = unit_cost * max(0, int(row.get("quantity") or 0))
-                row["remaining_work"] = row["work_required"] * (1.0 - min(1.0, max(0.0, self._number(row.get("progress")))))
+        orders = initialize_production_order_work(
+            orders,
+            state.tables.get("unit_designs"),
+        )
 
         configured_coefficient = state.globals.get("production_capacity_coefficient")
         coefficient = (
             DEFAULT_PRODUCTION_COEFFICIENT
             if configured_coefficient is None
-            else _finite(configured_coefficient)
+            else max(0.0, _finite(configured_coefficient))
         )
-        capacities: dict[str, float] = {}
-        if countries is not None:
-            for country in countries.to_dicts():
-                tag = self._tag(country.get("id"))
-                capacities[tag] = annual_production_capacity(
-                    country.get("gdp"), country.get("economic_health", 1.0), coefficient,
-                )
+        capacities = annual_production_capacity_frame(
+            state.tables.get("countries"), coefficient
+        )
         allocation_policy = str(state.globals.get("production_allocation_policy") or "priority")
-        updated = allocate_production_capacity(rows, capacities, fraction, allocation_policy)
-        for row in updated:
-            if str(row.get("status") or "").strip().lower() not in {"cancelled", "completed", "delivered"}:
-                row["updated_at_minute"] = int(state.time.total_minutes)
-        state.update_table("production_orders", self._frame(state, "production_orders", updated))
+        updated = allocate_production_capacity_frame(
+            orders,
+            capacities,
+            fraction,
+            allocation_policy,
+        )
+        if "updated_at_minute" in updated.columns:
+            terminal = ["cancelled", "completed", "delivered"]
+            updated = updated.with_columns(
+                pl.when(
+                    ~pl.col("status").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_lowercase().is_in(terminal)
+                )
+                .then(pl.lit(int(state.time.total_minutes)))
+                .otherwise(pl.col("updated_at_minute"))
+                .cast(state.get_table("production_orders").schema["updated_at_minute"])
+                .alias("updated_at_minute")
+            )
+        state.update_table("production_orders", updated)
 
     def _training_level(self, value: Any) -> str:
         levels = {"recruit", "regular"}

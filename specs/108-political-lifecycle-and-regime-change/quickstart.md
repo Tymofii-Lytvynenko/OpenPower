@@ -17,3 +17,20 @@ Pending political transitions/elections/crises pass the focused snapshot and sav
 ```
 
 The 10,000-country steady-state benchmark warms the lifecycle first, then measures three unchanged updates. Median runtime was **0.001 s**; all political table revisions remained unchanged. This meets the SC-007 threshold of 0.5 s on the current Windows/project-venv runtime; it does not measure cold initialization. Automated implementation and save/load gates are complete; manual interactive UI verification remains open.
+
+## Language and religion identity policy extension
+
+Run the identity-policy and layered-profile simulation contracts:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests/test_identity_bilateral_workflows.py tests/test_data_loader_mod_layering.py
+```
+
+Run the Internal Laws identity journey at standard and compact sizes:
+
+```powershell
+.\.venv\Scripts\python.exe main.py ui-test run internal-laws --fixture tests/ui/fixtures/identity-trade.json --journey tests/ui/journeys/identity-policy.json --width 1280 --height 720
+.\.venv\Scripts\python.exe main.py ui-test run internal-laws --fixture tests/ui/fixtures/identity-trade.json --journey tests/ui/journeys/identity-policy.json --width 800 --height 600
+```
+
+The implementation report records 20 tests across the identity workflow and data-layering modules, plus a 14-step identity journey at both viewport sizes. This was reported evidence in `docs/COUNTRY_IDENTITY_AND_BILATERAL_TRADE.md`; the tests were not rerun during this specification reconciliation. The synthetic UI journey verifies projection and action dispatch; the simulation tests remain responsible for daily share updates and political effects.

@@ -330,6 +330,17 @@ class MilitaryCapabilitySystem(ISystem):
             (order for order in orders if str(order.get("status") or "") == "active"),
             key=lambda order: str(order.get("id") or ""),
         )
+        if not active_orders:
+            return
+        design_table = state.tables.get("unit_designs")
+        design_by_id = (
+            {}
+            if design_table is None or not {"id", "domain"}.issubset(design_table.columns)
+            else {
+                str(row.get("id") or ""): row
+                for row in design_table.select("id", "domain").to_dicts()
+            }
+        )
         for order in active_orders:
             unit = units.get(str(order.get("unit_id") or ""))
             if unit is None:
@@ -342,10 +353,7 @@ class MilitaryCapabilitySystem(ISystem):
             facility = facility_by_id.get(facility_id)
             domains = self._facility_domains(facility or {})
             design_id = str(unit.get("design_id") or "")
-            designs = state.tables.get("unit_designs")
-            design = None
-            if designs is not None and not designs.is_empty() and "id" in designs.columns:
-                design = next((row for row in designs.to_dicts() if str(row.get("id") or "") == design_id), None)
+            design = design_by_id.get(design_id)
             domain = str((design or {}).get("domain") or unit.get("unit_domain") or "land").strip().lower()
             unavailable = (
                 facility is None

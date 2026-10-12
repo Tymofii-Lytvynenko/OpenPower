@@ -64,3 +64,7 @@ tests/
 ## Complexity Tracking
 
 No constitution violations or additional dependencies are planned.
+
+## Shared route preparation
+
+`CovertOperationsSystem` composes `RegionRouteSnapshot` and `RegionTravelTime` from the military routing layer. The topology and coordinate indexes are constructed lazily and discarded at the end of the system update. This reuses route mechanics without persisting stale map data or weakening the per-cell movement-access checks.

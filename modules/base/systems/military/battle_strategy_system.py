@@ -86,7 +86,9 @@ class BattleStrategySystem(ISystem):
         if not {"units", "battles", "battle_force_postures", "battle_command_orders"}.issubset(state.tables):
             return
         posture_frame = state.get_table("battle_force_postures")
-        has_due_state = any(row.get("status") in {"disengaging", "retreating", "reorganizing", "returning"} for row in posture_frame.to_dicts())
+        has_due_state = not posture_frame.filter(
+            pl.col("status").is_in(["disengaging", "retreating", "reorganizing", "returning"])
+        ).is_empty()
         if not any(isinstance(action, (ActionSetBattleStrategy, ActionOccupyRegion)) for action in state.current_actions) and not has_due_state:
             return
         units_frame = state.get_table("units")
@@ -780,11 +782,9 @@ class BattleStrategySystem(ISystem):
         regions_frame = state.tables.get("regions")
         if regions_frame is None or regions_frame.is_empty():
             return
-        regions = regions_frame.to_dicts()
         duration_policy = MovementDurationPolicy()
         locations = duration_policy.region_locations(regions_frame)
         adjacency_frame = state.tables.get("region_adjacency")
-        adjacency = [] if adjacency_frame is None else adjacency_frame.to_dicts()
         access = MovementAccessPolicy().for_country(state, owner)
         planner = MilitaryRoutePlanner()
         garrison_counts: dict[int, int] = {}
@@ -803,6 +803,22 @@ class BattleStrategySystem(ISystem):
 
         surplus_units = [unit for unit in surplus_units if garrison_counts.get(int(unit.get("current_region_id") or 0), 0) > 1]
         unoccupied_targets = sorted(set(target_country_ids) - set(occupied_region_ids))
+        if not surplus_units or not unoccupied_targets:
+            return
+        prepared_graph = planner.prepare(regions_frame, adjacency_frame)
+        regions = prepared_graph.region_by_id.values()
+
+        def segment_minutes(left, right):
+            left_id = int(left.get("id") or 0)
+            right_id = int(right.get("id") or 0)
+            edge_key = (left_id, right_id) if left_id < right_id else (right_id, left_id)
+            distance = prepared_graph.edge_distance_km.get(edge_key)
+            if distance is not None:
+                return duration_policy.estimate_from_distance(distance)
+            source = locations.get(left_id)
+            target = locations.get(right_id)
+            return duration_policy.estimate_between(source, target) if source and target else 1440
+
         for target_region_id in unoccupied_targets:
             legal_assignments = []
             for unit in surplus_units:
@@ -813,24 +829,44 @@ class BattleStrategySystem(ISystem):
                     source_region_id,
                     target_region_id,
                     regions,
-                    adjacency,
+                    adjacency_frame,
                     lambda region, final: access.can_station(region) if final else access.can_transit(region),
-                    segment_cost=lambda left, right: duration_policy.estimate_between(
-                        locations[int(left.get("id") or 0)], locations[int(right.get("id") or 0)],
-                    ) if int(left.get("id") or 0) in locations and int(right.get("id") or 0) in locations else 1440,
+                    segment_cost=segment_minutes,
+                    prepared_graph=prepared_graph,
                 )
                 if plan.is_valid and len(plan.region_ids) > 1:
                     legal_assignments.append((plan.travel_cost, str(unit.get("id") or ""), unit, plan))
             if not legal_assignments:
                 continue
             _, _, unit, plan = min(legal_assignments, key=lambda item: (item[0], item[1], target_region_id))
-            if not self._start_occupation_route(state, owner, unit, plan, routes, locations, duration_policy, now):
+            if not self._start_occupation_route(
+                state,
+                owner,
+                unit,
+                plan,
+                routes,
+                locations,
+                duration_policy,
+                now,
+                prepared_graph.edge_distance_km,
+            ):
                 continue
             source_region_id = int(unit.get("current_region_id") or 0)
             garrison_counts[source_region_id] = garrison_counts.get(source_region_id, 0) - 1
             surplus_units.remove(unit)
 
-    def _start_occupation_route(self, state, owner, unit, plan, routes, locations, duration_policy, now):
+    def _start_occupation_route(
+        self,
+        state,
+        owner,
+        unit,
+        plan,
+        routes,
+        locations,
+        duration_policy,
+        now,
+        edge_distance_km=None,
+    ):
         source_region_id = int(unit.get("current_region_id") or 0)
         next_region_id = int(plan.region_ids[1])
         source_geo = self._unit_coordinate(unit, locations.get(source_region_id))
@@ -839,10 +875,21 @@ class BattleStrategySystem(ISystem):
         destination_geo = locations.get(destination_id)
         if source_geo is None or target_geo is None or destination_geo is None:
             return False
+        edge_key = (
+            (source_region_id, next_region_id)
+            if source_region_id < next_region_id
+            else (next_region_id, source_region_id)
+        )
+        edge_distance = (edge_distance_km or {}).get(edge_key)
+        duration = (
+            duration_policy.estimate_from_distance(edge_distance)
+            if edge_distance is not None
+            else duration_policy.estimate_between(source_geo, target_geo)
+        )
         unit.update(
             source_region_id=source_region_id, source_latitude=source_geo.latitude, source_longitude=source_geo.longitude,
             target_region_id=next_region_id, target_latitude=target_geo.latitude, target_longitude=target_geo.longitude,
-            departed_at_minute=now, arrival_at_minute=now + duration_policy.estimate_between(source_geo, target_geo),
+            departed_at_minute=now, arrival_at_minute=now + duration,
             movement_progress=0.0, is_moving=True, engagement_mode="", unit_lifecycle="occupation_moving",
         )
         route = next((row for row in routes if str(row.get("unit_id") or "") == str(unit.get("id") or "")), None)

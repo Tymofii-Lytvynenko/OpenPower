@@ -254,6 +254,20 @@ def test_casualties_occupation_blockade_and_duration_raise_exhaustion_and_degrad
     assert any(isinstance(event, EventWarExhaustionUpdated) for event in state.events)
 
 
+def test_occupied_region_index_normalizes_and_counts_owner_controller_pairs():
+    regions = [
+        {"owner": " aaa ", "controller": "bbb"},
+        {"owner": "AAA", "controller": "BBB"},
+        {"owner": "AAA", "controller": "CCC"},
+        {"owner": "AAA", "controller": ""},
+        {"owner": "", "controller": "BBB"},
+    ]
+
+    assert DiplomaticBalanceSystem._occupied_region_counts(regions) == {
+        "AAA": {"BBB": 2, "CCC": 1}
+    }
+
+
 def test_expired_blockade_contributes_nothing_while_unexpired_blockade_remains():
     state = _state()
     state.time.total_minutes = 10

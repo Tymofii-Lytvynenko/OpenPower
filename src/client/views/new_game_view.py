@@ -10,6 +10,7 @@ from src.client.ui.core.theme import GAMETHEME
 from src.shared.config import GameConfig
 from src.client.utils.coords_util import calculate_centroid
 from src.client.utils.color_generator import generate_political_colors
+from src.client.ui.panels.shared.panel_data import resolve_country_name
 
 if TYPE_CHECKING:
     from src.shared.protocols import SessionPort
@@ -159,7 +160,7 @@ class NewGameView(BaseImGuiView):
         if self.ui.begin_centered_panel("New Game", screen_w, screen_h, w=600, h=600):
             self.ui.draw_title("SELECT NATION")
             
-            from imgui_bundle import imgui
+            from src.client.ui.core.instrumented_imgui import imgui
             
             # Left Column: Country List
             # Height 400 allows enough space for list while leaving room for bottom buttons
@@ -167,7 +168,9 @@ class NewGameView(BaseImGuiView):
             if not self.playable_countries.is_empty():
                 for row in self.playable_countries.iter_rows(named=True):
                     c_id = row['id']
-                    label = f"{c_id} - {row.get('name', '')}"
+                    # Production country tables use localized geography names,
+                    # rather than the optional fixture-only `name` column.
+                    label = f"{c_id} - {resolve_country_name(self.net.get_state(), c_id)}"
                     is_selected = (self.selected_country_id == c_id)
                     
                     if imgui.selectable(label, is_selected)[0]:

@@ -4,7 +4,7 @@ import ctypes
 from pathlib import Path
 from typing import Dict, Optional, Any
 from PIL import Image
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 from src.core.paths import ProjectPaths
 
 class FlagTexture:
@@ -26,14 +26,18 @@ class FlagRenderer:
     """
     _instance = None
 
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(FlagRenderer, cls).__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
-        if self._initialized: return
+    def __init__(self, texture_uploader=None):
+        if self._initialized:
+            if texture_uploader is not None:
+                self._texture_uploader = texture_uploader
+                self.clear_cache()
+            return
         
         current_path = Path(__file__).resolve()
         self.project_root = current_path
@@ -51,7 +55,10 @@ class FlagRenderer:
         self._error_printed = False # To prevent console spam on rendering failures
         self._initialized = True
         
-        self._emergency_texture = self._create_emergency_texture()
+        self._texture_uploader = texture_uploader
+        # Panel factories can run before either Arcade or Hello ImGui creates
+        # its GL context. Defer uploads until the first rendered flag.
+        self._emergency_texture = None
         print(f"[FlagRenderer] Memory Persistence Mode. Flags at: {self.flags_dir}")
 
     def draw_flag(self, tag: str, width: float, height: float):
@@ -133,6 +140,8 @@ class FlagRenderer:
         Uploads PIL image and returns a wrapper that PROTECTS the texture from GC.
         """
         try:
+            if self._texture_uploader is not None:
+                return self._texture_uploader(image, label)
             window = arcade.get_window()
             ctx = window.ctx
             
@@ -172,6 +181,8 @@ class FlagRenderer:
         """Retrieves a texture from cache or loads it from disk."""
         if tag in self._cache:
             return self._cache[tag]
+        if self._emergency_texture is None:
+            self._emergency_texture = self._create_emergency_texture()
 
         clean_tag = tag.strip()
         flag_path = self.flags_dir / f"{clean_tag}.png"
@@ -201,3 +212,4 @@ class FlagRenderer:
 
     def clear_cache(self):
         self._cache.clear()
+        self._emergency_texture = None

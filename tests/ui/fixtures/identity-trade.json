@@ -1,0 +1,190 @@
+{
+  "tables": {
+    "country_identity_groups": [
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "ukrainian",
+        "display_name": "Ukrainian",
+        "population_share": 72,
+        "legal_status": "official",
+        "source_note": "Synthetic UI fixture."
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "russian",
+        "display_name": "Russian",
+        "population_share": 25,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "other",
+        "display_name": "Other languages",
+        "population_share": 3,
+        "legal_status": "legal",
+        "is_other_bucket": true
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "religion",
+        "identity_id": "orthodox",
+        "display_name": "Orthodox",
+        "population_share": 68,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "religion",
+        "identity_id": "catholic",
+        "display_name": "Catholic",
+        "population_share": 22,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "religion",
+        "identity_id": "other",
+        "display_name": "Other religions",
+        "population_share": 10,
+        "legal_status": "legal",
+        "is_other_bucket": true
+      }
+    ],
+    "regions": [
+      {
+        "id": 1,
+        "name": "Kyiv",
+        "owner": "UKR",
+        "controller": "UKR"
+      },
+      {
+        "id": 3,
+        "name": "Lviv",
+        "owner": "UKR",
+        "controller": "UKR"
+      },
+      {
+        "id": 2,
+        "name": "Warsaw",
+        "owner": "POL",
+        "controller": "POL"
+      },
+      {
+        "id": 4,
+        "name": "Gdansk",
+        "owner": "POL",
+        "controller": "POL"
+      }
+    ],
+    "country_governments": [
+      {
+        "country_id": "UKR",
+        "capital_region_id": 1,
+        "ruling_party_id": "party-1"
+      },
+      {
+        "country_id": "POL",
+        "capital_region_id": 2
+      }
+    ],
+    "political_parties": [
+      {
+        "country_id": "UKR",
+        "party_id": "party-1",
+        "display_name": "Demonstration party",
+        "support_share": 0.65,
+        "eligible": true
+      }
+    ],
+    "country_laws": [
+      {
+        "country_id": "UKR",
+        "law_id": "speech",
+        "title": "Freedom of speech",
+        "value": "Permitted",
+        "status": "active"
+      }
+    ],
+    "migration_policies": [
+      {
+        "country_id": "UKR",
+        "migration_policy": "managed",
+        "border_policy": "open",
+        "entry_rate": 0.75,
+        "exit_rate": 1
+      }
+    ],
+    "research_tracks": [
+      {
+        "id": "UKR-land",
+        "country_id": "UKR",
+        "branch": "land",
+        "research_level": 3,
+        "unlocks_json": "[\"tank\"]"
+      },
+      {
+        "id": "POL-land",
+        "country_id": "POL",
+        "branch": "land",
+        "research_level": 1
+      },
+      {
+        "id": "UKR-naval",
+        "country_id": "UKR",
+        "branch": "naval",
+        "research_level": 1
+      },
+      {
+        "id": "POL-naval",
+        "country_id": "POL",
+        "branch": "naval",
+        "research_level": 3,
+        "unlocks_json": "[\"frigate\"]"
+      }
+    ],
+    "diplomatic_trade_deals": [
+      {
+        "id": "incoming-accept",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "status": "pending",
+        "expires_at_minute": 43200,
+        "offered_assets_json": "[{\"type\":\"cash\",\"amount\":500}]",
+        "requested_assets_json": "[{\"type\":\"cash\",\"amount\":1000}]",
+        "reason": "Demonstration incoming offer."
+      },
+      {
+        "id": "incoming-reject",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "status": "pending",
+        "expires_at_minute": 43200,
+        "offered_assets_json": "[{\"type\":\"cash\",\"amount\":500}]",
+        "requested_assets_json": "[{\"type\":\"cash\",\"amount\":1000}]",
+        "reason": "Demonstration incoming offer."
+      },
+      {
+        "id": "incoming-counter",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "status": "pending",
+        "expires_at_minute": 43200,
+        "offered_assets_json": "[{\"type\":\"cash\",\"amount\":500}]",
+        "requested_assets_json": "[{\"type\":\"cash\",\"amount\":1000}]",
+        "reason": "Demonstration incoming offer."
+      },
+      {
+        "id": "outgoing",
+        "source_country_id": "UKR",
+        "target_country_id": "POL",
+        "status": "pending",
+        "expires_at_minute": 43200,
+        "offered_assets_json": "[{\"type\":\"cash\",\"amount\":100}]",
+        "requested_assets_json": "[]"
+      }
+    ]
+  }
+}

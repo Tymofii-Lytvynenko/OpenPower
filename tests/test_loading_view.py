@@ -31,6 +31,16 @@ def test_loading_failure_is_reported_once_across_updates() -> None:
     on_failure.assert_called_once_with(view.error)
 
 
+def test_loading_failure_without_callback_keeps_client_alive() -> None:
+    view = _make_view(SimpleNamespace(progress=0.5, status_text="Loading"), Mock())
+    view.is_finished = True
+    view.error = RuntimeError("load failed")
+    view.on_update(1 / 60)
+    view.on_update(1 / 60)
+    assert view.error is not None
+    view.window.show_view.assert_not_called()
+
+
 def test_loading_success_transitions_once_after_final_progress_frame() -> None:
     task = SimpleNamespace(progress=0.7, status_text="Loading")
     next_view = object()

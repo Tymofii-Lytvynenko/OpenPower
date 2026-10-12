@@ -29,3 +29,11 @@ Lifecycle outcomes are data-only events in `src/shared/events.py` and durable ta
 ## Client projection
 
 The political overview is read-only and derives government, ruling party, active laws, next election, separate bounded values, current crisis, and recent attributable history from the latest client snapshot. Buttons dispatch semantic actions and render authoritative acceptance/rejection results.
+
+## Language and religion identity policy
+
+- `ActionSetCountryIdentityPolicy` carries country tag, identity dimension (`language` or `religion`), group ID, and new status (`official`, `legal`, `restricted`, or `illegal`). The handler requires authority over the country and a listed non-aggregate group; invalid actions are journaled with a reason and have no policy side effect.
+- `country_identity_distribution` contains normalized static profile estimates; bootstrap seeds missing entries into mutable `country_identity_groups` with initial status `legal`. `country_identity_signals` stores per-country group counts, averaged shares, pressure, and update time.
+- `EventCountryIdentityPolicyChanged` records the old/new status, group share, reason, and simulation minute. `EventCountryIdentityCompositionChanged` records a daily share transfer between identity groups without asserting movement of people.
+- `IdentityPolicySystem` processes composition only on unpaused `EventNewDay`. It transfers a deterministic bounded share from restricted/illegal groups to a recognized same-dimension group, updates the aggregate signals and attributable `political_effects`, and records the cause in `political_history`.
+- `IdentityPolicyView` is a read-only projection in the Internal Laws panel. It displays shares, status, and source caveats; `Other` is visible but not an action target. Profiles without a known source year display year `0` as unknown.

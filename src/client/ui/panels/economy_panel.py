@@ -1,5 +1,6 @@
 import polars as pl
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
+from src.client.ui.core.testability import record_last_item
 
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.primitives import UIPrimitives as Prims
@@ -195,7 +196,9 @@ class EconomyPanel:
             imgui.push_style_var(imgui.StyleVar_.frame_padding, (4, 1))
             imgui.push_style_color(imgui.Col_.button, imgui.get_color_u32((0.2, 0.2, 0.2, 1.0)))
             
-            if imgui.button(f"more##{btn_id}"):
+            clicked = imgui.button(f"more##{btn_id}")
+            record_last_item(f"economy.{btn_id}", f"Open {title}", "button")
+            if clicked:
                 callback()
                 
             imgui.pop_style_color()

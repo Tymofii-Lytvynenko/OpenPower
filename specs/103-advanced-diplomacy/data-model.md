@@ -37,3 +37,15 @@ All persistent state lives in schema-managed `GameState.tables`; shared actions 
 - Coalition membership is derived from active pacts, and pacts dissolve when the primary threat no longer has active wars/occupations or its force collapses.
 - Exhaustion index, peace desire, scores, and penalties stay in their documented bounds; inactive wars do not retain active per-war exhaustion rows.
 - Writes pass through `GameState.update_table` and preserve schema types/defaults for save/load and IPC.
+
+## Bilateral country trade
+
+Key: `diplomatic_trade_deals.id`. Each row stores source/target countries, JSON offered/requested assets, linked counteroffer IDs, the creating player, timestamps, responding country, response, status, and reason.
+
+Supported normalized assets are finite positive cash, positive region IDs, and a research branch with a positive level. Each side is limited to 16 raw assets and may not repeat a territory or technology branch. Proposals have a 1–365-day deadline, defaulting to 30 days. Status moves from `pending` to one terminal result: `accepted`, `rejected`, `withdrawn`, `expired`, or `countered`.
+
+Before creation and again immediately before acceptance, validate that both countries exist and are not active belligerents; available cash covers each outgoing amount; each transferred region is still owned and unoccupied and its owner retains at least one region; and each technology offer equals the seller's current branch level and improves the recipient's level. A counteroffer closes the original as `countered`, creates a new offer with the countries and packages reversed, and records both links.
+
+Settlement prepares updated country, region, government, and research rows after all checks pass, then commits those tables at the simulation boundary. Transferred regions publish ownership facts after commit. If a country's capital no longer belongs to it, its capital becomes the lowest-ID remaining owned region. Technology level and unlocks are copied to the recipient; the seller retains its level.
+
+AI values cash at face value, regions by the giver's GDP divided by its owned-region count, and technology by recipient GDP and newly unlocked levels. A valid offer is accepted at `received_value >= 0.9 * requested_value`; otherwise AI selects a deterministic affordable subset for a counteroffer or rejects with a reason.

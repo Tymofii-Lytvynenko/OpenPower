@@ -1,6 +1,6 @@
 import polars as pl
 import dataclasses
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.containers import WindowManager

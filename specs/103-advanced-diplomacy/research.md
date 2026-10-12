@@ -35,3 +35,11 @@ The occupation-to-expansion scoring path previously recognized offensive capture
 
 - Run the full regression suite after the new active/suspended/expired alliance, mixed AI response, and both-orientation annexation cases.
 - Verify save/load and IPC preserve the optional archetype field and neutral default; scenario-specific content may choose profiles without hardcoding them in the engine.
+
+## Bilateral trade extension
+
+`BilateralTradeSystem` and `BilateralTradePolicy` add a proposal path alongside, not inside, peace packaging. The runtime schema, shared action/event contracts, and player panel expose cash, territory, and research assets. Both proposal and acceptance validate the whole package; settlement then commits the prepared country, region, government, and research tables and emits territory facts after ownership changes.
+
+AI exchange value is a deterministic heuristic: cash at face value, a region at the giver's national GDP divided by its owned-region count, and research based on the recipient's GDP and newly unlocked levels. AI accepts at 90% received-to-requested value or constructs a deterministic subset counteroffer; these values have not been calibrated against an external game balance. Countries at war must use peace deals; commodity trade remains the global market.
+
+Existing implementation evidence is in `tests/test_identity_bilateral_workflows.py`, `tests/ui/journeys/bilateral-trade.json`, and the reported workflow results in `docs/COUNTRY_IDENTITY_AND_BILATERAL_TRADE.md`. No additional test run was performed during this documentation reconciliation.

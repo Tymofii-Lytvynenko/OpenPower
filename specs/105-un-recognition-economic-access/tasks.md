@@ -37,3 +37,8 @@ T004 + T005 + T006 -> T009 + T010 + T011 + T012 -> T013
 - Focused recognition/diplomacy/schema/UI/persistence/trade matrix: **51 passed** on 2026-10-07 (Windows, project virtual environment, 9.47 s).
 - SC-009 scale benchmark: **1,000 pending cases + 10,000 votes + 10,000 statuses in 0.035 s** on 2026-10-06 (Windows, project virtual environment).
 - Focused recognition matrix: **51 passed in 11.19 s**, including the opt-in recognition benchmark at **0.052 s**; a fresh standalone controlled run measured **0.061 s**. The historical repository-wide suite reported **524 passed, 4 opt-in benchmarks skipped, 173 subtests passed in 151.51 s**; all four then-skipped scale gates passed separately. Latest repository-wide suite: **917 passed, 25 skipped, 116 warnings, 239 subtests passed in 832.53 s** (2026-10-07). SC-009 is below its 250 ms budget; no optimization iteration was needed. Interactive visual acceptance remains a manual gate.
+
+## Phase 4: Convergence
+
+- [X] T014 Clarify FR-010, FR-011, FR-012, and SC-005 to bound enforcement to explicit source-region provenance and document how regional bilateral/treaty resource allocations and derived revenue use recognition access.
+- [X] T015 Clarify AC-10 and FR-016 to match the council's eligible-voter deadline, current-vote, replacement, and resolved-status presentation in `src/client/ui/panels/politics/treaties_live.py`.

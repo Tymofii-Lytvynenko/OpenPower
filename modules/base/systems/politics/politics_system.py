@@ -66,7 +66,7 @@ class PoliticsSystem(ISystem):
 
     @property
     def dependencies(self) -> list[str]:
-        return ["base.population", "base.migration"]
+        return ["base.population", "base.migration", "base.identity_policy"]
 
     def update(self, state: GameState, delta_time: float) -> None:
         self._apply_one_time_political_effects(state)

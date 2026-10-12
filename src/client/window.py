@@ -26,7 +26,7 @@ class MainWindow(arcade.Window):
         font_path = config.get_asset_path("fonts/main_font.ttf")
         if not font_path or not font_path.exists():
             font_path = None
-        self.imgui = ImGuiService(self, font_path=font_path, enable_implot=True)
+        self.imgui = ImGuiService(self, font_path=font_path, enable_implot=True, inspection_provider=self._inspection_snapshot)
 
         self.nav = NavigationService(self)
         self.session: Optional[ClientSessionPort] = None
@@ -34,6 +34,28 @@ class MainWindow(arcade.Window):
         self._boot_result_queue: Queue[tuple[str, object]] = Queue()
         self._boot_closing = threading.Event()
         self._boot_thread: threading.Thread | None = None
+
+    def _inspection_snapshot(self) -> dict:
+        """Expose small authoritative observations only for opt-in UI inspection."""
+        session = self.session
+        state = getattr(session, "state", None)
+        if state is None:
+            return {"view": type(self.current_view).__name__, "ready": False}
+        tag = getattr(self.current_view, "player_tag", None) or state.globals.get("player_tag")
+        country = None
+        countries = state.tables.get("countries")
+        if tag and countries is not None:
+            import polars as pl
+            fields = [name for name in ("id", "money_reserves", "personal_income_tax_rate", "budget_infra_ratio") if name in countries.columns]
+            rows = countries.select(fields).filter(pl.col("id") == tag).to_dicts()
+            country = rows[0] if rows else None
+        return {"view": type(self.current_view).__name__, "ready": True,
+                "tick": int(state.globals.get("tick", 0)), "date": state.time.date_str,
+                "total_minutes": state.time.total_minutes, "paused": state.time.is_paused,
+                "speed": state.time.speed_level, "country": country,
+                "table_rows": {name: frame.height for name, frame in state.tables.items()},
+                "command_results": list(state.journal.command_results[-20:]),
+                "system_errors": list(getattr(session, "system_errors", []))}
 
     def _sync_geo_language_to_session(self) -> None:
         session = self.session
@@ -45,6 +67,7 @@ class MainWindow(arcade.Window):
             globals_dict["geo_language_code"] = self.settings.settings.geo_language_code
 
     def setup(self):
+        self._boot_ready_received = False
         self.boot_progress = 0.0
         self.boot_status = "Preparing client..."
         self.boot_error: Optional[str] = None
@@ -89,19 +112,28 @@ class MainWindow(arcade.Window):
                 return
             self.session = result  # type: ignore[assignment]
 
-        try:
-            msg_type, progress, text = self.session.progress_queue.get_nowait()
-        except Empty:
-            return
+        if getattr(self, "_boot_ready_received", False):
+            msg_type, progress, text = "READY", 1.0, "Ready"
+        else:
+            try:
+                msg_type, progress, text = self.session.progress_queue.get_nowait()
+            except Empty:
+                return
 
         if msg_type == "PROGRESS":
             self.boot_progress = float(progress)
             self.boot_status = str(text)
         elif msg_type == "READY":
+            self._boot_ready_received = True
+            self.session.tick(0.0)
+            # Progress and snapshots use different queues. Background decoding
+            # can finish after READY; navigation needs the first usable world.
+            if getattr(self.session, "state", None) is None:
+                self.boot_status = "Synchronizing game state..."
+                return
             arcade.unschedule(self._check_server_boot)
             self.boot_progress = 1.0
             self.boot_status = "Engine ready."
-            self.session.tick(0.0)
             self._sync_geo_language_to_session()
             self.nav.show_main_menu(self.session, self.game_config)
         elif msg_type == "ERROR":

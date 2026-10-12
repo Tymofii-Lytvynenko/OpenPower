@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.services.game_settings_service import GameSettingsService
 from src.client.ui.components.settings_content import GameSettingsContent

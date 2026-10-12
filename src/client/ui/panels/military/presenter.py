@@ -75,6 +75,7 @@ class UnitListRow:
     owner_name: str
     unit_type: str
     strength: int
+    quantity: int
     location: str
     status: str
     progress_pct: float
@@ -225,6 +226,7 @@ class MilitaryPresenter:
                     owner_name=resolve_country_name(state, owner_tag),
                     unit_type=self._humanize_unit_type(safe_text(row.get("unit_type"), "army")),
                     strength=safe_int(row.get("strength"), 0),
+                    quantity=safe_int(row.get("equipment_quantity"), safe_int(row.get("strength"), 0)),
                     location=location,
                     status=status,
                     progress_pct=progress_pct,

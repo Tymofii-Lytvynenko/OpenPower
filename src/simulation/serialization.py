@@ -12,6 +12,10 @@ JSON_LINE_OPTIONS = orjson.OPT_SORT_KEYS | orjson.OPT_SERIALIZE_NUMPY
 
 
 def to_plain_data(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int)):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
     if dataclasses.is_dataclass(value):
         return {field.name: to_plain_data(getattr(value, field.name)) for field in dataclasses.fields(value)}
     if isinstance(value, Path):
@@ -22,8 +26,6 @@ def to_plain_data(value: Any) -> Any:
         return [to_plain_data(item) for item in value]
     if isinstance(value, bytes):
         return value.hex()
-    if isinstance(value, float):
-        return value if math.isfinite(value) else None
     return value
 
 

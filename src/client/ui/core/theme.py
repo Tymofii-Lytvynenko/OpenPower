@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 def with_alpha(color: tuple, alpha: float) -> tuple:
     """Helper: Returns a new color tuple with modified alpha."""

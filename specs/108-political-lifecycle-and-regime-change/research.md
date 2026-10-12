@@ -50,3 +50,11 @@ A failed or rejected coup/transition updates the crisis outcome and political co
 - Exact historical election rules are scenario data; initial generic formulas are deterministic and inspectable.
 - Existing country-only macro indicators cannot attribute causes to individual laws unless an effect/cause record is explicitly emitted. The system must report unknown attribution rather than infer it.
 - The seed data's schema and rule coverage must be audited during implementation; missing government form metadata uses explicit defaults and is covered by tests.
+
+## Language and religion identity policy
+
+The base module bundles one language and one religion TOML profile per available country where an estimate is present. The loader records year `0` and identifies the values as OpenPower bundled estimates because profile-level census sources/years are not available. Normalization to 100% supports game rules but does not make definitions or source populations comparable; the UI and data model retain that caveat.
+
+`BootstrapSystem` seeds the mutable group table after static loading. `IdentityPolicySystem` handles player-authorized status actions, rejects the aggregate `Other` bucket and removal of the last nonzero recognized group, then refreshes the country signal and political-effect projections. Daily share drift is a deterministic legal-pressure simplification, not a population or migration model. Single-player actions/events use the current local authoritative action path; multiplayer transport is not added.
+
+The implementation report records coverage in `tests/test_identity_bilateral_workflows.py`, `tests/test_data_loader_mod_layering.py`, and the `identity-policy.json` UI journey. These results were not rerun during specification reconciliation.

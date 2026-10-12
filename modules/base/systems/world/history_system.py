@@ -10,6 +10,7 @@ from typing import Any
 import polars as pl
 
 from src.shared.state import GameState
+from src.shared.frame_fingerprint import frame_fingerprint
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 
 
@@ -250,28 +251,67 @@ class HistorySystem(ISystem):
         }
         now = int(state.time.total_minutes)
         tick = int(state.globals.get("tick", 0))
-        series_rows = series_table.to_dicts()
-        series_by_key = {str(row.get("id") or ""): row for row in series_rows}
-        new_series: list[dict[str, Any]] = []
-        new_snapshots: list[dict[str, Any]] = []
-
+        next_due_by_indicator = {
+            str(row["indicator_id"]): int(row["next_sample_at_minute"] or 0)
+            for row in series_table.group_by("indicator_id").agg(pl.col("next_sample_at_minute").min()).to_dicts()
+        }
+        previous_fingerprints = state.globals.get("history_source_fingerprints", {})
+        current_fingerprints = dict(previous_fingerprints)
+        active_definitions = []
         for definition in enabled:
-            source_table = str(definition.get("source_table") or "")
             dependencies = self._definition_sources(definition)
             definition_changed = "history_indicator_definitions" in changed_tables
-            if not initial and not definition_changed and not (dependencies & changed_tables) and now < self._next_due(series_by_key, definition):
+            if not initial and not definition_changed and not (dependencies & changed_tables) and now < next_due_by_indicator.get(str(definition.get("id") or ""), 2**63 - 1):
                 continue
+            indicator = str(definition.get("id") or "")
+            fingerprint = self._observation_fingerprint(state, definition)
+            if fingerprint is not None:
+                current_fingerprints[indicator] = fingerprint
+                # Infrastructure rewrites regional capacity every tick. Those
+                # revisions must not remeasure unchanged population indicators.
+                if not initial and not definition_changed and now < next_due_by_indicator.get(indicator, 2**63 - 1) and previous_fingerprints.get(indicator) == fingerprint:
+                    continue
+            active_definitions.append(definition)
+        active_ids = [str(definition.get("id") or "") for definition in active_definitions]
+        # Read only affected series; most regional history remains unchanged
+        # during an ordinary tick, even when country indicators are refreshed.
+        affected_series = series_table.filter(pl.col("indicator_id").is_in(active_ids))
+        series_rows = affected_series.to_dicts()
+        series_by_key = {str(row.get("id") or ""): row for row in series_rows}
+        subjects_by_indicator: dict[tuple[str, str], set[str]] = {}
+        for row in series_rows:
+            key = (str(row.get("indicator_id") or ""), str(row.get("subject_type") or ""))
+            subjects_by_indicator.setdefault(key, set()).add(str(row.get("subject_id") or ""))
+        new_series: list[dict[str, Any]] = []
+        new_snapshots: list[dict[str, Any]] = []
+        # Schema defaults are constant for this update. Looking them up for
+        # every subject duplicated work across tens of thousands of series.
+        snapshot_defaults = self._row_defaults(state, "history_snapshots")
+        series_defaults = self._row_defaults(state, "history_series_state")
+        for definition in active_definitions:
+            source_table = str(definition.get("source_table") or "")
             values, kinds = self._measure_definition(state, definition)
             indicator_id = str(definition.get("id") or "")
             interval = max(1, int(definition.get("sample_interval_minutes") or 1440))
             retention = max(interval, int(definition.get("retention_window_minutes") or 5_256_000))
             limit = max(1, int(definition.get("max_samples_per_series") or 3650))
             subject_type = str(definition.get("subject_type") or "world")
-            known = {
-                str(row.get("subject_id") or "")
-                for row in series_rows
-                if row.get("indicator_id") == indicator_id and row.get("subject_type") == subject_type
-            }
+            next_boundary = self._next_boundary(now, interval)
+            snapshot_template = dict(snapshot_defaults)
+            snapshot_template.update({
+                "subject_type": subject_type, "indicator_id": indicator_id,
+                "unit": str(definition.get("unit") or ""), "game_minute": now, "tick": tick,
+            })
+            series_template = dict(series_defaults)
+            series_template.update({
+                "subject_type": subject_type, "indicator_id": indicator_id,
+                "unit": snapshot_template["unit"], "last_sample_minute": now,
+                "last_sample_tick": tick,
+                "source_revision": int(state.table_revisions.get(source_table, 0)),
+                "schema_version": 1,
+            })
+            # Index once per tick instead of scanning every series for each indicator.
+            known = subjects_by_indicator.get((indicator_id, subject_type), set())
             subjects = set(values) | known
             for subject_id in sorted(subjects):
                 key = self._series_id(subject_type, subject_id, indicator_id)
@@ -287,35 +327,31 @@ class HistorySystem(ISystem):
                 if value is None and not due and previous is None:
                     continue
                 boundary = "initial" if previous is None else ("interval" if due else "change")
-                snapshot = self._row_defaults(state, "history_snapshots")
+                value_kind = kinds.get(subject_id, "authoritative")
+                confidence = 0.9 if value_kind == "derived" else 1.0
+                snapshot = dict(snapshot_template)
                 snapshot.update({
                     "id": f"history:{indicator_id}:{subject_type}:{subject_id}:{now}:{tick}",
-                    "subject_type": subject_type, "subject_id": subject_id,
-                    "indicator_id": indicator_id, "value": value, "unit": str(definition.get("unit") or ""),
-                    "game_minute": now, "tick": tick, "source_boundary": boundary,
-                    "confidence": 0.9 if kinds.get(subject_id) == "derived" else 1.0,
+                    "subject_id": subject_id, "value": value, "source_boundary": boundary,
+                    "confidence": confidence,
                     "completeness": completeness,
-                    "value_kind": kinds.get(subject_id, "authoritative"),
+                    "value_kind": value_kind,
                 })
                 new_snapshots.append(snapshot)
-                next_sample = int(previous.get("next_sample_at_minute") or 0) if previous else self._next_boundary(now, interval)
+                next_sample = int(previous.get("next_sample_at_minute") or 0) if previous else next_boundary
                 if due:
-                    next_sample = self._next_boundary(now, interval)
-                updated = self._row_defaults(state, "history_series_state")
+                    next_sample = next_boundary
+                updated = dict(series_template)
                 updated.update({
-                    "id": key, "subject_type": subject_type, "subject_id": subject_id,
-                    "indicator_id": indicator_id, "unit": str(definition.get("unit") or ""),
+                    "id": key, "subject_id": subject_id,
                     "latest_value": value, "latest_snapshot_id": snapshot["id"],
                     "latest_source_boundary": boundary,
-                    "latest_confidence": snapshot["confidence"],
-                    "latest_value_kind": snapshot["value_kind"],
-                    "last_sample_minute": now, "last_sample_tick": tick,
+                    "latest_confidence": confidence,
+                    "latest_value_kind": value_kind,
                     "next_sample_at_minute": next_sample,
                     "sample_count": (int(previous.get("sample_count") or 0) if previous else 0) + 1,
                     "last_compacted_at_minute": int(previous.get("last_compacted_at_minute") or now) if previous else now,
                     "completeness": completeness,
-                    "source_revision": int(state.table_revisions.get(source_table, 0)),
-                    "schema_version": 1,
                 })
                 new_series.append(updated)
                 series_by_key[key] = updated
@@ -324,7 +360,7 @@ class HistorySystem(ISystem):
                 previous = series_by_key.get(key)
                 if previous is None or previous.get("latest_value") is None:
                     continue
-                snapshot = self._row_defaults(state, "history_snapshots")
+                snapshot = dict(snapshot_template)
                 snapshot.update({
                     "id": f"history:{indicator_id}:{subject_type}:{removed_subject}:{now}:{tick}",
                     "subject_type": subject_type, "subject_id": removed_subject,
@@ -345,19 +381,37 @@ class HistorySystem(ISystem):
         if new_snapshots:
             state.update_table("history_snapshots", self._append(snapshots_table, new_snapshots))
         if new_series:
-            merged = {str(row.get("id") or ""): row for row in series_rows}
-            merged.update({str(row["id"]): row for row in new_series})
-            state.update_table("history_series_state", self._frame(series_table, list(merged.values())))
+            untouched = series_table.filter(~pl.col("indicator_id").is_in(active_ids))
+            state.update_table("history_series_state", pl.concat([
+                untouched, self._frame(series_table, list(series_by_key.values()))
+            ], how="vertical").sort("id"))
         if new_snapshots:
-            touched_keys = {
-                self._series_id(str(row["subject_type"]), str(row["subject_id"]), str(row["indicator_id"]))
-                for row in new_snapshots
-            }
+            touched_keys = {str(row["id"]) for row in new_series}
             self._compact(state, enabled, touched_keys, now)
         state.globals["history_series_snapshot_revision"] = int(
             state.table_revisions.get("history_snapshots", 0)
         )
+        state.globals["history_source_fingerprints"] = current_fingerprints
         state.globals["history_source_revisions"] = current_revisions
+
+    @staticmethod
+    def _observation_fingerprint(state: GameState, definition: dict[str, Any]) -> str | None:
+        derivation = str(definition.get("derivation") or "")
+        table = state.tables.get(str(definition.get("source_table") or ""))
+        if table is None:
+            return None
+        if derivation in {"region_population", "country_population"}:
+            identity = "id" if derivation == "region_population" else "owner"
+            columns = [identity, *[name for name in ("pop_14", "pop_15_64", "pop_65") if name in table.columns]]
+        elif derivation:
+            return None
+        else:
+            columns = list(dict.fromkeys(str(definition.get(key) or "") for key in
+                ("source_field", "subject_id_field", "related_id_field", "filter_field")))
+            columns = [name for name in columns if name and name in table.columns]
+        if not columns or not set(columns).issubset(table.columns):
+            return None
+        return frame_fingerprint(table, columns)
 
     def _measure_definition(self, state: GameState, definition: dict[str, Any]) -> tuple[dict[str, float], dict[str, str]]:
         derivation = str(definition.get("derivation") or "")
@@ -369,12 +423,11 @@ class HistorySystem(ISystem):
             table = state.tables.get("regions")
             if table is None:
                 return {}, {}
-            rows = table.to_dicts()
             fields = [name for name in ("pop_14", "pop_15_64", "pop_65") if name in table.columns]
-            values = {
-                str(row.get("id")): sum(float(row.get(field) or 0.0) for field in fields)
-                for row in rows if row.get("id") is not None
-            }
+            values = {}
+            for row in table.select(["id", *fields]).iter_rows(named=False):
+                if row[0] is not None:
+                    values[str(row[0])] = sum(float(value or 0.0) for value in row[1:])
             return values, {subject: "derived" for subject in values}
         if derivation == "resource_coverage":
             return self._resource_coverage(state)
@@ -397,18 +450,28 @@ class HistorySystem(ISystem):
             return {}, {}
         aggregation = str(definition.get("aggregation") or "last").lower()
         grouped: dict[str, list[float]] = {}
-        for row in table.to_dicts():
-            if filter_field and str(row.get(filter_field) or "") != filter_value:
+        # World tables contain many unrelated columns; materializing those for
+        # every indicator dominated live simulation ticks on the full world.
+        columns = list(dict.fromkeys(name for name in (field, subject_field, related_field, filter_field) if name and name in table.columns))
+        column_indices = {name: index for index, name in enumerate(columns)}
+        field_index = column_indices[field]
+        subject_index = column_indices[subject_field]
+        related_index = column_indices.get(related_field)
+        filter_index = column_indices.get(filter_field)
+        for row in table.select(columns).iter_rows(named=False):
+            filtered_value = row[filter_index] if filter_index is not None else None
+            if filter_field and str(filtered_value or "") != filter_value:
                 continue
-            subject = str(row.get(subject_field) or "").strip()
+            subject = str(row[subject_index] or "").strip()
             if not subject:
                 continue
             if definition.get("subject_type") == "relationship" and related_field:
-                related = str(row.get(related_field) or "").strip()
+                related_value = row[related_index] if related_index is not None else None
+                related = str(related_value or "").strip()
                 if not related:
                     continue
                 subject = "|".join(sorted((subject.upper(), related.upper())))
-            value = row.get(field)
+            value = row[field_index]
             if aggregation == "count":
                 grouped.setdefault(subject, []).append(1.0)
                 continue
@@ -441,17 +504,19 @@ class HistorySystem(ISystem):
         if not owner_field or not population_fields:
             return {}, {}
         population: dict[str, float] = {}
-        for row in regions.to_dicts():
-            owner = str(row.get(owner_field) or "").strip().upper()
+        for row in regions.select([owner_field, *population_fields]).iter_rows(named=False):
+            owner = str(row[0] or "").strip().upper()
             if not owner:
                 continue
-            population[owner] = population.get(owner, 0.0) + sum(float(row.get(field) or 0.0) for field in population_fields)
+            population[owner] = population.get(owner, 0.0) + sum(
+                float(value or 0.0) for value in row[1:]
+            )
         values: dict[str, float] = {}
-        for row in countries.to_dicts():
-            country = str(row.get("id") or "").strip().upper()
+        for country_value, gdp_value in countries.select(["id", "gdp"]).iter_rows(named=False):
+            country = str(country_value or "").strip().upper()
             people = population.get(country, 0.0)
             try:
-                gdp = float(row.get("gdp"))
+                gdp = float(gdp_value)
             except (TypeError, ValueError):
                 continue
             if country and people > 0 and math.isfinite(gdp):
@@ -466,10 +531,12 @@ class HistorySystem(ISystem):
         if not fields:
             return {}, {}
         totals: dict[str, float] = {}
-        for row in regions.to_dicts():
-            owner = self._tag(row.get("owner"))
+        for row in regions.select(["owner", *fields]).iter_rows(named=False):
+            owner = self._tag(row[0])
             if owner:
-                totals[owner] = totals.get(owner, 0.0) + sum(float(row.get(field) or 0.0) for field in fields)
+                totals[owner] = totals.get(owner, 0.0) + sum(
+                    float(value or 0.0) for value in row[1:]
+                )
         return totals, {subject: "derived" for subject in totals}
 
     def _resource_coverage(self, state: GameState) -> tuple[dict[str, float], dict[str, str]]:
@@ -638,20 +705,30 @@ class HistorySystem(ISystem):
         if snapshots is None or snapshots.is_empty() or series_table is None or not touched_keys:
             return
         definition_by_id = {str(row.get("id") or ""): row for row in definitions}
-        series_rows = series_table.to_dicts()
-        series_by_key = {str(row.get("id") or ""): row for row in series_rows}
-        compact_keys: set[str] = set()
-        for key in touched_keys:
-            series_row = series_by_key.get(key, {})
-            indicator_id = str(series_row.get("indicator_id") or "")
-            definition = definition_by_id.get(indicator_id, {})
-            cap = max(1, int(definition.get("max_samples_per_series") or 3650))
-            retention = max(1, int(definition.get("retention_window_minutes") or 5_256_000))
-            last_compaction = int(series_row.get("last_compacted_at_minute") or 0)
-            if int(series_row.get("sample_count") or 0) > cap * 2 or int(now) - last_compaction >= retention:
-                compact_keys.add(key)
+        limits = pl.DataFrame([
+            {
+                "indicator_id": indicator_id,
+                "_sample_cap": max(1, int(definition.get("max_samples_per_series") or 3650)),
+                "_retention": max(1, int(definition.get("retention_window_minutes") or 5_256_000)),
+            }
+            for indicator_id, definition in definition_by_id.items()
+        ], schema={"indicator_id": pl.Utf8, "_sample_cap": pl.Int64, "_retention": pl.Int64})
+        # Check thresholds in columns before materializing full series rows.
+        # Skip full-row conversion when no series has reached either threshold.
+        candidates = (
+            series_table.select("id", "indicator_id", "sample_count", "last_compacted_at_minute")
+            .filter(pl.col("id").is_in(sorted(touched_keys)))
+            .join(limits, on="indicator_id", how="left")
+            .filter(
+                (pl.col("sample_count").fill_null(0) > pl.col("_sample_cap").fill_null(3650) * 2)
+                | (int(now) - pl.col("last_compacted_at_minute").fill_null(0) >= pl.col("_retention").fill_null(5_256_000))
+            )
+        )
+        compact_keys = set(candidates.get_column("id").to_list())
         if not compact_keys:
             return
+        series_rows = series_table.to_dicts()
+        series_by_key = {str(row.get("id") or ""): row for row in series_rows}
 
         key_expr = pl.concat_str(
             [pl.col("subject_type"), pl.col("subject_id"), pl.col("indicator_id")],

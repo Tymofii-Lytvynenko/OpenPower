@@ -96,3 +96,7 @@ tests/
 ## Complexity Tracking
 
 No constitution violations or added architectural complexity require an exception.
+
+## Update-local routing indexes
+
+`MilitaryRoutePlanner.prepare()` materializes region topology once for repeated searches in one `MilitarySystem.update()`. `RegionRouteSnapshot` and `RegionTravelTime` provide lazy region/home/coordinate indexes for covert routing. The objects are discarded after the update so later map or ownership changes are visible. The prepared graph caches topology only: per-order access, unit-domain checks, and segment costs still run for each search. This preserves the route legality contract while avoiding repeated full-world materialization.

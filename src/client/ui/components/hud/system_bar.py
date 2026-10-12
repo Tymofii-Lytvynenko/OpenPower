@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from imgui_bundle import imgui, icons_fontawesome_6
+from imgui_bundle import icons_fontawesome_6
+from src.client.ui.core.instrumented_imgui import imgui
+from src.client.ui.core.testability import record_last_item
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,7 +156,9 @@ class SystemBar:
                 imgui.same_line()
 
             label = self._button_label(action)
-            if imgui.button(label, (self._button_width(action), 30)):
+            clicked = imgui.button(label, (self._button_width(action), 30))
+            record_last_item(f"hud.system.{action.id}", action.tooltip, "button")
+            if clicked:
                 action.callback()
 
             if imgui.is_item_hovered():

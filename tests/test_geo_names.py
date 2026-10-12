@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import polars as pl
 
 from src.client.ui.panels.shared.panel_data import resolve_country_name, resolve_region_name
-from src.shared.geo_names import normalize_geo_language_code
+from src.shared.geo_names import get_geo_name_resolver, normalize_geo_language_code
 
 
 class TestGeoNameResolution(unittest.TestCase):
@@ -23,8 +23,12 @@ class TestGeoNameResolution(unittest.TestCase):
             },
         )
 
-        self.assertEqual(resolve_country_name(state, "USA"), "США")
-        self.assertEqual(resolve_region_name(state, 1), "Каліфорнія")
+        expected_country = get_geo_name_resolver("uk").country_name("USA")
+        expected_region = get_geo_name_resolver("uk").region_name("US-CA")
+        self.assertNotEqual(expected_country, "United States")
+        self.assertNotEqual(expected_region, "California")
+        self.assertEqual(resolve_country_name(state, "USA"), expected_country)
+        self.assertEqual(resolve_region_name(state, 1), expected_region)
 
     def test_falls_back_to_table_names_for_unknown_codes(self):
         state = SimpleNamespace(

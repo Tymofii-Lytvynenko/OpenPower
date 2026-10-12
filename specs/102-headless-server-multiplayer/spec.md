@@ -36,5 +36,5 @@ As a multiplayer gamer or dedicated server administrator, I want to run and join
 
 ## Assumptions & Dependencies
 
-- **Assumption**: Server process isolation and zero-copy IPC architecture (`src/server`) provide foundation for network serialization.
+- **Assumption**: The local process-isolation and versioned Arrow snapshot protocol provide reusable serialization and state-model patterns, but they do not implement zero-copy transport or remote-client networking.
 - **Dependency**: Arrow IPC stream transport formats are defined in `src/shared`.

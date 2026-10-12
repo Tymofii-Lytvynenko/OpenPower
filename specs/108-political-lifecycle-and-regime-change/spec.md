@@ -17,6 +17,7 @@ As a national leader, I want governments, parties, laws, approval, elections, an
 7. **Apply domestic effects**: **Given** a government changes its tax, labour, rights, or migration laws, **When** the next dependent systems update, **Then** the country’s budget, migration, economy, public approval, and military readiness use the active law state.
 8. **Use AI politics**: **Given** a country is AI-controlled, **When** an election, law choice, or crisis becomes actionable, **Then** the AI follows the same legal rules, deadlines, costs, and outcome calculations as a human player.
 9. **Persist the lifecycle**: **Given** a political transition is pending or resolved, **When** the game is saved and loaded, **Then** dates, votes, parties, laws, and political effects continue without divergence.
+10. **Set language and religion policy**: **Given** the country has loaded identity profiles, **When** the player inspects or changes a language/religion group status, **Then** the interface shows shares and their source caveat, rejects changes to the aggregate `Other` group, records the authorized decision, and updates the declared rights/stability signals. Daily composition drift transfers only a bounded share to a recognized group and does not move population between regions.
 
 ### Edge Cases
 
@@ -28,6 +29,7 @@ As a national leader, I want governments, parties, laws, approval, elections, an
 - A coup attempt fails, is detected, or loses support; the country remains in the prior regime and receives the configured consequences.
 - A legacy save contains seeded laws but no lifecycle metadata; the system derives a valid initial political state without changing existing ownership.
 - A political effect would make approval, stability, or corruption leave its allowed range; values are clamped and the cause remains visible.
+- A language or religion profile is missing, has unknown source year, or contains the aggregate `Other` row; unavailable profiles stay visibly absent, unknown provenance is disclosed, and the aggregate row cannot be assigned a separate legal status.
 
 ## Functional Requirements
 
@@ -49,6 +51,11 @@ As a national leader, I want governments, parties, laws, approval, elections, an
 - **FR-016**: Political state MUST survive save/load, snapshot synchronization, and replay with the same pending dates, transitions, and next valid outcomes.
 - **FR-017**: The player MUST be able to inspect the current government, parties, active laws, next election, approval, stability, corruption, and recent political causes from one political overview.
 - **FR-018**: Identical political state, time, and ordered actions MUST produce identical election results, crisis outcomes, and regime changes.
+- **FR-019**: Identity Profiles: The political view MUST expose each loaded language and religion group, its normalized share, legal status, and source metadata. Unknown bundled source year MUST be represented as unknown, not assigned a current census year. The aggregate `Other` bucket is visible and non-editable.
+- **FR-020**: Identity Policy Actions: An authorized player MUST be able to set a listed group's status to `official`, `legal`, `restricted`, or `illegal` through a shared action. Unauthorized, absent, unsupported, or aggregate-group changes MUST be rejected with a reason and no policy mutation. Restricting or banning a group MUST leave another nonzero group of that same dimension legally recognized.
+- **FR-021**: Identity Composition: At an unpaused daily boundary, restricted and illegal groups MUST shift a bounded share to the largest recognized group in the same dimension at rates equivalent to 0.5% and 2% per game-year respectively. Shifts MUST preserve each profile total and MUST NOT change regional population, migration flows, or national population.
+- **FR-022**: Identity Effects: For a country with identity groups, the system MUST calculate language and religion signals independently, average the available dimensions, and publish attributable bounded public-rights and stability effects for existing political consumers.
+- **FR-023**: Identity Evidence: Policy changes and composition shifts MUST emit shared events and append attributable political history records with the prior/new status or share change and game minute.
 
 ## Key Entities & Data Model
 
@@ -57,10 +64,12 @@ As a national leader, I want governments, parties, laws, approval, elections, an
 - **Law State**: A named domestic policy with current value, pending transition, legal authority, duration, and dependent effects.
 - **Election**: A scheduled or overridden political contest with electorate, parties, turnout, results, winner, and resolution time.
 - **Political Crisis**: A tracked protest, strike, paralysis, coup, revolution, succession, or constitutional transition with triggers, participants, status, and outcome.
+- **Identity Group**: A country language or religion profile entry with normalized share, legal status, source metadata, and policy/composition timestamps.
+- **Identity Policy Signal**: A per-country summary of language/religion group counts, recognized/restricted/illegal shares, bounded policy pressure, and update minute.
 
 ## Scope Boundaries
 
-This feature activates the political lifecycle around the existing government and law records. It does not replace the existing stability drift, treaty effects, economy, migration, military combat, or diplomatic relationship calculations. It does not create a new territorial ownership model.
+This feature activates the political lifecycle around the existing government and law records and adds legal identity policy for language/religion groups. Identity shares are game estimates rather than verified comparable census data. Identity composition changes do not simulate population movement or regional demographics. The feature does not replace existing economy, migration, military combat, or diplomatic relationship calculations and does not add multiplayer identity synchronization.
 
 ## Success Criteria
 
@@ -71,6 +80,9 @@ This feature activates the political lifecycle around the existing government an
 - **SC-005**: A player can identify the current government, active laws, approval, stability, corruption, next election, and crisis cause within 30 seconds from the political overview.
 - **SC-006**: Saving and loading during an election, law transition, or crisis preserves the next outcome and all deadlines.
 - **SC-007**: Processing political state for 10,000 countries completes within 500 milliseconds in a controlled benchmark when no political state changed.
+- **SC-008**: 100% of invalid identity-policy actions are rejected without changing the target group, aggregate signals, or political effects.
+- **SC-009**: Repeated daily composition updates from identical group state/time produce identical shares and event/history records; each nonempty profile preserves its 100% total.
+- **SC-010**: A player can see a group's source-year caveat, share, and legal status in the internal-laws view and can distinguish the aggregate `Other` row from editable groups.
 
 ## Assumptions & Dependencies
 

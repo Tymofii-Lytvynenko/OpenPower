@@ -103,6 +103,8 @@ class InfrastructureSystem(ISystem):
             state, now, policies
         ):
             self._refresh_read_models_from_frames(state, policies)
+            self._depreciate_profiles_from_frames(state, policies, now)
+            self._materialize_read_models_from_frames(state, state.get_table("regional_infrastructure"))
             state.globals["infrastructure_last_update_minute"] = now
             return
 
@@ -137,12 +139,10 @@ class InfrastructureSystem(ISystem):
         regions = state.tables.get("regions")
         projects = state.tables.get("infrastructure_projects")
         impacts = state.tables.get("strategic_impacts")
-        previous = state.globals.get("infrastructure_last_update_minute")
         if (
             profiles is None
             or regions is None
             or projects is None
-            or (previous is not None and now > int(previous))
             or any(
                 isinstance(action, (ActionInvestRegionalInfrastructure, ActionCancelInfrastructureProject))
                 for action in state.current_actions
@@ -287,7 +287,62 @@ class InfrastructureSystem(ISystem):
             ).otherwise(pl.col("last_source_id")).alias("last_source_id"),
         )
         state.update_table("regional_infrastructure", normalized)
-        self._materialize_read_models_from_frames(state, normalized)
+
+    def _depreciate_profiles_from_frames(self, state, policies, now: int) -> None:
+        previous = state.globals.get("infrastructure_last_update_minute")
+        elapsed = max(0, now - int(previous)) if previous is not None else 0
+        if not elapsed:
+            return
+        from modules.base.systems.world.infrastructure_policy import MINUTES_PER_YEAR
+
+        profiles = state.get_table("regional_infrastructure")
+        regions = state.get_table("regions")
+        countries = state.get_table("countries")
+        budget_fields = [name for name in ("budget_infra_ratio", "budget_telecom_ratio", "budget_health_ratio") if name in countries.columns]
+        budgets = countries.select(pl.col("id").alias("_country"), *budget_fields)
+        for name in ("budget_infra_ratio", "budget_telecom_ratio", "budget_health_ratio"):
+            if name not in budgets.columns:
+                fallback = "budget_infra_ratio" if name == "budget_health_ratio" else None
+                budgets = budgets.with_columns((pl.col(fallback) if fallback else pl.lit(0.0)).alias(name))
+        region_inputs = regions.select(
+            pl.col("id").alias("region_id"), pl.col("owner").alias("_country"),
+            (self._finite_column("infrastructure_use") if "infrastructure_use" in regions.columns else pl.lit(0.0)).clip(0.0, 2.0).alias("_use"),
+        ).join(budgets, on="_country", how="left")
+        occupations = state.tables.get("occupations")
+        occupied = []
+        if occupations is not None and not occupations.is_empty() and "region_id" in occupations.columns:
+            if "occupation_status" in occupations.columns:
+                occupations = occupations.filter(
+                    pl.col("occupation_status").cast(pl.Utf8, strict=False).fill_null("").str.to_lowercase().is_in(["", "active"])
+                )
+            occupied = occupations.get_column("region_id").cast(pl.Int64, strict=False).fill_null(0).to_list()
+        wear = max(0.0, min(2.0, self._finite(state.globals.get("infrastructure_occupation_use_multiplier", 0.5))))
+        work = profiles.join(region_inputs, on="region_id", how="left", maintain_order="left")
+        maintenance = pl.when(pl.col("category") == "telecom").then(
+            self._finite_column("budget_telecom_ratio")
+        ).when(pl.col("category") == "utilities").then(
+            self._finite_column("budget_health_ratio")
+        ).otherwise(self._finite_column("budget_infra_ratio")).clip(0.0, 1.0)
+        use = (pl.col("_use").fill_null(0.0) + pl.when(pl.col("region_id").is_in(occupied)).then(wear).otherwise(0.0)).clip(0.0, 2.0)
+        rate = self._policy_expression(policies, "annual_depreciation", pl.lit(0.0)).clip(0.0, 1.0)
+        known = pl.col("category").is_in(list(policies))
+        work = work.with_columns(
+            pl.when(known).then(maintenance).otherwise(pl.col("maintenance_level")).alias("maintenance_level"),
+            (pl.col("condition") - rate * (elapsed / MINUTES_PER_YEAR) * (1.0 + use) * (1.0 - maintenance)).clip(lower_bound=0.0).alias("_condition"),
+        )
+        changed = known & (pl.col("_condition") != pl.col("condition"))
+        work = work.with_columns(
+            pl.when(changed).then(now).otherwise(pl.col("last_change_minute")).alias("last_change_minute"),
+            pl.when(changed).then(pl.lit("depreciation")).otherwise(pl.col("last_source_type")).alias("last_source_type"),
+            pl.when(changed).then(pl.lit(f"game-minute:{now}")).otherwise(pl.col("last_source_id")).alias("last_source_id"),
+            pl.when(changed).then(pl.col("_condition")).otherwise(pl.col("condition")).alias("condition"),
+        ).with_columns(
+            pl.when(known & (pl.col("maximum") > 0.0)).then((pl.col("level") / pl.col("maximum")) * pl.col("condition"))
+            .when(known).then(0.0).otherwise(pl.col("capacity")).alias("capacity")
+        ).select(profiles.columns)
+        # Ordinary elapsed-time updates must not materialize every profile and
+        # wide regional row in Python; project/damage ticks retain the row path.
+        state.update_table("regional_infrastructure", work)
 
     def _materialize_read_models_from_frames(
         self,
@@ -1087,8 +1142,13 @@ class InfrastructureSystem(ISystem):
 
         ids: list[Any] = []
         outputs: dict[str, list[float]] = {column: [] for column in REGION_OUTPUT_COLUMNS}
+        region_aggregation_context: dict[int, tuple[str, float]] = {}
         for region in regions.iter_rows(named=True):
             region_id = int(region.get("id") or 0)
+            region_aggregation_context[region_id] = (
+                self._tag(region.get("owner")),
+                self._regional_weight(region),
+            )
             category_rows = by_region.get(region_id, {})
             transport = category_rows.get("transport", {})
             utilities = category_rows.get("utilities", {})
@@ -1124,17 +1184,16 @@ class InfrastructureSystem(ISystem):
         country_frame = state.tables.get("countries")
         if country_frame is None or country_frame.is_empty() or "id" not in country_frame.columns:
             return
-        region_rows = regions.to_dicts()
         country_rows = country_frame.to_dicts()
-        region_by_id = {int(row.get("id") or 0): row for row in region_rows}
         aggregate_totals: dict[str, dict[str, list[float]]] = {}
         for profile in profiles:
-            region = region_by_id.get(int(profile.get("region_id") or 0))
-            if region is None:
+            context = region_aggregation_context.get(
+                int(profile.get("region_id") or 0)
+            )
+            if context is None:
                 continue
-            owner = self._tag(region.get("owner"))
+            owner, weight = context
             category = str(profile.get("category") or "")
-            weight = self._regional_weight(region)
             if not owner or weight <= 0.0:
                 continue
             buckets = aggregate_totals.setdefault(owner, {})

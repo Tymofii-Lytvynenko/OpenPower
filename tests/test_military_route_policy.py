@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 import polars as pl
 
@@ -12,6 +13,29 @@ from src.shared.state import GameState
 
 
 class MilitaryRoutePlannerTest(unittest.TestCase):
+    def test_prepared_graph_rechecks_access_and_preserves_cost_tie_breaking(self) -> None:
+        regions = [{"id": value} for value in range(1, 5)]
+        edges = [
+            {"region_id": 1, "neighbor_region_id": 2},
+            {"region_id": 2, "neighbor_region_id": 4},
+            {"region_id": 1, "neighbor_region_id": 3},
+            {"region_id": 3, "neighbor_region_id": 4},
+        ]
+        planner = MilitaryRoutePlanner()
+        with patch.object(planner, "_adjacency", wraps=planner._adjacency) as build_graph:
+            graph = planner.prepare(regions, edges)
+            for blocked in (None, 2, 3):
+                allowed = lambda region, _final: region["id"] != blocked
+                plan = planner.plan(1, 4, regions, edges, allowed, prepared_graph=graph)
+                assert plan.region_ids == ((1, 3, 4) if blocked == 2 else (1, 2, 4))
+                assert plan.travel_cost == 2.0
+            manual = planner.plan(
+                1, 4, regions, edges, lambda region, _final: region["id"] != 2,
+                explicit_waypoints=[2], prepared_graph=graph,
+            )
+            assert not manual.is_valid
+            assert build_graph.call_count == 1
+
     def test_finds_least_cost_route_and_breaks_ties_by_region_id(self) -> None:
         regions = [{"id": value} for value in range(1, 5)]
         edges = [
@@ -72,6 +96,50 @@ class MilitaryRoutePlannerTest(unittest.TestCase):
 
         self.assertEqual(speed_factor, 1.1)
         self.assertLess(trained, baseline)
+
+    def test_prepared_segment_cost_matches_reference_duration_for_route_edges(self) -> None:
+        state = GameState()
+        state.globals.update({
+            "military_domain_duration_multipliers": {"land": 1.2, "air": 0.8},
+            "military_force_size_duration_coefficient": 0.3,
+            "military_infrastructure_duration_coefficient": 0.4,
+            "military_telecom_coordination_coefficient": 0.2,
+            "military_domestic_duration_multiplier": 0.9,
+            "military_foreign_duration_multiplier": 1.3,
+        })
+        system = MilitarySystem()
+        locations = {
+            1: GeoCoordinate(0.0, 0.0),
+            2: GeoCoordinate(15.0, 5.0),
+        }
+        sources = [{"id": 1}, {"id": 3}]
+        targets = [
+            {"id": 2, "owner": "USA", "infrastructure": 0.7, "telecom_capacity": 0.4},
+            {"id": 3, "owner": "CAN", "infrastructure": 0.2, "communications": 0.8},
+            {"id": 4, "owner": "", "infrastructure": 1.0},
+        ]
+        units = [
+            {"owner": "USA", "unit_type": "army", "unit_domain": "land", "strength": 1000},
+            {"owner": "USA", "unit_type": "fighter", "unit_domain": "air", "strength": 1},
+        ]
+
+        for unit in units:
+            prepared = system._route_segment_cost_for_unit(
+                locations, unit, state, capability_speed_multiplier=1.1
+            )
+            for source in sources:
+                for target in targets:
+                    self.assertEqual(
+                        prepared(source, target),
+                        system._route_segment_minutes_for_unit(
+                            source,
+                            target,
+                            locations,
+                            unit,
+                            state,
+                            capability_speed_multiplier=1.1,
+                        ),
+                    )
 
     def test_military_system_traverses_each_region_in_the_accepted_route(self) -> None:
         unit = UnitFactory().create("USA-1", "USA", "army", 100, 1, GeoCoordinate(0.0, 0.0), 0)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.renderers.flag_renderer import FlagRenderer
 from src.client.ui.core.theme import GAMETHEME
@@ -38,7 +38,8 @@ def country_options_from_state(state) -> tuple[CountryOption, ...]:
         return ()
 
     options_by_tag: dict[str, CountryOption] = {}
-    for row in countries.iter_rows(named=True):
+    columns = [name for name in ("id", "name", "display_name") if name in countries.columns]
+    for row in countries.select(columns).iter_rows(named=True):
         raw_tag = row.get("id")
         tag = "" if raw_tag is None else str(raw_tag).strip()
         if not tag:

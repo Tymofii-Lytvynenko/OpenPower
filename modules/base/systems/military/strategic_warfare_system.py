@@ -110,25 +110,31 @@ class StrategicUpdateIndexes:
 class StrategicEventBuffer:
     """Collects per-strike notifications and relation changes for one atomic flush."""
 
-    messages: list[dict[str, Any]] | None
+    messages: pl.DataFrame | None
     message_schema: Any
     message_dirty: bool = False
+    message_additions: list[dict[str, Any]] | None = None
     relation_deltas: dict[tuple[str, str], float] | None = None
 
     @classmethod
     def from_state(cls, state: GameState) -> StrategicEventBuffer:
         table = state.tables.get("messages")
         return cls(
-            messages=None if table is None else table.to_dicts(),
+            messages=table,
             message_schema=None if table is None else table.schema,
             relation_deltas={},
+            message_additions=[],
         )
 
     def add_message(self, state: GameState, recipient: str, status: str, body: str) -> None:
         if self.messages is None:
             return
-        message_id = f"strategic-message-{len(self.messages) + 1:08d}"
-        self.messages.append({
+        additions = self.message_additions
+        if additions is None:
+            additions = []
+            self.message_additions = additions
+        message_id = f"strategic-message-{self.messages.height + len(additions) + 1:08d}"
+        additions.append({
             "id": message_id,
             "country_id": recipient,
             "category": "strategic",
@@ -149,32 +155,57 @@ class StrategicEventBuffer:
             self.relation_deltas[pair] = self.relation_deltas.get(pair, 0.0) + delta
 
     def flush(self, state: GameState) -> None:
-        if self.message_dirty and self.messages is not None:
-            state.update_table("messages", pl.DataFrame(self.messages, schema=self.message_schema))
+        if self.message_dirty and self.messages is not None and self.message_additions:
+            additions = pl.DataFrame(self.message_additions, schema=self.message_schema)
+            state.update_table("messages", pl.concat([self.messages, additions], how="vertical"))
         if not self.relation_deltas:
             return
         table = state.tables.get("countries_relations")
-        if table is None:
+        if table is None or not {"source", "target", "value"}.issubset(table.columns):
             return
-        rows = table.to_dicts()
-        applied: set[tuple[str, str]] = set()
-        for row in rows:
-            pair = (
-                str(row.get("source") or "").strip().upper(),
-                str(row.get("target") or "").strip().upper(),
+        deltas = pl.DataFrame(
+            [
+                (source, target, delta)
+                for (source, target), delta in sorted(self.relation_deltas.items())
+            ],
+            schema={"_source_key": pl.Utf8, "_target_key": pl.Utf8, "_delta": pl.Float64},
+            orient="row",
+        )
+        keyed = table.with_columns(
+            pl.col("source").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_uppercase().alias("_source_key"),
+            pl.col("target").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_uppercase().alias("_target_key"),
+        )
+        updated = (
+            keyed.join(deltas, on=["_source_key", "_target_key"], how="left")
+            .with_columns(
+                pl.when(pl.col("_delta").is_not_null())
+                .then(
+                    (pl.col("value").cast(pl.Float64, strict=False).fill_null(0.0) + pl.col("_delta"))
+                    .clip(lower_bound=-100.0, upper_bound=100.0)
+                )
+                .otherwise(pl.col("value"))
+                .alias("value")
             )
-            delta = self.relation_deltas.get(pair)
-            if delta is None:
-                continue
-            row["value"] = max(-100.0, min(100.0, float(row.get("value") or 0.0) + delta))
-            applied.add(pair)
-        for source, destination in sorted(set(self.relation_deltas) - applied):
-            rows.append({
-                "source": source,
-                "target": destination,
-                "value": max(-100.0, min(100.0, self.relation_deltas[(source, destination)])),
-            })
-        updated = pl.DataFrame(rows, schema=table.schema) if rows else pl.DataFrame(schema=table.schema)
+        )
+        missing = deltas.join(
+            keyed.select("_source_key", "_target_key").unique(),
+            on=["_source_key", "_target_key"],
+            how="anti",
+        )
+        updated = updated.select(list(table.columns))
+        if not missing.is_empty():
+            additions = missing.select(
+                pl.col("_source_key").alias("source"),
+                pl.col("_target_key").alias("target"),
+                pl.col("_delta").clip(lower_bound=-100.0, upper_bound=100.0).alias("value"),
+            )
+            for name, dtype in table.schema.items():
+                if name not in additions.columns:
+                    additions = additions.with_columns(pl.lit(None, dtype=dtype).alias(name))
+                else:
+                    additions = additions.with_columns(pl.col(name).cast(dtype, strict=False))
+            additions = additions.select(list(table.columns))
+            updated = pl.concat([updated, additions], how="vertical")
         if not updated.equals(table):
             state.update_table("countries_relations", updated)
 
@@ -199,35 +230,35 @@ class StrategicWarfareSystem(ISystem):
         required = {"strategic_weapons", "strategic_launch_orders", "missile_defense_layers", "strategic_impacts"}
         if not required.issubset(state.tables):
             return
-        weapons = state.get_table("strategic_weapons").to_dicts()
+        now = int(state.time.total_minutes)
+        has_launch_actions = any(isinstance(action, ActionLaunchStrategicStrike) for action in state.current_actions)
+        has_production_actions = any(isinstance(action, ActionProduceStrategicWeapon) for action in state.current_actions)
         production_table = state.tables.get("strategic_production_orders")
+        order_table = state.get_table("strategic_launch_orders")
+        defense_table = state.get_table("missile_defense_layers")
+        has_due_production_orders = self._has_due_production_orders(production_table, now)
+        has_due_orders = self._has_due_launch_orders(order_table, now)
+        maintainable_defenses = (
+            not state.time.is_paused
+            and any(isinstance(event, EventNewDay) for event in state.events)
+            and self._has_maintainable_defenses(defense_table)
+        )
+        if not (has_launch_actions or has_production_actions or has_due_production_orders or has_due_orders or maintainable_defenses):
+            return
+
+        weapons = state.get_table("strategic_weapons").to_dicts()
         production_orders = [] if production_table is None else production_table.to_dicts()
-        orders = state.get_table("strategic_launch_orders").to_dicts()
-        defenses = state.get_table("missile_defense_layers").to_dicts()
+        orders = order_table.to_dicts()
+        defenses = defense_table.to_dicts()
         impacts = state.get_table("strategic_impacts").to_dicts()
         countries_frame = state.tables.get("countries")
         country_rows = [] if countries_frame is None else countries_frame.to_dicts()
         original_countries = [dict(row) for row in country_rows]
-        now = int(state.time.total_minutes)
-        has_launch_actions = any(isinstance(action, ActionLaunchStrategicStrike) for action in state.current_actions)
-        has_due_production_orders = any(
-            (order.get("status") == "pending" and now >= int(order.get("completes_at_minute") or 0))
-            or (order.get("status") == "readying" and now >= int(order.get("ready_at_minute") or 0))
-            for order in production_orders
-        )
         production_orders_changed = False
         if has_due_production_orders:
             production_orders_changed = self._complete_production_orders(
                 state, weapons, production_orders, country_rows, now,
             )
-        has_due_orders = any(
-            order.get("status") == "pending"
-            and now >= int(order.get("resolves_at_minute") or 0)
-            for order in orders
-        )
-        maintainable_defenses = not state.time.is_paused and any(
-            isinstance(event, EventNewDay) for event in state.events
-        ) and any(bool(row.get("researched")) and bool(row.get("operational")) for row in defenses)
         indexes = StrategicUpdateIndexes.build(state) if has_launch_actions or has_due_orders or maintainable_defenses else None
         event_buffer = StrategicEventBuffer.from_state(state) if has_launch_actions or has_due_orders else None
         if maintainable_defenses:
@@ -276,6 +307,37 @@ class StrategicWarfareSystem(ISystem):
         self._write(state, "strategic_launch_orders", orders)
         self._write(state, "missile_defense_layers", defenses)
         self._write(state, "strategic_impacts", impacts)
+
+    @staticmethod
+    def _has_due_production_orders(orders: pl.DataFrame | None, now: int) -> bool:
+        if orders is None or orders.is_empty() or not {"status", "completes_at_minute", "ready_at_minute"}.issubset(orders.columns):
+            return False
+        status = pl.col("status").cast(pl.Utf8).fill_null("")
+        due = orders.filter(
+            ((status == "pending") & (pl.col("completes_at_minute").fill_null(0) <= now))
+            | ((status == "readying") & (pl.col("ready_at_minute").fill_null(0) <= now))
+        )
+        return not due.is_empty()
+
+    @staticmethod
+    def _has_due_launch_orders(orders: pl.DataFrame, now: int) -> bool:
+        if orders.is_empty() or not {"status", "resolves_at_minute"}.issubset(orders.columns):
+            return False
+        due = orders.filter(
+            (pl.col("status").cast(pl.Utf8).fill_null("") == "pending")
+            & (pl.col("resolves_at_minute").fill_null(0) <= now)
+        )
+        return not due.is_empty()
+
+    @staticmethod
+    def _has_maintainable_defenses(defenses: pl.DataFrame) -> bool:
+        if defenses.is_empty() or not {"researched", "operational"}.issubset(defenses.columns):
+            return False
+        maintainable = defenses.filter(
+            pl.col("researched").cast(pl.Boolean, strict=False).fill_null(False)
+            & pl.col("operational").cast(pl.Boolean, strict=False).fill_null(False)
+        )
+        return not maintainable.is_empty()
 
     def _prepare_weapon_production(self, state, weapons, production_orders, action, countries, now):
         if "strategic_production_orders" not in state.tables:

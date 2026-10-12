@@ -22,3 +22,17 @@ The budget and resource tests are headless contract tests. The data inspector te
 - Target: 10,000-row Data Inspector frame <4 ms/frame; interactive dashboards 60+ FPS.
 - Measure before changing an algorithm. Each algorithm has a maximum of three measured optimization iterations. Log every implementation change and its before/after result; if the target still fails after iteration three, stop tuning it, record the outstanding issue, and continue with other requirements.
 - Headless unit tests do not establish rendered OpenGL frame time. Do not mark either GUI performance gate verified from test-only evidence.
+
+## Developer UI journeys
+
+Use the UI test catalog and deterministic recording-client journeys to inspect surfaces and verify visible controls, geometry, and dispatched actions:
+
+```powershell
+.\.venv\Scripts\python.exe main.py ui-test list
+.\.venv\Scripts\python.exe main.py ui-test run budget --journey tests/ui/journeys/budget.json
+.\.venv\Scripts\python.exe main.py ui-test run internal-laws --fixture tests/ui/fixtures/identity-trade.json --journey tests/ui/journeys/identity-policy.json --width 1280 --height 720
+.\.venv\Scripts\python.exe main.py ui-test all --matrix --output artifacts/ui/matrix
+.\.venv\Scripts\python.exe main.py ui-test live-smoke
+```
+
+Journey artifacts contain `report.json` and `actual.png`; optional overlays, visual diffs, fixture fields, selectors, and the live bridge are described in [`docs/UI_TESTING.md`](../../docs/UI_TESTING.md). Recording-client runs prove UI dispatch only. Use the desktop verification steps above for live rendering and frame-time acceptance.

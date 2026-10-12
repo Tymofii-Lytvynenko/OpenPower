@@ -6,7 +6,7 @@
 
 ## Summary
 
-Complete structured peace settlements and dynamic diplomatic balance using existing module-layer systems. `AdvancedDiplomacySystem` and `PeaceDealPolicy` own clause validation, multi-party responses, AI utility, ratification, and peace events; `DiplomaticBalanceSystem` owns expansion pressure, defensive coalitions, per-war exhaustion, and corresponding status events. Preserve existing treaty/war resolution, table schemas, and action/event APIs.
+Complete structured peace settlements, bilateral asset offers, and dynamic diplomatic balance using existing module-layer systems. `AdvancedDiplomacySystem` and `PeaceDealPolicy` own peace-clause validation, multi-party responses, AI utility, ratification, and peace events; `BilateralTradeSystem` and `BilateralTradePolicy` own non-belligerent cash/region/research proposals, validation, counteroffers, and settlement; `DiplomaticBalanceSystem` owns expansion pressure, defensive coalitions, per-war exhaustion, and corresponding status events. Preserve existing treaty/war resolution, table schemas, and action/event APIs.
 
 ## Technical Context
 
@@ -14,7 +14,7 @@ Complete structured peace settlements and dynamic diplomatic balance using exist
 
 **Primary Dependencies**: Polars DataFrames, existing `GameState`, shared `GameAction`/domain-event contracts.
 
-**Storage**: Existing in-memory tables with the repository's save/IPC persistence path.
+**Storage**: Existing in-memory tables with the repository's save/IPC persistence path, including `diplomatic_trade_deals`.
 
 **Testing**: pytest unit and system integration tests.
 
@@ -26,7 +26,7 @@ Complete structured peace settlements and dynamic diplomatic balance using exist
 
 **Constraints**: Keep policy in `modules/base/systems/world`; use semantic actions and events; preserve player authorization, multi-party consent, existing treaty closure, deterministic ordering, and table contracts; no client or engine internals in gameplay systems.
 
-**Scale/Scope**: Multiple active wars, participants, structured clauses (reparations, territory, treaty annulment, demilitarization), rolling one-year expansion events, coalition pacts, and per-country/per-war exhaustion state.
+**Scale/Scope**: Multiple active wars, participants, structured peace clauses (reparations, territory, treaty annulment, demilitarization), bilateral pending offers of cash/regions/research, rolling one-year expansion events, coalition pacts, and per-country/per-war exhaustion state. Country-to-country trade is single-player; multiplayer remains excluded.
 
 ## Constitution Check
 
@@ -65,5 +65,12 @@ tests/test_diplomatic_balance_system.py
 **Structure Decision**: Extend the existing diplomacy/balance systems and schema registry; no new service boundary or project structure is needed.
 
 ## Complexity Tracking
+
+## Bilateral trade implementation locations
+
+- `modules/base/systems/world/bilateral_trade_system.py` and `bilateral_trade_policy.py`: proposal lifecycle, asset validation/valuation, AI response, and settlement.
+- `modules/base/schema.py`: `diplomatic_trade_deals` table; `src/shared/actions.py` and `src/shared/events.py`: trade commands and `EventDiplomaticTradeChanged`.
+- `src/client/ui/panels/trade_panel.py`: player proposal and response workflow.
+- `tests/test_identity_bilateral_workflows.py` and `tests/ui/journeys/bilateral-trade.json`: simulation and UI workflow coverage.
 
 No constitution exception is approved. The optional AI archetype field defaults to a neutral `pragmatic` profile, preserving behavior for existing saves/content unless an archetype is configured.

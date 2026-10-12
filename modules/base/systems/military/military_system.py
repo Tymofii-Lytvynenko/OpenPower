@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import math
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import numpy as np
 import polars as pl
@@ -24,6 +24,7 @@ from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolic
 from modules.base.systems.military.authority_policy import player_controls_country
 from modules.base.systems.military.route_policy import MilitaryRoutePlanner
 from modules.base.systems.military.capability_catalog import get_role_profile
+from modules.base.systems.military.unit_catalog import MILITARY_UNIT_TYPES
 from modules.base.systems.military.naval_invasion_policy import NavalInvasionPolicy
 from modules.base.systems.military.readiness_system import ReadinessSystem
 from modules.base.systems.world.demilitarization_policy import DemilitarizationPolicy
@@ -35,7 +36,6 @@ UNIT_TABLE = "units"
 NO_TARGET_REGION = -1
 DEFAULT_UNIT_TYPE = "army"
 DEFAULT_MOVE_MINUTES = 1440
-
 UNIT_SCHEMA: dict[str, pl.DataType] = {
     "id": pl.Utf8,
     "owner": pl.Utf8,
@@ -43,6 +43,7 @@ UNIT_SCHEMA: dict[str, pl.DataType] = {
     "design_id": pl.Utf8,
     "unit_domain": pl.Utf8,
     "strength": pl.Int64,
+    "equipment_quantity": pl.Int64,
     "current_region_id": pl.Int32,
     "latitude": pl.Float64,
     "longitude": pl.Float64,
@@ -131,6 +132,9 @@ class MovementDurationPolicy:
     def estimate_between(self, source: GeoCoordinate, target: GeoCoordinate) -> int:
         projection = EquirectangularProjection(360.0, 180.0)
         distance_km = projection.geo_distance_km(source, target)
+        return self.estimate_from_distance(distance_km)
+
+    def estimate_from_distance(self, distance_km: float) -> int:
         return int(max(360, min(10080, 360 + distance_km * 0.45)))
 
     def region_locations(self, regions: pl.DataFrame) -> dict[int, GeoCoordinate]:
@@ -178,6 +182,7 @@ class UnitFactory:
         current_minute: int,
         design_id: str = "",
         training_level: str = "Recruit",
+        equipment_quantity: int | None = None,
     ) -> dict[str, Any]:
         safe_strength = max(1, int(strength))
         return {
@@ -187,6 +192,10 @@ class UnitFactory:
             "design_id": str(design_id or ""),
             "unit_domain": get_role_profile(unit_type or DEFAULT_UNIT_TYPE).domain,
             "strength": safe_strength,
+            "equipment_quantity": max(
+                0,
+                int(safe_strength if equipment_quantity is None else equipment_quantity),
+            ),
             "current_region_id": int(region_id),
             "latitude": float(geo.latitude),
             "longitude": float(geo.longitude),
@@ -269,7 +278,9 @@ class MilitarySystem(ISystem):
         self._readiness_system = ReadinessSystem()
         self._demilitarization_policy = DemilitarizationPolicy()
         self._manpower_cache_key: tuple[int, int, int] | None = None
-        self._manpower_by_owner: dict[str, int | float] = {}
+        self._manpower_by_owner = pl.DataFrame(
+            schema={"owner": pl.Utf8, "total_core_manpower": pl.Float64}
+        )
 
     @property
     def id(self) -> str:
@@ -308,12 +319,17 @@ class MilitarySystem(ISystem):
         segment ahead preserves contact-before-completion precedence without
         making the readiness system depend on the movement implementation.
         """
-        unit_rows = units.to_dicts()
-        if not unit_rows:
-            return
         war_table = state.tables.get("countries_wars")
         war_rows = [] if war_table is None else war_table.to_dicts()
         hostile_pairs = hostile_country_pairs(war_rows)
+        if not hostile_pairs or units.is_empty() or "owner" not in units.columns:
+            return
+        hostile_countries = sorted({country for pair in hostile_pairs for country in pair})
+        unit_rows = units.filter(
+            pl.col("owner").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase().is_in(hostile_countries)
+        ).to_dicts()
+        if not unit_rows:
+            return
         by_id = {str(row.get("id") or ""): row for row in unit_rows}
         contact_ids: set[str] = set()
 
@@ -441,7 +457,8 @@ class MilitarySystem(ISystem):
 
         home_regions = self._home_regions_by_country(regions)
         region_locations = self._duration_policy.region_locations(regions)
-        country_strength = self._country_strengths(countries)
+        country_strengths = self._country_strengths(countries)
+        country_units = self._country_initial_unit_types(countries, country_strengths)
         current_minute = state.time.total_minutes
         rows = []
 
@@ -452,17 +469,22 @@ class MilitarySystem(ISystem):
 
             home_region_id = home_regions[clean_tag]
             home_geo = region_locations.get(home_region_id, GeoCoordinate(0.0, 0.0))
-            rows.append(
-                self._unit_factory.create(
-                    unit_id=f"{clean_tag}-{DEFAULT_UNIT_TYPE}-001",
-                    owner=clean_tag,
-                    unit_type=DEFAULT_UNIT_TYPE,
-                    strength=country_strength.get(clean_tag, 1),
-                    region_id=home_region_id,
-                    geo=home_geo,
-                    current_minute=current_minute,
+            for unit_type, strength, quantity in country_units.get(clean_tag, ()):
+                if strength <= 0:
+                    continue
+                rows.append(
+                    self._unit_factory.create(
+                        unit_id=f"{clean_tag}-{unit_type}-001",
+                        owner=clean_tag,
+                        unit_type=unit_type,
+                        strength=strength,
+                        region_id=home_region_id,
+                        geo=home_geo,
+                        current_minute=current_minute,
+                        design_id=f"{clean_tag}-{unit_type}-2001",
+                        equipment_quantity=quantity,
+                    )
                 )
-            )
 
         return self._units_from_rows(rows)
 
@@ -498,10 +520,92 @@ class MilitarySystem(ISystem):
             return {}
 
         return {
-            str(row["id"]): max(1, int(row["military_count"] or 0))
+            str(row["id"]): max(0, int(row["military_count"] or 0))
             for row in countries.select(["id", "military_count"]).iter_rows(named=True)
             if row["id"] is not None
         }
+
+    def _country_initial_unit_types(
+        self,
+        countries: pl.DataFrame,
+        country_strengths: dict[str, int],
+    ) -> dict[str, tuple[tuple[str, int, int], ...]]:
+        unit_columns = {unit_type.quantity_column for unit_type in MILITARY_UNIT_TYPES}
+        has_unit_data = unit_columns.issubset(countries.columns)
+        result: dict[str, tuple[tuple[str, int, int], ...]] = {}
+
+        for row in countries.iter_rows(named=True):
+            country_id = row.get("id")
+            if country_id is None:
+                continue
+            tag = str(country_id)
+            if has_unit_data:
+                total_personnel = country_strengths.get(tag, 0)
+                quantities = {
+                    unit_type.role: max(0, int(row.get(unit_type.quantity_column) or 0))
+                    for unit_type in MILITARY_UNIT_TYPES
+                }
+                if total_personnel > 0 and sum(quantities.values()) > 0:
+                    equipment_roles = [
+                        unit_type
+                        for unit_type in MILITARY_UNIT_TYPES
+                        if unit_type.role not in {"infantry", "strategic_missiles"}
+                        and quantities[unit_type.role] > 0
+                        and unit_type.crew_factor > 0
+                    ]
+                    raw_staff = {
+                        unit_type.role: quantities[unit_type.role] * unit_type.crew_factor
+                        for unit_type in equipment_roles
+                    }
+                    raw_total = sum(raw_staff.values())
+                    support_limit = int(round(total_personnel * 0.40))
+                    support_personnel = min(support_limit, int(round(raw_total)))
+                    if equipment_roles and total_personnel >= len(equipment_roles):
+                        support_personnel = max(
+                            support_personnel,
+                            min(support_limit, len(equipment_roles)),
+                        )
+
+                    staff_by_role = {unit_type.role: 0 for unit_type in equipment_roles}
+                    if raw_total > 0 and support_personnel > 0:
+                        exact_shares = {
+                            role: (weight / raw_total) * support_personnel
+                            for role, weight in raw_staff.items()
+                        }
+                        staff_by_role = {
+                            role: int(value)
+                            for role, value in exact_shares.items()
+                        }
+                        remainder = support_personnel - sum(staff_by_role.values())
+                        remainder_roles = sorted(
+                            exact_shares,
+                            key=lambda role: (
+                                exact_shares[role] - staff_by_role[role],
+                                -next(index for index, item in enumerate(MILITARY_UNIT_TYPES) if item.role == role),
+                            ),
+                            reverse=True,
+                        )
+                        for role in remainder_roles[:remainder]:
+                            staff_by_role[role] += 1
+
+                    infantry_personnel = max(0, total_personnel - sum(staff_by_role.values()))
+                    unit_types = []
+                    for unit_type in MILITARY_UNIT_TYPES:
+                        role = unit_type.role
+                        if role == "strategic_missiles":
+                            continue
+                        quantity = quantities[role]
+                        strength = infantry_personnel if role == "infantry" else staff_by_role.get(role, 0)
+                        if strength > 0 and (quantity > 0 or role == "infantry"):
+                            unit_types.append((role, strength, quantity))
+                    if unit_types:
+                        result[tag] = tuple(unit_types)
+                        continue
+
+            fallback_strength = country_strengths.get(tag, 0)
+            result[tag] = (("infantry", fallback_strength, fallback_strength),) if fallback_strength > 0 else ()
+
+        return result
 
     def _process_completed_production_orders(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
         required_tables = {"countries", "regions", "unit_designs", "production_orders"}
@@ -661,11 +765,22 @@ class MilitarySystem(ISystem):
 
             dispatched_id = unit_id
             if requested < available:
+                available_equipment = max(0, int(unit.get("equipment_quantity") or 0))
+                dispatched_equipment = min(
+                    available_equipment,
+                    int(round(available_equipment * requested / available)),
+                )
                 unit["strength"] = available - requested
+                unit["equipment_quantity"] = available_equipment - dispatched_equipment
                 deployment["quantity"] = available - requested
                 clone = dict(unit)
                 dispatched_id = self._next_unit_id(rows, owner, str(unit.get("unit_type") or DEFAULT_UNIT_TYPE))
-                clone.update(id=dispatched_id, strength=requested, unit_lifecycle="deployment_queued")
+                clone.update(
+                    id=dispatched_id,
+                    strength=requested,
+                    equipment_quantity=dispatched_equipment,
+                    unit_lifecycle="deployment_queued",
+                )
                 rows.append(clone)
                 units_by_id[dispatched_id] = clone
                 deployment = dict(deployment)
@@ -957,10 +1072,18 @@ class MilitarySystem(ISystem):
                 seller["money_reserves"] = float(seller.get("money_reserves") or 0.0) + total_cost
                 seller["military_count"] = max(0, int(seller.get("military_count") or 0) - quantity)
                 if quantity < int(source_unit.get("strength") or 0):
-                    source_unit["strength"] = int(source_unit.get("strength") or 0) - quantity
+                    source_strength = max(1, int(source_unit.get("strength") or 0))
+                    source_equipment = max(0, int(source_unit.get("equipment_quantity") or 0))
+                    travel_equipment = min(
+                        source_equipment,
+                        int(round(source_equipment * quantity / source_strength)),
+                    )
+                    source_unit["strength"] = source_strength - quantity
+                    source_unit["equipment_quantity"] = source_equipment - travel_equipment
                     travel_unit = dict(source_unit)
                     travel_unit["id"] = self._next_unit_id(unit_rows, buyer_tag, str(source_unit.get("unit_type") or DEFAULT_UNIT_TYPE))
                     travel_unit["strength"] = quantity
+                    travel_unit["equipment_quantity"] = travel_equipment
                     unit_rows.append(travel_unit)
                 else:
                     travel_unit = source_unit
@@ -1104,9 +1227,9 @@ class MilitarySystem(ISystem):
         now = int(state.time.total_minutes)
         regions = state.get_table("regions")
         region_locations = self._duration_policy.region_locations(regions)
-        region_by_id = {int(region["id"]): region for region in regions.to_dicts()}
         adjacency = state.tables.get("region_adjacency")
-        adjacency_rows = [] if adjacency is None else adjacency.to_dicts()
+        prepared_graph = self._route_planner.prepare(regions, adjacency)
+        region_by_id = prepared_graph.region_by_id
         route_table = state.tables.get("unit_movement_routes")
         route_rows = [] if route_table is None else route_table.to_dicts()
         route_by_unit = {str(item.get("unit_id") or ""): item for item in route_rows}
@@ -1153,6 +1276,13 @@ class MilitarySystem(ISystem):
 
             unit_domain = self._domain_for_unit(row)
             access_context = self._access_policy.for_country(state, owner)
+            segment_duration = self._route_segment_cost_for_unit(
+                region_locations,
+                row,
+                state,
+                (capability_speed_by_unit or {}).get(unit_id, 1.0),
+                prepared_graph.edge_distance_km,
+            )
             blocked_domains: list[int] = []
 
             def can_enter(region: dict[str, Any], final: bool) -> bool:
@@ -1169,13 +1299,11 @@ class MilitarySystem(ISystem):
                 source_region_id,
                 target_region_id,
                 region_by_id.values(),
-                adjacency_rows,
+                adjacency,
                 can_enter,
-                segment_cost=lambda left, right: self._route_segment_minutes_for_unit(
-                    left, right, region_locations, row, state,
-                    (capability_speed_by_unit or {}).get(unit_id, 1.0),
-                ),
+                segment_cost=segment_duration,
                 explicit_waypoints=action.via_region_ids if action.via_region_ids else None,
+                prepared_graph=prepared_graph,
             )
             if not route_plan.is_valid:
                 reason = route_plan.rejection_reason
@@ -1274,9 +1402,8 @@ class MilitarySystem(ISystem):
                 self._record_unit_order_feedback(feedback_rows, unit_id, owner, "move", "accepted", "The unit escalated its existing contact instead of leaving the battle.", now)
                 rows.append(row)
                 continue
-            duration = self._route_segment_minutes_for_unit(
-                region_by_id[source_region_id], region_by_id[next_region_id], region_locations, row, state,
-                (capability_speed_by_unit or {}).get(unit_id, 1.0),
+            duration = segment_duration(
+                region_by_id[source_region_id], region_by_id[next_region_id]
             )
             row["source_region_id"] = source_region_id
             row["source_latitude"] = source_geo.latitude
@@ -1375,6 +1502,115 @@ class MilitarySystem(ISystem):
         territory_multiplier = self._bounded_multiplier(state.globals.get(territory_key), 1.0)
         speed_multiplier = max(0.5, min(1.5, self._row_float_from_mapping(capability_speed_multiplier, 1.0)))
         return int(max(360, min(10080, round(base * domain_multiplier * size_multiplier * infrastructure_multiplier * telecom_multiplier * territory_multiplier / speed_multiplier))))
+
+    def _route_segment_cost_for_unit(
+        self,
+        locations: dict[int, GeoCoordinate],
+        unit: dict[str, Any],
+        state: GameState,
+        capability_speed_multiplier: float = 1.0,
+        edge_distance_km: dict[tuple[int, int], float] | None = None,
+    ) -> Callable[[dict[str, Any], dict[str, Any]], int]:
+        """Prepare unit-wide movement factors once for a route search."""
+        domain = self._domain_for_unit(unit)
+        domain_multipliers = state.globals.get("military_domain_duration_multipliers", {})
+        domain_multiplier = (
+            self._bounded_multiplier(domain_multipliers.get(domain), 1.0)
+            if isinstance(domain_multipliers, dict)
+            else 1.0
+        )
+        size_coefficient = max(
+            0.0,
+            min(
+                0.5,
+                self._row_float_from_mapping(
+                    state.globals.get("military_force_size_duration_coefficient"), 0.0
+                ),
+            ),
+        )
+        strength = max(1, int(unit.get("strength") or 1))
+        size_multiplier = 1.0 + min(1.0, math.log10(strength) / 4.0) * size_coefficient
+        infrastructure_coefficient = max(
+            0.0,
+            min(
+                0.5,
+                self._row_float_from_mapping(
+                    state.globals.get("military_infrastructure_duration_coefficient", 0.25),
+                    0.25,
+                ),
+            ),
+        )
+        telecom_coefficient = max(
+            0.0,
+            min(
+                0.5,
+                self._row_float_from_mapping(
+                    state.globals.get("military_telecom_coordination_coefficient", 0.15),
+                    0.15,
+                ),
+            ),
+        )
+        owner = str(unit.get("owner") or "").strip().upper()
+        speed_multiplier = max(
+            0.5,
+            min(1.5, self._row_float_from_mapping(capability_speed_multiplier, 1.0)),
+        )
+        target_multipliers: dict[int, tuple[float, float, float]] = {}
+        prepared_edge_distances = edge_distance_km or {}
+
+        def cost(source: dict[str, Any], target: dict[str, Any]) -> int:
+            source_geo = locations.get(int(source.get("id") or 0))
+            target_id = int(target.get("id") or 0)
+            target_geo = locations.get(target_id)
+            source_id = int(source.get("id") or 0)
+            edge_key = (source_id, target_id) if source_id < target_id else (target_id, source_id)
+            edge_distance = prepared_edge_distances.get(edge_key)
+            if edge_distance is not None:
+                base = self._duration_policy.estimate_from_distance(edge_distance)
+            elif source_geo is None or target_geo is None:
+                base = DEFAULT_MOVE_MINUTES
+            else:
+                base = self._duration_policy.estimate_between(source_geo, target_geo)
+
+            target_multiplier = target_multipliers.get(target_id)
+            if target_multiplier is None:
+                infrastructure = max(
+                    0.0, min(1.0, self._row_float(target, "infrastructure", 0.0))
+                )
+                telecom = max(
+                    0.0,
+                    min(
+                        1.0,
+                        self._row_float(
+                            target,
+                            "telecom_capacity",
+                            self._row_float(target, "communications", 0.0),
+                        ),
+                    ),
+                )
+                target_owner = str(target.get("owner") or "").strip().upper()
+                territory_key = (
+                    "military_domestic_duration_multiplier"
+                    if not target_owner or target_owner == owner
+                    else "military_foreign_duration_multiplier"
+                )
+                target_multiplier = (
+                    1.0 / (1.0 + infrastructure * infrastructure_coefficient),
+                    1.0 / (1.0 + telecom * telecom_coefficient),
+                    self._bounded_multiplier(state.globals.get(territory_key), 1.0),
+                )
+                target_multipliers[target_id] = target_multiplier
+
+            infrastructure_multiplier, telecom_multiplier, territory_multiplier = target_multiplier
+            duration = base * domain_multiplier
+            duration *= size_multiplier
+            duration *= infrastructure_multiplier
+            duration *= telecom_multiplier
+            duration *= territory_multiplier
+            duration /= speed_multiplier
+            return int(max(360, min(10080, round(duration))))
+
+        return cost
 
     def _capability_speed_by_unit(self, state: GameState) -> dict[str, float]:
         table = state.tables.get("unit_capability_projections")
@@ -2162,6 +2398,7 @@ class MilitarySystem(ISystem):
             "design_id": "",
             "unit_domain": "land",
             "strength": 1,
+            "equipment_quantity": 0,
             "current_region_id": 0,
             "latitude": 0.0,
             "longitude": 0.0,
@@ -2200,6 +2437,10 @@ class MilitarySystem(ISystem):
 
         had_latitude = "latitude" in units.columns
         had_longitude = "longitude" in units.columns
+        if "equipment_quantity" not in units.columns:
+            units = units.with_columns(
+                pl.col("strength").cast(pl.Int64, strict=False).fill_null(0).alias("equipment_quantity")
+            )
         for column, default_value in defaults.items():
             if column not in units.columns:
                 units = units.with_columns(pl.lit(default_value).alias(column))
@@ -2245,29 +2486,24 @@ class MilitarySystem(ISystem):
             id(regions),
         )
         if cache_key != self._manpower_cache_key:
-            owners = regions.get_column("owner").unique().to_list()
-            if len(owners) == 1:
-                owner = owners[0]
-                self._manpower_by_owner = {
-                    owner: regions.get_column("pop_15_64").sum() or 0,
-                }
-            else:
-                self._manpower_by_owner = {
-                    row["owner"]: row["total_core_manpower"] or 0
-                    for row in regions.group_by("owner").agg(
-                        pl.col("pop_15_64").sum().alias("total_core_manpower")
-                    ).to_dicts()
-                }
+            self._manpower_by_owner = regions.group_by("owner").agg(
+                pl.col("pop_15_64").sum().alias("total_core_manpower")
+            )
             self._manpower_cache_key = cache_key
 
         countries = state.get_table("countries")
         if countries.is_empty():
             return
 
-        countries = countries.with_columns(
-            pl.Series(
-                "total_core_manpower",
-                [self._manpower_by_owner.get(country_id, 0) for country_id in countries.get_column("id").to_list()],
-            )
-        )
+        countries = (
+            countries.drop("total_core_manpower")
+            if "total_core_manpower" in countries.columns
+            else countries
+        ).join(
+            self._manpower_by_owner,
+            left_on="id",
+            right_on="owner",
+            how="left",
+            maintain_order="left",
+        ).with_columns(pl.col("total_core_manpower").fill_null(0))
         state.update_table("countries", countries)

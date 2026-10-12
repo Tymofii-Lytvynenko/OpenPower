@@ -298,12 +298,19 @@ class DiplomaticBalanceSystem(ISystem):
                 target_allies.setdefault(member, set()).update(members - {member})
 
         country_by_id = {self._tag(row.get("id")): row for row in countries}
-        active_war_pairs = {
-            frozenset((left, right))
-            for war in wars
-            if str(war.get("status") or "active").lower() == "active"
-            for left in self._tags(war.get("side_a"))
-            for right in self._tags(war.get("side_b"))
+        active_war_pairs: set[frozenset[str]] = set()
+        active_war_participants: set[str] = set()
+        for war in wars:
+            if str(war.get("status") or "active").lower() != "active":
+                continue
+            side_a = self._tags(war.get("side_a"))
+            side_b = self._tags(war.get("side_b"))
+            active_war_participants.update(side_a | side_b)
+            active_war_pairs.update(frozenset((left, right)) for left in side_a for right in side_b)
+        occupied_controllers = {
+            controller
+            for region in regions
+            if self._tag(region.get("owner")) != (controller := self._tag(region.get("controller")))
         }
         existing_by_target = {
             self._tag(row.get("primary_target_country_id")): row for row in pacts
@@ -327,16 +334,8 @@ class DiplomaticBalanceSystem(ISystem):
                 for country in existing_members
                 if country in country_by_id and country not in target_allies.get(target, set())
             }
-            active_wars = any(
-                target in self._tags(war.get("side_a")) | self._tags(war.get("side_b"))
-                and str(war.get("status") or "active").lower() == "active"
-                for war in wars
-            )
-            current_occupations = any(
-                self._tag(region.get("controller")) == target
-                and self._tag(region.get("owner")) != target
-                for region in regions
-            )
+            active_wars = target in active_war_participants
+            current_occupations = target in occupied_controllers
             collapsed = int(country_by_id.get(target, {}).get("military_count") or 0) <= 0
             threat_ended = not active_wars and not current_occupations
             should_dissolve = existing_active and (threat_ended or collapsed)
@@ -475,6 +474,7 @@ class DiplomaticBalanceSystem(ISystem):
             (str(row.get("war_id") or ""), self._tag(row.get("country_id"))): row for row in previous
         }
         regions = self._rows(state, "regions")
+        occupied_by_owner = self._occupied_region_counts(regions)
         blockades = self._rows(state, "naval_blockades")
         blockade_by_country: dict[str, float] = {}
         for row in blockades:
@@ -507,10 +507,8 @@ class DiplomaticBalanceSystem(ISystem):
                 force = max(0, int(country_row.get("military_count") or 0))
                 casualty_score = min(40.0, casualties / max(1, force + casualties) * 40.0)
                 occupied = sum(
-                    1
-                    for region in regions
-                    if self._tag(region.get("owner")) == country
-                    and self._tag(region.get("controller")) in enemies
+                    occupied_by_owner.get(country, {}).get(enemy, 0)
+                    for enemy in enemies
                 )
                 occupation_score = min(20.0, occupied * 4.0)
                 blockade = blockade_by_country.get(country, 0.0)
@@ -582,6 +580,20 @@ class DiplomaticBalanceSystem(ISystem):
                     changed = True
             if changed:
                 state.update_table("units", pl.DataFrame(unit_rows, schema=units.schema, strict=False))
+
+    @classmethod
+    def _occupied_region_counts(
+        cls, regions: list[dict[str, Any]]
+    ) -> dict[str, dict[str, int]]:
+        """Index regional occupation once for all war participants."""
+        counts: dict[str, dict[str, int]] = {}
+        for region in regions:
+            owner = cls._tag(region.get("owner"))
+            controller = cls._tag(region.get("controller"))
+            if owner and controller:
+                by_controller = counts.setdefault(owner, {})
+                by_controller[controller] = by_controller.get(controller, 0) + 1
+        return counts
 
     def _war_days(self, war: dict[str, Any], now: int) -> int:
         raw = str(war.get("created_at") or "").strip()

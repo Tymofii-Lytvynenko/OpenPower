@@ -459,22 +459,16 @@ class MilitaryTrainingPolicy:
                 "unit_domain": (pl.Utf8, "land"),
             },
         )
-        scheduled = country_frame(context, self.cadence_days).select(
+        scheduled_frame = country_frame(context, self.cadence_days).select(
             "country_id", "money_reserves"
-        ).collect().to_dicts()
+        ).collect()
+        if scheduled_frame.is_empty():
+            return pl.DataFrame(schema={"country_id": pl.Utf8}).lazy()
+        scheduled = scheduled_frame.to_dicts()
         funds = {
             str(row.get("country_id") or "").strip().upper(): _finite_float(row.get("money_reserves"))
             for row in scheduled
         }
-        design_table = context.table("unit_designs")
-        design_domains: dict[str, str] = {}
-        if design_table is not None:
-            design_schema = set(design_table.collect_schema().names())
-            if {"id", "domain"}.issubset(design_schema):
-                design_domains = {
-                    str(row.get("id") or ""): str(row.get("domain") or "land").strip().lower()
-                    for row in design_table.select("id", "domain").collect().to_dicts()
-                }
         facilities = facilities_table.collect().to_dicts()
         order_table = context.table("unit_training_orders")
         orders = [] if order_table is None else order_table.collect().to_dicts()
@@ -498,11 +492,32 @@ class MilitaryTrainingPolicy:
         )
         candidates: list[dict[str, Any]] = []
         selected_countries: set[str] = set()
-        ordered_units = sorted(
-            units.collect().to_dicts(),
-            key=lambda row: (str(row.get("owner") or "").upper(), str(row.get("id") or "")),
+        candidate_units = (
+            units.filter(
+                pl.col("owner").cast(pl.Utf8).fill_null("").str.strip_chars().str.to_uppercase().is_in(sorted(funds))
+                & ~pl.col("id").cast(pl.Utf8).is_in(sorted(battle_unit_ids | active_training_ids))
+                & (pl.col("training_state").str.strip_chars().str.to_lowercase() != "training")
+                & ~pl.col("is_moving")
+                & (pl.col("current_region_id") > 0)
+                & (pl.col("engagement_mode").str.strip_chars() == "")
+            )
+            .sort([pl.col("owner").cast(pl.Utf8).str.strip_chars().str.to_uppercase(), "id"])
+            .collect()
         )
-        for unit in ordered_units:
+        design_table = context.table("unit_designs")
+        design_domains: dict[str, str] = {}
+        if design_table is not None and not candidate_units.is_empty():
+            design_schema = set(design_table.collect_schema().names())
+            if {"id", "domain"}.issubset(design_schema):
+                design_ids = candidate_units.get_column("design_id").drop_nulls().unique().to_list()
+                design_domains = {
+                    str(row.get("id") or ""): str(row.get("domain") or "land").strip().lower()
+                    for row in design_table.filter(pl.col("id").cast(pl.Utf8).is_in(design_ids))
+                    .select("id", "domain")
+                    .collect()
+                    .to_dicts()
+                }
+        for unit in candidate_units.to_dicts():
             country = str(unit.get("owner") or "").strip().upper()
             unit_id = str(unit.get("id") or "")
             if (

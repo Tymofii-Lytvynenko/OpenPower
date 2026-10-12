@@ -9,7 +9,7 @@ import math
 import time
 from typing import Any, Callable, Iterable, Mapping, Optional, TYPE_CHECKING
 
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.renderers.globe_overlay_projection import (
     GlobeOverlayProjection,

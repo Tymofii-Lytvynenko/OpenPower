@@ -71,6 +71,7 @@ description: "Implementation tasks for regional infrastructure and telecommunica
 - [x] T021 [P] Reconcile schema, baseline, damage-source, project-cancellation, and aggregation rules across `specs/111-regional-infrastructure-and-telecom/spec.md`, `data-model.md`, `contracts/infrastructure-actions.md`, and `quickstart.md`
 - [x] T022 Run the feature quickstart and all focused plus movement, economy, strategic, save/load, migration, and layer-boundary regressions; record the actual results in `specs/111-regional-infrastructure-and-telecom/quickstart.md`
 - [x] T023 Verify the 100,000-record incremental update target and report sample count, changed share, runtime, and environment in `tests/test_infrastructure_performance.py`
+- [x] T024 Use the behavior-equivalent column-expression depreciation path when there are no active projects or damage events; retain the mutable path otherwise and compare output frames in `tests/test_regional_infrastructure_system.py`. The reported live playtest notes this fast path; no new performance claim is made.
 
 ## Dependencies and execution order
 

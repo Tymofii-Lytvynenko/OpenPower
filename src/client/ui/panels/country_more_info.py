@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import polars as pl
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.renderers.country_region_map import CountryMapTexture, CountryRegionMapTextureCache
 from src.client.ui.core.containers import WindowManager

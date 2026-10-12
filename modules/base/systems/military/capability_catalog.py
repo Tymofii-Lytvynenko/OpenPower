@@ -9,6 +9,10 @@ from typing import Any, Mapping
 
 
 CAPABILITY_BOUNDS: dict[str, tuple[float, float]] = {
+    "hit_points": (0.0, 10000.0),
+    "gun_fire_rate": (-1.0, 100.0),
+    "missile_fire_rate": (-1.0, 100.0),
+    "missile_rearm_delay": (-1.0, 100000.0),
     "speed": (0.0, 2500.0),
     "maneuverability": (0.0, 100.0),
     "sensors": (0.0, 40000.0),
@@ -32,6 +36,10 @@ FIXED_ROLE_CHARACTERISTICS: dict[str, str] = {
 }
 
 _CAPABILITY_DESCRIPTIONS: dict[str, tuple[str, str, str]] = {
+    "hit_points": ("Base hit points", "Represents the unit type's base hit-point pool.", "A design value is descriptive until the battle projection consumes unit hit points."),
+    "gun_fire_rate": ("Gun rate", "Represents the unit type's gun firing rate; -1 means no gun weapon.", "This game-scale value is descriptive until the battle projection consumes firing rate."),
+    "missile_fire_rate": ("Missile rate", "Represents the unit type's missile firing rate; -1 means no missile weapon.", "This game-scale value is descriptive until the battle projection consumes firing rate."),
+    "missile_rearm_delay": ("Rearm delay", "Represents the unit type's missile rearm delay; -1 means no missile rearm cycle.", "This game-scale value is descriptive until the battle projection consumes rearm delay."),
     "speed": ("km/h", "Represents the role's movement speed.", "A design value by itself does not change movement routing."),
     "maneuverability": ("index (0–100)", "Represents ability to reposition or evade.", "A design value is bounded and does not change battle-round timing."),
     "sensors": ("km", "Represents detection and targeting reach.", "A design value does not reveal foreign units without authorized intelligence."),
@@ -97,11 +105,19 @@ def _profile(
     missile_payload: float = 0.0,
     stealth: float = 0.0,
     countermeasures: float = 0.0,
+    hit_points: float = 100.0,
+    gun_fire_rate: float = -1.0,
+    missile_fire_rate: float = -1.0,
+    missile_rearm_delay: float = -1.0,
 ) -> UnitRoleProfile:
     return UnitRoleProfile(
         role=role,
         domain=domain,
         capabilities={
+            "hit_points": hit_points,
+            "gun_fire_rate": gun_fire_rate,
+            "missile_fire_rate": missile_fire_rate,
+            "missile_rearm_delay": missile_rearm_delay,
             "speed": speed,
             "maneuverability": maneuverability,
             "sensors": sensors,
@@ -122,26 +138,26 @@ def _profile(
 
 
 DEFAULT_ROLE_PROFILES: dict[str, UnitRoleProfile] = {
-    "infantry": _profile("infantry", "land", 8, 2, 2, 1, 0, 0, ("infantry", "artillery", "air_defense"), ("armor", "air"), maneuverability=35, sensors=10, stealth=0.1),
-    "infantry_vehicles": _profile("infantry_vehicles", "land", 65, 12, 3, 3, 8, 2, ("infantry", "armor", "artillery"), ("air", "anti_armor"), maneuverability=40, sensors=25, countermeasures=5),
-    "air_defense": _profile("air_defense", "land", 55, 15, 2, 2, 100, 3, ("air", "missile"), ("artillery", "armor"), maneuverability=25, sensors=180),
-    "mobile_launchers": _profile("mobile_launchers", "land", 45, 8, 0, 0, 12000, 10, ("strategic_target",), ("air", "reconnaissance"), maneuverability=20, sensors=50, stealth=0.2),
-    "tanks": _profile("tanks", "land", 70, 80, 5, 8, 8, 4, ("infantry", "armor", "artillery"), ("air", "anti_armor"), maneuverability=30, sensors=35),
-    "artillery": _profile("artillery", "land", 45, 10, 40, 6, 0, 0, ("infantry", "armor", "artillery", "infrastructure"), ("air", "armor"), maneuverability=15, sensors=20),
-    "transport_helicopters": _profile("transport_helicopters", "air", 260, 5, 0, 0, 0, 0, ("transport",), ("air_defense", "fighters"), maneuverability=55, sensors=30),
-    "attack_helicopters": _profile("attack_helicopters", "air", 280, 12, 4, 4, 12, 5, ("infantry", "armor", "artillery", "ships"), ("air_defense", "fighters"), maneuverability=65, sensors=60, countermeasures=20),
-    "anti_submarine_helicopters": _profile("anti_submarine_helicopters", "air", 250, 6, 2, 1, 10, 3, ("submarines", "ships"), ("air_defense", "fighters"), maneuverability=60, sensors=200),
-    "attack_aircraft": _profile("attack_aircraft", "air", 900, 18, 8, 5, 35, 6, ("infantry", "armor", "artillery", "ships"), ("air_defense", "fighters"), maneuverability=45, sensors=120, countermeasures=25),
-    "fighters": _profile("fighters", "air", 2200, 15, 5, 3, 120, 5, ("air", "bombers", "missile"), ("air_defense", "fighters"), maneuverability=80, sensors=250, stealth=0.05, countermeasures=35),
-    "bombers": _profile("bombers", "air", 1000, 25, 5, 5, 8000, 8, ("infrastructure", "strategic_target", "ships"), ("fighters", "air_defense"), maneuverability=30, sensors=180, missile_payload=10000, countermeasures=30),
-    "patrol_craft": _profile("patrol_craft", "naval", 55, 10, 20, 2, 30, 2, ("ships", "submarines"), ("air", "destroyers"), maneuverability=45, sensors=80),
-    "corvettes": _profile("corvettes", "naval", 45, 25, 25, 4, 120, 4, ("ships", "submarines", "air"), ("air", "destroyers"), maneuverability=35, sensors=140, countermeasures=15),
-    "frigates": _profile("frigates", "naval", 35, 45, 30, 5, 250, 5, ("ships", "submarines", "air", "missile"), ("submarines", "bombers"), maneuverability=30, sensors=250, countermeasures=25),
-    "destroyers": _profile("destroyers", "naval", 35, 70, 35, 7, 500, 8, ("ships", "submarines", "air", "missile"), ("submarines", "bombers"), maneuverability=25, sensors=400, countermeasures=35),
-    "attack_submarines": _profile("attack_submarines", "naval", 30, 40, 10, 2, 200, 8, ("ships", "submarines"), ("anti_submarine", "destroyers"), maneuverability=20, sensors=180, stealth=0.75),
-    "ballistic_missile_submarines": _profile("ballistic_missile_submarines", "naval", 25, 50, 0, 0, 12000, 10, ("strategic_target",), ("anti_submarine", "destroyers"), maneuverability=15, sensors=100, stealth=0.85, missile_payload=100000),
-    "aircraft_carriers": _profile("aircraft_carriers", "naval", 30, 100, 5, 5, 300, 7, ("ships", "air"), ("submarines", "bombers"), maneuverability=15, sensors=300, countermeasures=30),
-    "strategic_missiles": _profile("strategic_missiles", "strategic", 24000, 0, 0, 0, 40000, 10, ("military", "civilian", "strategic_target"), ("missile_defense",), maneuverability=0, sensors=0, missile_precision=0.8, missile_payload=100000),
+    "infantry": _profile("infantry", "land", 8, 2, 2, 1, 0, 0, ("infantry", "artillery", "air_defense"), ("armor", "air"), maneuverability=35, sensors=10, stealth=0.1, hit_points=5, gun_fire_rate=3),
+    "infantry_vehicles": _profile("infantry_vehicles", "land", 65, 12, 3, 3, 8, 2, ("infantry", "armor", "artillery"), ("air", "anti_armor"), maneuverability=40, sensors=25, countermeasures=5, hit_points=100, gun_fire_rate=5),
+    "air_defense": _profile("air_defense", "land", 55, 15, 2, 2, 100, 3, ("air", "missile"), ("artillery", "armor"), maneuverability=25, sensors=180, hit_points=80, gun_fire_rate=4, missile_fire_rate=4, missile_rearm_delay=10),
+    "mobile_launchers": _profile("mobile_launchers", "land", 45, 8, 0, 0, 12000, 10, ("strategic_target",), ("air", "reconnaissance"), maneuverability=20, sensors=50, stealth=0.2, hit_points=80, missile_fire_rate=3, missile_rearm_delay=10),
+    "tanks": _profile("tanks", "land", 70, 80, 5, 8, 8, 4, ("infantry", "armor", "artillery"), ("air", "anti_armor"), maneuverability=30, sensors=35, hit_points=200, gun_fire_rate=0.1),
+    "artillery": _profile("artillery", "land", 45, 10, 40, 6, 0, 0, ("infantry", "armor", "artillery", "infrastructure"), ("air", "armor"), maneuverability=15, sensors=20, hit_points=80, gun_fire_rate=0.05),
+    "attack_helicopters": _profile("attack_helicopters", "air", 280, 12, 4, 4, 12, 5, ("infantry", "armor", "artillery", "ships"), ("air_defense", "fighters"), maneuverability=65, sensors=60, countermeasures=20, hit_points=160, gun_fire_rate=10, missile_fire_rate=3, missile_rearm_delay=40),
+    "transport_helicopters": _profile("transport_helicopters", "air", 260, 5, 0, 0, 0, 0, ("transport",), ("air_defense", "fighters"), maneuverability=55, sensors=30, hit_points=120, gun_fire_rate=8),
+    "anti_submarine_helicopters": _profile("anti_submarine_helicopters", "naval", 250, 6, 2, 1, 10, 3, ("submarines", "ships"), ("air_defense", "fighters"), maneuverability=60, sensors=200, hit_points=120, gun_fire_rate=8, missile_fire_rate=3, missile_rearm_delay=40),
+    "fighters": _profile("fighters", "air", 2200, 15, 5, 3, 120, 5, ("air", "bombers", "missile"), ("air_defense", "fighters"), maneuverability=80, sensors=250, stealth=0.05, countermeasures=35, hit_points=40, gun_fire_rate=100, missile_fire_rate=5, missile_rearm_delay=60),
+    "attack_aircraft": _profile("attack_aircraft", "air", 900, 18, 8, 5, 35, 6, ("infantry", "armor", "artillery", "ships"), ("air_defense", "fighters"), maneuverability=45, sensors=120, countermeasures=25, hit_points=50, gun_fire_rate=100, missile_fire_rate=5, missile_rearm_delay=60),
+    "bombers": _profile("bombers", "air", 1000, 25, 5, 5, 8000, 8, ("infrastructure", "strategic_target", "ships"), ("fighters", "air_defense"), maneuverability=30, sensors=180, missile_payload=10000, countermeasures=30, hit_points=80, missile_fire_rate=4, missile_rearm_delay=120),
+    "patrol_craft": _profile("patrol_craft", "naval", 55, 10, 20, 2, 30, 2, ("ships", "submarines"), ("air", "destroyers"), maneuverability=45, sensors=80, hit_points=400, gun_fire_rate=1, missile_fire_rate=5, missile_rearm_delay=1440),
+    "corvettes": _profile("corvettes", "naval", 45, 25, 25, 4, 120, 4, ("ships", "submarines", "air"), ("air", "destroyers"), maneuverability=35, sensors=140, countermeasures=15, hit_points=800, gun_fire_rate=0.5, missile_fire_rate=10, missile_rearm_delay=1440),
+    "frigates": _profile("frigates", "naval", 35, 45, 30, 5, 250, 5, ("ships", "submarines", "air", "missile"), ("submarines", "bombers"), maneuverability=30, sensors=250, countermeasures=25, hit_points=1000, gun_fire_rate=0.5, missile_fire_rate=10, missile_rearm_delay=1440),
+    "destroyers": _profile("destroyers", "naval", 35, 70, 35, 7, 500, 8, ("ships", "submarines", "air", "missile"), ("submarines", "bombers"), maneuverability=25, sensors=400, countermeasures=35, hit_points=1500, gun_fire_rate=0.5, missile_fire_rate=10, missile_rearm_delay=1440),
+    "attack_submarines": _profile("attack_submarines", "naval", 30, 40, 10, 2, 200, 8, ("ships", "submarines"), ("anti_submarine", "destroyers"), maneuverability=20, sensors=180, stealth=0.75, hit_points=500, missile_fire_rate=0.2, missile_rearm_delay=4320),
+    "ballistic_missile_submarines": _profile("ballistic_missile_submarines", "naval", 25, 50, 0, 0, 12000, 10, ("strategic_target",), ("anti_submarine", "destroyers"), maneuverability=15, sensors=100, stealth=0.85, missile_payload=100000, hit_points=600, missile_rearm_delay=43200),
+    "aircraft_carriers": _profile("aircraft_carriers", "naval", 30, 100, 5, 5, 300, 7, ("ships", "air"), ("submarines", "bombers"), maneuverability=15, sensors=300, countermeasures=30, hit_points=4000, missile_fire_rate=0.4, missile_rearm_delay=60),
+    "strategic_missiles": _profile("strategic_missiles", "strategic", 24000, 0, 0, 0, 40000, 10, ("military", "civilian", "strategic_target"), ("missile_defense",), maneuverability=0, sensors=0, missile_precision=0.8, missile_payload=100000, hit_points=1),
     "missile_defense": _profile("missile_defense", "strategic", 0, 0, 0, 0, 5000, 1, ("missile",), ("saturation",), maneuverability=0, sensors=5000, missile_precision=0.8),
 }
 
@@ -149,6 +165,7 @@ ROLE_ALIASES = {
     "army": "infantry",
     "infantry_vehicle": "infantry_vehicles",
     "infantry_vehicle_brigade": "infantry_vehicles",
+    "artillery_gun": "artillery",
     "ifv": "infantry_vehicles",
     "apc": "infantry_vehicles",
     "air_defence": "air_defense",
@@ -157,7 +174,9 @@ ROLE_ALIASES = {
     "artillery_brigade": "artillery",
     "transport_helicopter": "transport_helicopters",
     "attack_helicopter": "attack_helicopters",
+    "asw_helicopter": "anti_submarine_helicopters",
     "anti_submarine_helicopter": "anti_submarine_helicopters",
+    "fighter_aircraft": "fighters",
     "fighter": "fighters",
     "bomber": "bombers",
     "patrol_boat": "patrol_craft",
@@ -168,6 +187,7 @@ ROLE_ALIASES = {
     "ballistic_missile_submarine": "ballistic_missile_submarines",
     "aircraft_carrier": "aircraft_carriers",
     "strategic_missile": "strategic_missiles",
+    "ballistic_missile": "strategic_missiles",
 }
 
 

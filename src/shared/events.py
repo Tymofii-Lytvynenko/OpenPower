@@ -527,6 +527,44 @@ class EventPoliticalLawTransitionResolved(DomainGameEvent):
 
 
 @dataclass
+class EventCountryIdentityPolicyChanged(DomainGameEvent):
+    """Records a country changing the legal status of a language or religion."""
+
+    country_id: str
+    identity_type: str
+    identity_id: str
+    previous_status: str
+    new_status: str
+    population_share: float
+    at_minute: int
+    reason: str
+
+
+@dataclass
+class EventCountryIdentityCompositionChanged(DomainGameEvent):
+    """Records policy-driven self-identification shifts without changing population."""
+
+    country_id: str
+    identity_type: str
+    source_identity_id: str
+    destination_identity_id: str
+    share_points: float
+    at_minute: int
+
+
+@dataclass
+class EventDiplomaticTradeChanged(DomainGameEvent):
+    """Records a proposal, response, withdrawal, or execution of a trade package."""
+
+    deal_id: str
+    source_country_id: str
+    target_country_id: str
+    status: str
+    reason: str
+    at_minute: int
+
+
+@dataclass
 class EventPoliticalElectionResolved(DomainGameEvent):
     """Records a deterministic election outcome and next ruling authority."""
 

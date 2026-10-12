@@ -26,6 +26,7 @@ class ImGuiService:
         font_path: Optional[Path] = None,
         *,
         enable_implot: bool = False,
+        inspection_provider=None,
     ):
         self.window = window
         self.window.switch_to()
@@ -68,6 +69,22 @@ class ImGuiService:
         self._frame_started = False
         self._current_delta_time = 1.0 / 60.0
         self._real_fps: float = 60.0  # Fast EMA for display
+        self._ui_bridge = None
+        import os
+        artifacts = os.environ.get("OPENPOWER_UI_ARTIFACTS")
+        if artifacts:
+            from src.client.ui.testing.live_bridge import LiveUIBridge
+            self._ui_bridge = LiveUIBridge(Path(artifacts), capture=self._capture_ui_frame, inspection_provider=inspection_provider)
+
+    def _capture_ui_frame(self, path: Path):
+        import cv2
+        import numpy as np
+        framebuffer = self.window.ctx.screen
+        width, height = framebuffer.size
+        image = np.frombuffer(framebuffer.read(components=4), dtype=np.uint8).reshape(height, width, 4)
+        image = cv2.cvtColor(np.flipud(image), cv2.COLOR_RGBA2BGRA)
+        # Read OpenGL on the render thread; compress PNGs in the export worker.
+        return image
 
     def resize(self, width: int, height: int):
         """
@@ -105,6 +122,8 @@ class ImGuiService:
 
         if self._frame_started:
             imgui.end_frame()
+            if self._ui_bridge is not None:
+                self._ui_bridge.abort_frame()
 
         # 1. Use the real delta time captured from the game loop
         self.io.delta_time = self._current_delta_time
@@ -117,7 +136,11 @@ class ImGuiService:
         pixel_ratio = self.window.get_pixel_ratio()
         self.io.display_framebuffer_scale = imgui.ImVec2(pixel_ratio, pixel_ratio)
 
+        if self._ui_bridge is not None:
+            self._ui_bridge.before_frame()
         imgui.new_frame()
+        if self._ui_bridge is not None:
+            self._ui_bridge.start_frame((width, height))
         self._frame_started = True
 
     def render(self):
@@ -132,6 +155,8 @@ class ImGuiService:
         imgui.render()
         draw_data = imgui.get_draw_data()
         self.renderer.render(draw_data)
+        if self._ui_bridge is not None:
+            self._ui_bridge.finish_frame()
         
         # --- FIX: CRITICAL RESET FOR ARCADE ---
         # ImGui enables GL_SCISSOR_TEST to clip UI elements. If we don't disable it,
@@ -149,6 +174,8 @@ class ImGuiService:
 
     def shutdown(self) -> None:
         """Release plotting and ImGui contexts in dependency order."""
+        if self._ui_bridge is not None:
+            self._ui_bridge.close()
         if self._frame_started:
             imgui.set_current_context(self._context)
             imgui.end_frame()

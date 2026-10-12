@@ -33,6 +33,8 @@
 ### Implementation for User Story 1
 
 - [X] T008 Acceptance suite exposed no correctness gaps in the named source files; no implementation changes were needed.
+- [X] T011 Load layered language/religion profiles before bootstrap, normalize accepted profiles, and verify source-year/provenance plus child replacement in `src/server/io/static_loader.py`, `src/server/io/data_load_manager.py`, and `tests/test_data_loader_mod_layering.py`.
+- [X] T012 Verify keyed extension records with duplicate keys collapse to one merged row while retaining the last non-null extension values in `tests/test_data_loader_mod_layering.py`.
 
 ## Phase 4: Empirical gates and final verification
 
@@ -44,9 +46,9 @@
 ## Dependencies and execution order
 
 - T001 establishes measurement context.
-- T002–T007 are independent acceptance tests and precede any source correction in T008.
+- T002–T007 are independent acceptance tests and precede any source correction in T008; T011–T012 add the layered-profile and duplicate-key cases to the same user story.
 - T009 runs after correctness is stable; a passing benchmark requires no tuning.
-- T010 is the final feature validation.
+- T010 is the final feature validation and follows T011–T012.
 
 ## Parallel opportunities
 

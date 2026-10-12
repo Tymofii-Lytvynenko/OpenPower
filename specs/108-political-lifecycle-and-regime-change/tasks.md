@@ -116,6 +116,16 @@
 - [X] T044 [US9] Run the focused political suite, save/load matrix, quickstart, and full repository suite; record measured outcomes in `specs/108-political-lifecycle-and-regime-change/quickstart.md`.
 - [X] T045 [US9] Update plan assumptions and mark only empirically verified requirements/tasks complete in `specs/108-political-lifecycle-and-regime-change/plan.md` and `specs/108-political-lifecycle-and-regime-change/tasks.md`.
 
+## Phase 12: Language and religion identity policy
+
+
+- [X] T046 Load bundled, layered language/religion profiles before bootstrap and seed the mutable group table with normalized shares and unknown-source-year metadata in `src/server/io/static_loader.py`, `modules/base/systems/world/bootstrap_system.py`, and `tests/test_data_loader_mod_layering.py`.
+- [X] T047 Implement authorized legal-status actions, aggregate-Other protection, recognized-group invariant, deterministic daily share drift, signal/effect refresh, events, and political history in `modules/base/systems/politics/identity_policy.py`, `identity_policy_system.py`, and `tests/test_identity_bilateral_workflows.py`.
+- [X] T048 Add read-only identity profiles and legal-status controls to the existing Internal Laws view, with source caveats and stable identity action IDs in `src/client/ui/panels/politics/identity_policy_view.py` and `internal_laws_panel.py`.
+- [X] T049 Cover status authority, invalid actions, `Other`, pause/daily behavior, share conservation, and effects in `tests/test_identity_bilateral_workflows.py`.
+- [X] T050 Add and run the identity-policy UI journey at 1280×720 and 800×600; record the reported workflow coverage in `tests/ui/journeys/identity-policy.json` and `docs/COUNTRY_IDENTITY_AND_BILATERAL_TRADE.md`.
+- [X] T051 Synchronize identity requirements, data model, contract, plan, research, tasks, and quickstart with the current estimate-based single-player behavior.
+
 ## Dependency order
 
 ```text

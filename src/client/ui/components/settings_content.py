@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from imgui_bundle import imgui, icons_fontawesome_6
+from imgui_bundle import icons_fontawesome_6
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.services.game_settings_service import GameSettingsService
 from src.client.ui.core.primitives import UIPrimitives as Prims

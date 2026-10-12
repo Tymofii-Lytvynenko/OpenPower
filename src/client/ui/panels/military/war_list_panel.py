@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import polars as pl
-from imgui_bundle import imgui, icons_fontawesome_6
+from imgui_bundle import icons_fontawesome_6
+from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.renderers.flag_renderer import FlagRenderer
 from src.client.ui.core.containers import WindowManager

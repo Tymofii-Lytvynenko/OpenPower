@@ -34,6 +34,13 @@
 
 ## Dependencies & Execution Order
 
+## Phase 5: Bilateral asset offers
+
+- [X] T017 Add the schema, four shared actions, lifecycle event, system/policy registration, and player workflow in `modules/base/schema.py`, `src/shared/actions.py`, `src/shared/events.py`, `modules/base/systems/world/bilateral_trade_system.py`, `bilateral_trade_policy.py`, and `src/client/ui/panels/trade_panel.py`.
+- [X] T018 Cover cash/region/research exchanges, authorization, active-war and stale-asset rejection, atomicity, counteroffers, withdrawal, expiry, and AI valuation in `tests/test_identity_bilateral_workflows.py`.
+- [X] T019 Add and run the bilateral trade UI journey at 1280×720 and 800×600; recorded in `tests/ui/journeys/bilateral-trade.json` and `docs/COUNTRY_IDENTITY_AND_BILATERAL_TRADE.md`.
+- [X] T020 Synchronize the trade requirements, data model, contract, implementation plan, research, and quickstart with the current single-player implementation.
+
 - US1 proposal validation and state transitions are the foundation for same-tick settlement behavior.
 - US2 and US3 consume battle/territory/treaty facts and can be tested separately, then integrated with US1 event ordering.
 - T013 depends on stable table/event contracts; T015 runs after all code and tests.

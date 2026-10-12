@@ -13,6 +13,8 @@ From the repository root, run the relevant policy, readiness, invasion, and clie
   tests/test_military_route_presenter.py `
   tests/test_unit_route_overlay.py `
   tests/test_military_movement_spec.py `
+  tests/test_region_route_snapshot.py `
+  tests/test_region_travel_time.py `
   tests/test_military_movement_performance.py
 ```
 

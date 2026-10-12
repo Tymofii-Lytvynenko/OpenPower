@@ -2,8 +2,9 @@ import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from imgui_bundle import imgui
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.theme import GAMETHEME
+from src.client.ui.core.testability import record_last_item
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,6 +18,56 @@ class UnitCompositionRow:
 
 class UIPrimitives:
     """Stateless functional UI widgets shared by panels and HUD components."""
+
+    @staticmethod
+    def button(
+        label: str,
+        *,
+        test_id: str,
+        size: tuple[float, float] | None = None,
+        enabled: bool = True,
+    ) -> bool:
+        """Draw a button with a stable ImGui ID and optional test telemetry."""
+        stable_label = f"{label}###{test_id}"
+        clicked = (
+            imgui.button(stable_label)
+            if size is None
+            else imgui.button(stable_label, size)
+        )
+        record_last_item(test_id, label, "button", enabled=enabled)
+        return clicked
+
+    @staticmethod
+    def slider_float(
+        label: str,
+        value: float,
+        minimum: float,
+        maximum: float,
+        format_string: str,
+        *,
+        test_id: str,
+        enabled: bool = True,
+    ) -> tuple[bool, float]:
+        """Draw a float slider with a stable ImGui ID and test telemetry."""
+        changed, updated_value = imgui.slider_float(
+            f"{label}###{test_id}", value, minimum, maximum, format_string
+        )
+        record_last_item(test_id, label, "slider_float", enabled=enabled)
+        return changed, updated_value
+
+    @staticmethod
+    def invisible_button(
+        size: tuple[float, float],
+        *,
+        test_id: str,
+        label: str | None = None,
+        enabled: bool = True,
+    ) -> bool:
+        """Draw an invisible hit target that remains addressable in test reports."""
+        semantic_label = label or test_id
+        clicked = imgui.invisible_button(f"{semantic_label}###{test_id}", size)
+        record_last_item(test_id, semantic_label, "invisible_button", enabled=enabled)
+        return clicked
 
     @staticmethod
     def header(label: str, show_bg: bool = True):
@@ -155,13 +206,20 @@ class UIPrimitives:
         width: float = 50,
         height: float = 50,
         show_inactive_indicator: bool = False,
+        test_id: str | None = None,
+        accessible_label: str | None = None,
     ) -> bool:
         """Draws a square icon toggle with an optional bottom indicator."""
         bg = GAMETHEME.colors.interaction_active if is_active else GAMETHEME.colors.bg_input
         imgui.push_style_color(imgui.Col_.button, bg)
         imgui.push_style_var(imgui.StyleVar_.frame_rounding, 8.0)
 
-        clicked = imgui.button(icon, (width, height))
+        # Demographics and Migration share an icon; a domain ID prevents both
+        # toggles from aliasing the same native ImGui item in the HUD window.
+        label = f"{icon}###{test_id}" if test_id is not None else icon
+        clicked = imgui.button(label, (width, height))
+        if test_id is not None:
+            record_last_item(test_id, accessible_label or icon, "button")
 
         imgui.pop_style_var()
         imgui.pop_style_color()

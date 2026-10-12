@@ -6,7 +6,7 @@
 
 ## Summary
 
-Use a protocol-driven registry of independent AI policy scorers that return Polars LazyFrames. Normalize and combine candidate decisions, apply scope/conflict/quota resolution deterministically, collect once, and translate winning rows into semantic game actions. Keep generic execution mechanics in the current `src/core/ai_framework.py` and gameplay policies in `modules/base/systems/world/ai/`; the spec's `src/engine/ai_framework.py` assumption does not match the repository's actual layering.
+Use a protocol-driven registry of independent AI policy scorers that return Polars LazyFrames. Normalize and combine candidate decisions, apply scope/conflict/quota resolution deterministically, collect once, and translate winning rows into semantic game actions. Keep generic execution mechanics in `src/core/ai_framework.py` and gameplay policies in `modules/base/systems/world/ai/`.
 
 ## Technical Context
 
@@ -32,7 +32,7 @@ Use a protocol-driven registry of independent AI policy scorers that return Pola
 
 **Before research**
 
-- Layering: PASS WITH LOCATION CORRECTION — generic framework is in `src/core/ai_framework.py` (mechanism-only); policies are in `modules/base/systems/world/ai/`; `AISystem` is module orchestration.
+- Layering: PASS — generic framework is in `src/core/ai_framework.py` (mechanism-only); policies are in `modules/base/systems/world/ai/`; `AISystem` is module orchestration.
 - Data-oriented design: PASS — country-wide decisions are expressed with Polars LazyFrames and collected into typed decision tables.
 - Modularity/SOLID: PASS — scorers implement a small protocol and register compositionally; action resolvers are policy-owned.
 - Passive client/state: PASS — AI reads context tables and emits `GameAction` objects; it does not mutate `GameState.tables`.

@@ -65,8 +65,8 @@ class LoadingView(arcade.View):
                     self._failure_reported = True
                     if self.on_failure:
                         self.on_failure(self.error)
-                    else:
-                        raise self.error
+                    # Keep a failed load inspectable and recoverable. Raising in
+                    # Arcade's update callback previously terminated the client.
                 return
             else:
                 # Delay switching by 1 frame to allow "100%" text to render
@@ -111,13 +111,17 @@ class LoadingView(arcade.View):
         # 3. Render Loading UI
         screen_w, screen_h = self.window.get_size()
         
-        if self.ui.begin_centered_panel("Loader", screen_w, screen_h, w=400, h=150):
+        panel_height = min(320, screen_h - 40) if self.error else 150
+        if self.ui.begin_centered_panel("Loader", screen_w, screen_h, w=400, h=panel_height):
             self.ui.draw_title("PROCESSING")
             self.ui.draw_progress_bar(self.task.progress, self.task.status_text)
             
             if self.error:
-                from imgui_bundle import imgui
+                from src.client.ui.core.instrumented_imgui import imgui
                 imgui.text_colored(GAMETHEME.colors.error, "OPERATION FAILED")
+                imgui.text_wrapped(str(self.error))
+                if imgui.button("RETURN TO START"):
+                    self.window.setup()
 
             self.ui.end_panel()
 

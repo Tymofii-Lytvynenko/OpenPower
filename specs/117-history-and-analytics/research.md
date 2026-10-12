@@ -11,7 +11,11 @@
 
 The opt-in SC-007 ranking fixture contains 10,000,000 snapshots across 200 series. On the current Windows/Python 3.14.1/Polars environment, the latest run ranked the fixture in 2.67 ms, below the 500 ms target. The query uses its revision-matched series index; the aggregate retention measurement gap is tracked below.
 
-Focused post-change regressions on 2026-10-07 reported 40 passed and one opt-in performance skip in 3.92 seconds. The query-service layer move and relationship indicator-ID correction do not alter the benchmark algorithm, so SC-007 was not remeasured and no new optimization iteration was spent.
+Focused post-change regressions on 2026-10-07 reported 40 passed and one opt-in performance skip in 3.92 seconds. The query-service layer move and relationship indicator-ID correction did not alter the ranking benchmark algorithm, so SC-007 was not remeasured in that pass.
+
+## Integrated recording optimization evidence (2026-10-08)
+
+The three-tick `energy_crisis` comparison in `docs/SIMULATION_OPTIMIZATION_REPORT.md` reduced HistorySystem time on steps 2–3 from 2.50–2.62 s to 1.68–1.73 s after prebuilding sample templates/fields and reusing the series index during compaction. The full-workload canonical saved-state hash and all table hashes matched the baseline after each iteration. The route and AI iterations preceded the history iteration; the three-tick total fell from 29.77 s to 14.40 s. This is an integrated workload check, not a 10-million-row recording/compaction measurement or a change to the separate 2.67 ms ranking result. No long-campaign storage budget was established.
 
 ## Open performance-measurement issue
 

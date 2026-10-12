@@ -1,8 +1,10 @@
 import polars as pl
+from unittest.mock import patch
 
 from modules.base.schema import ensure_base_tables
 from modules.base.systems.military.covert_operations_system import CovertOperationsSystem
 from modules.base.systems.world.ai_system import AISystem
+from modules.base.systems.world.ai.covert_policy import CovertOperationsPolicy
 from src.core.ai_framework import AITableContext
 from src.shared.actions import ActionCreateCovertCell, ActionStartCovertMission
 from src.shared.state import GameState
@@ -88,3 +90,49 @@ def test_ai_creates_and_uses_cells_through_the_authoritative_action_handler() ->
     assert mission["owner_country_id"] == "AI"
     assert mission["target_country_id"] == "PLAYER"
     assert mission["status"] == "preparation"
+
+
+def test_relationship_index_is_shared_and_preserves_duplicate_weighting() -> None:
+    state = _state()
+    state.update_table("countries", pl.DataFrame({
+        "id": ["A", "B", "C", "PLAYER"], "gdp": [1000.0] * 4,
+        "money_reserves": [500.0] * 4, "is_playable": [True] * 4,
+    }))
+    state.update_table("regions", pl.DataFrame({
+        "id": [1, 2, 3, 4], "owner": ["A", "B", "C", "PLAYER"],
+    }))
+    state.update_table("countries_relations", pl.DataFrame({
+        "source": ["A", "C", "C", "A"], "target": ["C", "A", "A", "B"],
+        "value": [-40.0, 10.0, 10.0, -10.0],
+    }))
+    policy = CovertOperationsPolicy()
+    relations = state.get_table("countries_relations")
+    assert policy._index_relations(relations) == policy._index_relations(relations.to_dicts())
+    with patch.object(policy, "_index_relations", wraps=policy._index_relations) as index:
+        candidates = policy.build_candidates(_context(state)).collect().to_dicts()
+        assert index.call_count == 1
+    targets = {row["country_id"]: row["target_country_id"] for row in candidates}
+    assert targets == {"A": "B", "B": "A", "C": "A"}
+
+    state.update_table("countries_relations", pl.DataFrame({
+        "source": ["A"], "target": ["C"], "value": [-100.0],
+    }))
+    next_targets = {
+        row["country_id"]: row["target_country_id"]
+        for row in policy.build_candidates(_context(state)).collect().to_dicts()
+    }
+    assert next_targets["A"] == "C"
+
+
+def test_relationship_snapshot_is_not_indexed_when_cell_creation_is_unaffordable():
+    state = _state()
+    state.update_table(
+        "countries",
+        state.get_table("countries").with_columns(pl.lit(0.0).alias("money_reserves")),
+    )
+    policy = CovertOperationsPolicy()
+    with patch.object(policy, "_index_relations", wraps=policy._index_relations) as index:
+        candidates = policy.build_candidates(_context(state)).collect().to_dicts()
+
+    assert candidates == []
+    index.assert_not_called()
