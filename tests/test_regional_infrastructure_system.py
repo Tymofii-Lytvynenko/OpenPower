@@ -138,6 +138,69 @@ class RegionalInfrastructureSystemTest(unittest.TestCase):
         self.assertEqual(completed["status"], "completed")
         self.assertAlmostEqual(profile["level"], 0.6)
 
+    def test_active_project_completion_matches_row_path_for_upgrades_and_repairs(self):
+        from polars.testing import assert_frame_equal
+
+        system = InfrastructureSystem()
+        for project_type in ("upgrade", "repair"):
+            with self.subTest(project_type=project_type):
+                state = self._prepared_state()
+                target_level = 0.6
+                if project_type == "repair":
+                    state.update_table(
+                        "strategic_impacts",
+                        pl.DataFrame(
+                            [{"id": "damage-parity-1", "region_id": 101,
+                              "category": "infrastructure", "severity": 0.5}],
+                            schema=state.get_table("strategic_impacts").schema,
+                        ),
+                    )
+                    system.update(state, 0.0)
+                    target_level = state.get_table("infrastructure_damage_records")[
+                        "restoration_ceiling"
+                    ][0]
+
+                state.current_actions = [
+                    ActionInvestRegionalInfrastructure(
+                        "player-1", "USA", 101, "transport", target_level
+                    )
+                ]
+                system.update(state, 0.0)
+                project = state.get_table("infrastructure_projects").to_dicts()[0]
+                self.assertEqual(project["project_type"], project_type)
+                state.current_actions = []
+                if project_type == "repair":
+                    state.update_table(
+                        "strategic_impacts", state.get_table("strategic_impacts").head(0)
+                    )
+                state.time.total_minutes = project["started_at_minute"] + project[
+                    "duration_minutes"
+                ]
+                reference = copy.deepcopy(state)
+
+                system.update(state, 0.0)
+                with patch.object(
+                    InfrastructureSystem,
+                    "_can_refresh_read_models_without_mutable_rows",
+                    return_value=False,
+                ):
+                    system.update(reference, 0.0)
+
+                for table_name in (
+                    "regional_infrastructure",
+                    "infrastructure_projects",
+                    "infrastructure_damage_records",
+                    "regions",
+                    "countries",
+                ):
+                    assert_frame_equal(
+                        state.get_table(table_name),
+                        reference.get_table(table_name),
+                        check_exact=False,
+                        rel_tol=1e-12,
+                        abs_tol=1e-12,
+                    )
+
     def test_invalid_authority_and_project_conflict_do_not_debit_treasury(self):
         state = self._prepared_state()
         before = state.get_table("countries").filter(pl.col("id") == "USA")["money_reserves"][0]

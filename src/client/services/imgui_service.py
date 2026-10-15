@@ -74,7 +74,12 @@ class ImGuiService:
         artifacts = os.environ.get("OPENPOWER_UI_ARTIFACTS")
         if artifacts:
             from src.client.ui.testing.live_bridge import LiveUIBridge
-            self._ui_bridge = LiveUIBridge(Path(artifacts), capture=self._capture_ui_frame, inspection_provider=inspection_provider)
+            self._ui_bridge = LiveUIBridge(
+                Path(artifacts),
+                capture=self._capture_ui_frame,
+                inspection_provider=inspection_provider,
+                dispatch_window_event=self.window.dispatch_event,
+            )
 
     def _capture_ui_frame(self, path: Path):
         import cv2
@@ -137,7 +142,7 @@ class ImGuiService:
         self.io.display_framebuffer_scale = imgui.ImVec2(pixel_ratio, pixel_ratio)
 
         if self._ui_bridge is not None:
-            self._ui_bridge.before_frame()
+            self._ui_bridge.before_frame((width, height))
         imgui.new_frame()
         if self._ui_bridge is not None:
             self._ui_bridge.start_frame((width, height))

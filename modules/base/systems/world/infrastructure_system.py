@@ -103,6 +103,7 @@ class InfrastructureSystem(ISystem):
             state, now, policies
         ):
             self._refresh_read_models_from_frames(state, policies)
+            self._advance_projects_from_frames(state, now, policies)
             self._depreciate_profiles_from_frames(state, policies, now)
             self._materialize_read_models_from_frames(state, state.get_table("regional_infrastructure"))
             state.globals["infrastructure_last_update_minute"] = now
@@ -129,6 +130,167 @@ class InfrastructureSystem(ISystem):
         self._materialize_read_models(state, profile_rows)
         state.globals["infrastructure_last_update_minute"] = now
 
+    def _advance_projects_from_frames(
+        self,
+        state: GameState,
+        now: int,
+        policies: dict[str, InfrastructureCategoryPolicy],
+    ) -> None:
+        profiles = state.get_table("regional_infrastructure")
+        project_frame = state.get_table("infrastructure_projects")
+        if (
+            profiles.is_empty()
+            or project_frame.is_empty()
+            or "status" not in project_frame.columns
+        ):
+            return
+
+        project_rows = project_frame.to_dicts()
+        active_indexes = [
+            index
+            for index, project in enumerate(project_rows)
+            if str(project.get("status") or "") in ACTIVE_PROJECT_STATUSES
+        ]
+        if not active_indexes:
+            return
+
+        active_projects = [project_rows[index] for index in active_indexes]
+        # A project can only complete the profile for its own region and category.
+        active_keys = pl.DataFrame(
+            [
+                {
+                    "region_id": int(project.get("region_id") or 0),
+                    "category": str(project.get("category") or ""),
+                }
+                for project in active_projects
+            ]
+        ).with_columns(
+            pl.col("region_id").cast(profiles.schema["region_id"], strict=False),
+            pl.col("category").cast(profiles.schema["category"], strict=False),
+        ).unique()
+        profile_rows = profiles.join(
+            active_keys,
+            on=["region_id", "category"],
+            how="inner",
+            maintain_order="left",
+        ).to_dicts()
+
+        damage_frame = state.tables.get("infrastructure_damage_records")
+        repair_may_complete = any(
+            str(project.get("status") or "") == "in_progress"
+            and str(project.get("project_type") or "upgrade") == "repair"
+            and self._project_progress_after_update(project, now) >= 1.0
+            for project in active_projects
+        )
+        damage_rows = (
+            damage_frame.to_dicts()
+            if repair_may_complete and damage_frame is not None
+            else []
+        )
+
+        damage_changed = self._advance_projects(
+            state,
+            profile_rows,
+            project_rows,
+            damage_rows,
+            now,
+            policies,
+            regions_by_id=self._project_regions_by_id(state, active_projects),
+        )
+
+        completed_projects = [
+            project_rows[index]
+            for index in active_indexes
+            if str(project_rows[index].get("status") or "") == "completed"
+        ]
+        completed_keys = {
+            (
+                int(project.get("region_id") or 0),
+                str(project.get("category") or ""),
+            )
+            for project in completed_projects
+        }
+        changed_profiles = [
+            profile
+            for profile in profile_rows
+            if (
+                int(profile.get("region_id") or 0),
+                str(profile.get("category") or ""),
+            ) in completed_keys
+        ]
+        if changed_profiles:
+            state.update_table(
+                "regional_infrastructure",
+                self._update_project_profiles(profiles, changed_profiles),
+            )
+        self._write_rows(state, "infrastructure_projects", project_rows)
+        if damage_changed:
+            self._write_rows(state, "infrastructure_damage_records", damage_rows)
+
+    @staticmethod
+    def _project_regions_by_id(
+        state: GameState,
+        projects: list[dict[str, Any]],
+    ) -> dict[int, dict[str, Any]]:
+        regions = state.tables.get("regions")
+        if regions is None or "id" not in regions.columns:
+            return {}
+
+        region_ids = sorted({int(project.get("region_id") or 0) for project in projects})
+        if not region_ids:
+            return {}
+        id_expression = pl.col("id").cast(pl.Int64, strict=False)
+        columns = ["id"] + (["owner"] if "owner" in regions.columns else [])
+        return {
+            int(row.get("id") or 0): row
+            for row in regions.filter(id_expression.is_in(region_ids))
+            .select(columns)
+            .iter_rows(named=True)
+        }
+
+    @staticmethod
+    def _update_project_profiles(
+        profiles: pl.DataFrame,
+        rows: list[dict[str, Any]],
+    ) -> pl.DataFrame:
+        key_columns = ("region_id", "category")
+        updated_columns = (
+            "level",
+            "condition",
+            "capacity",
+            "last_change_minute",
+            "last_source_type",
+            "last_source_id",
+        )
+        update_columns = [column for column in updated_columns if column in profiles.columns]
+        updates = pl.DataFrame(rows, infer_schema_length=None)
+        for column, dtype in profiles.schema.items():
+            if column in updates.columns:
+                updates = updates.with_columns(pl.col(column).cast(dtype, strict=False))
+        updates = updates.select(*key_columns, *update_columns).unique(
+            subset=list(key_columns),
+            keep="last",
+            maintain_order=True,
+        ).with_columns(pl.lit(True).alias("__project_update_exists"))
+        updates = updates.rename(
+            {column: f"__project_{column}" for column in update_columns}
+        )
+        merged = profiles.join(
+            updates,
+            on=list(key_columns),
+            how="left",
+            maintain_order="left",
+        ).with_columns(
+            pl.when(pl.col("__project_update_exists").fill_null(False))
+            .then(pl.col(f"__project_{column}"))
+            .otherwise(pl.col(column))
+            .alias(column)
+            for column in update_columns
+        )
+        return merged.drop(
+            ["__project_update_exists", *(f"__project_{column}" for column in update_columns)]
+        )
+
     def _can_refresh_read_models_without_mutable_rows(
         self,
         state: GameState,
@@ -151,10 +313,6 @@ class InfrastructureSystem(ISystem):
             or any(isinstance(event, EventRandomEventTriggered) for event in state.events)
             or self._has_due_random_event_effects(state, now)
         ):
-            return False
-        if "status" in projects.columns and projects.filter(
-            pl.col("status").is_in(list(ACTIVE_PROJECT_STATUSES))
-        ).height:
             return False
         return self._has_complete_profile_coverage(profiles, regions, policies)
 
@@ -549,12 +707,14 @@ class InfrastructureSystem(ISystem):
         damage_records: list[dict[str, Any]],
         now: int,
         policies: dict[str, InfrastructureCategoryPolicy],
-    ) -> None:
-        regions = self._region_rows(state)
+        regions_by_id: dict[int, dict[str, Any]] | None = None,
+    ) -> bool:
+        regions = regions_by_id if regions_by_id is not None else self._region_rows(state)
         profiles_by_key = {
             (int(row.get("region_id") or 0), str(row.get("category") or "")): row
             for row in profiles
         }
+        damage_records_changed = False
         for project in projects:
             if str(project.get("status") or "") not in ACTIVE_PROJECT_STATUSES:
                 continue
@@ -578,10 +738,7 @@ class InfrastructureSystem(ISystem):
                 )
                 continue
 
-            duration = max(1, int(project.get("duration_minutes") or 1))
-            last_update = int(project.get("updated_at_minute") or project.get("started_at_minute") or 0)
-            elapsed = max(0, now - last_update)
-            progress = max(0.0, min(1.0, float(project.get("progress") or 0.0) + elapsed / duration))
+            progress = self._project_progress_after_update(project, now)
             project.update(progress=progress, updated_at_minute=now)
             if progress < 1.0:
                 continue
@@ -604,7 +761,9 @@ class InfrastructureSystem(ISystem):
                         and str(record.get("category") or "") == str(project.get("category") or "")
                         and capacity >= self._finite(record.get("restoration_ceiling")) - 1e-9
                     ):
-                        record["recovered"] = True
+                        if record.get("recovered") is not True:
+                            record["recovered"] = True
+                            damage_records_changed = True
             project.update(
                 status="completed",
                 progress=1.0,
@@ -612,6 +771,19 @@ class InfrastructureSystem(ISystem):
                 updated_at_minute=now,
                 reason="Construction completed.",
             )
+        return damage_records_changed
+
+    @staticmethod
+    def _project_progress_after_update(project: dict[str, Any], now: int) -> float:
+        duration = max(1, int(project.get("duration_minutes") or 1))
+        last_update = int(
+            project.get("updated_at_minute") or project.get("started_at_minute") or 0
+        )
+        elapsed = max(0, now - last_update)
+        return max(
+            0.0,
+            min(1.0, float(project.get("progress") or 0.0) + elapsed / duration),
+        )
 
     @staticmethod
     def _normalize_profiles(

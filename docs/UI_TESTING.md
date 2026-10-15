@@ -99,7 +99,20 @@ Write `commands.json` in that directory, preferably by atomic replacement:
 ]}
 ```
 
-Live operations are `click`, `input`, `drag`, `scroll` (optional wheel `amount`), and `key`. Targets must be visible, enabled interactive controls. Vector input accepts a list. Native IO events are delivered over multiple frames, with acknowledgements in `report.json.commands`. Unique IDs are deduplicated across view changes through `receipts.json`. A `dispatched` acknowledgement confirms input delivery; verify the resulting widget value or game state separately. A context replacement before acknowledgement is reported as interrupted.
+Live operations are `click`, `input`, `drag`, `pointer_drag`, `scroll` (optional wheel `amount`), and `key`. `click`, `input`, `drag`, and `scroll` target visible, enabled interactive controls. Vector input accepts a list. `pointer_drag` dispatches a real window mouse gesture and does not require a widget target; provide `start` and `end` points in logical window coordinates with a top-left origin. The optional `button` is `left` (default), `right`, or `middle`; `steps` controls interpolation frames and defaults to 8 (valid range 1–120). For example:
+
+```json
+{"commands": [{
+  "id": "move-unit-on-map",
+  "op": "pointer_drag",
+  "start": {"x": 820, "y": 410},
+  "end": {"x": 1040, "y": 520},
+  "button": "left",
+  "steps": 10
+}]}
+```
+
+Native IO events are delivered over multiple frames, with acknowledgements in `report.json.commands`. Unique IDs are deduplicated across view changes through `receipts.json`. A `dispatched` acknowledgement confirms input delivery; verify the resulting widget value or game state separately. A context replacement before acknowledgement is reported as interrupted.
 
 The real client also exports `game`: current view, authoritative simulation tick/date, pause and speed, selected country budget fields, table sizes, recent command results, and system errors. Use this to confirm a command reached the simulation. `frame_timing_ms` summarizes the last 240 rendered frame intervals; these include inspection overhead and are practical diagnostics, not benchmark gates. Screenshots, overlays, and JSON serialization run on an artifact worker, with one export in flight to prevent a backlog.
 

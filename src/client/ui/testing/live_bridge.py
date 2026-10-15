@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import json
 import time
-from concurrent.futures import ThreadPoolExecutor
 from collections import deque
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from math import isfinite
 from pathlib import Path
 
+import arcade
 from imgui_bundle import imgui
 
 from src.client.ui.core.testability import UIRunTelemetry
@@ -17,12 +20,20 @@ from src.client.ui.testing.layout_checks import analyze_layout
 class LiveUIBridge:
     """Compose telemetry and native IO events without attaching Test Engine to Arcade."""
 
-    def __init__(self, directory: Path, capture=None, interval: float = 0.5, inspection_provider=None):
+    def __init__(
+        self,
+        directory: Path,
+        capture=None,
+        interval: float = 0.5,
+        inspection_provider=None,
+        dispatch_window_event: Callable[..., object] | None = None,
+    ):
         self.directory = directory.resolve()
         self.directory.mkdir(parents=True, exist_ok=True)
         self.telemetry = UIRunTelemetry((1, 1))
         self.capture = capture
         self.inspection_provider = inspection_provider
+        self.dispatch_window_event = dispatch_window_event
         self._frame_intervals = deque(maxlen=240)
         self._previous_frame = None
         self.interval = interval
@@ -31,6 +42,7 @@ class LiveUIBridge:
         self._queue: list[dict] = []
         self._events: list = []
         self._current = None
+        self._active_pointer_drag: tuple[float, float, int] | None = None
         self._frame_scope = None
         self._last_export = 0.0
         self._command_stamp = None
@@ -51,14 +63,20 @@ class LiveUIBridge:
         except (OSError, ValueError, KeyError, TypeError) as exc:
             self.telemetry.record_error("live receipts", str(exc))
 
-    def before_frame(self) -> None:
+    def before_frame(self, viewport_size: tuple[int, int] | None = None) -> None:
+        if viewport_size is not None:
+            self.telemetry.viewport_size = viewport_size
         self._read_commands()
         if self._events:
             try:
                 self._events.pop(0)()
             except Exception as exc:
                 self._events.clear()
-                self.results.append({"id": self._current["id"], "passed": False, "error": str(exc)})
+                error = str(exc)
+                release_error = self._release_active_pointer_drag()
+                if release_error:
+                    error = f"{error}; pointer release failed: {release_error}"
+                self.results.append({"id": self._current["id"], "passed": False, "error": error})
                 self._current = None
                 io = imgui.get_io()
                 io.add_mouse_button_event(0, False)
@@ -207,6 +225,8 @@ class LiveUIBridge:
             if key is None:
                 raise ValueError("Unknown ImGui key")
             return [lambda: io.add_key_event(key, True), lambda: io.add_key_event(key, False)]
+        if operation == "pointer_drag":
+            return self._pointer_drag_events(command)
         target = UITestDriver(None, self.telemetry).find(command["target"])
         widget = self.telemetry.widget(target)
         if not widget["visible"] or not widget["enabled"] or not widget["interactive"]:
@@ -259,3 +279,108 @@ class LiveUIBridge:
                     lambda: io.add_key_event(imgui.Key.enter, True),
                     lambda: io.add_key_event(imgui.Key.enter, False), lambda: None]
         raise ValueError(f"Unsupported live UI operation: {operation}")
+
+    def _pointer_drag_events(self, command: dict) -> list[Callable[[], object]]:
+        dispatcher = self.dispatch_window_event
+        if dispatcher is None:
+            raise ValueError("Pointer drag requires a window event dispatcher.")
+
+        width, height = self.telemetry.viewport_size
+        start = self._pointer_point(command.get("start"), "start", width, height)
+        end = self._pointer_point(command.get("end"), "end", width, height)
+
+        button_name = command.get("button", "left")
+        buttons = {
+            "left": arcade.MOUSE_BUTTON_LEFT,
+            "right": arcade.MOUSE_BUTTON_RIGHT,
+            "middle": arcade.MOUSE_BUTTON_MIDDLE,
+        }
+        if button_name not in buttons:
+            raise ValueError("Pointer drag button must be 'left', 'right', or 'middle'.")
+        button = buttons[button_name]
+
+        steps = command.get("steps", 8)
+        if isinstance(steps, bool) or not isinstance(steps, int) or not 1 <= steps <= 120:
+            raise ValueError("Pointer drag steps must be an integer from 1 to 120.")
+
+        events: list[Callable[[], object]] = []
+
+        def add_event(event_type: str, *args) -> None:
+            events.append(
+                lambda event_type=event_type, args=args: dispatcher(event_type, *args)
+            )
+
+        start_x, start_y = start
+        end_x, end_y = end
+        start_arcade_y = height - start_y
+        add_event("on_mouse_motion", start_x, start_arcade_y, 0.0, 0.0)
+
+        def press() -> None:
+            self._active_pointer_drag = (start_x, start_y, button)
+            dispatcher("on_mouse_press", start_x, start_arcade_y, button, 0)
+
+        events.append(press)
+        previous_x, previous_y = start_x, start_arcade_y
+        for step in range(1, steps + 1):
+            fraction = step / steps
+            x = start_x + (end_x - start_x) * fraction
+            top_y = start_y + (end_y - start_y) * fraction
+            y = height - top_y
+            dx, dy = x - previous_x, y - previous_y
+
+            def drag(
+                x=x,
+                y=y,
+                top_y=top_y,
+                dx=dx,
+                dy=dy,
+            ) -> None:
+                self._active_pointer_drag = (x, top_y, button)
+                dispatcher("on_mouse_drag", x, y, dx, dy, button, 0)
+
+            events.append(drag)
+            previous_x, previous_y = x, y
+
+        def release() -> None:
+            x, top_y, active_button = self._active_pointer_drag or (end_x, end_y, button)
+            dispatcher("on_mouse_release", x, height - top_y, active_button, 0)
+            self._active_pointer_drag = None
+
+        events.append(release)
+        return events
+
+    @staticmethod
+    def _pointer_point(value, name: str, width: int, height: int) -> tuple[float, float]:
+        if not isinstance(value, dict):
+            raise ValueError(f"Pointer drag {name} must be an object with x and y coordinates.")
+
+        point = []
+        for axis, limit in (("x", width), ("y", height)):
+            coordinate = value.get(axis)
+            if isinstance(coordinate, bool) or not isinstance(coordinate, (int, float)):
+                raise ValueError(f"Pointer drag {name}.{axis} must be a number.")
+            coordinate = float(coordinate)
+            if not isfinite(coordinate) or not 0 <= coordinate < limit:
+                raise ValueError(f"Pointer drag {name}.{axis} must be within the {limit}-pixel viewport.")
+            point.append(coordinate)
+        return point[0], point[1]
+
+    def _release_active_pointer_drag(self) -> str | None:
+        active_drag = self._active_pointer_drag
+        dispatcher = self.dispatch_window_event
+        if active_drag is None or dispatcher is None:
+            return None
+
+        x, top_y, button = active_drag
+        self._active_pointer_drag = None
+        try:
+            dispatcher(
+                "on_mouse_release",
+                x,
+                self.telemetry.viewport_size[1] - top_y,
+                button,
+                0,
+            )
+        except Exception as exc:
+            return str(exc)
+        return None
