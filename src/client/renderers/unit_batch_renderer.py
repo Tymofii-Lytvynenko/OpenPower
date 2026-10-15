@@ -106,6 +106,7 @@ class UnitBatchRenderer:
                 self._uploaded_vertices_key = cache_key
 
             self._ctx.scissor = None
+            # Arcade scales the default framebuffer viewport by DPI internally.
             self._ctx.viewport = (0, 0, screen_width, screen_height)
             self._ctx.enable_only(self._ctx.BLEND)
             self._ctx.blend_func = self._ctx.BLEND_DEFAULT

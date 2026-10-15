@@ -143,16 +143,14 @@ class GameView(BaseImGuiView):
 
     def on_selection_changed(self, region_id: int | None):
         self.selected_region_id = region_id
-        if region_id is not None:
-            self.layout.panel_manager.set_visible("REGIONAL_INFRASTRUCTURE", True)
 
     def on_draw(self):
         # ImGui and batched overlays can leave a clipping rectangle active. It must be
         # removed before clearing, otherwise stale depth values cut holes into the globe.
         ctx = self.window.ctx
         ctx.scissor = None
-        framebuffer_width, framebuffer_height = self.window.get_framebuffer_size()
-        ctx.viewport = (0, 0, framebuffer_width, framebuffer_height)
+        # Arcade's window framebuffer converts this logical viewport to pixels.
+        ctx.viewport = (0, 0, *self.window.get_size())
         ctx.enable_only(ctx.DEPTH_TEST, ctx.BLEND)
 
         # 1. Clear Screen

@@ -76,6 +76,25 @@ class MigrationPresenter:
         "policy_restricted": "Effective migration policy does not permit this flow",
     }
 
+    def __init__(self) -> None:
+        self._country_cache: dict[tuple, MigrationCountrySummary | None] = {}
+        self._region_cache: dict[tuple, MigrationRegionSummary | None] = {}
+
+    @staticmethod
+    def _revision_key(state: Any, names: tuple[str, ...]) -> tuple:
+        revisions = getattr(state, "table_revisions", None)
+        tables = getattr(state, "tables", {})
+        if revisions is not None:
+            return tuple((name, int(revisions.get(name, 0))) for name in names)
+        return tuple((name, id(tables.get(name))) for name in names)
+
+    @staticmethod
+    def _remember(cache: dict, key: tuple, value: Any) -> Any:
+        cache[key] = value
+        if len(cache) > 64:
+            cache.pop(next(iter(cache)))
+        return value
+
     def present_country(
         self,
         state: Any,
@@ -86,11 +105,21 @@ class MigrationPresenter:
     ) -> MigrationCountrySummary | None:
         tables = getattr(state, "tables", {})
         tag = str(country_id or "").strip().upper()
+        cache_key = (
+            tag,
+            int(route_limit),
+            int(reason_limit),
+            *self._revision_key(state, (
+                "countries", "migration_policies", "migration_signals", "migration_flows"
+            )),
+        )
+        if cache_key in self._country_cache:
+            return self._country_cache[cache_key]
         countries = tables.get("countries")
         if not tag or countries is None or "id" not in countries.columns:
-            return None
+            return self._remember(self._country_cache, cache_key, None)
         if countries.filter(pl.col("id").cast(pl.Utf8).str.to_uppercase() == tag).is_empty():
-            return None
+            return self._remember(self._country_cache, cache_key, None)
 
         policy = self._find_row(tables.get("migration_policies"), "country_id", tag) or {}
         signal = self._find_row(tables.get("migration_signals"), "country_id", tag) or {}
@@ -98,7 +127,7 @@ class MigrationPresenter:
         net_flow = self._integer(signal.get("net_flow"))
         trend = "net inflow" if net_flow > 0 else "net outflow" if net_flow < 0 else "balanced"
         status_counts = self._status_counts(flows)
-        return MigrationCountrySummary(
+        summary = MigrationCountrySummary(
             country_id=tag,
             migration_policy=str(policy.get("migration_policy") or "managed"),
             border_policy=str(policy.get("border_policy") or "managed"),
@@ -121,6 +150,7 @@ class MigrationPresenter:
             top_routes=self._top_routes(flows, max(0, int(route_limit))),
             recent_reasons=self._recent_reasons(flows, max(0, int(reason_limit))),
         )
+        return self._remember(self._country_cache, cache_key, summary)
 
     def present_region(
         self,
@@ -131,22 +161,29 @@ class MigrationPresenter:
         reason_limit: int = 5,
     ) -> MigrationRegionSummary | None:
         tables = getattr(state, "tables", {})
+        cache_key = (
+            int(region_id),
+            int(route_limit),
+            int(reason_limit),
+            *self._revision_key(state, ("regions", "migration_flows")),
+        )
+        if cache_key in self._region_cache:
+            return self._region_cache[cache_key]
         regions = tables.get("regions")
         if regions is None or not {"id", "owner"}.issubset(regions.columns):
-            return None
+            return self._remember(self._region_cache, cache_key, None)
         selected = regions.filter(pl.col("id") == int(region_id))
         if selected.is_empty():
-            return None
+            return self._remember(self._region_cache, cache_key, None)
         region = selected.row(0, named=True)
         owner = str(region.get("owner") or "").strip().upper()
         flows_frame = tables.get("migration_flows")
         flows = []
         if flows_frame is not None and {"origin_region_id", "destination_region_id"}.issubset(flows_frame.columns):
-            flows = [
-                row for row in flows_frame.to_dicts()
-                if self._integer(row.get("origin_region_id")) == int(region_id)
-                or self._integer(row.get("destination_region_id")) == int(region_id)
-            ]
+            flows = flows_frame.filter(
+                (pl.col("origin_region_id") == int(region_id))
+                | (pl.col("destination_region_id") == int(region_id))
+            ).to_dicts()
 
         incoming = sum(
             max(0, self._integer(row.get("population_count")))
@@ -166,7 +203,7 @@ class MigrationPresenter:
             if self._integer(row.get("destination_region_id")) == int(region_id)
             and str(row.get("status") or "") == "pending"
         )
-        return MigrationRegionSummary(
+        summary = MigrationRegionSummary(
             region_id=int(region_id),
             owner=owner,
             incoming_population=incoming,
@@ -177,15 +214,14 @@ class MigrationPresenter:
             top_routes=self._top_routes(flows, max(0, int(route_limit))),
             recent_reasons=self._recent_reasons(flows, max(0, int(reason_limit))),
         )
+        return self._remember(self._region_cache, cache_key, summary)
 
     def _country_flows(self, frame: pl.DataFrame | None, country_id: str) -> list[dict[str, Any]]:
         if frame is None or not {"origin_country_id", "destination_country_id"}.issubset(frame.columns):
             return []
-        return [
-            row for row in frame.to_dicts()
-            if str(row.get("origin_country_id") or "").strip().upper() == country_id
-            or str(row.get("destination_country_id") or "").strip().upper() == country_id
-        ]
+        origin = pl.col("origin_country_id").cast(pl.Utf8).str.strip_chars().str.to_uppercase() == country_id
+        destination = pl.col("destination_country_id").cast(pl.Utf8).str.strip_chars().str.to_uppercase() == country_id
+        return frame.filter(origin | destination).to_dicts()
 
     def _top_routes(self, flows: list[dict[str, Any]], limit: int) -> tuple[MigrationRouteView, ...]:
         grouped: dict[tuple[int, int], list[dict[str, Any]]] = {}

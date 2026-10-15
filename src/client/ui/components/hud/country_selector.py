@@ -64,6 +64,18 @@ class CountrySelector:
         self.flag_renderer = flag_renderer or FlagRenderer()
         self._anchor = (0.0, 0.0)
         self._width = 0.0
+        self._options_source = None
+        self._options_revision = None
+        self._options: tuple[CountryOption, ...] = ()
+
+    def options(self, state) -> tuple[CountryOption, ...]:
+        countries = getattr(state, "tables", {}).get("countries")
+        revision = getattr(state, "table_revisions", {}).get("countries")
+        if countries is not self._options_source or revision != self._options_revision:
+            self._options = country_options_from_state(state)
+            self._options_source = countries
+            self._options_revision = revision
+        return self._options
 
     def open(self, anchor: tuple[float, float], width: float) -> None:
         self._anchor = anchor
@@ -71,7 +83,9 @@ class CountrySelector:
         imgui.open_popup(self.POPUP_ID)
 
     def render(self, state, active_tag: str) -> str | None:
-        options = country_options_from_state(state)
+        if not imgui.is_popup_open(self.POPUP_ID):
+            return None
+        options = self.options(state)
         em = imgui.get_font_size()
         padding = em * 0.22
         item_gap = em * 0.08

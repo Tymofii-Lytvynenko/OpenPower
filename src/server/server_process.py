@@ -1,5 +1,6 @@
-import multiprocessing as mp
 import time
+from multiprocessing.queues import Queue
+from multiprocessing.synchronize import Event
 from queue import Empty, Full
 from typing import Optional
 
@@ -21,13 +22,13 @@ def _drain_queue(queue_obj):
 
 def run_server_process(
     config_root,
-    action_queue: mp.Queue,
-    state_queue: mp.Queue,
-    progress_queue: mp.Queue,
+    action_queue: Queue,
+    state_queue: Queue,
+    progress_queue: Queue,
     save_name: Optional[str] = None,
-    shutdown_event: Optional[mp.Event] = None,
+    shutdown_event: Optional[Event] = None,
     player_tag: Optional[str] = None,
-    snapshot_ack_queue: mp.Queue | None = None,
+    snapshot_ack_queue: Queue | None = None,
 ):
     from pathlib import Path
 

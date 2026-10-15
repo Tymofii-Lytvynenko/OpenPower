@@ -45,8 +45,9 @@ class GlobeOverlayProjectionTest(unittest.TestCase):
             else:
                 self.assertIsNotNone(batch_point)
                 assert batch_point is not None
-                self.assertAlmostEqual(batch_point.screen_x, scalar_point.screen_x, places=4)
-                self.assertAlmostEqual(batch_point.screen_y, scalar_point.screen_y, places=4)
+                # Float32 batch operations can differ by a fraction of a pixel.
+                self.assertAlmostEqual(batch_point.screen_x, scalar_point.screen_x, delta=1e-4)
+                self.assertAlmostEqual(batch_point.screen_y, scalar_point.screen_y, delta=1e-4)
 
     def test_zoom_and_longitude_seam_matrix_keeps_visible_points_bounded(self) -> None:
         for distance in (

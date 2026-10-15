@@ -185,6 +185,17 @@ class ViewportController:
         )
         self.renderer.update_overlay(color_map)
         self._map_layer_cache_key = self._map_layer_state_key(state)
+        self._political_source = self._political_color_source(state)
+
+    def _political_color_source(self, state):
+        if self.current_mode_key != "political" or state is None:
+            return None
+        regions = state.tables.get("regions")
+        if regions is None:
+            return None
+        return regions.select([
+            name for name in ("id", "owner", "controller") if name in regions.columns
+        ])
 
     def refresh_map_layer_if_stale(self, state=None) -> bool:
         """Refresh the map overlay only after relevant state has changed."""
@@ -193,6 +204,20 @@ class ViewportController:
 
         cache_key = self._map_layer_state_key(state)
         if cache_key == self._map_layer_cache_key:
+            return False
+
+        # Population, income and infrastructure update the same regions table.
+        # Only ownership and control affect political colors.
+        source = self._political_color_source(state)
+        previous = getattr(self, "_political_source", None)
+        if (
+            self._map_layer_cache_key is not None
+            and self._map_layer_cache_key[0] == "political"
+            and source is not None
+            and previous is not None
+            and source.equals(previous)
+        ):
+            self._map_layer_cache_key = cache_key
             return False
 
         self.refresh_map_layer(state)

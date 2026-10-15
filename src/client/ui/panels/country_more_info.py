@@ -364,8 +364,8 @@ class CountryMoreInfoPanel:
             (p.x + frame_w, p.y + frame_h),
             imgui.get_color_u32((0.24, 0.52, 0.70, 0.95)),
             0.0,
-            0,
-            1.5,
+            flags=0,
+            thickness=1.5,
         )
 
         map_data = self._map_data_provider()

@@ -11,7 +11,6 @@ from src.client.renderers.flag_renderer import FlagRenderer
 from src.client.ui.components.hud.country_selector import (
     CountrySelector,
     CountryStatus,
-    country_options_from_state,
 )
 from src.client.ui.core.theme import GAMETHEME
 from src.shared.actions import ActionSetGameSpeed, ActionSetPaused
@@ -260,7 +259,7 @@ class CentralBar:
         return imgui.calc_text_size(label).x + horizontal_padding * 2.0
 
     def _country_name(self, state) -> str:
-        for option in country_options_from_state(state):
+        for option in self.country_selector.options(state):
             if option.tag == self.active_tag:
                 return option.name
         return self.active_tag
@@ -315,8 +314,8 @@ class CentralBar:
             (origin.x + width, origin.y + metrics.total_height),
             imgui.get_color_u32((0.48, 0.50, 0.49, 1.0)),
             bevel,
-            0,
-            bevel,
+            flags=0,
+            thickness=bevel,
         )
         draw_list.add_line(
             (origin.x + bevel, origin.y + main_height),
@@ -443,8 +442,8 @@ class CentralBar:
             (screen_pos.x + metrics.lcd_width, screen_pos.y + metrics.control_height),
             imgui.get_color_u32((0.40, 0.43, 0.40, 1.0)),
             0.0,
-            0,
-            border_width,
+            flags=0,
+            thickness=border_width,
         )
 
         imgui.begin_child(

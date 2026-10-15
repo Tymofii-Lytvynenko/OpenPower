@@ -611,8 +611,8 @@ class UnitRenderer:
                 draw_list.add_polyline(
                     visible_points,
                     imgui.get_color_u32(outline_color),
-                    imgui.ImDrawFlags_.closed,
-                    1.25,
+                    flags=imgui.ImDrawFlags_.closed,
+                    thickness=1.25,
                 )
                 continue
 
@@ -740,8 +740,8 @@ class UnitRenderer:
             (right + 1, bottom + 1),
             imgui.get_color_u32(border_color),
             3.0,
-            0,
-            1.5 if is_selected or is_hovered else 1.0,
+            flags=0,
+            thickness=1.5 if is_selected or is_hovered else 1.0,
         )
 
         if unit.is_moving:
@@ -793,8 +793,8 @@ class UnitRenderer:
                 (right + 1, bottom + 1),
                 imgui.get_color_u32(border_color),
                 3.0,
-                0,
-                1.5 if is_selected else 1.0,
+                flags=0,
+                thickness=1.5 if is_selected else 1.0,
             )
 
         if unit.is_moving:
@@ -838,8 +838,8 @@ class UnitRenderer:
             (right, draw_bottom),
             imgui.get_color_u32((0.45, 0.70, 1.00, 0.85)),
             0.0,
-            0,
-            1.2,
+            flags=0,
+            thickness=1.2,
         )
 
     def _draw_unit_composition_plate(
@@ -954,8 +954,8 @@ class UnitRenderer:
             (right, bottom),
             imgui.get_color_u32(GAMETHEME.colors.text_main),
             rounding,
-            0,
-            1.0,
+            flags=0,
+            thickness=1.0,
         )
         draw_list.add_text(
             (x - text_size.x * 0.5, y - text_size.y * 0.5),

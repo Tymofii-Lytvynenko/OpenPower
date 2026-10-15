@@ -9,6 +9,7 @@ from src.client.ui.components.hud import central_bar as central_bar_module
 from src.client.ui.components.hud.central_bar import CentralBar
 from src.client.ui.components.hud.country_selector import (
     CountryOption,
+    CountrySelector,
     CountryStatus,
     country_options_from_state,
     resolve_country_status,
@@ -19,6 +20,25 @@ from src.shared.state import GameState
 
 
 class TestCountryOptions(unittest.TestCase):
+    def test_options_are_reused_until_country_table_changes(self) -> None:
+        selector = CountrySelector(flag_renderer=MagicMock())
+        state = GameState(tables={"countries": pl.DataFrame({
+            "id": ["UKR"], "name": ["Ukraine"]
+        })})
+        first = selector.options(state)
+        self.assertIs(selector.options(state), first)
+        state.update_table("countries", pl.DataFrame({
+            "id": ["UKR"], "name": ["Updated name"]
+        }))
+        self.assertEqual(selector.options(state), (CountryOption("UKR", "Updated name"),))
+
+    def test_closed_popup_does_not_build_options(self) -> None:
+        selector = CountrySelector(flag_renderer=MagicMock())
+        with patch("src.client.ui.components.hud.country_selector.imgui.is_popup_open", return_value=False):
+            with patch.object(selector, "options") as options:
+                self.assertIsNone(selector.render(None, "UKR"))
+                options.assert_not_called()
+
     def test_normalizes_deduplicates_and_sorts_by_display_name(self) -> None:
         state = SimpleNamespace(
             tables={

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import polars as pl
+
 
 @dataclass(frozen=True, slots=True)
 class InfrastructureCategoryView:
@@ -19,6 +21,7 @@ class InfrastructureCategoryView:
     last_change_minute: int = 0
     last_source_type: str = ""
     last_source_id: str = ""
+    project_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,28 +47,37 @@ class NationalInfrastructureView:
 class InfrastructurePresenter:
     """Builds immutable UI projections without editing simulation state."""
 
+    def __init__(self) -> None:
+        self._region_cache: dict[tuple, RegionalInfrastructureView] = {}
+
     def build_region_summary(self, state: Any, region_id: int) -> RegionalInfrastructureView:
-        regions = state.tables.get("regions")
-        region = next(
-            (
-                row
-                for row in ([] if regions is None else regions.to_dicts())
-                if int(row.get("id") or 0) == int(region_id)
-            ),
-            {},
+        region_id = int(region_id)
+        tables = state.tables
+        revisions = getattr(state, "table_revisions", None)
+        cache_key = (
+            region_id,
+            *((int(revisions.get(name, 0)) for name in (
+                "regions", "infrastructure_projects", "regional_infrastructure"
+            )) if revisions is not None else (id(tables.get(name)) for name in (
+                "regions", "infrastructure_projects", "regional_infrastructure"
+            ))),
         )
-        project_table = state.tables.get("infrastructure_projects")
+        cached = self._region_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        regions = tables.get("regions")
+        region = self._find_row(regions, "id", region_id)
+        project_table = tables.get("infrastructure_projects")
         active_projects = {
             str(row.get("category") or ""): row
-            for row in ([] if project_table is None else project_table.to_dicts())
-            if int(row.get("region_id") or 0) == int(region_id)
-            and str(row.get("status") or "") in {"in_progress", "paused"}
+            for row in self._rows_for_region(project_table, region_id)
+            if str(row.get("status") or "") in {"in_progress", "paused"}
         }
-        profile_table = state.tables.get("regional_infrastructure")
+        profile_table = tables.get("regional_infrastructure")
         profiles = {
             str(row.get("category") or ""): row
-            for row in ([] if profile_table is None else profile_table.to_dicts())
-            if int(row.get("region_id") or 0) == int(region_id)
+            for row in self._rows_for_region(profile_table, region_id)
         }
         category_names = sorted(profiles)
         categories: list[InfrastructureCategoryView] = []
@@ -87,6 +99,7 @@ class InfrastructurePresenter:
                     * level
                     * (1.0 - maintenance_level),
                     project_status=str(active_project.get("status") or ""),
+                    project_id=str(active_project.get("id") or ""),
                     project_progress=self._ratio(active_project.get("progress")),
                     project_reason=str(active_project.get("reason") or ""),
                     last_change_minute=max(0, int(profile.get("last_change_minute") or 0)),
@@ -103,12 +116,29 @@ class InfrastructurePresenter:
                 "telecom_capacity",
             )
         )
-        return RegionalInfrastructureView(
+        summary = RegionalInfrastructureView(
             region_id=int(region_id),
             owner=str(region.get("owner") or ""),
             categories=tuple(categories),
             downstream_effects=effects,
         )
+        self._region_cache[cache_key] = summary
+        if len(self._region_cache) > 64:
+            self._region_cache.pop(next(iter(self._region_cache)))
+        return summary
+
+    @staticmethod
+    def _find_row(frame, key: str, value: int) -> dict[str, Any]:
+        if frame is None or key not in frame.columns:
+            return {}
+        selected = frame.filter(pl.col(key) == value)
+        return selected.row(0, named=True) if not selected.is_empty() else {}
+
+    @staticmethod
+    def _rows_for_region(frame, region_id: int) -> list[dict[str, Any]]:
+        if frame is None or "region_id" not in frame.columns:
+            return []
+        return frame.filter(pl.col("region_id") == region_id).to_dicts()
 
     def build_country_summary(self, state: Any, country_tag: str) -> NationalInfrastructureView:
         country_id = str(country_tag or "").strip().upper()

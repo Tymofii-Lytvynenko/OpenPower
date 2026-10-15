@@ -62,19 +62,9 @@ class RegionInfrastructurePanel:
             return
         active = category.project_status in {"in_progress", "paused"}
         if active:
-            project = next(
-                (
-                    row
-                    for row in state.get_table("infrastructure_projects").to_dicts()
-                    if str(row.get("category") or "") == category.category
-                    and str(row.get("status") or "") in {"in_progress", "paused"}
-                    and int(row.get("region_id") or 0) == int(context.selected_region_id or 0)
-                ),
-                None,
-            )
-            if project is not None and imgui.small_button(f"Cancel##{category.category}"):
+            if category.project_id and imgui.small_button(f"Cancel##{category.category}"):
                 client.send_action(
-                    ActionCancelInfrastructureProject(client.player_id, str(project.get("id") or ""))
+                    ActionCancelInfrastructureProject(client.player_id, category.project_id)
                 )
             return
 

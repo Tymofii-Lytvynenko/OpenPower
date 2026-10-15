@@ -56,6 +56,17 @@ class ViewportMapRefreshTests(unittest.TestCase):
         self.assertTrue(controller.refresh_map_layer_if_stale(state))
         self.assertEqual(controller.renderer.update_overlay.call_count, 2)
 
+    def test_population_changes_do_not_rebuild_political_overlay(self) -> None:
+        controller = self._controller()
+        state = self._state()
+        self.assertTrue(controller.refresh_map_layer_if_stale(state))
+        state.update_table("regions", state.tables["regions"].with_columns(
+            pl.lit(1000).alias("population")
+        ))
+        self.assertFalse(controller.refresh_map_layer_if_stale(state))
+        self.assertFalse(controller.refresh_map_layer_if_stale(state))
+        self.assertEqual(controller.renderer.update_overlay.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

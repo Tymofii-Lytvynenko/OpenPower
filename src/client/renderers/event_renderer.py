@@ -211,8 +211,8 @@ class EventRenderer:
             (right, bottom),
             imgui.get_color_u32(accent),
             _PLACARD_ROUNDING,
-            0,
-            1.4,
+            flags=0,
+            thickness=1.4,
         )
 
         # Thin severity indicator bar along the bottom

@@ -676,8 +676,8 @@ class BattleEffectRenderer:
             (placement.label_x + text_width, placement.label_y + 22.0),
             imgui.get_color_u32(marker_color),
             4.0,
-            0,
-            1.2,
+            flags=0,
+            thickness=1.2,
         )
         draw_list.add_text(
             (placement.label_x + 9.0, placement.label_y + 4.0),
