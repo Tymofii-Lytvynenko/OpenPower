@@ -8,6 +8,7 @@ import polars as pl
 
 from modules.base.systems.economy.economic_health_policy import (
     DebtContractRequestInputs,
+    DebtContractRequestPlan,
     DebtContractRequestPlanner,
     DebtRestructuringInputs,
     DebtRestructuringPlan,
@@ -125,6 +126,13 @@ class _DebtContractResolutionContext:
     creditor: dict[str, Any] | None
     debtor: dict[str, Any] | None
     principal: float
+
+
+@dataclass(frozen=True)
+class _PlannedDebtContractRequest:
+    debtor_id: str
+    plan: DebtContractRequestPlan
+    at_minute: int
 
 
 class EconomicHealthSystem(ISystem):
@@ -541,6 +549,18 @@ class EconomicHealthSystem(ISystem):
         return transition
 
     def _request_debt_contract(self, state: GameState, action: ActionRequestDebtContract, now: int) -> None:
+        request = self._plan_debt_contract_request(state, action, now)
+        if request is None:
+            return
+
+        self._persist_debt_contract_request(state, request)
+
+    def _plan_debt_contract_request(
+        self,
+        state: GameState,
+        action: ActionRequestDebtContract,
+        now: int,
+    ) -> _PlannedDebtContractRequest | None:
         debtor_id = str(action.debtor_country_id)
         creditor_id = str(action.creditor_country_id)
         debtor = self._country(state, debtor_id)
@@ -583,8 +603,21 @@ class EconomicHealthSystem(ISystem):
                     at_minute=now,
                 ),
             )
-            return
+            return None
 
+        return _PlannedDebtContractRequest(
+            debtor_id=debtor_id,
+            plan=plan,
+            at_minute=now,
+        )
+
+    def _persist_debt_contract_request(
+        self,
+        state: GameState,
+        request: _PlannedDebtContractRequest,
+    ) -> None:
+        debtor_id = request.debtor_id
+        plan = request.plan
         contracts = state.tables["debt_contracts"]
         if not contracts.filter(pl.col("id") == plan.contract_id).is_empty():
             self._reject(
@@ -595,7 +628,7 @@ class EconomicHealthSystem(ISystem):
                     indicator="foreign_debt",
                     value=plan.principal,
                     reason="Duplicate deterministic financing request.",
-                    at_minute=now,
+                    at_minute=request.at_minute,
                 ),
             )
             return
@@ -611,7 +644,7 @@ class EconomicHealthSystem(ISystem):
                 previous_value=0.0,
                 new_value=plan.principal,
                 reason="Financing request awaits creditor approval.",
-                at_minute=now,
+                at_minute=request.at_minute,
             ),
         )
 
