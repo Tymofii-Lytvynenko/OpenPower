@@ -7,6 +7,16 @@ from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
+class DebtDistressRequest:
+    country_id: str
+    requested_status: str
+    trigger: str
+    arrears: float
+    now: int
+    reason: str
+
+
+@dataclass(frozen=True)
 class DebtDistressInputs:
     country_id: str
     requested_status: str

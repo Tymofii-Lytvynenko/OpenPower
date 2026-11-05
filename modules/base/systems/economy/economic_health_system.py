@@ -36,6 +36,7 @@ from modules.base.systems.economy.due_debt_settlement import (
 from modules.base.systems.economy.debt_distress_policy import (
     DebtDistressInputs,
     DebtDistressPlanner,
+    DebtDistressRequest,
     DeterministicDebtDistressPlanner,
 )
 from modules.base.systems.world.authority_policy import player_controls_country
@@ -552,12 +553,14 @@ class EconomicHealthSystem(ISystem):
         )
         self._set_distress(
             state,
-            debtor_id,
-            "restructuring",
-            "authorized_restructuring",
-            self._number(restructured_contract.get("arrears_amount")),
-            now,
-            restructured_contract["reason"],
+            DebtDistressRequest(
+                country_id=debtor_id,
+                requested_status="restructuring",
+                trigger="authorized_restructuring",
+                arrears=self._number(restructured_contract.get("arrears_amount")),
+                now=now,
+                reason=restructured_contract["reason"],
+            ),
         )
         self._transition_event(
             state,
@@ -625,15 +628,18 @@ class EconomicHealthSystem(ISystem):
     ) -> None:
         self._set_distress(
             state,
-            installment.debtor_country_id,
-            "arrears",
-            "scheduled_service_shortfall",
-            installment.settlement.new_arrears,
-            installment.due_at_minute,
-            installment.contract["reason"],
+            DebtDistressRequest(
+                country_id=installment.debtor_country_id,
+                requested_status="arrears",
+                trigger="scheduled_service_shortfall",
+                arrears=installment.settlement.new_arrears,
+                now=installment.due_at_minute,
+                reason=installment.contract["reason"],
+            ),
         )
 
-    def _set_distress(self, state: GameState, country_id: str, status: str, trigger: str, arrears: float, now: int, reason: str) -> None:
+    def _set_distress(self, state: GameState, request: DebtDistressRequest) -> None:
+        country_id = request.country_id
         cases = state.tables.get("debt_distress_cases")
         if cases is None:
             return
@@ -647,15 +653,15 @@ class EconomicHealthSystem(ISystem):
         plan = self._debt_distress_planner.plan(
             DebtDistressInputs(
                 country_id=country_id,
-                requested_status=status,
-                trigger=trigger,
-                fallback_arrears=arrears,
+                requested_status=request.requested_status,
+                trigger=request.trigger,
+                fallback_arrears=request.arrears,
                 country_arrears=country.get("arrears"),
                 country_gdp=country.get("gdp"),
                 default_arrears_minimum=terms.get("default_arrears_minimum"),
                 default_arrears_gdp_ratio=terms.get("default_arrears_gdp_ratio"),
-                now=now,
-                reason=reason,
+                now=request.now,
+                reason=request.reason,
                 case_count=cases.height,
                 existing_case=existing_case,
             )
@@ -682,8 +688,8 @@ class EconomicHealthSystem(ISystem):
                 "arrears",
                 0.0,
                 plan.total_arrears,
-                reason,
-                now,
+                request.reason,
+                request.now,
             )
 
     def _recover_distress_if_eligible(self, state: GameState, country_id: str, now: int) -> None:
