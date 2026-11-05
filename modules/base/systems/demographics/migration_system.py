@@ -19,6 +19,10 @@ from modules.base.systems.demographics.migration_policy import (
     estimate_migration_count,
     evaluate_border_access,
 )
+from modules.base.systems.demographics.migration_signal_policy import (
+    DeterministicMigrationSignalCalculator,
+    MigrationSignalCalculator,
+)
 from modules.base.systems.world.random_event_effects import aggregate_active_effects
 from modules.base.systems.politics.political_effect_policy import aggregate_political_effects_by_type
 from modules.base.systems.world.authority_policy import player_controls_country
@@ -27,7 +31,6 @@ from src.shared.events import (
     EventMigrationFlowCreated,
     EventMigrationFlowResolved,
     EventMigrationPolicyUpdated,
-    EventMigrationSignalUpdated,
     EventNewDay,
 )
 from src.shared.state import GameState
@@ -173,7 +176,12 @@ class MigrationSystem(ISystem):
         "_country_signatures": SYSTEM_STATE_CACHE,
     }
 
-    def __init__(self) -> None:
+    def __init__(self, signal_calculator: MigrationSignalCalculator | None = None) -> None:
+        self._signal_calculator = (
+            signal_calculator
+            if signal_calculator is not None
+            else DeterministicMigrationSignalCalculator()
+        )
         self._route_index: dict[int, tuple[int, ...]] = {}
         self._adjacency_revision = -1
         self._region_signatures: dict[int, str] = {}
@@ -1173,130 +1181,34 @@ class MigrationSystem(ISystem):
         now: int,
         completed_flows: list[dict[str, Any]],
     ) -> None:
-        signals = state.get_table("migration_signals")
-        signal_rows = {self._tag(row.get("country_id")): row for row in signals.to_dicts()}
-        window_start = (now // SIGNAL_WINDOW_MINUTES) * SIGNAL_WINDOW_MINUTES
-        countries = [
-            self._tag(country_id)
-            for country_id in state.get_table("countries")["id"].to_list()
-            if self._tag(country_id)
-        ]
-        policies = self._effective_policy_map(state, now)
-        health_effects = aggregate_active_effects(
-            state.tables.get("random_event_effects"),
-            now,
-            categories={"health"},
-            subject_type="region",
+        projection = self._signal_calculator.calculate(
+            current_records=state.get_table("migration_signals").to_dicts(),
+            country_ids=state.get_table("countries")["id"].to_list(),
+            region_records=state.get_table("regions").to_dicts(),
+            completed_flows=completed_flows,
+            policies=self._effective_policy_map(state, now),
+            health_effects=aggregate_active_effects(
+                state.tables.get("random_event_effects"),
+                now,
+                categories={"health"},
+                subject_type="region",
+            ),
+            political_effects=aggregate_active_effects(
+                state.tables.get("random_event_effects"),
+                now,
+                categories={"political_pressure"},
+                subject_type="country",
+            ),
+            now=now,
+            window_minutes=SIGNAL_WINDOW_MINUTES,
         )
-        political_effects = aggregate_active_effects(
-            state.tables.get("random_event_effects"),
-            now,
-            categories={"political_pressure"},
-            subject_type="country",
+        state.events.extend(projection.events)
+        self._replace_records(
+            state,
+            "migration_signals",
+            list(projection.changed_records),
+            "country_id",
         )
-        region_owner = {
-            str(row.get("id")): self._tag(row.get("owner"))
-            for row in state.get_table("regions").iter_rows(named=True)
-        }
-        health_pressure_by_country: dict[str, float] = {}
-        for (_, region_id, _), magnitude in health_effects.items():
-            owner = region_owner.get(region_id, "")
-            if owner:
-                health_pressure_by_country[owner] = health_pressure_by_country.get(owner, 0.0) + max(0.0, -magnitude)
-        updated: dict[str, dict[str, Any]] = {}
-        for country_id in sorted(countries):
-            current = signal_rows.get(country_id)
-            existing = dict(current or {})
-            # An empty table defaults its window to zero, so first-time rows still need their country key seeded.
-            if current is None or self._integer(existing.get("window_start_minute")) != window_start:
-                existing = {
-                    "country_id": country_id,
-                    "gross_inflow": 0,
-                    "gross_outflow": 0,
-                    "net_flow": 0,
-                    "working_age_delta": 0,
-                    "service_pressure": 0.0,
-                    "political_pressure": 0.0,
-                    "law_pressure": 0.0,
-                    "window_start_minute": window_start,
-                    "updated_at_minute": now,
-                    "politics_consumed_at_minute": 0,
-                    "economy_consumed_at_minute": 0,
-                }
-            updated[country_id] = existing
-
-        for flow in completed_flows:
-            origin = self._tag(flow.get("origin_country_id"))
-            destination = self._tag(flow.get("destination_country_id"))
-            total = max(0, self._integer(flow.get("population_count")))
-            working = max(0, self._integer(flow.get("working_age_count")))
-            if total <= 0:
-                continue
-            if origin in updated:
-                updated[origin]["gross_outflow"] = self._integer(updated[origin].get("gross_outflow")) + total
-                updated[origin]["working_age_delta"] = self._integer(updated[origin].get("working_age_delta")) - working
-            if destination in updated:
-                updated[destination]["gross_inflow"] = self._integer(updated[destination].get("gross_inflow")) + total
-                updated[destination]["working_age_delta"] = self._integer(updated[destination].get("working_age_delta")) + working
-
-        region_totals: dict[str, int] = {}
-        service_capacity: dict[str, int] = {}
-        for region in state.get_table("regions").to_dicts():
-            owner = self._tag(region.get("owner"))
-            if not owner:
-                continue
-            region_totals[owner] = region_totals.get(owner, 0) + self._population(region)
-            service = self._integer(region.get("service_capacity"))
-            service_capacity[owner] = service_capacity.get(owner, 0) + service
-
-        changed: list[dict[str, Any]] = []
-        for country_id, row in updated.items():
-            inflow = self._integer(row.get("gross_inflow"))
-            outflow = self._integer(row.get("gross_outflow"))
-            row["net_flow"] = inflow - outflow
-            population = max(1, region_totals.get(country_id, 0))
-            event_political = political_effects.get(("country", country_id, "political_pressure"), 0.0)
-            row["political_pressure"] = self._bounded_ratio(
-                max(inflow, outflow) / population / 0.05
-                + min(0.5, max(-0.5, event_political))
-            )
-            policy = policies.get(country_id, self._default_policy(country_id, now))
-            row["law_pressure"] = self._bounded_ratio(
-                row["political_pressure"]
-                * self._bounded_ratio(policy.get("enforcement_strength"), 0.5)
-            )
-            capacity = service_capacity.get(country_id, 0)
-            if capacity <= 0:
-                capacity = max(1, int(population * 0.1))
-            health_pressure = min(0.5, max(0.0, health_pressure_by_country.get(country_id, 0.0)))
-            row["service_pressure"] = self._bounded_ratio(inflow / capacity + health_pressure)
-            row["updated_at_minute"] = now
-            current = signal_rows.get(country_id)
-            if current is None or any(
-                current.get(field) != row.get(field)
-                for field in (
-                    "gross_inflow",
-                    "gross_outflow",
-                    "net_flow",
-                    "working_age_delta",
-                    "service_pressure",
-                    "political_pressure",
-                    "law_pressure",
-                    "window_start_minute",
-                )
-            ):
-                changed.append(row)
-                state.events.append(
-                    EventMigrationSignalUpdated(
-                        country_id=country_id,
-                        political_pressure=float(row["political_pressure"]),
-                        service_pressure=float(row["service_pressure"]),
-                        net_flow=int(row["net_flow"]),
-                        at_minute=now,
-                        law_pressure=float(row["law_pressure"]),
-                    )
-                )
-        self._replace_records(state, "migration_signals", changed, "country_id")
 
     def _get_route_index(self, state: GameState) -> dict[int, tuple[int, ...]]:
         adjacency = state.tables.get("region_adjacency")
