@@ -41,7 +41,10 @@ from modules.base.systems.economy.debt_distress_policy import (
     DeterministicDebtDistressPlanner,
 )
 from modules.base.systems.economy.economic_policy_transition import (
+    DeterministicEconomicPolicyApplicationPlanner,
     DeterministicEconomicPolicyTransitionPlanner,
+    EconomicPolicyApplicationInputs,
+    EconomicPolicyApplicationPlanner,
     EconomicPolicyTransitionInputs,
     EconomicPolicyTransitionPlanner,
 )
@@ -106,6 +109,7 @@ class EconomicHealthSystem(ISystem):
         due_debt_processor: DueDebtSettlementProcessor | None = None,
         debt_distress_planner: DebtDistressPlanner | None = None,
         policy_transition_planner: EconomicPolicyTransitionPlanner | None = None,
+        policy_application_planner: EconomicPolicyApplicationPlanner | None = None,
     ) -> None:
         self._profile_calculator = _resolve_component(
             profile_calculator,
@@ -138,6 +142,10 @@ class EconomicHealthSystem(ISystem):
         self._policy_transition_planner = _resolve_component(
             policy_transition_planner,
             DeterministicEconomicPolicyTransitionPlanner,
+        )
+        self._policy_application_planner = _resolve_component(
+            policy_application_planner,
+            DeterministicEconomicPolicyApplicationPlanner,
         )
 
     @property
@@ -374,52 +382,75 @@ class EconomicHealthSystem(ISystem):
         due = transitions.filter((pl.col("status") == "scheduled") & (pl.col("effective_at_minute") <= now)).sort(["effective_at_minute", "id"])
         if due.is_empty():
             return
-        applied: list[dict[str, Any]] = []
-        for transition in due.iter_rows(named=True):
-            country_id = str(transition["country_id"])
-            policy = str(transition["policy_name"])
-            current_country = self._country(state, country_id)
-            allowed_policies = {"minimum_wage", "interest_rate", "personal_income_tax_rate", *self.SPENDING_POLICIES}
-            if current_country is None or policy not in allowed_policies:
-                transition["status"] = "rejected"
-                transition["reason"] = "Country or policy no longer exists."
-                applied.append(transition)
-                continue
-            old = self._number(current_country.get(policy))
-            target = self._number(transition.get("target_value"))
-            self._country_values(state, country_id, {policy: target})
-            transition["status"] = "applied"
-            transition["reason"] = f"{policy.replace('_', ' ').title()} changed at its effective time."
-            applied.append(transition)
-            source_id = str(transition["id"])
-            self._record_cause(
-                state,
-                EconomicCauseRecordRequest(
-                    country_id=country_id,
-                    source_type="policy",
-                    source_id=source_id,
-                    indicator=policy,
-                    previous_value=old,
-                    new_value=target,
-                    unit="policy units",
-                    game_minute=now,
-                    reason=transition["reason"],
-                ),
-            )
-            self._transition_event(
-                state,
-                EconomicTransitionEventRequest(
-                    event_type="applied",
-                    country_id=country_id,
-                    source_id=source_id,
-                    indicator=policy,
-                    previous_value=old,
-                    new_value=target,
-                    reason=transition["reason"],
-                    at_minute=now,
-                ),
-            )
+        supported_policies = frozenset({
+            "minimum_wage",
+            "interest_rate",
+            "personal_income_tax_rate",
+            *self.SPENDING_POLICIES,
+        })
+        applied = [
+            self._apply_due_policy_transition(state, transition, now, supported_policies)
+            for transition in due.iter_rows(named=True)
+        ]
         self._replace_rows(state, "economic_policy_transitions", applied)
+
+    def _apply_due_policy_transition(
+        self,
+        state: GameState,
+        transition: dict[str, Any],
+        now: int,
+        supported_policies: frozenset[str],
+    ) -> dict[str, Any]:
+        country_id = str(transition["country_id"])
+        policy = str(transition["policy_name"])
+        current_country = self._country(state, country_id)
+        application = self._policy_application_planner.plan(
+            EconomicPolicyApplicationInputs(
+                country_exists=current_country is not None,
+                policy_name=policy,
+                supported_policies=supported_policies,
+            )
+        )
+        if not application.should_apply:
+            transition["status"] = "rejected"
+            transition["reason"] = application.reason
+            return transition
+
+        assert current_country is not None
+        old = self._number(current_country.get(policy))
+        target = self._number(transition.get("target_value"))
+        self._country_values(state, country_id, {policy: target})
+        transition["status"] = "applied"
+        transition["reason"] = application.reason
+        source_id = str(transition["id"])
+        self._record_cause(
+            state,
+            EconomicCauseRecordRequest(
+                country_id=country_id,
+                source_type="policy",
+                source_id=source_id,
+                indicator=policy,
+                previous_value=old,
+                new_value=target,
+                unit="policy units",
+                game_minute=now,
+                reason=transition["reason"],
+            ),
+        )
+        self._transition_event(
+            state,
+            EconomicTransitionEventRequest(
+                event_type="applied",
+                country_id=country_id,
+                source_id=source_id,
+                indicator=policy,
+                previous_value=old,
+                new_value=target,
+                reason=transition["reason"],
+                at_minute=now,
+            ),
+        )
+        return transition
 
     def _request_debt_contract(self, state: GameState, action: ActionRequestDebtContract, now: int) -> None:
         debtor_id = str(action.debtor_country_id)

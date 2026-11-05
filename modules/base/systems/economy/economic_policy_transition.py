@@ -37,6 +37,19 @@ class EconomicPolicyTransitionPlan:
     rejection_reason: str | None = None
 
 
+@dataclass(frozen=True)
+class EconomicPolicyApplicationInputs:
+    country_exists: bool
+    policy_name: str
+    supported_policies: frozenset[str]
+
+
+@dataclass(frozen=True)
+class EconomicPolicyApplicationPlan:
+    should_apply: bool
+    reason: str
+
+
 class EconomicPolicyTransitionPlanner(Protocol):
     def prepare(self, inputs: EconomicPolicyTransitionInputs) -> EconomicPolicyTransitionDraft: ...
 
@@ -45,6 +58,10 @@ class EconomicPolicyTransitionPlanner(Protocol):
         draft: EconomicPolicyTransitionDraft,
         transition_id_exists: bool,
     ) -> EconomicPolicyTransitionPlan: ...
+
+
+class EconomicPolicyApplicationPlanner(Protocol):
+    def plan(self, inputs: EconomicPolicyApplicationInputs) -> EconomicPolicyApplicationPlan: ...
 
 
 class DeterministicEconomicPolicyTransitionPlanner:
@@ -117,6 +134,20 @@ class DeterministicEconomicPolicyTransitionPlanner:
                 "reason": reason,
             },
             transition_cost=draft.transition_cost,
+        )
+
+
+class DeterministicEconomicPolicyApplicationPlanner:
+    def plan(self, inputs: EconomicPolicyApplicationInputs) -> EconomicPolicyApplicationPlan:
+        if not inputs.country_exists or inputs.policy_name not in inputs.supported_policies:
+            return EconomicPolicyApplicationPlan(
+                should_apply=False,
+                reason="Country or policy no longer exists.",
+            )
+
+        return EconomicPolicyApplicationPlan(
+            should_apply=True,
+            reason=f"{inputs.policy_name.replace('_', ' ').title()} changed at its effective time.",
         )
 
 
