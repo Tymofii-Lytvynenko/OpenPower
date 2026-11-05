@@ -140,28 +140,49 @@ class CombatStatePublisher:
         region_rows: list[dict[str, Any]],
         original_controllers: dict[int, str],
     ) -> None:
-        controller_updates = {
+        controller_updates = self._changed_controllers(region_rows, original_controllers)
+        updated_regions = self._region_frame_with_controller_updates(
+            state,
+            regions,
+            controller_updates,
+            original_controllers,
+        )
+        self._update_table_if_changed(state, REGIONS_TABLE, updated_regions)
+
+    @staticmethod
+    def _changed_controllers(
+        region_rows: list[dict[str, Any]],
+        original_controllers: dict[int, str],
+    ) -> dict[int, str]:
+        return {
             int(row.get("id") or 0): str(row.get("controller") or "")
             for row in region_rows
             if str(row.get("controller") or "")
             != original_controllers.get(int(row.get("id") or 0), "")
         }
-        updated_regions = regions
-        if controller_updates:
-            all_region_rows = regions.to_dicts()
-            for region_id, controller in controller_updates.items():
-                state.events.append(
-                    EventOccupationChanged(
-                        region_id=region_id,
-                        previous_controller=str(original_controllers.get(region_id) or ""),
-                        controller=controller,
-                        source="battle_resolution",
-                        at_minute=int(state.time.total_minutes),
-                    )
+
+    def _region_frame_with_controller_updates(
+        self,
+        state: GameState,
+        regions: pl.DataFrame,
+        controller_updates: dict[int, str],
+        original_controllers: dict[int, str],
+    ) -> pl.DataFrame:
+        if not controller_updates:
+            return regions
+        all_region_rows = regions.to_dicts()
+        for region_id, controller in controller_updates.items():
+            state.events.append(
+                EventOccupationChanged(
+                    region_id=region_id,
+                    previous_controller=str(original_controllers.get(region_id) or ""),
+                    controller=controller,
+                    source="battle_resolution",
+                    at_minute=int(state.time.total_minutes),
                 )
-                self._set_region_controller(all_region_rows, region_id, controller)
-            updated_regions = self._frame_from_rows(regions.schema, all_region_rows)
-        self._update_table_if_changed(state, REGIONS_TABLE, updated_regions)
+            )
+            self._set_region_controller(all_region_rows, region_id, controller)
+        return self._frame_from_rows(regions.schema, all_region_rows)
 
     @staticmethod
     def _set_region_controller(
