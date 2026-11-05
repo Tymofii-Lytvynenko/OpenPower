@@ -1,5 +1,4 @@
 from functools import lru_cache
-from typing import NamedTuple
 
 import numpy as np
 import polars as pl
@@ -10,44 +9,16 @@ from src.shared.numeric import stable_group_sums, stable_sum
 from src.shared.frames import ensure_sorted
 from src.shared.events import EventRealSecond
 from modules.base.systems.economy.treaty_trade_policy import TreatyTradePolicy
-from modules.base.systems.economy.market_clearing_kernel import calculate_unconstrained_market
 from modules.base.systems.economy.market_input_validator import MarketInputValidator
 from modules.base.systems.economy.market_frame_builder import MarketFrameBuilder
+from modules.base.systems.economy.missing_column_warning_registry import (
+    MissingColumnWarningRegistry,
+)
+from modules.base.systems.economy.market_data import _MarketIndexCache
+from modules.base.systems.economy.unconstrained_market_simulator import (
+    UnconstrainedMarketSimulator,
+)
 from modules.base.systems.world.recognition_policy import regional_trade_access_allowed
-
-
-@lru_cache(maxsize=4)
-def _resource_market_metadata(
-    physics_entries: tuple[tuple[str, bool, float], ...],
-) -> tuple[dict[str, int], np.ndarray, np.ndarray]:
-    resource_ids = tuple(resource_id for resource_id, _, _ in physics_entries)
-    indices_by_id = {resource_id: index for index, resource_id in enumerate(resource_ids)}
-    decay_rates = np.fromiter(
-        (decay_rate for _, _, decay_rate in physics_entries),
-        dtype=np.float64,
-        count=len(physics_entries),
-    )
-    storable = np.fromiter(
-        (is_storable for _, is_storable, _ in physics_entries),
-        dtype=np.bool_,
-        count=len(physics_entries),
-    )
-    return (
-        indices_by_id,
-        decay_rates,
-        storable,
-    )
-
-
-class _MarketIndexCache(NamedTuple):
-    country_ids: pl.Series
-    production_country_ids: pl.Series
-    production_resource_ids: pl.Series
-    physics_entries: tuple[tuple[str, bool, float], ...]
-    country_indices: np.ndarray
-    resource_indices: np.ndarray
-    keys_are_sorted: bool
-    country_ids_precede_world: bool
 
 
 class TradeSystem(ISystem):
@@ -72,6 +43,8 @@ class TradeSystem(ISystem):
         "_treaty_trade_policy": SYSTEM_STATE_HELPER,
         "_market_input_validator": SYSTEM_STATE_HELPER,
         "_market_frame_builder": SYSTEM_STATE_HELPER,
+        "_unconstrained_market_simulator": SYSTEM_STATE_HELPER,
+        "_market_column_warning_registry": SYSTEM_STATE_HELPER,
     }
 
     TRADE_PRIORITY_MATRIX = {
@@ -139,9 +112,14 @@ class TradeSystem(ISystem):
         self,
         market_input_validator: MarketInputValidator | None = None,
         market_frame_builder: MarketFrameBuilder | None = None,
+        unconstrained_market_simulator: UnconstrainedMarketSimulator | None = None,
+        market_column_warning_registry: MissingColumnWarningRegistry | None = None,
     ):
-        self._missing_columns = set()
-        self._market_index_cache: _MarketIndexCache | None = None
+        self._market_column_warning_registry = (
+            market_column_warning_registry
+            if market_column_warning_registry is not None
+            else MissingColumnWarningRegistry(self.id)
+        )
         self._treaty_trade_policy = TreatyTradePolicy()
         self._market_input_validator = (
             market_input_validator if market_input_validator is not None else MarketInputValidator()
@@ -149,6 +127,27 @@ class TradeSystem(ISystem):
         self._market_frame_builder = (
             market_frame_builder if market_frame_builder is not None else MarketFrameBuilder()
         )
+        self._unconstrained_market_simulator = (
+            unconstrained_market_simulator
+            if unconstrained_market_simulator is not None
+            else UnconstrainedMarketSimulator()
+        )
+
+    @property
+    def _missing_columns(self) -> set[str]:
+        return self._market_column_warning_registry.seen_columns
+
+    @_missing_columns.setter
+    def _missing_columns(self, value: set[str]) -> None:
+        self._market_column_warning_registry.seen_columns = value
+
+    @property
+    def _market_index_cache(self) -> _MarketIndexCache | None:
+        return self._unconstrained_market_simulator.market_index_cache
+
+    @_market_index_cache.setter
+    def _market_index_cache(self, value: _MarketIndexCache | None) -> None:
+        self._unconstrained_market_simulator.market_index_cache = value
 
     @property
     def id(self) -> str:
@@ -181,8 +180,7 @@ class TradeSystem(ISystem):
             state,
             production_lf,
             _resource_physics_table(),
-            self._missing_columns,
-            self.id,
+            self._market_column_warning_registry,
         )
 
         # ---------------------------------------------------------
@@ -344,348 +342,13 @@ class TradeSystem(ISystem):
         state.update_table("countries", ensure_sorted(countries_df, ("id",)))
 
     def _simulate_market_cycle_fast(self, state: GameState, fraction: float) -> bool:
-        """Use aligned NumPy columns when the market has no bilateral constraints."""
-        production = state.tables.get("domestic_production")
-        countries = state.tables.get("countries")
-        ledger = state.tables.get("resource_ledger")
-        regional = state.tables.get("regional_production")
-        treaty_effects = state.tables.get("treaty_effects")
-        if (
-            production is None
-            or countries is None
-            or ledger is None
-            or production.is_empty()
-            or (regional is not None and not regional.is_empty())
-            or (treaty_effects is not None and not treaty_effects.is_empty())
-            or not {"country_id", "game_resource_id", "domestic_production"}.issubset(production.columns)
-            or not {"country_id", "game_resource_id", "consumption_usd"}.issubset(ledger.columns)
-            or not {"id"}.issubset(countries.columns)
-        ):
-            return False
-
-        key_columns = ("country_id", "game_resource_id")
-        production_country_ids = production.get_column("country_id")
-        production_resource_ids = production.get_column("game_resource_id")
-        country_id_series = countries.get_column("id")
-        if (
-            countries.schema["id"] != pl.String
-            or production.schema["country_id"] != pl.String
-            or production.schema["game_resource_id"] != pl.String
-        ):
-            return False
-
-        physics_entries = tuple(
-            (
-                resource_id,
-                bool(values["is_storable"]),
-                float(values["decay_rate"]),
-            )
-            for resource_id, values in self.RESOURCE_PHYSICS.items()
-        )
-        cached_indices = self._market_index_cache
-        cache_hit = (
-            cached_indices is not None
-            and cached_indices.country_ids.equals(country_id_series)
-            and cached_indices.production_country_ids.equals(production_country_ids)
-            and cached_indices.production_resource_ids.equals(production_resource_ids)
-            and cached_indices.physics_entries == physics_entries
-        )
-
-        # A cached row mapping is valid only for the exact immutable key columns and
-        # country order from which it was built; ledger/stockpile alignment is still
-        # checked on every call because those tables have independent lifecycles.
-        if (
-            not production_country_ids.equals(ledger.get_column("country_id"))
-            or not production_resource_ids.equals(ledger.get_column("game_resource_id"))
-        ):
-            return False
-
-        stockpiles = state.tables.get("stockpiles")
-        if stockpiles is not None:
-            if not {"country_id", "game_resource_id", "stock_amount"}.issubset(stockpiles.columns):
-                return False
-            if (
-                not production_country_ids.equals(stockpiles.get_column("country_id"))
-                or not production_resource_ids.equals(stockpiles.get_column("game_resource_id"))
-            ):
-                return False
-
-        row_count = production.height
-        if not cache_hit and (
-            production.select(pl.struct(key_columns).is_duplicated().any()).item()
-            or country_id_series.null_count() > 0
-            or production_country_ids.null_count() > 0
-            or production_resource_ids.null_count() > 0
-        ):
-            return False
-        keys_are_sorted = (
-            cached_indices.keys_are_sorted
-            if cache_hit
-            else production.select(pl.struct(key_columns)).to_series().is_sorted()
-        )
-        country_ids_precede_world = (
-            cached_indices.country_ids_precede_world
-            if cache_hit
-            else all(country_id < "WORLD" for country_id in country_id_series.to_list())
-        )
-
-        supported_numeric_types = {
-            pl.Float32,
-            pl.Float64,
-            pl.Int8,
-            pl.Int16,
-            pl.Int32,
-            pl.Int64,
-            pl.UInt8,
-            pl.UInt16,
-            pl.UInt32,
-            pl.UInt64,
-        }
-        numeric_columns = (
-            (production, "domestic_production"),
-            (production, "tax_rate"),
-            (ledger, "consumption_usd"),
-            (countries, "economic_trade_modifier"),
-            (stockpiles, "stock_amount"),
-        )
-        if any(
-            frame is not None
-            and column in frame.columns
-            and frame.schema[column] not in supported_numeric_types
-            for frame, column in numeric_columns
-        ):
-            return False
-        (
-            resource_indices_by_id,
-            decay_rates_by_resource,
-            storable_by_resource,
-        ) = _resource_market_metadata(physics_entries)
-        if cache_hit:
-            country_indices = cached_indices.country_indices
-            resource_indices = cached_indices.resource_indices
-        else:
-            country_values = production_country_ids.to_numpy()
-            resource_values = production_resource_ids.to_numpy()
-            country_ids = country_id_series.to_list()
-            country_index_by_id = {
-                str(country_id): index for index, country_id in enumerate(country_ids)
-            }
-            if len(country_index_by_id) != len(country_ids):
-                return False
-            # Build Python hash mappings once per stable key layout, not once per tick.
-            country_indices = np.fromiter(
-                (country_index_by_id.get(country_id, -1) for country_id in country_values),
-                dtype=np.int32,
-                count=row_count,
-            )
-            resource_indices = np.fromiter(
-                (resource_indices_by_id.get(resource_id, -1) for resource_id in resource_values),
-                dtype=np.int32,
-                count=row_count,
-            )
-        if (country_indices < 0).any() or (resource_indices < 0).any():
-            return False
-
-        production_column = production.get_column("domestic_production")
-        for table, column in (
-            (production, "domestic_production"),
-            (production, "tax_rate"),
-            (production, "is_gov_controlled"),
-            (production, "is_legal"),
-        ):
-            if column in table.columns and table.get_column(column).null_count():
-                return False
-        production_values = production_column.cast(pl.Float64, strict=False).to_numpy()
-        if not np.isfinite(production_values).all():
-            return False
-
-        def numeric_values(frame: pl.DataFrame, column: str, default: float) -> np.ndarray:
-            if column not in frame.columns:
-                return np.full(row_count, default, dtype=np.float64)
-            return (
-                frame.get_column(column)
-                .cast(pl.Float64, strict=False)
-                .fill_null(default)
-                .to_numpy()
-            )
-
-        demand = numeric_values(ledger, "consumption_usd", 0.0)
-        stock = (
-            numeric_values(stockpiles, "stock_amount", 0.0)
-            if stockpiles is not None
-            else np.zeros(row_count, dtype=np.float64)
-        )
-        country_columns = set(countries.columns)
-        trade_modifier_values = (
-            countries.get_column("economic_trade_modifier")
-            .cast(pl.Float64, strict=False)
-            .fill_null(1.0)
-            .to_numpy()
-            if "economic_trade_modifier" in country_columns
-            else np.ones(countries.height, dtype=np.float64)
-        )
-        if not np.isfinite(trade_modifier_values).all():
-            raise ValueError(
-                "countries.economic_trade_modifier must contain finite values."
-            )
-        trade_modifiers_by_country = np.clip(trade_modifier_values, 0.5, 1.0)
-        trade_modifiers = trade_modifiers_by_country[country_indices]
-        if "is_gov_controlled" in production.columns:
-            government_controlled = (
-                production.get_column("is_gov_controlled")
-                .cast(pl.Boolean, strict=False)
-                .fill_null(False)
-                .to_numpy()
-            )
-        else:
-            if "is_gov_controlled" not in self._missing_columns:
-                print(f"[{self.id}] Column 'is_gov_controlled' not found in 'domestic_production'. Defaulting to False.")
-                self._missing_columns.add("is_gov_controlled")
-            government_controlled = np.zeros(row_count, dtype=np.bool_)
-        if "is_legal" in production.columns:
-            legal = (
-                production.get_column("is_legal")
-                .cast(pl.Boolean, strict=False)
-                .fill_null(False)
-                .to_numpy()
-            )
-        else:
-            if "is_legal" not in self._missing_columns:
-                print(f"[{self.id}] Column 'is_legal' not found in 'domestic_production'. Defaulting to True.")
-                self._missing_columns.add("is_legal")
-            legal = np.ones(row_count, dtype=np.bool_)
-        tax_rates = numeric_values(production, "tax_rate", 0.05)
-        if "tax_rate" not in production.columns and "tax_rate" not in self._missing_columns:
-            print(f"[{self.id}] Column 'tax_rate' not found in 'domestic_production'. Defaulting to 0.05.")
-            self._missing_columns.add("tax_rate")
-
-        for table_name, column_name, values, require_nonnegative in (
-            ("domestic_production", "domestic_production", production_values, True),
-            ("resource_ledger", "consumption_usd", demand, True),
-            ("stockpiles", "stock_amount", stock, True),
-            ("domestic_production", "tax_rate", tax_rates, True),
-            ("countries", "economic_trade_modifier", trade_modifiers_by_country, False),
-        ):
-            if not np.isfinite(values).all() or (
-                require_nonnegative and (values < 0.0).any()
-            ):
-                raise ValueError(
-                    f"{table_name}.{column_name} must contain finite"
-                    f"{' and non-negative' if require_nonnegative else ''} values."
-                )
-
-        clearing = calculate_unconstrained_market(
-            production_values=production_values,
-            demand=demand,
-            stock=stock,
-            trade_modifiers=trade_modifiers,
-            resource_indices=resource_indices,
-            country_indices=country_indices,
-            decay_rates_by_resource=decay_rates_by_resource,
-            storable_by_resource=storable_by_resource,
-            government_controlled=government_controlled,
-            legal=legal,
-            tax_rates=tax_rates,
+        """Delegate eligible unconstrained cycles to the composed NumPy simulator."""
+        return self._unconstrained_market_simulator.simulate(
+            state=state,
             fraction=fraction,
-            row_count=row_count,
-            country_count=countries.height,
+            resource_physics=self.RESOURCE_PHYSICS,
+            warning_registry=self._market_column_warning_registry,
         )
-        updated_production = clearing.updated_production
-        new_stock = clearing.new_stock
-        import_actual = clearing.import_actual
-        export_actual = clearing.export_actual
-        trade_income = clearing.trade_income
-        trade_expense = clearing.trade_expense
-
-        production_updates = [
-            pl.Series("domestic_production", updated_production),
-            pl.Series("stock_amount", new_stock),
-        ]
-        if "is_gov_controlled" not in production.columns:
-            production_updates.append(
-                pl.Series("is_gov_controlled", government_controlled)
-            )
-        if "is_legal" not in production.columns:
-            production_updates.append(pl.Series("is_legal", legal))
-        if "tax_rate" not in production.columns:
-            production_updates.append(pl.Series("tax_rate", tax_rates))
-        market_output = production.with_columns(production_updates)
-        cached_country_indices = country_indices
-        cached_resource_indices = resource_indices
-        if not keys_are_sorted:
-            # The output contract sorts market rows; carry the aligned index vectors
-            # through that same permutation so the next tick can reuse the cache.
-            sort_order = np.lexsort(
-                (production_resource_ids.to_numpy(), production_country_ids.to_numpy())
-            )
-            cached_country_indices = country_indices[sort_order]
-            cached_resource_indices = resource_indices[sort_order]
-            market_output = ensure_sorted(market_output, key_columns)
-        if not cache_hit:
-            self._market_index_cache = _MarketIndexCache(
-                country_id_series,
-                market_output.get_column("country_id"),
-                market_output.get_column("game_resource_id"),
-                physics_entries,
-                cached_country_indices,
-                cached_resource_indices,
-                True,
-                country_ids_precede_world,
-            )
-        state.update_table(
-            "stockpiles",
-            market_output.select(
-                "country_id",
-                "game_resource_id",
-                "stock_amount",
-            ),
-        )
-
-        flow_schema = {
-            "exporter_id": pl.Utf8,
-            "importer_id": pl.Utf8,
-            "game_resource_id": pl.Utf8,
-            "trade_value_usd": pl.Float64,
-        }
-        positive_exports = np.flatnonzero(export_actual > 0.0)
-        positive_imports = np.flatnonzero(import_actual > 0.0)
-        export_rows = pl.DataFrame(
-            {
-                "exporter_id": production_country_ids.gather(positive_exports),
-                "importer_id": ["WORLD"] * len(positive_exports),
-                "game_resource_id": production_resource_ids.gather(positive_exports),
-                "trade_value_usd": export_actual[positive_exports],
-            },
-            schema=flow_schema,
-        )
-        import_rows = pl.DataFrame(
-            {
-                "exporter_id": ["WORLD"] * len(positive_imports),
-                "importer_id": production_country_ids.gather(positive_imports),
-                "game_resource_id": production_resource_ids.gather(positive_imports),
-                "trade_value_usd": import_actual[positive_imports],
-            },
-            schema=flow_schema,
-        )
-        trade_network = pl.concat([export_rows, import_rows])
-        if not (keys_are_sorted and country_ids_precede_world):
-            trade_network = trade_network.sort(
-                ["exporter_id", "importer_id", "game_resource_id"]
-            )
-        state.update_table("trade_network", trade_network)
-        state.update_table(
-            "domestic_production",
-            market_output.drop("stock_amount"),
-        )
-        updated_countries = countries.with_columns(
-            pl.Series("trade_income", trade_income),
-            pl.Series("trade_expense", trade_expense),
-        )
-        if not country_id_series.is_sorted():
-            updated_countries = ensure_sorted(updated_countries, ("id",))
-        state.update_table("countries", updated_countries)
-        return True
-
     def _apply_treaty_production_bonus(self, state: GameState, production: pl.LazyFrame) -> pl.LazyFrame:
         effects = state.tables.get("treaty_effects")
         if effects is None or effects.is_empty() or "domestic_production" not in production.collect_schema().names():

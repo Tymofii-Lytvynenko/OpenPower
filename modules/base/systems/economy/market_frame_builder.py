@@ -1,8 +1,7 @@
-from collections.abc import MutableSet
-
 import polars as pl
 
 from src.shared.state import GameState
+from modules.base.systems.economy.missing_column_warning_registry import MissingColumnWarningRegistry
 
 
 class MarketFrameBuilder:
@@ -13,8 +12,7 @@ class MarketFrameBuilder:
         state: GameState,
         production_with_treaty_bonuses: pl.LazyFrame,
         resource_physics: pl.DataFrame,
-        missing_columns: MutableSet[str],
-        system_id: str,
+        warning_registry: MissingColumnWarningRegistry,
     ) -> pl.LazyFrame:
         countries = state.get_table("countries")
         country_columns = set(countries.columns)
@@ -59,16 +57,13 @@ class MarketFrameBuilder:
         # Older module data may omit metadata, so retain the established defaults.
         production_columns = state.get_table("domestic_production").columns
         market = self._with_default_column(
-            market, production_columns, missing_columns, system_id,
-            "is_gov_controlled", False,
+            market, production_columns, warning_registry, "is_gov_controlled", False
         )
         market = self._with_default_column(
-            market, production_columns, missing_columns, system_id,
-            "is_legal", True,
+            market, production_columns, warning_registry, "is_legal", True
         )
         market = self._with_default_column(
-            market, production_columns, missing_columns, system_id,
-            "tax_rate", 0.05,
+            market, production_columns, warning_registry, "tax_rate", 0.05
         )
 
         return market.join(
@@ -82,17 +77,11 @@ class MarketFrameBuilder:
     def _with_default_column(
         market: pl.LazyFrame,
         production_columns: list[str],
-        missing_columns: MutableSet[str],
-        system_id: str,
+        warning_registry: MissingColumnWarningRegistry,
         column: str,
         default: bool | float,
     ) -> pl.LazyFrame:
         if column in production_columns:
             return market
-        if column not in missing_columns:
-            print(
-                f"[{system_id}] Column '{column}' not found in 'domestic_production'. "
-                f"Defaulting to {default}."
-            )
-            missing_columns.add(column)
+        warning_registry.report_missing(column, default)
         return market.with_columns(pl.lit(default).alias(column))
