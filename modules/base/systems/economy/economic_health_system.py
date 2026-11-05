@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import polars as pl
@@ -33,6 +32,11 @@ from modules.base.systems.economy.due_debt_settlement import (
     append_rows,
     finite_number,
     replace_rows,
+)
+from modules.base.systems.economy.debt_distress_policy import (
+    DebtDistressInputs,
+    DebtDistressPlanner,
+    DeterministicDebtDistressPlanner,
 )
 from modules.base.systems.world.authority_policy import player_controls_country
 from modules.base.systems.world.random_event_effects import aggregate_active_effects
@@ -77,6 +81,7 @@ class EconomicHealthSystem(ISystem):
         debt_contract_request_planner: DebtContractRequestPlanner | None = None,
         debt_restructuring_planner: DebtRestructuringPlanner | None = None,
         due_debt_processor: DueDebtSettlementProcessor | None = None,
+        debt_distress_planner: DebtDistressPlanner | None = None,
     ) -> None:
         self._profile_calculator = (
             profile_calculator
@@ -107,6 +112,11 @@ class EconomicHealthSystem(ISystem):
             due_debt_processor
             if due_debt_processor is not None
             else DeterministicDueDebtSettlementProcessor(self._debt_service_calculator)
+        )
+        self._debt_distress_planner = (
+            debt_distress_planner
+            if debt_distress_planner is not None
+            else DeterministicDebtDistressPlanner()
         )
 
     @property
@@ -632,74 +642,49 @@ class EconomicHealthSystem(ISystem):
             & pl.col("status").is_in(["arrears", "restructuring", "default", "recovery_pending"])
         )
         country = self._country(state, country_id) or {}
-        total_arrears = max(0.0, self._number(country.get("arrears"), arrears))
         terms = self._terms(state)
-        default_floor = self._bounded(terms.get("default_arrears_minimum"), 0.0, 1_000_000_000_000.0, 100.0)
-        default_share = self._bounded(terms.get("default_arrears_gdp_ratio"), 0.0, 1.0, 0.1)
-        default_threshold = max(default_floor, self._number(country.get("gdp")) * default_share)
         existing_case = active.sort("entered_at_minute").row(0, named=True) if not active.is_empty() else None
-        current_status = str((existing_case or {}).get("status") or "")
-        resolved_status = "default" if total_arrears >= default_threshold or current_status == "default" else status
-        if current_status == "restructuring" and resolved_status == "arrears":
-            resolved_status = "restructuring"
-        case_id = f"distress:{country_id}:{now}:{cases.height}"
-        previous_status = current_status
-        if active.is_empty():
-            row = {
-                "id": case_id,
-                "country_id": country_id,
-                "status": resolved_status,
-                "trigger": trigger,
-                "entered_at_minute": now,
-                "updated_at_minute": now,
-                "arrears_at_entry": total_arrears,
-                "restriction_json": json.dumps(self._restrictions(resolved_status), sort_keys=True),
-                "recovery_condition": "All contractual arrears are cleared and treasury is non-negative.",
-                "reason": reason,
-            }
-            self._append_rows(state, "debt_distress_cases", [row])
-        else:
-            row = existing_case
-            case_id = str(row["id"])
-            row.update(
-                status=resolved_status,
-                updated_at_minute=now,
-                restriction_json=json.dumps(self._restrictions(resolved_status), sort_keys=True),
+        plan = self._debt_distress_planner.plan(
+            DebtDistressInputs(
+                country_id=country_id,
+                requested_status=status,
+                trigger=trigger,
+                fallback_arrears=arrears,
+                country_arrears=country.get("arrears"),
+                country_gdp=country.get("gdp"),
+                default_arrears_minimum=terms.get("default_arrears_minimum"),
+                default_arrears_gdp_ratio=terms.get("default_arrears_gdp_ratio"),
+                now=now,
                 reason=reason,
+                case_count=cases.height,
+                existing_case=existing_case,
             )
-            self._replace_rows(state, "debt_distress_cases", [row])
-        modifiers = self._restrictions(resolved_status)
+        )
+        if plan.creates_case:
+            self._append_rows(state, "debt_distress_cases", [plan.case])
+        else:
+            self._replace_rows(state, "debt_distress_cases", [plan.case])
         self._country_values(state, country_id, {
-            "debt_distress_status": resolved_status,
-            "economic_production_modifier": modifiers["production"],
-            "economic_trade_modifier": modifiers["trade"],
-            "economic_policy_modifier": modifiers["policy"],
-            "economic_health_modifier": modifiers["health"],
-            "economic_political_modifier": modifiers["politics"],
-            "economic_creditworthiness_modifier": modifiers["creditworthiness"],
+            "debt_distress_status": plan.status,
+            "economic_production_modifier": plan.modifiers["production"],
+            "economic_trade_modifier": plan.modifiers["trade"],
+            "economic_policy_modifier": plan.modifiers["policy"],
+            "economic_health_modifier": plan.modifiers["health"],
+            "economic_political_modifier": plan.modifiers["politics"],
+            "economic_creditworthiness_modifier": plan.modifiers["creditworthiness"],
         })
-        if previous_status != resolved_status:
-            self._transition_event(state, resolved_status, country_id, case_id, "arrears", 0.0, total_arrears, reason, now)
-
-    def _restrictions(self, status: str) -> dict[str, float]:
-        configured = {
-            "arrears": {
-                "production": 0.95, "trade": 0.95, "policy": 0.9,
-                "health": 0.98, "politics": 0.98, "creditworthiness": 0.95,
-            },
-            "restructuring": {
-                "production": 0.9, "trade": 0.9, "policy": 0.75,
-                "health": 0.95, "politics": 0.9, "creditworthiness": 0.85,
-            },
-            "default": {
-                "production": 0.75, "trade": 0.8, "policy": 0.6,
-                "health": 0.9, "politics": 0.75, "creditworthiness": 0.7,
-            },
-        }
-        return configured.get(status, {
-            "production": 1.0, "trade": 1.0, "policy": 1.0,
-            "health": 1.0, "politics": 1.0, "creditworthiness": 1.0,
-        })
+        if plan.previous_status != plan.status:
+            self._transition_event(
+                state,
+                plan.status,
+                country_id,
+                plan.case_id,
+                "arrears",
+                0.0,
+                plan.total_arrears,
+                reason,
+                now,
+            )
 
     def _recover_distress_if_eligible(self, state: GameState, country_id: str, now: int) -> None:
         cases = state.tables.get("debt_distress_cases")
