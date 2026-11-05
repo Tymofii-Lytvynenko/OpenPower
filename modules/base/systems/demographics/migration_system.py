@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from dataclasses import dataclass, field as dataclass_field
 from typing import Any, Mapping
 
 import polars as pl
@@ -42,6 +43,46 @@ FLOW_STATUS_COMPLETED = "completed"
 FLOW_STATUS_REDIRECTED = "redirected"
 FLOW_STATUS_REJECTED = "rejected"
 FLOW_STATUS_CANCELLED = "cancelled"
+
+
+@dataclass(frozen=True)
+class MigrationFlowEndpoints:
+    flow_id: str
+    origin_region_id: int
+    destination_region_id: int
+    origin_country_id: str
+    destination_country_id: str
+    origin: dict[str, Any] | None
+    destination: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class MigrationFlowAvailability:
+    source_cohorts: tuple[int, int, int]
+    available_source: dict[str, int]
+    available_total: int
+    planned_count: int
+    count: int
+    other_destination_reservation: int
+    capacity: DestinationCapacity
+
+
+@dataclass
+class MigrationFlowCompletionBatch:
+    state: GameState
+    now: int
+    due_flows: pl.DataFrame
+    regions_frame: pl.DataFrame
+    region_rows: list[dict[str, Any]]
+    regions: dict[int, dict[str, Any]]
+    country_ids: set[str]
+    reserved_out: dict[int, tuple[int, int, int]]
+    reserved_in: dict[int, int]
+    pending_routes: set[tuple[int, int]]
+    current_policies: dict[str, dict[str, Any]]
+    completed: list[dict[str, Any]] = dataclass_field(default_factory=list)
+    updates: list[dict[str, Any]] = dataclass_field(default_factory=list)
+    redirected_flows: list[dict[str, Any]] = dataclass_field(default_factory=list)
 
 
 class MigrationSystem(ISystem):
@@ -245,20 +286,32 @@ class MigrationSystem(ISystem):
         self._replace_records(state, "migration_policy_transitions", applied, "id")
 
     def _complete_due_flows(self, state: GameState, now: int) -> list[dict[str, Any]]:
+        batch = self._build_due_flow_batch(state, now)
+        if batch is None:
+            return []
+
+        for flow in batch.due_flows.iter_rows(named=True):
+            self._process_due_flow(batch, flow)
+
+        self._persist_due_flow_batch(batch)
+        return batch.completed
+
+    def _build_due_flow_batch(
+        self,
+        state: GameState,
+        now: int,
+    ) -> MigrationFlowCompletionBatch | None:
         flows = state.get_table("migration_flows")
-        due = flows.filter(
+        due_flows = flows.filter(
             (pl.col("status") == FLOW_STATUS_PENDING)
             & (pl.col("expected_completion_at_minute") <= now)
         ).sort(["expected_completion_at_minute", "id"])
-        if due.is_empty():
-            return []
+        if due_flows.is_empty():
+            return None
 
         regions_frame = state.get_table("regions")
         region_rows = regions_frame.to_dicts()
-        regions = {
-            self._integer(row.get("id")): row
-            for row in region_rows
-        }
+        regions = {self._integer(row.get("id")): row for row in region_rows}
         country_ids = {
             self._tag(value) for value in state.get_table("countries")["id"].to_list()
         }
@@ -272,210 +325,382 @@ class MigrationSystem(ISystem):
             )
             for row in pending_rows
         }
-        current_policies = self._policy_map(state, now)
-        completed: list[dict[str, Any]] = []
-        updates: list[dict[str, Any]] = []
-        redirected_flows: list[dict[str, Any]] = []
-
-        for flow in due.iter_rows(named=True):
-            flow_id = str(flow.get("id") or "")
-            origin_id = self._integer(flow.get("origin_region_id"))
-            destination_id = self._integer(flow.get("destination_region_id"))
-            origin = regions.get(origin_id)
-            destination = regions.get(destination_id)
-            origin_country = self._tag(flow.get("origin_country_id"))
-            destination_country = self._tag(flow.get("destination_country_id"))
-            if (
-                origin is None
-                or destination is None
-                or origin_id == destination_id
-                or self._tag(origin.get("owner")) != origin_country
-                or self._tag(destination.get("owner")) != destination_country
-                or origin_country not in country_ids
-                or destination_country not in country_ids
-            ):
-                updates.append(self._resolve_row(flow, FLOW_STATUS_CANCELLED, "authority_changed", now))
-                continue
-
-            if str(flow.get("transition_rule") or "finish_authorized") != "finish_authorized":
-                border = self._border_decision(
-                    state,
-                    origin_country,
-                    destination_country,
-                    current_policies,
-                )
-                if not border.eligible:
-                    updates.append(self._resolve_row(flow, FLOW_STATUS_CANCELLED, "border_changed", now))
-                    continue
-
-            source = self._cohort_counts(origin)
-            other_source_reservations = self._reservation_without(
-                reserved_out.get(origin_id, (0, 0, 0)), flow
-            )
-            available_source = {
-                "pop_14": max(0, source[0] - other_source_reservations[0]),
-                "pop_15_64": max(0, source[1] - other_source_reservations[1]),
-                "pop_65": max(0, source[2] - other_source_reservations[2]),
-            }
-            planned = max(0, self._integer(flow.get("population_count")))
-            available_total = sum(available_source.values())
-            count = min(planned, available_total)
-            other_destination_reservation = max(
-                0,
-                reserved_in.get(destination_id, 0)
-                - self._integer(flow.get("population_count")),
-            )
-            capacity = assess_destination_capacity(
-                destination,
-                current_population=self._population(destination),
-                reserved_population=other_destination_reservation,
-            )
-            if capacity.available_people < planned <= available_total:
-                alternate = self._find_redirect_destination(
-                    state,
-                    origin,
-                    destination_id,
-                    planned,
-                    regions,
-                    country_ids,
-                    current_policies,
-                    reserved_in,
-                    pending_routes,
-                )
-                if alternate is not None:
-                    alternate_id, alternate_region, _ = alternate
-                    planned_cohorts = tuple(
-                        self._integer(flow.get(field))
-                        for field in ("dependent_count", "working_age_count", "elderly_count")
-                    )
-                    if not (
-                        sum(planned_cohorts) == planned
-                        and all(
-                            planned_cohorts[index] <= available_source[field]
-                            for index, field in enumerate(("pop_14", "pop_15_64", "pop_65"))
-                        )
-                    ):
-                        planned_cohorts = calculate_migrant_cohorts(
-                            planned,
-                            available_source,
-                        )
-                    redirected, pending_redirect = self._redirect_flow_records(
-                        flow,
-                        alternate_id,
-                        self._tag(alternate_region.get("owner")),
-                        planned_cohorts,
-                        now,
-                    )
-                    updates.append(redirected)
-                    redirected_flows.append(pending_redirect)
-                    self._subtract_reservation(reserved_out, origin_id, flow)
-                    remaining_reservation = reserved_out.get(origin_id, (0, 0, 0))
-                    reserved_out[origin_id] = tuple(
-                        remaining_reservation[index] + planned_cohorts[index]
-                        for index in range(3)
-                    )
-                    reserved_in[destination_id] = other_destination_reservation
-                    reserved_in[alternate_id] = reserved_in.get(alternate_id, 0) + planned
-                    pending_routes.discard((origin_id, destination_id))
-                    pending_routes.add((origin_id, alternate_id))
-                    state.events.append(
-                        EventMigrationFlowResolved(
-                            flow_id=flow_id,
-                            status=FLOW_STATUS_REDIRECTED,
-                            population_count=planned,
-                            reason_code="redirected_capacity",
-                            at_minute=now,
-                        )
-                    )
-                    state.events.append(
-                        EventMigrationFlowCreated(
-                            flow_id=str(pending_redirect["id"]),
-                            origin_region_id=origin_id,
-                            destination_region_id=alternate_id,
-                            population_count=planned,
-                            reason_code="redirected_capacity",
-                            at_minute=now,
-                        )
-                    )
-                    continue
-            count = min(count, capacity.available_people)
-            if count <= 0:
-                reason = "source_cohort_limit" if available_total <= 0 else "capacity_changed"
-                updates.append(self._resolve_row(flow, FLOW_STATUS_CANCELLED, reason, now))
-                continue
-
-            planned_cohorts = tuple(
-                self._integer(flow.get(field))
-                for field in ("dependent_count", "working_age_count", "elderly_count")
-            )
-            # Keep the authorized mix unless live cohorts changed enough to make it unsafe.
-            if all(
-                planned_cohorts[index] <= available_source[field]
-                for index, field in enumerate(("pop_14", "pop_15_64", "pop_65"))
-            ) and sum(planned_cohorts) == count:
-                cohorts = planned_cohorts
-            else:
-                cohorts = calculate_migrant_cohorts(count, available_source)
-            actual = sum(cohorts)
-            if actual <= 0:
-                updates.append(self._resolve_row(flow, FLOW_STATUS_CANCELLED, "source_cohort_limit", now))
-                continue
-
-            origin["pop_14"] = max(0, source[0] - cohorts[0])
-            origin["pop_15_64"] = max(0, source[1] - cohorts[1])
-            origin["pop_65"] = max(0, source[2] - cohorts[2])
-            destination_counts = self._cohort_counts(destination)
-            destination["pop_14"] = destination_counts[0] + cohorts[0]
-            destination["pop_15_64"] = destination_counts[1] + cohorts[1]
-            destination["pop_65"] = destination_counts[2] + cohorts[2]
-            updated = dict(flow)
-            updated.update({
-                "dependent_count": cohorts[0],
-                "working_age_count": cohorts[1],
-                "elderly_count": cohorts[2],
-                "population_count": actual,
-                "completed_at_minute": now,
-                "status": FLOW_STATUS_COMPLETED,
-                "reason_code": (
-                    "source_cohort_limit"
-                    if actual < planned and available_total < planned
-                    else "capacity_changed"
-                    if actual < planned
-                    else "completed"
-                ),
-            })
-            updates.append(updated)
-            completed.append(updated)
-            self._subtract_reservation(reserved_out, origin_id, flow)
-            reserved_in[destination_id] = other_destination_reservation
-            state.events.append(
-                EventMigrationFlowResolved(
-                    flow_id=flow_id,
-                    status=FLOW_STATUS_COMPLETED,
-                    population_count=actual,
-                    reason_code=str(updated["reason_code"]),
-                    at_minute=now,
-                )
-            )
-
-        state.update_table(
-            "regions",
-            pl.DataFrame(region_rows, schema=regions_frame.schema, strict=False),
+        return MigrationFlowCompletionBatch(
+            state=state,
+            now=now,
+            due_flows=due_flows,
+            regions_frame=regions_frame,
+            region_rows=region_rows,
+            regions=regions,
+            country_ids=country_ids,
+            reserved_out=reserved_out,
+            reserved_in=reserved_in,
+            pending_routes=pending_routes,
+            current_policies=self._policy_map(state, now),
         )
-        self._replace_records(state, "migration_flows", updates, "id")
-        self._append_records(state, "migration_flows", redirected_flows)
-        for row in updates:
+
+    def _process_due_flow(
+        self,
+        batch: MigrationFlowCompletionBatch,
+        flow: dict[str, Any],
+    ) -> None:
+        endpoints = self._flow_endpoints(batch, flow)
+        if not self._has_current_flow_authority(batch, endpoints):
+            self._record_flow_cancellation(batch, flow, "authority_changed")
+            return
+        if not self._flow_border_is_eligible(batch, flow, endpoints):
+            self._record_flow_cancellation(batch, flow, "border_changed")
+            return
+
+        availability = self._flow_availability(batch, flow, endpoints)
+        if self._redirect_due_flow(batch, flow, endpoints, availability):
+            return
+        self._complete_available_flow(batch, flow, endpoints, availability)
+
+    def _flow_endpoints(
+        self,
+        batch: MigrationFlowCompletionBatch,
+        flow: Mapping[str, Any],
+    ) -> MigrationFlowEndpoints:
+        origin_region_id = self._integer(flow.get("origin_region_id"))
+        destination_region_id = self._integer(flow.get("destination_region_id"))
+        return MigrationFlowEndpoints(
+            flow_id=str(flow.get("id") or ""),
+            origin_region_id=origin_region_id,
+            destination_region_id=destination_region_id,
+            origin_country_id=self._tag(flow.get("origin_country_id")),
+            destination_country_id=self._tag(flow.get("destination_country_id")),
+            origin=batch.regions.get(origin_region_id),
+            destination=batch.regions.get(destination_region_id),
+        )
+
+    def _has_current_flow_authority(
+        self,
+        batch: MigrationFlowCompletionBatch,
+        endpoints: MigrationFlowEndpoints,
+    ) -> bool:
+        if endpoints.origin is None or endpoints.destination is None:
+            return False
+        if endpoints.origin_region_id == endpoints.destination_region_id:
+            return False
+        if self._tag(endpoints.origin.get("owner")) != endpoints.origin_country_id:
+            return False
+        if self._tag(endpoints.destination.get("owner")) != endpoints.destination_country_id:
+            return False
+        if endpoints.origin_country_id not in batch.country_ids:
+            return False
+        if endpoints.destination_country_id not in batch.country_ids:
+            return False
+        return True
+
+    def _flow_border_is_eligible(
+        self,
+        batch: MigrationFlowCompletionBatch,
+        flow: Mapping[str, Any],
+        endpoints: MigrationFlowEndpoints,
+    ) -> bool:
+        if str(flow.get("transition_rule") or "finish_authorized") == "finish_authorized":
+            return True
+        border = self._border_decision(
+            batch.state,
+            endpoints.origin_country_id,
+            endpoints.destination_country_id,
+            batch.current_policies,
+        )
+        return border.eligible
+
+    def _record_flow_cancellation(
+        self,
+        batch: MigrationFlowCompletionBatch,
+        flow: Mapping[str, Any],
+        reason: str,
+    ) -> None:
+        batch.updates.append(
+            self._resolve_row(flow, FLOW_STATUS_CANCELLED, reason, batch.now)
+        )
+
+    def _flow_availability(
+        self,
+        batch: MigrationFlowCompletionBatch,
+        flow: Mapping[str, Any],
+        endpoints: MigrationFlowEndpoints,
+    ) -> MigrationFlowAvailability:
+        origin = batch.regions[endpoints.origin_region_id]
+        destination = batch.regions[endpoints.destination_region_id]
+        source_cohorts = self._cohort_counts(origin)
+        other_source_reservations = self._reservation_without(
+            batch.reserved_out.get(endpoints.origin_region_id, (0, 0, 0)),
+            flow,
+        )
+        available_source = {
+            "pop_14": max(0, source_cohorts[0] - other_source_reservations[0]),
+            "pop_15_64": max(0, source_cohorts[1] - other_source_reservations[1]),
+            "pop_65": max(0, source_cohorts[2] - other_source_reservations[2]),
+        }
+        planned_count = max(0, self._integer(flow.get("population_count")))
+        available_total = sum(available_source.values())
+        count = min(planned_count, available_total)
+        other_destination_reservation = max(
+            0,
+            batch.reserved_in.get(endpoints.destination_region_id, 0)
+            - self._integer(flow.get("population_count")),
+        )
+        capacity = assess_destination_capacity(
+            destination,
+            current_population=self._population(destination),
+            reserved_population=other_destination_reservation,
+        )
+        return MigrationFlowAvailability(
+            source_cohorts=source_cohorts,
+            available_source=available_source,
+            available_total=available_total,
+            planned_count=planned_count,
+            count=count,
+            other_destination_reservation=other_destination_reservation,
+            capacity=capacity,
+        )
+
+    def _redirect_due_flow(
+        self,
+        batch: MigrationFlowCompletionBatch,
+        flow: Mapping[str, Any],
+        endpoints: MigrationFlowEndpoints,
+        availability: MigrationFlowAvailability,
+    ) -> bool:
+        if not (
+            availability.capacity.available_people < availability.planned_count
+            <= availability.available_total
+        ):
+            return False
+
+        origin = batch.regions[endpoints.origin_region_id]
+        alternate = self._find_redirect_destination(
+            batch.state,
+            origin,
+            endpoints.destination_region_id,
+            availability.planned_count,
+            batch.regions,
+            batch.country_ids,
+            batch.current_policies,
+            batch.reserved_in,
+            batch.pending_routes,
+        )
+        if alternate is None:
+            return False
+
+        alternate_id, alternate_region, _ = alternate
+        planned_cohorts = self._redirected_cohorts(flow, availability)
+        redirected, pending_redirect = self._redirect_flow_records(
+            flow,
+            alternate_id,
+            self._tag(alternate_region.get("owner")),
+            planned_cohorts,
+            batch.now,
+        )
+        batch.updates.append(redirected)
+        batch.redirected_flows.append(pending_redirect)
+        self._update_redirect_reservations(
+            batch,
+            flow,
+            endpoints,
+            availability,
+            alternate_id,
+            planned_cohorts,
+        )
+        self._emit_redirect_events(
+            batch,
+            endpoints,
+            availability,
+            alternate_id,
+            pending_redirect,
+        )
+        return True
+
+    def _redirected_cohorts(
+        self,
+        flow: Mapping[str, Any],
+        availability: MigrationFlowAvailability,
+    ) -> tuple[int, int, int]:
+        planned_cohorts = tuple(
+            self._integer(flow.get(field))
+            for field in ("dependent_count", "working_age_count", "elderly_count")
+        )
+        cohorts_match_plan = sum(planned_cohorts) == availability.planned_count
+        cohorts_fit_source = all(
+            planned_cohorts[index] <= availability.available_source[field]
+            for index, field in enumerate(("pop_14", "pop_15_64", "pop_65"))
+        )
+        if cohorts_match_plan and cohorts_fit_source:
+            return planned_cohorts
+        return calculate_migrant_cohorts(
+            availability.planned_count,
+            availability.available_source,
+        )
+
+    def _update_redirect_reservations(
+        self,
+        batch: MigrationFlowCompletionBatch,
+        flow: Mapping[str, Any],
+        endpoints: MigrationFlowEndpoints,
+        availability: MigrationFlowAvailability,
+        alternate_id: int,
+        planned_cohorts: tuple[int, int, int],
+    ) -> None:
+        self._subtract_reservation(batch.reserved_out, endpoints.origin_region_id, flow)
+        remaining_reservation = batch.reserved_out.get(endpoints.origin_region_id, (0, 0, 0))
+        batch.reserved_out[endpoints.origin_region_id] = tuple(
+            remaining_reservation[index] + planned_cohorts[index]
+            for index in range(3)
+        )
+        batch.reserved_in[endpoints.destination_region_id] = (
+            availability.other_destination_reservation
+        )
+        batch.reserved_in[alternate_id] = (
+            batch.reserved_in.get(alternate_id, 0) + availability.planned_count
+        )
+        batch.pending_routes.discard((endpoints.origin_region_id, endpoints.destination_region_id))
+        batch.pending_routes.add((endpoints.origin_region_id, alternate_id))
+
+    @staticmethod
+    def _emit_redirect_events(
+        batch: MigrationFlowCompletionBatch,
+        endpoints: MigrationFlowEndpoints,
+        availability: MigrationFlowAvailability,
+        alternate_id: int,
+        pending_redirect: Mapping[str, Any],
+    ) -> None:
+        batch.state.events.append(
+            EventMigrationFlowResolved(
+                flow_id=endpoints.flow_id,
+                status=FLOW_STATUS_REDIRECTED,
+                population_count=availability.planned_count,
+                reason_code="redirected_capacity",
+                at_minute=batch.now,
+            )
+        )
+        batch.state.events.append(
+            EventMigrationFlowCreated(
+                flow_id=str(pending_redirect["id"]),
+                origin_region_id=endpoints.origin_region_id,
+                destination_region_id=alternate_id,
+                population_count=availability.planned_count,
+                reason_code="redirected_capacity",
+                at_minute=batch.now,
+            )
+        )
+
+    def _complete_available_flow(
+        self,
+        batch: MigrationFlowCompletionBatch,
+        flow: Mapping[str, Any],
+        endpoints: MigrationFlowEndpoints,
+        availability: MigrationFlowAvailability,
+    ) -> None:
+        count = min(availability.count, availability.capacity.available_people)
+        if count <= 0:
+            reason = "source_cohort_limit" if availability.available_total <= 0 else "capacity_changed"
+            self._record_flow_cancellation(batch, flow, reason)
+            return
+
+        cohorts = self._completion_cohorts(flow, availability, count)
+        actual = sum(cohorts)
+        if actual <= 0:
+            self._record_flow_cancellation(batch, flow, "source_cohort_limit")
+            return
+        self._apply_completed_flow(batch, flow, endpoints, availability, cohorts, actual)
+
+    def _completion_cohorts(
+        self,
+        flow: Mapping[str, Any],
+        availability: MigrationFlowAvailability,
+        count: int,
+    ) -> tuple[int, int, int]:
+        planned_cohorts = tuple(
+            self._integer(flow.get(field))
+            for field in ("dependent_count", "working_age_count", "elderly_count")
+        )
+        # Keep the authorized mix unless live cohorts changed enough to make it unsafe.
+        if all(
+            planned_cohorts[index] <= availability.available_source[field]
+            for index, field in enumerate(("pop_14", "pop_15_64", "pop_65"))
+        ) and sum(planned_cohorts) == count:
+            return planned_cohorts
+        return calculate_migrant_cohorts(count, availability.available_source)
+
+    def _apply_completed_flow(
+        self,
+        batch: MigrationFlowCompletionBatch,
+        flow: Mapping[str, Any],
+        endpoints: MigrationFlowEndpoints,
+        availability: MigrationFlowAvailability,
+        cohorts: tuple[int, int, int],
+        actual: int,
+    ) -> None:
+        origin = batch.regions[endpoints.origin_region_id]
+        destination = batch.regions[endpoints.destination_region_id]
+        origin["pop_14"] = max(0, availability.source_cohorts[0] - cohorts[0])
+        origin["pop_15_64"] = max(0, availability.source_cohorts[1] - cohorts[1])
+        origin["pop_65"] = max(0, availability.source_cohorts[2] - cohorts[2])
+        destination_counts = self._cohort_counts(destination)
+        destination["pop_14"] = destination_counts[0] + cohorts[0]
+        destination["pop_15_64"] = destination_counts[1] + cohorts[1]
+        destination["pop_65"] = destination_counts[2] + cohorts[2]
+        updated = dict(flow)
+        updated.update({
+            "dependent_count": cohorts[0],
+            "working_age_count": cohorts[1],
+            "elderly_count": cohorts[2],
+            "population_count": actual,
+            "completed_at_minute": batch.now,
+            "status": FLOW_STATUS_COMPLETED,
+            "reason_code": self._completed_flow_reason(
+                actual,
+                availability.planned_count,
+                availability.available_total,
+            ),
+        })
+        batch.updates.append(updated)
+        batch.completed.append(updated)
+        self._subtract_reservation(batch.reserved_out, endpoints.origin_region_id, flow)
+        batch.reserved_in[endpoints.destination_region_id] = (
+            availability.other_destination_reservation
+        )
+        batch.state.events.append(
+            EventMigrationFlowResolved(
+                flow_id=endpoints.flow_id,
+                status=FLOW_STATUS_COMPLETED,
+                population_count=actual,
+                reason_code=str(updated["reason_code"]),
+                at_minute=batch.now,
+            )
+        )
+
+    @staticmethod
+    def _completed_flow_reason(actual: int, planned_count: int, available_total: int) -> str:
+        if actual >= planned_count:
+            return "completed"
+        if available_total < planned_count:
+            return "source_cohort_limit"
+        return "capacity_changed"
+
+    def _persist_due_flow_batch(self, batch: MigrationFlowCompletionBatch) -> None:
+        batch.state.update_table(
+            "regions",
+            pl.DataFrame(batch.region_rows, schema=batch.regions_frame.schema, strict=False),
+        )
+        self._replace_records(batch.state, "migration_flows", batch.updates, "id")
+        self._append_records(batch.state, "migration_flows", batch.redirected_flows)
+        for row in batch.updates:
             if row.get("status") == FLOW_STATUS_CANCELLED:
-                state.events.append(
+                batch.state.events.append(
                     EventMigrationFlowResolved(
                         flow_id=str(row.get("id") or ""),
                         status=FLOW_STATUS_CANCELLED,
                         population_count=max(0, self._integer(row.get("population_count"))),
                         reason_code=str(row.get("reason_code") or "cancelled"),
-                        at_minute=now,
+                        at_minute=batch.now,
                     )
                 )
-        return completed
 
     def _find_redirect_destination(
         self,
