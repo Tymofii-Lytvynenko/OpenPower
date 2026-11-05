@@ -1,0 +1,24 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-battle-inspection-own.json",
+      "surface": "battle-map"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-battle-inspection-observer.json",
+      "surface": "battle-map"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-battle-inspection-result.json",
+      "surface": "battle-map"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-battle-inspection-observed.json",
+      "surface": "battle-map"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-battle-inspection-many-countries.json",
+      "surface": "battle-map"
+    }
+  ]
+}

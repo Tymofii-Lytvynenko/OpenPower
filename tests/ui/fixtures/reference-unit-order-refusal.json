@@ -1,0 +1,42 @@
+{
+  "tables": {
+    "unit_order_feedback": [
+      {
+        "id": "unit-1-20-1",
+        "unit_id": "unit-1",
+        "owner_country_id": "UKR",
+        "order_type": "move",
+        "status": "rejected",
+        "reason": "No legal route is available.",
+        "created_at_minute": 20
+      },
+      {
+        "id": "unit-2-20-2",
+        "unit_id": "unit-2",
+        "owner_country_id": "UKR",
+        "order_type": "move",
+        "status": "rejected",
+        "reason": "No legal route is available.",
+        "created_at_minute": 20
+      },
+      {
+        "id": "unit-3-20-3",
+        "unit_id": "unit-3",
+        "owner_country_id": "POL",
+        "order_type": "move",
+        "status": "rejected",
+        "reason": "Foreign order result must stay private.",
+        "created_at_minute": 20
+      },
+      {
+        "id": "unit-4-20-4",
+        "unit_id": "unit-4",
+        "owner_country_id": "UKR",
+        "order_type": "move",
+        "status": "accepted",
+        "reason": "Route accepted.",
+        "created_at_minute": 20
+      }
+    ]
+  }
+}

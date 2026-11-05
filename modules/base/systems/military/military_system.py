@@ -16,10 +16,16 @@ from src.shared.actions import (
     ActionBuyMarketUnit,
     ActionDispatchUnitDeployment,
     ActionMoveUnit,
+    ActionInvadeTerritory,
+    ActionSplitUnit,
+    ActionMergeUnits,
+    ActionDisbandUnits,
 )
 from src.shared.actions import ActionSetUnitReadiness
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 from modules.base.systems.military.movement_access import MovementAccessPolicy
+from modules.base.systems.military.movement_duration import MovementDurationPolicy, DEFAULT_MOVE_MINUTES
+from modules.base.systems.military.movement_domains import (unit_domain, has_domain_metadata, domain_route_compatible, region_is_water)
 from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
 from modules.base.systems.military.authority_policy import player_controls_country
 from modules.base.systems.military.route_policy import MilitaryRoutePlanner
@@ -27,6 +33,8 @@ from modules.base.systems.military.capability_catalog import get_role_profile
 from modules.base.systems.military.unit_catalog import MILITARY_UNIT_TYPES
 from modules.base.systems.military.naval_invasion_policy import NavalInvasionPolicy
 from modules.base.systems.military.readiness_system import ReadinessSystem
+from modules.base.systems.military.unit_reorganization import UnitReorganization
+from modules.base.systems.military.territory_entry import authorized_entry_moves
 from modules.base.systems.world.demilitarization_policy import DemilitarizationPolicy
 from src.core.map.engagement_geometry import engagement_radius_km, first_zone_contact_fraction, interpolate_geo
 from modules.base.systems.military.war_policy import hostile_country_pairs
@@ -35,7 +43,6 @@ from modules.base.systems.military.war_policy import hostile_country_pairs
 UNIT_TABLE = "units"
 NO_TARGET_REGION = -1
 DEFAULT_UNIT_TYPE = "army"
-DEFAULT_MOVE_MINUTES = 1440
 UNIT_SCHEMA: dict[str, pl.DataType] = {
     "id": pl.Utf8,
     "owner": pl.Utf8,
@@ -111,63 +118,6 @@ UNIT_ORDER_FEEDBACK_SCHEMA: dict[str, pl.DataType] = {
 }
 
 
-class MovementDurationPolicy:
-    """Estimates direct movement duration from source and target geolocations."""
-
-    def estimate_minutes(
-        self,
-        regions: pl.DataFrame,
-        source_region_id: int,
-        target_region_id: int,
-    ) -> int:
-        locations = self.region_locations(regions)
-        source = locations.get(source_region_id)
-        target = locations.get(target_region_id)
-
-        if source is None or target is None:
-            return DEFAULT_MOVE_MINUTES
-
-        return self.estimate_between(source, target)
-
-    def estimate_between(self, source: GeoCoordinate, target: GeoCoordinate) -> int:
-        projection = EquirectangularProjection(360.0, 180.0)
-        distance_km = projection.geo_distance_km(source, target)
-        return self.estimate_from_distance(distance_km)
-
-    def estimate_from_distance(self, distance_km: float) -> int:
-        return int(max(360, min(10080, 360 + distance_km * 0.45)))
-
-    def region_locations(self, regions: pl.DataFrame) -> dict[int, GeoCoordinate]:
-        required = {"id"}
-        if regions.is_empty() or not required.issubset(set(regions.columns)):
-            return {}
-
-        if {"latitude", "longitude"}.issubset(set(regions.columns)):
-            return {
-                int(row["id"]): GeoCoordinate(
-                    latitude=float(row["latitude"]),
-                    longitude=float(row["longitude"]),
-                )
-                for row in regions.select(["id", "latitude", "longitude"]).iter_rows(named=True)
-                if row["id"] is not None
-            }
-
-        if {"center_x", "center_y"}.issubset(set(regions.columns)):
-            projection = EquirectangularProjection(
-                max(float(regions["center_x"].max() or 1.0) + 1.0, 1.0),
-                max(float(regions["center_y"].max() or 1.0) + 1.0, 1.0),
-            )
-            return {
-                int(row["id"]): projection.pixel_to_geo(
-                    MapPixelCoordinate(float(row["center_x"]), float(row["center_y"]))
-                )
-                for row in regions.select(["id", "center_x", "center_y"]).iter_rows(named=True)
-                if row["id"] is not None
-            }
-
-        return {}
-
-
 class UnitFactory:
     """Creates normalized unit records without coupling callers to table details."""
 
@@ -239,7 +189,7 @@ class UnitFactory:
 
 class MilitarySystem(ISystem):
     access = SystemAccess(
-        reads=frozenset({'countries', 'regions', 'region_adjacency', 'treaty_effects', 'units', 'production_orders', 'unit_designs', 'unit_capability_projections', 'countries_wars', 'unit_readiness_transitions', 'unit_pending_orders', 'unit_movement_routes', 'unit_deployment_orders', 'political_effects'}),
+        reads=frozenset({'countries', 'regions', 'region_adjacency', 'treaty_effects', 'units', 'production_orders', 'unit_designs', 'unit_capability_projections', 'countries_wars', 'unit_readiness_transitions', 'unit_pending_orders', 'unit_movement_routes', 'unit_deployment_orders', 'political_effects', 'battles', 'battle_units', 'unit_training_orders', 'unit_market_listings'}),
         writes=frozenset({'countries', 'units', 'production_orders', 'unit_market_listings', 'unit_pending_orders', 'unit_movement_routes', 'unit_order_feedback', 'unit_deployment_orders'}),
         handles=frozenset(
             {
@@ -248,6 +198,10 @@ class MilitarySystem(ISystem):
                 ActionBuyMarketUnit,
                 ActionDispatchUnitDeployment,
                 ActionMoveUnit,
+                ActionInvadeTerritory,
+                ActionSplitUnit,
+                ActionMergeUnits,
+                ActionDisbandUnits,
                 ActionSetUnitReadiness,
             }
         ),
@@ -299,8 +253,9 @@ class MilitarySystem(ISystem):
         units = self._process_completed_production_orders(state, units)
         units = self._process_build_actions(state, units)
         units = self._process_market_buy_actions(state, units)
+        units = UnitReorganization.apply(state, units)
         units, deployment_moves = self._process_deployment_actions(state, units)
-        units = self._process_move_actions(state, units, deployment_moves, capability_speed_by_unit)
+        units = self._process_move_actions(state, units, [*deployment_moves, *authorized_entry_moves(state, units)], capability_speed_by_unit)
         units = self._process_attack_actions(state, units)
         units = self._update_unit_movements(state, units, state.time.total_minutes, capability_speed_by_unit)
         self._refresh_deployment_state(state, units)
@@ -822,6 +777,8 @@ class MilitarySystem(ISystem):
             unit = units_by_id.get(unit_id)
             route = routes.get(unit_id)
             if unit is None:
+                if str(deployment.get("status") or "") in {"delivered", "cancelled", "failed", "disbanded"}:
+                    continue
                 deployment.update(status="blocked", blocking_reason="The deployed group no longer exists.")
                 continue
             lifecycle = str(unit.get("unit_lifecycle") or "")
@@ -1635,38 +1592,17 @@ class MilitarySystem(ISystem):
         return factors
 
     def _domain_for_unit(self, unit):
-        domain = str(unit.get("unit_domain") or "").strip().lower()
-        return domain if domain in {"land", "air", "naval", "strategic"} else get_role_profile(unit.get("unit_type") or DEFAULT_UNIT_TYPE).domain
+        return unit_domain(unit)
 
     def _has_domain_route_metadata(self, all_regions):
-        metadata_fields = ("is_water", "region_type", "terrain", "is_port", "is_coastal")
-        return any(
-            any(key in row and row.get(key) is not None for key in metadata_fields)
-            for row in all_regions
-        )
+        return has_domain_metadata(all_regions)
 
     def _domain_route_compatible(self, domain, region, final, naval_invasion, all_regions, *, metadata_available=None):
-        metadata = (
-            self._has_domain_route_metadata(all_regions)
-            if metadata_available is None else bool(metadata_available)
-        )
-        if not metadata:
-            return True, ""
-        is_water = self._region_is_water(region)
-        is_port = bool(region.get("is_port")) or str(region.get("region_type") or region.get("terrain") or "").strip().lower() in {"port", "naval_base"}
-        is_coastal = bool(region.get("is_coastal")) or is_port
-        if domain == "land" and is_water:
-            return False, "Ground units cannot enter a water region."
-        if domain == "naval" and not is_water and not is_port and not (final and naval_invasion and is_coastal):
-            return False, "Naval units require a sea zone, port, or eligible coastal landing region."
-        if domain == "strategic":
-            return False, "Strategic assets do not use conventional movement orders."
-        return True, ""
+        return domain_route_compatible(domain, region, final, naval_invasion, all_regions,
+                                       metadata_available=metadata_available)
 
     def _region_is_water(self, region):
-        if region.get("is_water") is not None:
-            return bool(region.get("is_water"))
-        return str(region.get("region_type") or region.get("terrain") or "").strip().lower() in {"sea", "ocean", "water", "international_waters", "naval_zone"}
+        return region_is_water(region)
 
     def _bounded_multiplier(self, value, default):
         if value is None:

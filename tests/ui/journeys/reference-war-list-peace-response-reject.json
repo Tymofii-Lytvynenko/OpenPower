@@ -1,0 +1,35 @@
+{
+  "fixture": "tests/ui/fixtures/war-list-pending-response.json",
+  "steps": [
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "click", "target": "military.open_war_list" },
+    { "op": "click", "target": "war_list.page" },
+    {
+      "op": "assert_region",
+      "target": "war_list.peace.builder",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "war_list.peace.response.package.peace-fixture-1",
+      "visible": true,
+      "label": "Package from UKR: offered war_reparations; requested none"
+    },
+    {
+      "op": "assert",
+      "target": "war_list.peace.response.reject.peace-fixture-1",
+      "visible": true,
+      "enabled": true
+    },
+    { "op": "click", "target": "war_list.peace.response.reject.peace-fixture-1" },
+    {
+      "op": "assert_action",
+      "type": "ActionRespondPeaceDeal",
+      "fields": {
+        "deal_id": "peace-fixture-1",
+        "responder_country_id": "POL",
+        "accept": false
+      }
+    }
+  ]
+}

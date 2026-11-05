@@ -1,0 +1,41 @@
+{
+  "fixture": "tests/ui/fixtures/party-policy.json",
+  "steps": [
+    {
+      "op": "select",
+      "target": "laws.party.party-2.status",
+      "value": "Ineligible"
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/party-policy-stale.json"
+    },
+    {
+      "op": "click",
+      "target": "laws.apply"
+    },
+    {
+      "op": "assert_region",
+      "target": "generic_message.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPartyEligibility",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "generic_message.ok"
+    },
+    {
+      "op": "click",
+      "target": "laws.discard"
+    },
+    {
+      "op": "assert",
+      "target": "laws.apply",
+      "enabled": false
+    }
+  ]
+}

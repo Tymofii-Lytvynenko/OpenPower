@@ -1,0 +1,8 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-wide-main-panels-no-overlap.json",
+      "surface": "game-hud"
+    }
+  ]
+}

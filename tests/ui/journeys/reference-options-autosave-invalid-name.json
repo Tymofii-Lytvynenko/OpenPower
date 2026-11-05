@@ -1,0 +1,15 @@
+{
+  "steps": [
+    { "op": "click", "target": "main_menu.options" },
+    { "op": "click", "target": "options.source.profile.autosave" },
+    { "op": "input", "target": "options.source.profile.filename", "value": "../unsafe" },
+    { "op": "assert", "target": "options.source.profile.filename.error", "visible": true, "inside": "main_menu.options_screen" },
+    { "op": "click", "target": "main_menu.apply" },
+    { "op": "assert_region", "target": "main_menu.options_screen", "visible": true, "inside_viewport": true },
+    { "op": "assert", "target": "options.source.profile.filename.error", "visible": true, "inside": "main_menu.options_screen" },
+    { "op": "input", "target": "options.source.profile.filename", "value": "Campaign" },
+    { "op": "click", "target": "main_menu.apply" },
+    { "op": "click", "target": "main_menu.options" },
+    { "op": "assert", "target": "options.source.profile.filename", "value": "Campaign", "enabled": true }
+  ]
+}

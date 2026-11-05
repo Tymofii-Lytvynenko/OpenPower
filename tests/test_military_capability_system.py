@@ -402,6 +402,44 @@ class MilitaryCapabilitySystemTest(unittest.TestCase):
         self.assertAlmostEqual(completed_order["progress"], 1.0)
         self.assertEqual(original.get_table("unit_training_orders").to_dicts(), restored.get_table("unit_training_orders").to_dicts())
 
+    def test_published_training_quote_matches_charge_and_survives_ipc(self):
+        state = self._state()
+        system = MilitaryCapabilitySystem()
+        system.update(state, 0)
+        quote = state.get_table("unit_training_quotes").to_dicts()[0]
+        self.assertTrue(quote["available"])
+        self.assertEqual((quote["cost"], quote["required_days"]), (100, 30))
+        restored = GameState.from_ipc(state.to_ipc())
+        self.assertTrue(restored.get_table("unit_training_quotes").equals(state.get_table("unit_training_quotes")))
+        state.current_actions = [ActionTrainUnit("player", "USA", "USA-1", quote["target_level"],
+            expected_cost=quote["cost"], expected_required_days=quote["required_days"], expected_from_level=quote["from_level"])]
+        system.update(state, 0)
+        order = state.get_table("unit_training_orders").to_dicts()[0]
+        self.assertEqual((order["cost"], order["required_days"]), (quote["cost"], quote["required_days"]))
+        self.assertFalse(state.get_table("unit_training_quotes")["available"][0])
+
+    def test_changed_confirmation_terms_are_rejected_without_charge(self):
+        for fields in ({"expected_cost": 101}, {"expected_required_days": 31},
+                       {"expected_from_level": "Veteran"}, {"expected_cost": float("nan")},
+                       {"expected_cost": True}):
+            with self.subTest(fields=fields):
+                state = self._state()
+                state.current_actions = [ActionTrainUnit("player", "USA", "USA-1", "Regular", **fields)]
+                MilitaryCapabilitySystem().update(state, 0)
+                self.assertTrue(state.get_table("unit_training_orders").is_empty())
+                self.assertEqual(state.get_table("countries")["money_reserves"][0], 1000)
+                self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+
+    def test_unavailable_training_quote_does_not_invent_cost(self):
+        state = self._state()
+        state.update_table("unit_training_facilities", state.get_table("unit_training_facilities").clear())
+        MilitaryCapabilitySystem().update(state, 0)
+        quote = state.get_table("unit_training_quotes").to_dicts()[0]
+        self.assertFalse(quote["available"])
+        self.assertIsNone(quote["cost"])
+        self.assertIsNone(quote["required_days"])
+        self.assertIn("facility", quote["reason"])
+
     def _state(self) -> GameState:
         unit = UnitFactory().create("USA-1", "USA", "army", 100, 1, GeoCoordinate(10.0, 20.0), 0)
         unit["readiness_status"] = "ready"

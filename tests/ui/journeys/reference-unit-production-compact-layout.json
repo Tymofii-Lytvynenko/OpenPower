@@ -1,0 +1,18 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-production-actions.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_production"},
+    {"op": "assert_region", "target": "unit_production.panel", "visible": true, "min_width": 800, "min_height": 462, "inside_viewport": true},
+    {"op": "assert", "target": "unit_production.category.ground", "visible": true, "inside": "unit_production.panel"},
+    {"op": "assert", "target": "unit_production.queue.priority.order-high", "visible": true, "enabled": true, "inside": "unit_production.panel"},
+    {"op": "assert", "target": "unit_production.page.queue", "visible": true, "inside": "unit_production.panel", "no_overlap": "unit_production.accept_foreign.label"},
+    {"op": "assert", "target": "unit_production.page.foreign", "visible": true, "inside": "unit_production.panel", "no_overlap": "unit_production.accept_foreign.label"},
+    {"op": "assert", "target": "unit_production.page.deployments", "visible": true, "inside": "unit_production.panel", "no_overlap": "unit_production.accept_foreign.label"},
+    {"op": "click", "target": "unit_production.page.foreign"},
+    {"op": "assert", "target": "unit_production.page.foreign", "visible": true, "label": "[FOREIGN]"},
+    {"op": "click", "target": "unit_production.page.deployments"},
+    {"op": "assert", "target": "unit_production.page.deployments", "visible": true, "label": "[DEPLOY]"},
+    {"op": "assert", "target": "unit_production.capacity.value", "visible": true, "inside": "unit_production.panel"}
+  ]
+}

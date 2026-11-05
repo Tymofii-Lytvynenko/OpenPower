@@ -22,8 +22,17 @@ _CAMPAIGN_TABLES = (
 )
 
 
-def _start_persistable_campaign() -> GameState:
+def _start_persistable_campaign(player_party_id: str = "") -> GameState:
     state = _state()
+    if player_party_id:
+        state.update_table(
+            "political_parties",
+            pl.DataFrame(
+                [{"country_id": "USA", "party_id": player_party_id}],
+                schema=state.tables["political_parties"].schema,
+                strict=False,
+            ),
+        )
     _add_scenario(state, [{
         "id": "raise-oil-output",
         "objective_type": "resource_quantity",
@@ -35,7 +44,7 @@ def _start_persistable_campaign() -> GameState:
         }],
     }])
     state.time.total_minutes = 10
-    state.current_actions = [ActionStartCampaign("local_admin", "test", "USA")]
+    state.current_actions = [ActionStartCampaign("local_admin", "test", "USA", player_party_id)]
     setup = CampaignSetupSystem()
     evaluator = CampaignSystem()
     setup.update(state, 0.0)
@@ -62,7 +71,8 @@ def _advance_campaign(state: GameState, minute: int) -> None:
 
 
 def test_campaign_setup_progress_delegation_and_outcome_continue_after_all_persistence_paths(tmp_path) -> None:
-    state = _start_persistable_campaign()
+    state = _start_persistable_campaign("usa-party")
+    assert state.get_table("campaigns")[0, "player_party_id"] == "usa-party"
     registry = build_base_schema_registry()
     snapshot = StateSnapshotDecoder().decode(StateSnapshotEncoder().encode(state, force_full=True))
     ipc = GameState.from_ipc(state.to_ipc())

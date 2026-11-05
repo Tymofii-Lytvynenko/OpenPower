@@ -1,0 +1,12 @@
+{
+  "globals": {
+    "ui_command_results": {
+      "ActionCreateUnitDesign": [
+        {
+          "status": "rejected",
+          "message": "The selected design is missing required capabilities: Gun Range."
+        }
+      ]
+    }
+  }
+}

@@ -28,11 +28,13 @@ class NewGameTask:
         config: GameConfig,
         player_tag: str,
         scenario_id: str = "open_sandbox",
+        player_party_id: str = "",
     ):
         self.window = window
         self.config = config
         self.player_tag = player_tag
         self.scenario_id = scenario_id
+        self.player_party_id = player_party_id
         self.progress: float = 0.0
         self.status_text: str = "Preparing Campaign..."
         self._cancel_event = threading.Event()
@@ -101,6 +103,7 @@ class NewGameTask:
                     player_id=campaign_client.player_id,
                     scenario_id=self.scenario_id,
                     country_tag=self.player_tag,
+                    player_party_id=self.player_party_id,
                 )
             )
             # Campaign setup follows full-world bootstrap and queued fixed steps;

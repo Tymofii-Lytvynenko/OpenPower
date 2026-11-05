@@ -1,0 +1,30 @@
+{
+  "fixture": "tests/ui/fixtures/reference-dispatches.json",
+  "steps": [
+    {"op": "click", "target": "hud.mail"},
+    {"op": "assert_region", "target": "mail.panel", "visible": true},
+    {"op": "click", "target": "mail.dispatch.treaty-mail"},
+    {"op": "assert_absent", "target": "mail.dispatch.treaty-mail"},
+    {"op": "assert_region", "target": "treaties.details.dialog", "visible": true},
+    {"op": "assert", "target": "treaties.details.title", "label": "Mail-selected compact"},
+    {"op": "close_window", "target": "treaties.details.dialog"},
+    {"op": "close_window", "target": "treaties.panel"},
+    {"op": "click", "target": "mail.dispatch.trade-mail"},
+    {"op": "assert_region", "target": "trade.panel", "visible": true},
+    {"op": "assert", "target": "trade.detail.proposer", "label": "PROPOSER · POL"},
+    {"op": "assert", "target": "trade.detail.recipient", "label": "RECIPIENT · UKR"},
+    {"op": "assert", "target": "trade.deal.deal-mail.accept", "visible": true, "enabled": true},
+    {"op": "close_window", "target": "trade.panel"},
+    {"op": "click", "target": "mail.dispatch.battle-mail"},
+    {"op": "assert_region", "target": "battle.summary.dialog", "visible": true},
+    {"op": "assert", "target": "battle.summary.region", "label": "Kyiv"},
+    {"op": "assert", "target": "battle.summary.side.A", "label": "DEFENDERS"},
+    {"op": "assert", "target": "battle.summary.category.A.G", "label": "125"},
+    {"op": "assert", "target": "battle.summary.countries.A.0", "label": "POL"},
+    {"op": "assert", "target": "battle.summary.outcome.A", "label": "Defeat"},
+    {"op": "assert", "target": "battle.summary.side.B", "label": "ATTACKERS"},
+    {"op": "assert", "target": "battle.summary.category.B.I", "label": "42"},
+    {"op": "assert", "target": "battle.summary.countries.B.0", "label": "UKR"},
+    {"op": "assert", "target": "battle.summary.outcome.B", "label": "Victory"}
+  ]
+}

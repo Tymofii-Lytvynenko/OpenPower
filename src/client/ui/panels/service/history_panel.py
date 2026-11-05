@@ -6,15 +6,29 @@ from src.client.ui.core.instrumented_imgui import imgui
 import polars as pl
 
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.panel_context import PanelRenderContext
+from src.client.ui.core.theme import GAMETHEME
+from src.client.ui.layouts.gml_layout import (
+    active_gml_layout,
+    get_gml_layout,
+    resume_gml_layout,
+    suspend_gml_layout,
+)
 from src.client.ui.panels.shared.panel_widgets import draw_empty_state
+from src.client.ui.panels.service.history_event_marker_layer import HistoryEventMarkerLayer
+from src.client.services.history_indicator_catalog import (
+    history_indicator_sort_key,
+    history_indicator_source_label,
+)
 from src.client.services.history_query_service import HistoryQueryService
 
 
 class HistoryPanel:
     """Interactive read-only browser for persisted historical observations."""
 
-    _RANGES = (("30 days", 30 * 1440), ("1 year", 365 * 1440), ("5 years", 5 * 365 * 1440), ("All", 0))
+    _DEFAULT_INDICATOR_IDS = {"country": "country.population"}
+    _RANGES = (("1 month", 30 * 1440), ("6 months", 182 * 1440), ("1 year", 365 * 1440), ("2 years", 730 * 1440))
 
     def __init__(self) -> None:
         self._queries = HistoryQueryService()
@@ -31,93 +45,146 @@ class HistoryPanel:
         self._ranking_descending = True
         self._export_status = ""
         self._subject_cache: dict[str, tuple[tuple[int, ...], list[str]]] = {}
+        self._history_event_markers = HistoryEventMarkerLayer()
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        with WindowManager.window("HISTORY & ANALYTICS", x=900, y=90, w=740, h=650) as is_open:
+        viewport = imgui.get_main_viewport()
+        layout = get_gml_layout("History_Window")
+        x = min(900.0, max(0.0, float(viewport.size.x) - layout.width))
+        y = min(90.0, max(0.0, float(viewport.size.y) - layout.height))
+        with WindowManager.window(
+            "HISTORY###HistoryPanel", x=x, y=y,
+            w=layout.width, h=layout.height,
+            test_id="history.panel", gml_template="History_Window",
+        ) as is_open:
             if not is_open:
+                self._history_event_markers.hide()
                 return False
             self._render_content(state, context)
-            return True
+        self._history_event_markers.render_tooltip()
+        return True
 
     def _render_content(self, state, context: PanelRenderContext) -> None:
+        ui = GMLWidgets("History_Window/frmInner/frmHistory")
+        title_ui = GMLWidgets("History_Window/frmTitle")
+        if title_ui.button("btnApply", "…", "history.analytics", tooltip="Open additional analytics"):
+            imgui.open_popup("HistoryAnalytics")
+
         definitions_table = state.tables.get("history_indicator_definitions")
-        if definitions_table is None or definitions_table.is_empty():
-            draw_empty_state("Historical data will appear after the first simulation update.")
-            return
-        definitions = [row for row in definitions_table.to_dicts() if row.get("enabled", True)]
-        if not definitions:
-            draw_empty_state("No history indicators are enabled.")
+        definitions = (
+            [row for row in definitions_table.to_dicts() if row.get("enabled", True)]
+            if definitions_table is not None and not definitions_table.is_empty()
+            else []
+        )
+        matching = self._render_indicator_selector(definitions, ui)
+        now = int(state.time.total_minutes)
+        start = max(0, now - self._range_minutes)
+        if matching is None:
+            self._history_event_markers.hide()
+            self._render_chart_message("Historical data will appear after the first simulation update.")
+            self._render_analysis_popup(state, [], start, now, [])
             return
 
-        self._render_indicator_selector(definitions)
-        matching = next((row for row in definitions if row.get("id") == self._indicator_id), definitions[0])
         self._indicator_id = str(matching.get("id") or "")
         self._subject_type = str(matching.get("subject_type") or "country")
         subjects = self._subjects(state, self._subject_type)
         if not subjects:
-            draw_empty_state("No subjects currently provide this indicator.")
+            self._history_event_markers.hide()
+            self._render_chart_message("No subjects currently provide this indicator.")
             return
         default_subject = str(context.target_tag or "").upper()
         if self._subject_type == "region" and context.selected_region_id is not None:
             default_subject = str(context.selected_region_id)
         if self._subject_id not in subjects:
             self._subject_id = default_subject if default_subject in subjects else subjects[0]
-        self._render_subject_selector(subjects)
-        self._render_range_selector()
-        _, self._step_trend = imgui.checkbox("Step trend", self._step_trend)
-
-        now = int(state.time.total_minutes)
-        start = now - self._range_minutes if self._range_minutes > 0 else None
         selected_series = self._queries.series(
             state, self._subject_type, self._subject_id, self._indicator_id,
             start_minute=start, end_minute=now, granularity_minutes=self._granularity_minutes,
         )
-        current = self._queries.current_value(state, self._subject_type, self._subject_id, self._indicator_id)
         unit = str(matching.get("unit") or "")
-        imgui.separator()
-        if current.get("available"):
-            latest = selected_series[-1] if selected_series else None
-            current_text = self._format_value(current.get("value"), unit)
-            sampled_text = "unavailable" if latest is None else self._format_value(latest.get("value"), unit)
-            imgui.text(f"Current: {current_text}    Latest sample: {sampled_text}")
-            imgui.text_disabled(f"Source: {current.get('value_kind', 'unknown')} · samples: {len(selected_series)}")
-        else:
-            imgui.text_disabled(f"Current value unavailable · unit: {unit or 'unspecified'}")
-        self._draw_trend(selected_series, unit, step=self._step_trend)
-        comparison = self._render_comparison(state, subjects, start, now)
-        self._render_ranking(state, start, now)
-        timeline = self._render_timelines(state, now)
-        self._render_export(selected_series, comparison, timeline)
+        events = self._history_events(state, start, now)
+        values = [float(row["value"]) for row in selected_series if row.get("value") is not None]
+        low, high = (min(values), max(values)) if values else (None, None)
+        graph_ui = GMLWidgets("History_Window/frmInner/frmHistory/frmGraph")
+        graph_ui.text(
+            "txtV0", self._axis_value(low),
+            tooltip=self._format_value(low, unit) if low is not None else "No recorded minimum",
+            test_id="history.axis.min",
+        )
+        graph_ui.text(
+            "txtV1", self._axis_value(high),
+            tooltip=self._format_value(high, unit) if high is not None else "No recorded maximum",
+            test_id="history.axis.max",
+        )
+        self._render_time_ticks(graph_ui, now)
+        self._draw_trend(
+            selected_series,
+            unit,
+            events=events,
+            start_minute=start,
+            end_minute=now,
+            step=self._step_trend,
+        )
+        self._render_analysis_popup(state, subjects, start, now, selected_series)
 
-    def _render_indicator_selector(self, definitions: list[dict[str, Any]]) -> None:
+    def _render_indicator_selector(self, definitions: list[dict[str, Any]], ui: GMLWidgets) -> dict[str, Any] | None:
         by_type: dict[str, list[dict[str, Any]]] = {}
         for row in definitions:
             by_type.setdefault(str(row.get("subject_type") or "country"), []).append(row)
         types = sorted(by_type)
+        if not definitions:
+            imgui.push_style_var(imgui.StyleVar_.frame_padding, (3.0, 2.0))
+            imgui.begin_disabled()
+            try:
+                imgui.combo(
+                    "##history_indicator", 0, ["No indicators available"],
+                    test_id="history.indicator", gml_id=ui.path("cboDisplay"),
+                )
+            finally:
+                imgui.end_disabled()
+                imgui.pop_style_var()
+            return None
         if self._subject_type not in types:
             self._subject_type = types[0]
-        preview = self._label(self._indicator_id) if self._indicator_id else "Choose indicator"
-        if imgui.begin_combo("Indicator", preview):
-            for subject_type in types:
-                for row in sorted(by_type[subject_type], key=lambda item: str(item.get("id") or "")):
-                    indicator_id = str(row.get("id") or "")
-                    label = f"{self._label(indicator_id)} ({subject_type})"
-                    selected = indicator_id == self._indicator_id
-                    if imgui.selectable(label, selected)[0]:
-                        self._indicator_id = indicator_id
-                        self._subject_type = subject_type
-                    if selected:
-                        imgui.set_item_default_focus()
-            imgui.end_combo()
+        options = []
+        for row in sorted(definitions, key=history_indicator_sort_key):
+            indicator_id = str(row.get("id") or "")
+            subject_type = str(row.get("subject_type") or "country")
+            label = history_indicator_source_label(indicator_id) or self._label(indicator_id)
+            options.append((indicator_id, f"{label} ({subject_type})"))
+        selected_index = next(
+            (index for index, (indicator_id, _) in enumerate(options) if indicator_id == self._indicator_id),
+            next(
+                (
+                    index for index, (indicator_id, _) in enumerate(options)
+                    if indicator_id == self._DEFAULT_INDICATOR_IDS.get(self._subject_type)
+                ),
+                0,
+            ),
+        )
+        imgui.push_style_var(imgui.StyleVar_.frame_padding, (3.0, 2.0))
+        try:
+            changed, selected_index = imgui.combo(
+                "##history_indicator", selected_index, [label for _, label in options],
+                test_id="history.indicator", gml_id=ui.path("cboDisplay"),
+            )
+        finally:
+            imgui.pop_style_var()
+        if changed:
+            self._indicator_id = options[selected_index][0]
+        selected_id = options[selected_index][0]
+        return next(row for rows in by_type.values() for row in rows if str(row.get("id") or "") == selected_id)
 
     def _render_subject_selector(self, subjects: list[str]) -> None:
-        _, self._subject_search = imgui.input_text("Find subject", self._subject_search, 64)
+        imgui.text_disabled("Find subject")
+        _, self._subject_search = imgui.input_text("##history_subject_filter", self._subject_search, 64)
         normalized_search = self._subject_search.strip().lower()
         visible_subjects = [
             item for item in subjects
             if not normalized_search or normalized_search in item.lower()
         ][:200]
-        if imgui.begin_combo("Subject", self._subject_id):
+        imgui.text_disabled("Subject")
+        if imgui.begin_combo("##history_subject", self._subject_id):
             for subject_id in visible_subjects:
                 if imgui.selectable(subject_id, subject_id == self._subject_id)[0]:
                     self._subject_id = subject_id
@@ -125,15 +192,94 @@ class HistoryPanel:
                 imgui.text_disabled("No matching subjects.")
             imgui.end_combo()
 
-    def _render_range_selector(self) -> None:
-        preview = next((name for name, minutes in self._RANGES if minutes == self._range_minutes), "Custom")
-        if imgui.begin_combo("Time range", preview):
-            for name, minutes in self._RANGES:
-                if imgui.selectable(name, minutes == self._range_minutes)[0]:
-                    self._range_minutes = minutes
-            imgui.end_combo()
-        imgui.same_line()
-        if imgui.begin_combo("Granularity", str(self._granularity_minutes or "Raw") + (" min" if self._granularity_minutes else "")):
+    def _render_time_range_selector(self) -> None:
+        imgui.text_disabled("Time range")
+        selected_index = next(
+            (index for index, (_, minutes) in enumerate(self._RANGES) if minutes == self._range_minutes),
+            2,
+        )
+        changed, selected_index = imgui.combo(
+            "##history_time_range",
+            selected_index,
+            [label for label, _ in self._RANGES],
+            test_id="history.range",
+        )
+        if changed:
+            self._range_minutes = self._RANGES[selected_index][1]
+
+    def _render_time_ticks(self, ui: GMLWidgets, now: int) -> None:
+        range_days = max(1, self._range_minutes // 1440)
+        for index in range(6):
+            days_ago = round(range_days * (5 - index) / 5)
+            label = "now" if days_ago == 0 else f"-{days_ago}d" if days_ago < 60 else f"-{round(days_ago / 30)}mo"
+            ui.text(
+                f"txtH{index}", label,
+                tooltip=f"{days_ago} days before minute {now}" if days_ago else f"Current game minute {now}",
+                test_id=f"history.axis.time.{index}",
+            )
+
+    def _render_chart_message(self, message: str) -> None:
+        graph_ui = GMLWidgets("History_Window/frmInner/frmHistory/frmGraph")
+        rect = graph_ui.rect("Container")
+        session = active_gml_layout()
+        if rect is None or session is None:
+            draw_empty_state(message)
+            return
+        imgui.set_cursor_screen_pos((
+            session.window_position[0] + rect.x,
+            session.window_position[1] + rect.y,
+        ))
+        x, y = session.window_position[0] + rect.x, session.window_position[1] + rect.y
+        draw = imgui.get_window_draw_list()
+        draw.add_rect_filled((x, y), (x + rect.width, y + rect.height), imgui.get_color_u32((0.035, 0.045, 0.055, 0.94)))
+        draw.add_rect((x, y), (x + rect.width, y + rect.height), imgui.get_color_u32((0.45, 0.50, 0.56, 0.55)), 1.0)
+        # The empty-state sentence can exceed the graph width at the game's font size.
+        token = suspend_gml_layout()
+        try:
+            imgui.set_cursor_screen_pos((x + 8.0, y + 8.0))
+            imgui.push_text_wrap_pos(imgui.get_cursor_pos_x() + max(1.0, rect.width - 16.0))
+            try:
+                imgui.text_colored(
+                    GAMETHEME.colors.text_dim, message,
+                    test_id="history.chart.empty_message",
+                )
+            finally:
+                imgui.pop_text_wrap_pos()
+            imgui.set_cursor_screen_pos((x, y))
+            imgui.invisible_button("##history_chart_empty", (rect.width, rect.height), test_id="history.chart")
+        finally:
+            resume_gml_layout(token)
+
+    def _render_analysis_popup(
+        self,
+        state,
+        subjects: list[str],
+        start: int,
+        now: int,
+        selected_series: list[dict[str, Any]],
+    ) -> None:
+        if not imgui.begin_popup("HistoryAnalytics", test_id="history.analytics.popup"):
+            return
+        try:
+            imgui.text("Additional analysis")
+            if not subjects:
+                imgui.text_disabled("Additional analysis is available after history indicators are recorded.")
+                return
+            self._render_subject_selector(subjects)
+            self._render_time_range_selector()
+            self._render_granularity_selector()
+            _, self._step_trend = imgui.checkbox("Step trend", self._step_trend)
+            imgui.separator()
+            comparison = self._render_comparison(state, subjects, start, now) if subjects else None
+            self._render_ranking(state, start, now)
+            timeline = self._render_timelines(state, now)
+            self._render_export(selected_series, comparison, timeline)
+        finally:
+            imgui.end_popup()
+
+    def _render_granularity_selector(self) -> None:
+        imgui.text_disabled("Granularity")
+        if imgui.begin_combo("##history_granularity", str(self._granularity_minutes or "Raw") + (" min" if self._granularity_minutes else "")):
             for label, minutes in (("Raw", 0), ("1 day", 1440), ("1 week", 10080), ("1 month", 43200)):
                 if imgui.selectable(label, minutes == self._granularity_minutes)[0]:
                     self._granularity_minutes = minutes
@@ -147,7 +293,8 @@ class HistoryPanel:
         if not self._comparison_initialized and alternatives:
             self._comparison_ids.add(alternatives[0])
             self._comparison_initialized = True
-        if imgui.begin_combo("Compare with", f"{len(self._comparison_ids)} selected"):
+        imgui.text_disabled("Compare with")
+        if imgui.begin_combo("##history_compare", f"{len(self._comparison_ids)} selected"):
             for subject in alternatives:
                 changed, selected = imgui.checkbox(subject, subject in self._comparison_ids)
                 if changed:
@@ -275,6 +422,23 @@ class HistoryPanel:
             imgui.same_line()
             imgui.text_disabled(self._export_status)
 
+    def _history_events(self, state, start: int, end: int) -> list[dict[str, Any]]:
+        if self._subject_type == "relationship" and "|" in self._subject_id:
+            country_a, country_b = self._subject_id.split("|", 1)
+            return [
+                row for row in self._queries.relationship_timeline(state, country_a, country_b)
+                if row.get("timeline_kind") == "event"
+                and start <= int(row.get("game_minute") or 0) <= end
+            ]
+        return self._queries.event_timeline(
+            state,
+            subject_type=self._subject_type if self._subject_type != "country" else None,
+            subject_id=self._subject_id if self._subject_type != "country" else None,
+            country_ids=[self._subject_id] if self._subject_type == "country" else (),
+            start_minute=start,
+            end_minute=end,
+        )
+
     def _subjects(self, state, subject_type: str) -> list[str]:
         source_tables = ("countries", "regions", "countries_relations", "history_series_state")
         revisions = getattr(state, "table_revisions", {})
@@ -314,8 +478,98 @@ class HistoryPanel:
         self._subject_cache[subject_type] = (revision_key, result)
         return list(result)
 
-    @staticmethod
-    def _draw_trend(records: list[dict[str, Any]], unit: str, *, step: bool = False) -> None:
+    def _draw_trend(
+        self,
+        records: list[dict[str, Any]],
+        unit: str,
+        *,
+        events: list[dict[str, Any]],
+        start_minute: int,
+        end_minute: int,
+        step: bool = False,
+    ) -> None:
+        session = active_gml_layout()
+        component_path = "History_Window/frmInner/frmHistory/frmGraph/Container"
+        component = session.layout.component(component_path) if session is not None else None
+        if session is not None and component is not None:
+            rect = session.rect_for(component)
+            x = session.window_position[0] + rect.x
+            y = session.window_position[1] + rect.y
+            width, height = rect.width, rect.height
+            draw = imgui.get_window_draw_list()
+            draw.add_rect_filled(
+                (x, y), (x + width, y + height),
+                imgui.get_color_u32((0.035, 0.045, 0.055, 0.94)),
+            )
+            for fraction in (0.25, 0.5, 0.75):
+                grid_y = y + height * fraction
+                draw.add_line(
+                    (x, grid_y), (x + width, grid_y),
+                    imgui.get_color_u32((0.35, 0.39, 0.43, 0.24)), 1.0,
+                )
+            for index in range(1, 5):
+                grid_x = x + width * index / 5.0
+                draw.add_line(
+                    (grid_x, y), (grid_x, y + height),
+                    imgui.get_color_u32((0.35, 0.39, 0.43, 0.18)), 1.0,
+                )
+            draw.add_rect(
+                (x, y), (x + width, y + height),
+                imgui.get_color_u32((0.45, 0.50, 0.56, 0.55)), 1.0,
+            )
+
+            plotted_records = records[-240:]
+            values = [row.get("value") for row in plotted_records]
+            numeric = [float(value) for value in values if value is not None]
+            plot_left, plot_top = x + 5.0, y + 5.0
+            plot_width, plot_height = max(1.0, width - 10.0), max(1.0, height - 10.0)
+            if numeric:
+                low, high = min(numeric), max(numeric)
+                span = high - low
+                points: list[tuple[float, float] | None] = []
+                minute_span = max(1.0, float(end_minute - start_minute))
+                for index, (row, value) in enumerate(zip(plotted_records, values)):
+                    try:
+                        minute_fraction = (
+                            float(row.get("game_minute") or 0) - float(start_minute)
+                        ) / minute_span
+                    except (TypeError, ValueError):
+                        minute_fraction = index / max(1, len(values) - 1)
+                    point_x = plot_left + plot_width * max(0.0, min(1.0, minute_fraction))
+                    if value is None:
+                        points.append(None)
+                        draw.add_rect_filled(
+                            (point_x - 2.0, plot_top + 2.0),
+                            (point_x + 2.0, plot_top + plot_height - 2.0),
+                            imgui.get_color_u32((0.75, 0.35, 0.2, 0.48)),
+                        )
+                        continue
+                    normalized = 0.5 if span == 0 else (float(value) - low) / span
+                    point_y = plot_top + plot_height - 4.0 - max(0.0, min(1.0, normalized)) * (plot_height - 8.0)
+                    points.append((point_x, point_y))
+                color = imgui.get_color_u32(GAMETHEME.colors.accent)
+                for left, right in HistoryPanel._trend_segments(points, step=step):
+                    draw.add_line(left, right, color, 2.0)
+            else:
+                draw.add_text(
+                    (x + 8.0, y + 8.0), imgui.get_color_u32(GAMETHEME.colors.text_dim),
+                    "No historical samples in this range.",
+                )
+
+            imgui.set_cursor_screen_pos((x, y))
+            imgui.invisible_button("##history_chart", (width, height), test_id="history.chart")
+
+            self._history_event_markers.draw(
+                events,
+                chart_rect=(x, y, width, height),
+                start_minute=start_minute,
+                end_minute=end_minute,
+                parent_origin=session.window_position,
+                parent_size=(float(session.layout.width), float(session.layout.height)),
+            )
+            return
+
+        self._history_event_markers.hide()
         values = [row.get("value") for row in records]
         numeric = [float(value) for value in values if value is not None]
         if not numeric:
@@ -346,6 +600,19 @@ class HistoryPanel:
         imgui.dummy((width, height + 4))
         trend_kind = "step" if step else "line"
         imgui.text_disabled(f"Min {low:,.3f} · max {high:,.3f} · {unit or 'unit unspecified'} · {trend_kind} trend · gaps marked · no interpolation")
+
+    @staticmethod
+    def _axis_value(value: float | None) -> str:
+        if value is None:
+            return "—"
+        magnitude = abs(value)
+        if magnitude >= 1_000_000_000:
+            return f"{value / 1_000_000_000:.2g}b"
+        if magnitude >= 1_000_000:
+            return f"{value / 1_000_000:.2g}m"
+        if magnitude >= 10_000:
+            return f"{value / 1_000:.2g}k"
+        return f"{value:.3g}"
 
     @staticmethod
     def _trend_segments(

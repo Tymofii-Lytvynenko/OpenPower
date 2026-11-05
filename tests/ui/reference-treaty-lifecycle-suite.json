@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-treaty-lifecycle-removed.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-lifecycle-accepted.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-lifecycle-stale.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-refusal-mail.json",
+      "surface": "game-hud"
+    }
+  ]
+}

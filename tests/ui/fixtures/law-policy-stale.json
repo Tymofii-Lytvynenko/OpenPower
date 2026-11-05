@@ -1,0 +1,14 @@
+{
+  "tables": {
+    "country_laws": [
+      {
+        "country_id": "UKR",
+        "law_id": "speech",
+        "title": "Freedom of speech",
+        "value": "Restricted",
+        "status": "active",
+        "allowed_values_json": "[\"Permitted\", \"Restricted\"]"
+      }
+    ]
+  }
+}

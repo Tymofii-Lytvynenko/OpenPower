@@ -1044,7 +1044,8 @@ def test_repeated_budget_ticks_have_no_reserve_drift_and_zero_balance_has_no_int
     assert zero_balance.get_table("countries").item(0, "expense_debt_interest") == 0.0
 
 
-def test_dense_budget_fast_path_matches_polars_fallback_and_reuses_ledger_layout():
+def test_dense_budget_fast_path_matches_polars_fallback_and_reuses_ledger_layout(monkeypatch):
+    monkeypatch.setattr("modules.base.systems.economy.budget_system.BASE_UNIT_COST", 750_000.0)
     resource_ids = tuple(sorted(RESOURCE_MAPPING))
 
     def make_state() -> GameState:

@@ -1,0 +1,26 @@
+{
+  "fixture": "tests/ui/fixtures/reference-map-empire-legend.json",
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "map.legend.panel",
+      "visible": true,
+      "kind": "window",
+      "min_width": 232,
+      "min_height": 163,
+      "inside_viewport": true
+    },
+    {"op": "assert", "target": "map.legend.key.ally", "label": "ALLY"},
+    {"op": "assert", "target": "map.legend.key.selected", "label": "SELECTED"},
+    {"op": "assert", "target": "map.legend.key.enemy", "label": "ENEMY"},
+    {"op": "assert", "target": "map.legend.key.occupied", "label": "OCCUPIED"},
+    {"op": "assert", "target": "map.legend.key.claim", "label": "CLAIM"},
+    {"op": "assert", "target": "map.legend.country.POL", "label": "POL"},
+    {"op": "click", "target": "map.legend.country.POL"},
+    {
+      "op": "assert_viewport_request",
+      "type": "country",
+      "fields": {"country": "POL"}
+    }
+  ]
+}

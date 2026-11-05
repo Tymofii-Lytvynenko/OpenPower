@@ -176,6 +176,7 @@ def test_migration_panel_edits_and_dispatches_all_policy_controls():
     ui = SimpleNamespace(
         separator=lambda: None,
         text=lambda *args: None,
+        set_next_item_width=lambda width: None,
         combo=lambda label, index, options: (False, index),
         slider_float=lambda label, value, *args: (False, controls[label]),
         button=lambda label, *args: label == "Apply migration policy",

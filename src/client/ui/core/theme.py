@@ -16,10 +16,10 @@ class UIColors:
     text_dim: tuple      = (0.60, 0.60, 0.60, 1.00)
 
     # --- 2. Backgrounds (Glass/Modern) ---
-    # Dark charcoal, high alpha for readability, but still semi-transparent
-    bg_window: tuple     = (0.08, 0.09, 0.10, 0.85) 
+    # Overlapping panels must not show the labels of windows underneath them.
+    bg_window: tuple     = (0.08, 0.09, 0.10, 1.00)
     bg_child: tuple      = (0.00, 0.00, 0.00, 0.00) # Transparent (letting window bg show)
-    bg_popup: tuple      = (0.05, 0.05, 0.05, 0.85)
+    bg_popup: tuple      = (0.05, 0.05, 0.05, 1.00)
     bg_input: tuple      = (0.16, 0.18, 0.21, 0.60) # Dark neutral for inputs
     panel_bg_dark: tuple = (0.04, 0.04, 0.05, 0.90) # Very dark background for list boxes
 

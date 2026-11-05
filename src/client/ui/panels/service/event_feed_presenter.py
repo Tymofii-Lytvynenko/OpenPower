@@ -13,6 +13,7 @@ class EventCategory(str, Enum):
     MILITARY = "military"
     POLITICAL = "political"
     ECONOMIC = "economic"
+    DEMOGRAPHIC = "demographic"
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +47,9 @@ class EventFeedPresenter:
     """Builds the world event feed without coupling feed data to ImGui."""
 
     _CATEGORY_ALIASES: dict[EventCategory, frozenset[str]] = {
+        EventCategory.DEMOGRAPHIC: frozenset(
+            {"demographic", "demographics", "population", "migration", "birth", "death", "workforce", "labor", "labour"}
+        ),
         EventCategory.MILITARY: frozenset(
             {"military", "war", "conflict", "combat", "defense", "defence", "security", "army"}
         ),

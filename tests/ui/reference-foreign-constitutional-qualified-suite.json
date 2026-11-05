@@ -1,0 +1,8 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-foreign-constitutional-qualified-confirm.json",
+      "surface": "game-hud"
+    }
+  ]
+}

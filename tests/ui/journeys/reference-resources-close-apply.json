@@ -1,0 +1,32 @@
+{
+  "fixture": "tests/ui/fixtures/reference-resource-policy.json",
+  "steps": [
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "economy.resources_btn" },
+    { "op": "click", "target": "resources.category.energy" },
+    { "op": "click", "target": "resources.resource.oil" },
+    { "op": "assert", "target": "resources.policy.tax", "type": "input_int", "inside": "resources.panel", "relative_to": "resources.panel", "relative_rect": { "x": 157, "y": 297, "width": 57, "height": 16 } },
+    { "op": "assert", "target": "resources.policy.tax.decrement", "relative_to": "resources.panel", "relative_rect": { "x": 144.5, "y": 297, "width": 12, "height": 16 }, "no_overlap": "resources.policy.tax" },
+    { "op": "assert", "target": "resources.policy.tax.increment", "relative_to": "resources.panel", "relative_rect": { "x": 254.5, "y": 297, "width": 12, "height": 16 }, "no_overlap": "resources.policy.tax" },
+    { "op": "select", "target": "resources.policy.management", "value": "State Monopoly" },
+    { "op": "select", "target": "resources.policy.status", "value": "Banned" },
+    { "op": "input", "target": "resources.policy.tax", "value": 9 },
+    { "op": "click", "target": "resources.policy.tax.increment" },
+    { "op": "assert", "target": "resources.policy.tax", "value": 10 },
+    { "op": "close_window", "target": "resources.panel" },
+    { "op": "assert_region", "target": "resources.close.confirmation", "visible": true },
+    { "op": "click", "target": "resources.close.apply" },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResourcePolicy",
+      "count": 1,
+      "fields": {
+        "country_tag": "UKR",
+        "resource_id": "oil",
+        "is_gov_controlled": true,
+        "is_legal": false,
+        "tax_rate": 0.1
+      }
+    }
+  ]
+}

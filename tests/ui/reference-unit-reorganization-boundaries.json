@@ -1,0 +1,28 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-unit-split.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-merge.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-split.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-merge.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-group-list.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-reorganization-cancel.json",
+      "surface": "game-hud"
+    }
+  ]
+}

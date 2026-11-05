@@ -35,6 +35,15 @@ Save Persistence Pipeline (SaveWriter / SaveStateLoader)
     Hidden staging and backup directories are used only during replacement; a backup remains readable if commit is interrupted.
 ```
 
+## Functional Requirements
+
+- **FR-001**: A save operation MUST serialize persistent game state and metadata into a staging location before installing the completed save slot.
+- **FR-002**: Replacing an existing save MUST retain a recoverable copy until the new save is installed successfully; failed installation MUST restore the prior save when possible.
+- **FR-003**: Loading MUST reconstruct persistent state from the save's table files and metadata while excluding transient runtime state.
+- **FR-004**: Save versions MUST be migrated in sequence; unsupported future versions and malformed required save data MUST fail with a diagnostic rather than load partial substitute state.
+- **FR-005**: New-game data ingestion MUST load definitions, entities, and world relations in the documented order and report the source of malformed required inputs.
+- **FR-006**: Region identifiers and relation data MUST be normalized consistently when reading supported TSV and TOML source forms.
+
 ## Success Criteria
 
 - **SC-001**: Ultra-Fast Save Operations: Saving full campaign state to compressed Parquet files completes in under 300ms.

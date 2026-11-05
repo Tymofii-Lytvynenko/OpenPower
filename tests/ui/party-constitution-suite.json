@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/party-constitution-yes.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/party-constitution-no.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/party-constitution-reverse.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/party-constitution-stale.json"
+    }
+  ]
+}

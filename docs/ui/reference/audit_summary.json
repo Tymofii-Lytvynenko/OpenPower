@@ -1,0 +1,98 @@
+{
+  "gml_validation": {
+    "definition_count": 220,
+    "root_object_count": 220,
+    "raw_object_count": 3803,
+    "resolved_catalog_node_count": 3803,
+    "unknown_root_names": [],
+    "unknown_gml_types": [],
+    "inheritance_cycles": []
+  },
+  "gml_window_candidates": 92,
+  "window_status_counts": {
+    "reachable": 45,
+    "unknown": 17,
+    "conditional": 26,
+    "unused": 4
+  },
+  "window_mapping_status_counts": {
+    "verified_openpower": 31,
+    "partial": 53,
+    "verified_unavailable": 8
+  },
+  "component_rows": 3014,
+  "dynamic_component_calls": 144,
+  "navigation_edges": 176,
+  "navigation_verified_cpp": 176,
+  "navigation_exact_gml_widget_path_edges": 71,
+  "navigation_handler_only_edges": 105,
+  "window_spawn_callsite_accounting": {
+    "raw_window_spawn_calls": 153,
+    "graph_call_sites": 135,
+    "lifecycle_dynamic_call_sites": 18,
+    "unaccounted_call_sites": []
+  },
+  "dynamic_sites_with_receiver_geometry_or_visibility": 57,
+  "dynamic_sites_requiring_creator_or_update_trace": 87,
+  "reachable_window_mapping_status_counts": {
+    "verified_openpower": 21,
+    "partial": 24
+  },
+  "unimplemented_reachable_window_count": 20,
+  "unimplemented_reachable_window_inbound_rows": 60,
+  "data_contract_rows": 1366,
+  "data_contract_status_counts": {
+    "partial": 911,
+    "assumption/unknown": 174,
+    "verified_cpp": 78,
+    "verified_openpower": 129,
+    "verified_unavailable": 74
+  },
+  "interaction_contract_rows": 911,
+  "interaction_contract_status_counts": {
+    "verified_openpower": 328,
+    "partial": 226,
+    "verified_unavailable": 271,
+    "verified_cpp": 86
+  },
+  "gap_rows": 2545,
+  "gap_status_counts": {
+    "verified_openpower": 620,
+    "partial": 1208,
+    "verified_unavailable": 371,
+    "assumption/unknown": 255,
+    "verified_cpp": 91
+  },
+  "seed_transitions_unmatched_by_scanner": [],
+  "seed_transition_journey_rows": 31,
+  "seed_transition_journey_coverage_counts": {
+    "tested": 31
+  },
+  "navigation_journey_coverage_rows": 176,
+  "navigation_journey_coverage_counts": {
+    "tested": 129,
+    "tested_equivalent_validation": 7,
+    "blocked_missing_workflow": 18,
+    "reachable_route_test_missing": 2,
+    "tested_shared_component_contract": 1,
+    "journey_not_run": 1,
+    "source_operation_missing": 4,
+    "unreachable_source_branch": 1,
+    "lifecycle_initialization": 3,
+    "inactive_source_code": 1,
+    "tested_equivalent_alternate_feedback": 2,
+    "tested_equivalent_guided_tutorial": 7
+  },
+  "layout_geometry_crosswalk_rows": 176,
+  "layout_geometry_crosswalk_measured_routes": 64,
+  "journey_suite_total": 253,
+  "journey_suite_passed": 253,
+  "journey_action_assertions": 234,
+  "surface_matrix_runs": 172,
+  "surface_matrix_passed": 172,
+  "surface_matrix_count": 43,
+  "functional_matrix_suite_count": 20,
+  "functional_matrix_runs": 0,
+  "functional_matrix_passed": 0,
+  "output_dir": "C:\\ProgramData\\DEV\\OpenPower\\docs\\ui\\reference"
+}

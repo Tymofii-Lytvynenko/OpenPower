@@ -1,0 +1,14 @@
+{
+  "steps": [
+    {"op": "click", "target": "hud.panel.pol"},
+    {"op": "assert_region", "target": "politics.panel", "visible": true},
+    {"op": "click", "target": "politics.open_constitution"},
+    {"op": "assert_region", "target": "constitutional_form.panel", "visible": true},
+    {"op": "select", "target": "constitutional_form.capital", "value": "Kyiv"},
+    {"op": "assert", "target": "constitutional_form.apply", "enabled": true},
+    {"op": "click", "target": "constitutional_form.panel.close"},
+    {"op": "assert_region", "target": "constitutional_form.close.confirmation", "visible": true},
+    {"op": "click", "target": "constitutional_form.close.discard"},
+    {"op": "assert_action", "type": "ActionSetCountryCapital", "count": 0}
+  ]
+}

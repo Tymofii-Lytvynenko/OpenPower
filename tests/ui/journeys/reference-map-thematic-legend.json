@@ -1,0 +1,79 @@
+{
+  "fixture": "tests/ui/fixtures/reference-map-legend.json",
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "map.legend.panel",
+      "visible": true,
+      "kind": "window",
+      "min_width": 232,
+      "min_height": 163,
+      "inside_viewport": true
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.title",
+      "label": "GDP (Total)"
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.header.rank",
+      "label": "RANK",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.header.country",
+      "label": "COUNTRY",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.header.relations",
+      "label": "REL",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.key.high",
+      "label": "HIGH",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.key.low",
+      "label": "LOW",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.rank.UKR",
+      "label": "1"
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.rank.POL",
+      "label": "2"
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.tag.UKR",
+      "label": "UKR",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.relation.POL",
+      "label": "42"
+    },
+    {
+      "op": "click",
+      "target": "map.legend.country.POL"
+    },
+    {
+      "op": "assert_viewport_request",
+      "type": "country",
+      "fields": {"country": "POL"}
+    }
+  ]
+}

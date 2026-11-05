@@ -1,0 +1,32 @@
+{
+  "tables": {
+    "battles": [
+      {
+        "id": "battle-own",
+        "region_id": 1,
+        "anchor_latitude": 0.0,
+        "anchor_longitude": -10.0,
+        "attacker_side": "UKR",
+        "defender_side": "POL",
+        "status": "active",
+        "mode": "assault",
+        "balance": 0.6,
+        "round": 3,
+        "side_a_strength": 1000.0,
+        "side_b_strength": 800.0,
+        "updated_at_minute": 0
+      },
+      {
+        "id": "battle-observer",
+        "region_id": 2,
+        "anchor_latitude": 0.0,
+        "anchor_longitude": 15.0,
+        "attacker_side": "POL",
+        "defender_side": "DEU",
+        "status": "active",
+        "mode": "positional",
+        "updated_at_minute": 1
+      }
+    ]
+  }
+}

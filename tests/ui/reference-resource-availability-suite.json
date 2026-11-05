@@ -1,0 +1,12 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-economy-resources.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-resource-production-dialog.json",
+      "surface": "game-hud"
+    }
+  ]
+}

@@ -32,6 +32,13 @@ As a player viewing the global military map, I want military units and national 
 - **FlagAtlasEntry**: Immutable dataclass storing normalized UV bounding box `(u0, v0, u1, v1)` and ImGui vector helpers `uv_min` / `uv_max`.
 - **UnitBillboardBatch**: Buffer storing screen projected coordinates, scale factors, selection state, and flag atlas UV lookups.
 
+## Functional Requirements
+
+- **FR-001**: The unit map MUST display each visible unit with its owning country's flag, using a defined fallback when the flag asset is missing.
+- **FR-002**: The renderer MUST use normalized atlas coordinates for flag sampling and preserve the fallback draw path when batch rendering is unavailable.
+- **FR-003**: The map MUST aggregate nearby units into readable stacks at overview zoom levels while retaining owner identity and combined force information.
+- **FR-004**: The player MUST be able to select units individually or by drag selection, preview a route, and dispatch a movement order only for a valid destination.
+
 ## Success Criteria
 
 - **SC-001**: Single Draw Call Efficiency: 200+ unit flag icons on screen render within 1 GPU texture bind call.

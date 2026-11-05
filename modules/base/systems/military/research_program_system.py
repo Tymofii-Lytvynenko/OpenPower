@@ -19,13 +19,21 @@ from src.shared.actions import (
 from src.shared.events import EventRealSecond
 from src.shared.state import GameState
 from src.shared.system_state import SYSTEM_STATE_HELPER
+from src.shared.research_funding import linked_research_funding_group, redistribute_linked_funding
 from modules.base.systems.military.production_policy import (
     DEFAULT_PRODUCTION_COEFFICIENT,
+    MAX_PRODUCTION_QUEUE_ORDERS,
+    MAX_UNIT_PRODUCTION_QUANTITY,
     allocate_production_capacity_frame,
     annual_production_capacity_frame,
+    initial_production_eta_days,
     initialize_production_order_work,
 )
-from modules.base.systems.military.capability_catalog import get_role_profile, project_capabilities
+from modules.base.systems.military.capability_catalog import (
+    design_capability_error,
+    get_role_profile,
+    project_capabilities,
+)
 from modules.base.systems.military.research_eligibility_policy import research_requirements_met
 from modules.base.systems.military.authority_policy import player_controls_country
 from modules.base.systems.world.demilitarization_policy import DemilitarizationPolicy
@@ -148,23 +156,42 @@ class ResearchProgramSystem(ISystem):
 
     def _set_research_funding(self, tracks: list[dict[str, Any]], action: ActionUpdateResearchFunding) -> None:
         country, branch = self._tag(action.country_tag), str(action.branch or "").strip().lower()
+        branch = branch or "general"
+        linked_group = linked_research_funding_group(branch)
+        rows_by_branch: dict[str, dict[str, Any]] = {}
         for row in tracks:
-            if self._tag(row.get("country_id")) == country and str(row.get("branch") or "").lower() == branch:
-                row["funding_ratio"] = self._ratio(action.funding_ratio)
-                row["priority"] = max(1, int(action.priority))
-                return
-        tracks.append({
-            "id": f"research-{country}-{branch or 'general'}",
-            "country_id": country,
-            "branch": branch or "general",
-            "funding_ratio": self._ratio(action.funding_ratio),
-            "progress": 0.0,
-            "priority": max(1, int(action.priority)),
-            "focus": "",
-            "research_level": 0,
-            "unlocks_json": "[]",
-            "blocking_reason": "",
-        })
+            row_branch = str(row.get("branch") or "").strip().lower()
+            if self._tag(row.get("country_id")) == country and row_branch in linked_group:
+                rows_by_branch.setdefault(row_branch, row)
+
+        funding_by_branch = {
+            linked_branch: self._ratio((rows_by_branch.get(linked_branch) or {}).get("funding_ratio"))
+            for linked_branch in linked_group
+        }
+        updated_funding = redistribute_linked_funding(
+            funding_by_branch,
+            branch,
+            action.funding_ratio,
+            linked_group,
+        )
+        for linked_branch, row in rows_by_branch.items():
+            row["funding_ratio"] = updated_funding[linked_branch]
+
+        if branch in rows_by_branch:
+            rows_by_branch[branch]["priority"] = max(1, int(action.priority))
+        else:
+            tracks.append({
+                "id": f"research-{country}-{branch}",
+                "country_id": country,
+                "branch": branch,
+                "funding_ratio": updated_funding[branch],
+                "progress": 0.0,
+                "priority": max(1, int(action.priority)),
+                "focus": "",
+                "research_level": 0,
+                "unlocks_json": "[]",
+                "blocking_reason": "",
+            })
 
     def _create_design(
         self,
@@ -211,8 +238,21 @@ class ResearchProgramSystem(ISystem):
             if self._tag(row.get("country_id")) == country
         }
         if not research_requirements_met(requirements, research_levels):
+            missing = [
+                f"{branch.replace('_', ' ').title()} level {level}"
+                for branch, level in requirements.items()
+                if research_levels.get(branch, 0) < level
+            ]
+            reason = "Required research is incomplete"
+            if missing:
+                reason += ": " + ", ".join(missing)
+            self._reject(state, action, reason + ".")
             return
         capabilities = project_capabilities(profile, stats)
+        capability_error = design_capability_error(class_name, capabilities)
+        if capability_error is not None:
+            self._reject(state, action, capability_error)
+            return
         research_level = research_levels.get(branch, 0)
         existing = {str(row.get("id") or "") for row in designs}
         index = 1
@@ -253,12 +293,26 @@ class ResearchProgramSystem(ISystem):
             self._reject(state, action, "The issuer does not control this country's production queue.")
             return
         quantity = int(action.quantity)
+        if quantity > MAX_UNIT_PRODUCTION_QUANTITY:
+            self._reject(
+                state,
+                action,
+                f"Production quantity cannot exceed {MAX_UNIT_PRODUCTION_QUANTITY:,} units.",
+            )
+            return
         design = next((
             row for row in designs
             if str(row.get("id") or "") == design_id and self._tag(row.get("country_id")) == country
         ), None)
         country_row = next((row for row in countries if self._tag(row.get("id")) == country), None)
         if quantity <= 0 or design is None or country_row is None:
+            return
+        if sum(self._tag(row.get("country_id")) == country for row in orders) >= MAX_PRODUCTION_QUEUE_ORDERS:
+            self._reject(
+                state,
+                action,
+                f"The production queue is limited to {MAX_PRODUCTION_QUEUE_ORDERS} orders.",
+            )
             return
         levels = {
             str(row.get("branch") or "").strip().lower(): max(0, int(row.get("research_level") or 0))
@@ -291,7 +345,7 @@ class ResearchProgramSystem(ISystem):
             "progress": 0.0,
             "priority": max(1, int(action.priority)),
             "status": "queued",
-            "eta_days": max(1, int(30 / max(1, int(action.priority)))),
+            "eta_days": initial_production_eta_days(action.priority),
             "unit_cost": max(0.0, self._number(design.get("cost"))),
             "work_required": total_cost,
             "remaining_work": total_cost,

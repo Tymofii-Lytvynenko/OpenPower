@@ -1,0 +1,28 @@
+{
+  "fixture": "tests/ui/fixtures/war-list-controlled-war.json",
+  "steps": [
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "click", "target": "military.open_war_list" },
+    { "op": "server_snapshot", "fixture": "tests/ui/fixtures/peace-submit-applied-result.json" },
+    { "op": "click", "target": "war_list.page" },
+    { "op": "assert_region", "target": "war_list.peace.builder", "visible": true },
+    { "op": "select", "target": "war_list.peace.clause_type", "value": "War reparations" },
+    { "op": "select", "target": "war_list.peace.direction", "value": "Offer to the other side" },
+    { "op": "input", "target": "war_list.peace.amount", "value": 1200 },
+    { "op": "input", "target": "war_list.peace.duration_months", "value": 12 },
+    { "op": "click", "target": "war_list.peace.add_clause" },
+    { "op": "click", "target": "war_list.peace.submit" },
+    {
+      "op": "assert_action",
+      "type": "ActionSubmitPeaceDeal",
+      "fields": { "war_id": "war-controlled-1", "proposer_country_id": "UKR" }
+    },
+    {
+      "op": "assert",
+      "target": "war_list.peace.submission_feedback",
+      "label": "Peace package submitted; awaiting responses from the opposing side."
+    },
+    { "op": "assert", "target": "war_list.peace.offered", "label": "Offered: none" },
+    { "op": "assert", "target": "war_list.peace.submit", "enabled": true }
+  ]
+}

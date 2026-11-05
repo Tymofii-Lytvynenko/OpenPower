@@ -1,0 +1,8 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-panel-text-anchors.json",
+      "surface": "game-hud"
+    }
+  ]
+}

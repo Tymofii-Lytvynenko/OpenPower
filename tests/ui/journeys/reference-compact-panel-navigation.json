@@ -1,0 +1,77 @@
+{
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "hud.panel_toggles",
+      "visible": true,
+      "inside_viewport": true
+    },
+    {
+      "op": "assert",
+      "target": "hud.panel.pol",
+      "visible": true,
+      "inside": "hud.panel_toggles",
+      "relative_to": "hud.panel_toggles"
+    },
+    {
+      "op": "click",
+      "target": "hud.panel.pol"
+    },
+    {
+      "op": "assert_region",
+      "target": "politics.panel",
+      "visible": true,
+      "inside_viewport": true,
+      "no_overlap": "hud.panel_toggles"
+    },
+    {
+      "op": "close_window",
+      "target": "politics.panel"
+    },
+    {
+      "op": "click",
+      "target": "hud.panel.mil"
+    },
+    {
+      "op": "assert_region",
+      "target": "military.panel",
+      "visible": true,
+      "inside_viewport": true,
+      "no_overlap": "hud.panel_toggles"
+    },
+    {
+      "op": "close_window",
+      "target": "military.panel"
+    },
+    {
+      "op": "click",
+      "target": "hud.panel.eco"
+    },
+    {
+      "op": "assert_region",
+      "target": "economy.panel",
+      "visible": true,
+      "inside_viewport": true,
+      "no_overlap": "hud.panel_toggles"
+    },
+    {
+      "op": "close_window",
+      "target": "economy.panel"
+    },
+    {
+      "op": "click",
+      "target": "hud.panel.dem"
+    },
+    {
+      "op": "assert_region",
+      "target": "demographics.panel",
+      "visible": true,
+      "inside_viewport": true,
+      "no_overlap": "hud.panel_toggles"
+    },
+    {
+      "op": "close_window",
+      "target": "demographics.panel"
+    }
+  ]
+}

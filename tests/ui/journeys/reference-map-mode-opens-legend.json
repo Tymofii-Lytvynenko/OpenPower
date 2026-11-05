@@ -1,0 +1,32 @@
+{
+  "fixture": "tests/ui/fixtures/reference-map-legend.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": {"label": "Map Mode", "type": "begin_menu"}
+    },
+    {
+      "op": "click",
+      "target": "map.context.mode.gdp_total"
+    },
+    {
+      "op": "assert_viewport_request",
+      "type": "map_mode",
+      "fields": {"map_mode": "gdp_total"}
+    },
+    {
+      "op": "assert_region",
+      "target": "map.legend.panel",
+      "visible": true,
+      "kind": "window",
+      "min_width": 232,
+      "min_height": 163,
+      "inside_viewport": true
+    },
+    {
+      "op": "assert",
+      "target": "map.legend.title",
+      "label": "GDP (Total)"
+    }
+  ]
+}

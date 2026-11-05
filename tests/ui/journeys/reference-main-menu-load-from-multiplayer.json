@@ -1,0 +1,23 @@
+{
+  "steps": [
+    { "op": "click", "target": "main_menu.multiplayer" },
+    { "op": "click", "target": "main_menu.multiplayer.internet" },
+    {
+      "op": "assert_region",
+      "target": "multiplayer.join.window",
+      "visible": true,
+      "min_width": 566,
+      "min_height": 454
+    },
+    { "op": "click", "target": "multiplayer.join.load_game" },
+    {
+      "op": "assert_region",
+      "target": "load_game.dialog",
+      "visible": true,
+      "min_width": 774,
+      "min_height": 290
+    },
+    { "op": "assert", "target": "load_game.submit", "visible": true, "enabled": false },
+    { "op": "assert_navigation_request", "type": "load_game", "count": 1 }
+  ]
+}

@@ -30,6 +30,7 @@ class UITestScenario:
     visual_masks: tuple[dict, ...] = ()
     initialize: Callable[[], None] | None = None
     cleanup: Callable[[], None] | None = None
+    font_path: Path | None = None
 
 
 def run_imgui_test(scenario: UITestScenario, output_dir: Path) -> int:
@@ -44,6 +45,7 @@ def run_imgui_test(scenario: UITestScenario, output_dir: Path) -> int:
             "width": scenario.viewport_size[0],
             "height": scenario.viewport_size[1],
         },
+        "requested_viewport": {"width": scenario.viewport_size[0], "height": scenario.viewport_size[1]},
     }
     test_handle: dict[str, Any] = {"test": None, "engine": None}
     runner_state: dict[str, Any] = {
@@ -57,6 +59,14 @@ def run_imgui_test(scenario: UITestScenario, output_dir: Path) -> int:
 
     runner_params = hello_imgui.RunnerParams()
     runner_params.app_window_params.window_title = scenario.window_title
+    runner_params.app_window_params.borderless = True
+    # Hello ImGui's borderless close/drag overlays otherwise intercept source
+    # controls at the viewport edge, terminating an exactly 1024x768 battle run.
+    runner_params.app_window_params.borderless_closable = False
+    runner_params.app_window_params.borderless_movable = False
+    runner_params.app_window_params.borderless_resizable = False
+    runner_params.app_window_params.window_geometry.position_mode = hello_imgui.WindowPositionMode.from_coords
+    runner_params.app_window_params.window_geometry.position = (0, 0)
     runner_params.app_window_params.window_geometry.size = scenario.viewport_size
     runner_params.app_window_params.window_geometry.window_size_measure_mode = (
         hello_imgui.WindowSizeMeasureMode.screen_coords
@@ -76,6 +86,7 @@ def run_imgui_test(scenario: UITestScenario, output_dir: Path) -> int:
         test.test_func = scenario.test
         engine_io = imgui.test_engine.get_io(engine)
         engine_io.config_run_speed = imgui.test_engine.TestRunSpeed.fast
+        engine_io.config_no_throttle = True
         engine_io.config_saved_settings = False
         test_handle["engine"] = engine
         test_handle["test"] = test
@@ -83,6 +94,13 @@ def run_imgui_test(scenario: UITestScenario, output_dir: Path) -> int:
 
     def render_frame() -> None:
         try:
+            display = imgui.get_io().display_size
+            if display.x > 0 and display.y > 0:
+                actual_size = (int(display.x), int(display.y))
+                runtime["viewport"] = {"width": actual_size[0], "height": actual_size[1]}
+                # Window managers must clamp to the actual drawable area, not
+                # a requested size that the desktop window manager reduced.
+                scenario.telemetry.viewport_size = actual_size
             with scenario.telemetry.frame():
                 scenario.render()
         except Exception:
@@ -125,11 +143,21 @@ def run_imgui_test(scenario: UITestScenario, output_dir: Path) -> int:
             hello_imgui.get_runner_params().app_shall_exit = True
 
     runner_params.callbacks.register_tests = register_tests
+    if scenario.font_path is not None:
+        from src.client.ui.core.font_loader import FontLoader
+
+        runner_params.callbacks.load_additional_fonts = lambda: FontLoader.configure_ui(
+            imgui.get_io(), scenario.font_path,
+        )
+        runtime["font"] = {"path": str(scenario.font_path), "logical_size": 14.0}
     runner_params.callbacks.show_gui = render_frame
     plot_context = {"value": None}
 
     def initialize() -> None:
         plot_context["value"] = implot.create_context()
+        # Startup fits windows into the desktop work area. Reapply the desired
+        # client size after creation so a full-height borderless fixture is exact.
+        hello_imgui.change_window_size(scenario.viewport_size)
         # Isolate runs from saved positions, including earlier viewport sizes.
         imgui.get_io().set_ini_filename("")
         imgui.get_io().config_flags |= imgui.ConfigFlags_.nav_enable_keyboard
@@ -160,6 +188,8 @@ def run_imgui_test(scenario: UITestScenario, output_dir: Path) -> int:
         and runner_state["error"] is None
     )
     checks = scenario.collect_checks(test_passed)
+    checks.append({"id": "runtime.viewport", "passed": runtime["viewport"] == runtime["requested_viewport"],
+                   "message": f"Requested {runtime['requested_viewport']}; rendered {runtime['viewport']}."})
     snapshot = scenario.telemetry.to_dict()
     findings = analyze_layout(snapshot)
     checks.append({"id": "layout.geometry", "passed": not any(f["severity"] == "error" for f in findings),

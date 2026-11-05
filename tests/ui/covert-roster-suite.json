@@ -1,0 +1,28 @@
+{
+  "results": [
+    {
+      "surface": "covert-ops",
+      "journey": "tests/ui/journeys/covert-roster-activity.json"
+    },
+    {
+      "surface": "covert-ops",
+      "journey": "tests/ui/journeys/covert-roster-retarget.json"
+    },
+    {
+      "surface": "covert-ops",
+      "journey": "tests/ui/journeys/covert-roster-busy.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-roster-rejected.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-long.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-foreign.json"
+    }
+  ]
+}

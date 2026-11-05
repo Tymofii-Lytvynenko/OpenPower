@@ -1,0 +1,93 @@
+{
+  "fixture": "tests/ui/fixtures/reference-map-information.json",
+  "steps": [
+    {
+      "op": "assert_absent",
+      "target": "unit.map.quantity.I"
+    },
+    {
+      "op": "click",
+      "target": "map.unit.unit-1"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.map.composition",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "unit.map.quantity.I",
+      "label": "1 000"
+    },
+    {
+      "op": "assert",
+      "target": "unit.map.quantity.G",
+      "label": "0"
+    },
+    {
+      "op": "click",
+      "target": "map.unit.unit-2"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.map.composition",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "unit.map.quantity.G",
+      "label": "9"
+    },
+    {
+      "op": "assert",
+      "target": "unit.map.quantity.I",
+      "label": "0"
+    },
+    {
+      "op": "click",
+      "target": "map.unit.unit-foreign"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.map.composition",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "unit.map.quantity.G",
+      "label": "?"
+    },
+    {
+      "op": "assert",
+      "target": "unit.map.quantity.I",
+      "label": "?"
+    },
+    {
+      "op": "click",
+      "target": "map.units.multiple"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.map.composition",
+      "visible": false
+    },
+    {
+      "op": "click",
+      "target": "map.unit.unit-1"
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/reference-map-information-removed.json"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.map.composition",
+      "visible": false
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionMoveUnit",
+      "count": 0
+    }
+  ]
+}

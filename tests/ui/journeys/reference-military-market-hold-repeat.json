@@ -1,0 +1,31 @@
+{
+  "fixture": "tests/ui/fixtures/reference-used-unit-market-repeat.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_market"},
+    {"op": "assert_region", "target": "unit_market.panel", "visible": true},
+    {"op": "select", "target": "unit_market.type", "value": "Tank"},
+    {"op": "click", "target": "unit_market.listing.listing-pol-tanks"},
+    {"op": "assert", "target": "unit_market.quantity.display", "type": "text_colored", "label": "21", "visible": true},
+    {"op": "assert_region", "target": "unit_market.panel", "visible": true},
+    {"op": "click", "target": "unit_market.quantity.input"},
+    {"op": "assert", "target": "unit_market.quantity.input", "type": "input_text", "value": "21"},
+    {"op": "assert_region", "target": "unit_market.panel", "visible": true},
+    {"op": "replace", "target": "unit_market.quantity.input", "value": 1},
+    {"op": "click", "target": "unit_market.listing.listing-pol-tanks"},
+    {"op": "assert", "target": "unit_market.quantity.display", "type": "text_colored", "label": "1", "visible": true},
+    {"op": "hold", "target": "unit_market.quantity.up", "duration_ms": 4000},
+    {"op": "assert", "target": "unit_market.quantity.input", "type": "input_text", "value": "21"},
+    {"op": "click", "target": "unit_market.buy"},
+    {
+      "op": "assert_action",
+      "type": "ActionBuyMarketUnit",
+      "fields": {
+        "listing_id": "listing-pol-tanks",
+        "buyer_country_tag": "UKR",
+        "quantity": 21
+      }
+    },
+    {"op": "assert", "target": "unit_market.request_status", "visible": true}
+  ]
+}

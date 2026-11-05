@@ -1,0 +1,17 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "economy.health_btn" },
+    { "op": "click", "target": "economic_health.more" },
+    { "op": "click", "target": "economic_health.more.policy" },
+    { "op": "click", "target": "economic_health.page.policy" },
+    { "op": "input", "target": "economic_health.minimum_wage", "value": 2500.0 },
+    { "op": "input", "target": "economic_health.tax_rate", "value": 35.0 },
+    { "op": "close_window", "target": "economic_health.extended" },
+    { "op": "assert_region", "target": "economic_health.close.confirmation", "visible": true },
+    { "op": "click", "target": "economic_health.close.discard" },
+    { "op": "assert_action", "type": "ActionChangeEconomicPolicy", "count": 0 },
+    { "op": "assert_action", "type": "ActionSetTax", "count": 0 },
+    { "op": "assert_region", "target": "economic_health.extended", "visible": false, "present": false }
+  ]
+}

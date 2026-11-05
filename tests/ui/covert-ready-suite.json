@@ -1,0 +1,52 @@
+{
+  "results": [
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-execute.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-cancel.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-selection.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-stale.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-military-covert-create.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-military-covert-train.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-military-covert-mission.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-long.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-foreign.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-intelligence.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-retire.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-rejected.json"
+    }
+  ]
+}

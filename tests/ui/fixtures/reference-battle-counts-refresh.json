@@ -1,0 +1,70 @@
+{
+  "tables": {
+    "battle_public_counts": [
+      {
+        "battle_id": "battle-observer",
+        "side": "A",
+        "category": "I",
+        "complete": true,
+        "sampled_at_minute": 1,
+        "unit_quantity": 0
+      },
+      {
+        "battle_id": "battle-observer",
+        "side": "A",
+        "category": "G",
+        "complete": true,
+        "sampled_at_minute": 1,
+        "unit_quantity": 2
+      },
+      {
+        "battle_id": "battle-observer",
+        "side": "A",
+        "category": "A",
+        "complete": true,
+        "sampled_at_minute": 1,
+        "unit_quantity": 0
+      },
+      {
+        "battle_id": "battle-observer",
+        "side": "A",
+        "category": "N",
+        "complete": true,
+        "sampled_at_minute": 1,
+        "unit_quantity": 0
+      },
+      {
+        "battle_id": "battle-observer",
+        "side": "B",
+        "category": "I",
+        "complete": true,
+        "sampled_at_minute": 1,
+        "unit_quantity": 1
+      },
+      {
+        "battle_id": "battle-observer",
+        "side": "B",
+        "category": "G",
+        "complete": true,
+        "sampled_at_minute": 1,
+        "unit_quantity": 0
+      },
+      {
+        "battle_id": "battle-observer",
+        "side": "B",
+        "category": "A",
+        "complete": true,
+        "sampled_at_minute": 1,
+        "unit_quantity": 0
+      },
+      {
+        "battle_id": "battle-observer",
+        "side": "B",
+        "category": "N",
+        "complete": true,
+        "sampled_at_minute": 1,
+        "unit_quantity": 0
+      }
+    ]
+  }
+}

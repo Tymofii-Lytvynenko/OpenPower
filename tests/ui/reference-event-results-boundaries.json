@@ -1,0 +1,12 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-covert-outcomes.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-live-combat-mail.json",
+      "surface": "game-hud"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "fixture": "tests/ui/fixtures/reference-treaty-long-rows.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.pol"},
+    {"op": "click", "target": "politics.open_treaties"},
+    {"op": "click", "target": "treaties.pending.proposal-long"},
+    {"op": "click", "target": "treaties.view_selected"},
+    {"op": "assert_region", "target": "treaties.details.dialog", "visible": true, "min_width": 634, "min_height": 448},
+    {"op": "assert", "target": "treaties.details.accept", "label": "ACCEPT", "visible": true, "enabled": true, "relative_to": "treaties.details.dialog", "relative_rect": {"x": 238, "y": 357, "width": 80, "height": 18}},
+    {"op": "assert", "target": "treaties.details.reject", "label": "REJECT", "visible": true, "enabled": true, "relative_to": "treaties.details.dialog", "relative_rect": {"x": 155, "y": 357, "width": 80, "height": 18}},
+    {"op": "click", "target": "treaties.details.accept"},
+    {
+      "op": "assert_action",
+      "type": "ActionRespondTreaty",
+      "fields": {
+        "treaty_id": "proposal-long",
+        "responder_country_tag": "UKR",
+        "accept": true
+      }
+    }
+  ]
+}

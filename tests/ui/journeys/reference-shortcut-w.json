@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "op": "key",
+      "key": "w"
+    },
+    {
+      "op": "assert_region",
+      "target": "war_list.panel",
+      "visible": true
+    },
+    {
+      "op": "key",
+      "key": "w"
+    },
+    {
+      "op": "assert_region",
+      "target": "war_list.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

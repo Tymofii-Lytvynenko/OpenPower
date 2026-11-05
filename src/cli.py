@@ -144,8 +144,12 @@ def _handle_ui_run(args) -> int:
     baseline = args.baseline
     if baseline is not None and not baseline.is_absolute():
         baseline = root / baseline
+    journey = read(args.journey)
+    fixture_path = args.fixture
+    if fixture_path is None and journey is not None and journey.get("fixture"):
+        fixture_path = Path(journey["fixture"])
     return run_surface(args.surface, output, root, (args.width, args.height),
-                       read(args.journey), read(args.fixture), baseline, args.tolerance)
+                       journey, read(fixture_path), baseline, args.tolerance)
 
 
 def _handle_ui_all(args) -> int:

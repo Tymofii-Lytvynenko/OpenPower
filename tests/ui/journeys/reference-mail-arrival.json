@@ -1,0 +1,28 @@
+{
+  "steps": [
+    {
+      "op": "server_event",
+      "target": "EventTreatyRefused",
+      "event_id": "closed-inbox-refusal",
+      "payload": {
+        "treaty_id": "deleted-proposal",
+        "source_country_tag": "UKR",
+        "title": "Refused compact",
+        "responder_country_tag": "POL",
+        "accepted_country_tags": ["UKR"],
+        "reason": "Declined"
+      }
+    },
+    {"op": "assert_absent", "target": "mail.dispatch.closed-inbox-refusal"},
+    {"op": "click", "target": "hud.mail"},
+    {"op": "assert_region", "target": "mail.panel", "visible": true},
+    {
+      "op": "assert",
+      "target": "mail.item.dispatch:closed-inbox-refusal.subject",
+      "label": "Treaty refused: Refused compact"
+    },
+    {"op": "click", "target": "mail.dispatch.closed-inbox-refusal"},
+    {"op": "assert_region", "target": "dispatch.report.dialog", "visible": true},
+    {"op": "assert_absent", "target": "mail.dispatch.closed-inbox-refusal"}
+  ]
+}

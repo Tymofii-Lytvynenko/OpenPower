@@ -1,0 +1,69 @@
+{
+  "fixture": "tests/ui/fixtures/reference-map-information.json",
+  "steps": [
+    {
+      "op": "assert_absent",
+      "target": "map.region_control.region"
+    },
+    {
+      "op": "hover",
+      "target": "map.region.1"
+    },
+    {
+      "op": "key_down",
+      "key": "tab"
+    },
+    {
+      "op": "assert_region",
+      "target": "map.region_control",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "map.region_control.region",
+      "label": "Kyiv"
+    },
+    {
+      "op": "assert",
+      "target": "map.region_control.politic",
+      "label": "Ukraine"
+    },
+    {
+      "op": "assert",
+      "target": "map.region_control.military",
+      "label": "Poland"
+    },
+    {
+      "op": "hover",
+      "target": "map.ocean"
+    },
+    {
+      "op": "assert_region",
+      "target": "map.region_control",
+      "visible": false
+    },
+    {
+      "op": "hover",
+      "target": "map.region.1"
+    },
+    {
+      "op": "assert_region",
+      "target": "map.region_control",
+      "visible": true
+    },
+    {
+      "op": "key_up",
+      "key": "tab"
+    },
+    {
+      "op": "assert_region",
+      "target": "map.region_control",
+      "visible": false
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionMoveUnit",
+      "count": 0
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "fixture": "tests/ui/fixtures/identity-trade.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.pol"
+    },
+    {
+      "op": "click",
+      "target": "politics.open_laws"
+    },
+    {
+      "op": "select",
+      "target": "identity.UKR.language.russian.status",
+      "value": "Restricted"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCountryIdentityPolicy",
+      "count": 0
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.panel",
+      "visible": true
+    },
+    {
+      "op": "close_window",
+      "target": "laws.panel"
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.close.confirmation",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "laws.close.discard"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCountryIdentityPolicy",
+      "count": 0
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

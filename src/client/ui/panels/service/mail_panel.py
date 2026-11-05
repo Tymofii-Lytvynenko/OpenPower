@@ -15,7 +15,9 @@ class MailPanel:
         self._selected_message_id: str = ""
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        with WindowManager.window("MAIL", x=1220, y=100, w=540, h=420) as is_open:
+        with WindowManager.window(
+            "MAIL", x=1220, y=100, w=540, h=420, test_id="mail.panel"
+        ) as is_open:
             if not is_open:
                 return False
             self._render_content(state, context.target_tag)

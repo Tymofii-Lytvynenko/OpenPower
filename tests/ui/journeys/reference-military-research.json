@@ -1,0 +1,280 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.mil"
+    },
+    {
+      "op": "assert_region",
+      "target": "military.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "military.open_research"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_research.panel",
+      "visible": true,
+      "min_width": 607,
+      "min_height": 455
+    },
+    {
+      "op": "assert",
+      "target": "unit_research.funding.ground",
+      "type": "invisible_button",
+      "enabled": true,
+      "inside": "unit_research.panel",
+      "relative_to": "unit_research.panel",
+      "relative_rect": {
+        "x": 117,
+        "y": 62,
+        "width": 100,
+        "height": 16
+      },
+      "tolerance": 0.5
+    },
+    {
+      "op": "drag",
+      "target": "unit_research.funding.ground",
+      "fraction": 0.31
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "unit_research.branch.air"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_research.model_view",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "unit_research.tab.progress"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_research.detail.progress",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "unit_research.tab.funding"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_research.detail.funding",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "unit_research.branch.strategic"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_research.detail.funding",
+      "visible": true
+    },
+    {
+      "op": "drag",
+      "target": "unit_research.funding.strategic_program",
+      "fraction": 0.73
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 0
+    },
+    {
+      "op": "assert",
+      "target": "unit_research.apply",
+      "type": "button",
+      "enabled": true,
+      "inside": "unit_research.panel"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_research.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "unit_research.apply"
+    },
+    {
+      "op": "assert",
+      "target": "unit_research.funding_value.ground",
+      "label": "31%"
+    },
+    {
+      "op": "assert",
+      "target": "unit_research.detail_funding_value.strategic_program",
+      "label": "73%"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 5,
+      "index": 0,
+      "fields": {
+        "branch": "ground",
+        "country_tag": "UKR",
+        "funding_ratio": 0.31
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 5,
+      "index": 1,
+      "fields": {
+        "branch": "air",
+        "country_tag": "UKR",
+        "funding_ratio": 0.06333333333333332
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 5,
+      "index": 2,
+      "fields": {
+        "branch": "naval",
+        "country_tag": "UKR",
+        "funding_ratio": 0.06333333333333332
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 5,
+      "index": 3,
+      "fields": {
+        "branch": "strategic",
+        "country_tag": "UKR",
+        "funding_ratio": 0.06333333333333332
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 5,
+      "index": 4,
+      "fields": {
+        "branch": "strategic_program",
+        "country_tag": "UKR",
+        "funding_ratio": 0.73
+      }
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/reference-unit-research-accepted.json"
+    },
+    {
+      "op": "assert",
+      "target": "unit_research.funding_value.ground",
+      "label": "31%"
+    },
+    {
+      "op": "assert",
+      "target": "unit_research.detail_funding_value.strategic_program",
+      "label": "73%"
+    },
+    {
+      "op": "assert",
+      "target": "unit_research.apply",
+      "enabled": false
+    },
+    {
+      "op": "drag",
+      "target": "unit_research.funding.ground",
+      "fraction": 0.82
+    },
+    {
+      "op": "click",
+      "target": "unit_research.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 9,
+      "index": 5,
+      "fields": {
+        "branch": "ground",
+        "country_tag": "UKR",
+        "funding_ratio": 0.82
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 9,
+      "index": 6,
+      "fields": {
+        "branch": "air",
+        "country_tag": "UKR",
+        "funding_ratio": 0
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 9,
+      "index": 7,
+      "fields": {
+        "branch": "naval",
+        "country_tag": "UKR",
+        "funding_ratio": 0
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResearchFunding",
+      "count": 9,
+      "index": 8,
+      "fields": {
+        "branch": "strategic",
+        "country_tag": "UKR",
+        "funding_ratio": 0
+      }
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/reference-unit-research-rejected.json"
+    },
+    {
+      "op": "assert_region",
+      "target": "generic_message.dialog",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "generic_message.ok"
+    },
+    {
+      "op": "assert",
+      "target": "unit_research.funding_value.ground",
+      "label": "82%"
+    },
+    {
+      "op": "assert",
+      "target": "unit_research.apply",
+      "enabled": true
+    },
+    {
+      "op": "click",
+      "target": "unit_research.tab.technology"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_research.detail.technology",
+      "visible": true
+    }
+  ]
+}

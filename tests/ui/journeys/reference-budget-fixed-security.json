@@ -1,0 +1,38 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.eco"
+    },
+    {
+      "op": "click",
+      "target": "economy.budget_btn"
+    },
+    {
+      "op": "assert_region",
+      "target": "budget.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "budget.navigate.fixed-security"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.progress.heading",
+      "label": "PROGRESS",
+      "inside": "covert_ops.panel",
+      "relative_to": "covert_ops.panel",
+      "relative_rect": {
+        "x": 529,
+        "y": 52
+      },
+      "no_overlap": "covert_ops.cells.empty"
+    }
+  ]
+}

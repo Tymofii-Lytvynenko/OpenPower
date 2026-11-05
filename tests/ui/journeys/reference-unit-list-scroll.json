@@ -1,0 +1,27 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-list-actions.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_unit_list"},
+    {
+      "op": "assert",
+      "target": "unit_list.scrollbar",
+      "type": "invisible_button",
+      "enabled": true,
+      "inside": "unit_list.panel",
+      "min_width": 14,
+      "minimum_tolerance": 1,
+      "min_height": 300
+    },
+    {"op": "drag", "target": "unit_list.scrollbar", "fraction": 1.0},
+    {"op": "assert", "target": "unit_list.row.name.unit-infantry-1", "visible": true},
+    {
+      "op": "assert",
+      "target": "unit_list.row.name.unit-infantry-1",
+      "relative_to": "unit_list.panel",
+      "relative_rect": {"x": 259, "y": 370.5},
+      "tolerance": 0.5,
+      "relative_rect_min_viewport_width": 1280
+    }
+  ]
+}

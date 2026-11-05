@@ -19,6 +19,16 @@
 - [ ] T009 Run an interactive client scenario to verify pause heartbeat and visible date/speed controls; record this manual gate separately from headless test coverage.
 - [X] T010 Stabilize the default 12-thread 10,000-region benchmark so SC-003 passes reproducibly across controlled runs; four consecutive runs on the supported runtime remained below 2 ms.
 
+## Requirement Traceability
+
+| Requirement | Existing implementation and acceptance tasks |
+| --- | --- |
+| FR-001 | T001, T002 |
+| FR-002 | T001, T002 |
+| FR-003 | T003–T008, T010 |
+| FR-004 | T004, T005 |
+| FR-005 | T001, T002 |
+
 ## Dependencies and exit criteria
 
 The cohort correctness fix is independent of the scale benchmark. Feature completion requires focused regressions, full-suite validation, the SC-003 measurement, and the manual UI check; unmet gates remain open and documented.

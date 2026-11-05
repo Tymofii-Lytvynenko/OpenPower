@@ -1,0 +1,12 @@
+{
+  "journal": {
+    "command_results": [
+      {
+        "action_type": "ActionUpdateResearchFunding",
+        "player_id": "ui-test-player",
+        "status": "rejected",
+        "reason": "The issuer no longer controls this research program."
+      }
+    ]
+  }
+}

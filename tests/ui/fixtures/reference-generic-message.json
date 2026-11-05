@@ -1,0 +1,10 @@
+{
+  "globals": {
+    "ui_system_errors": [
+      {
+        "system_id": "base.diplomacy",
+        "message": "A treaty state update needs attention."
+      }
+    ]
+  }
+}

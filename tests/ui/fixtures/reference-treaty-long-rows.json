@@ -1,0 +1,34 @@
+{
+  "tables": {
+    "countries_treaties": [
+      {
+        "id": "nato-long",
+        "name": "North Atlantic Treaty Organization",
+        "type": "alliance",
+        "status": "active",
+        "members": [
+          "UKR", "POL", "USA", "CAN", "GBR", "FRA", "DEU", "ITA",
+          "ESP", "NOR", "DNK", "NLD", "BEL", "CZE", "ROU", "TUR"
+        ],
+        "side_a": ["UKR"],
+        "side_b": ["POL", "USA", "CAN", "GBR", "FRA", "DEU", "ITA", "ESP", "NOR", "DNK", "NLD", "BEL", "CZE", "ROU", "TUR"],
+        "open_to_new_members": false
+      }
+    ],
+    "pending_treaties": [
+      {
+        "id": "proposal-long",
+        "title": "North Atlantic Treaty Organization Membership Coordination Protocol",
+        "treaty_type": "alliance",
+        "status": "pending",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "side_a": ["POL"],
+        "side_b": ["UKR"],
+        "required_responses": ["UKR"],
+        "accepted_members": ["POL"],
+        "terms": "Coordination terms for member states."
+      }
+    ]
+  }
+}

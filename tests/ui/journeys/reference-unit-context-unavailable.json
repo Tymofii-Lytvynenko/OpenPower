@@ -1,0 +1,33 @@
+{
+  "steps": [
+    {
+      "op": "assert",
+      "target": "unit.context.split",
+      "enabled": true,
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "unit.context.merge_with",
+      "enabled": true,
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "unit.context.move",
+      "enabled": true,
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "unit.context.move_and_attack",
+      "enabled": true,
+      "visible": true
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.context.popup",
+      "visible": true
+    }
+  ]
+}

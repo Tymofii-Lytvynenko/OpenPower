@@ -3,6 +3,7 @@ from __future__ import annotations
 import polars as pl
 
 from src.client.ui.panels.service.campaign_presenter import CampaignPresenter
+from src.client.ui.components.shared.game_over_dialog import GameOverDialog
 
 
 class _State:
@@ -109,3 +110,18 @@ def test_failed_and_cancelled_objectives_sort_after_actionable_goals_and_keep_pr
     assert CampaignPresenter.latest_evidence(objective) == {
         "source_table": "regions", "game_minute": 25, "current_value": 1, "target_value": 2,
     }
+
+
+def test_game_over_query_matches_terminal_outcome_and_sandbox_continuation():
+    state = _State(campaigns=pl.DataFrame({
+        "id": ["finished", "sandbox"],
+        "actor_country_id": ["USA", "CAN"],
+        "started_at_minute": [10, 10],
+        "outcome": ["victory", "defeat"],
+        "sandbox_continuation": [False, True],
+    }))
+    dialog = GameOverDialog()
+
+    assert dialog.is_game_over(state, "usa") is True
+    assert dialog.is_game_over(state, "CAN") is False
+    assert dialog.is_game_over(state, "MEX") is False

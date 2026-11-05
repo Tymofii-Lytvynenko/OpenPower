@@ -95,4 +95,7 @@ def _save_summary(name: str, data: Dict[str, Any]) -> Dict[str, Any]:
         "timestamp": data.get("timestamp", ""),
         # Robustly handle saves that predate the 'globals' key.
         "tick": data.get("globals", {}).get("tick", 0),
+        "country_tag": data.get("globals", {}).get("player_tag", ""),
+        "scenario": data.get("globals", {}).get("scenario_name", ""),
+        "game_time": data.get("time", {}).get("date_str", ""),
     }

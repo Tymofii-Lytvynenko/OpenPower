@@ -1,0 +1,8 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-treaty-long-rows.json",
+      "surface": "game-hud"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-reorganization.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "unit.context.view_list"
+    },
+    {
+      "op": "click",
+      "target": "unit.group.train"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.training.question",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "unit.training.question.no"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "count": 0
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.training.question",
+      "visible": false
+    }
+  ]
+}

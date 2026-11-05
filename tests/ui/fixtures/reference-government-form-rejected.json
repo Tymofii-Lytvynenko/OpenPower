@@ -1,0 +1,58 @@
+{
+  "globals": {
+    "ui_command_results": {
+      "ActionSetGovernmentForm": [
+        {
+          "status": "rejected",
+          "reason": "The government form changed after this selection was opened. Review it and try again.",
+          "country_id": "UKR",
+          "target_form_id": "single-party democracy"
+        }
+      ]
+    }
+  },
+  "tables": {
+    "country_governments": [
+      {
+        "country_id": "UKR",
+        "government_type": "Transitional republic",
+        "government_form_id": "transitional republic",
+        "ruling_party_id": "incumbent",
+        "capital_region_id": 1,
+        "election_eligible": true,
+        "next_election_at_minute": 100000,
+        "crisis_status": "none",
+        "initialized": true,
+        "martial_law": false
+      }
+    ],
+    "government_form_rules": [
+      {
+        "government_form_id": "transitional republic",
+        "display_name": "Transitional republic",
+        "election_eligible": true,
+        "election_interval_minutes": 100000,
+        "minimum_eligible_parties": 1,
+        "maximum_eligible_parties": 0
+      },
+      {
+        "government_form_id": "single-party democracy",
+        "display_name": "Single-party democracy",
+        "election_eligible": true,
+        "election_interval_minutes": 100000,
+        "minimum_eligible_parties": 1,
+        "maximum_eligible_parties": 1
+      }
+    ],
+    "political_parties": [
+      {
+        "country_id": "UKR",
+        "party_id": "incumbent",
+        "display_name": "Incumbent",
+        "support_share": 1.0,
+        "eligible": true,
+        "is_ruling": true
+      }
+    ]
+  }
+}

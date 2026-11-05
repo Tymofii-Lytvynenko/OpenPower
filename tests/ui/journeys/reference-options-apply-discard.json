@@ -1,0 +1,113 @@
+{
+  "steps": [
+    { "op": "click", "target": "main_menu.options" },
+    { "op": "assert_region", "target": "main_menu.options.tab.profile.content", "visible": true },
+    {
+      "op": "assert",
+      "target": "main_menu.options.tab.profile",
+      "visible": true,
+      "relative_to": "main_menu.window",
+      "relative_rect": { "x": 28, "y": 36, "width": 101, "height": 16 },
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "options.source.profile.player_name",
+      "type": "input_text",
+      "enabled": false,
+      "relative_to": "main_menu.window",
+      "relative_rect": { "x": 198, "y": 70, "width": 200 },
+      "tolerance": 1.0
+    },
+    { "op": "assert_absent", "target": "options.source.profile.interval" },
+    { "op": "click", "target": "options.source.profile.autosave" },
+    {
+      "op": "assert",
+      "target": "options.source.profile.interval",
+      "type": "input_int",
+      "enabled": true,
+      "value": 15,
+      "relative_to": "main_menu.window",
+      "relative_rect": { "x": 200, "y": 195, "width": 37, "height": 24 },
+      "tolerance": 1.0
+    },
+    { "op": "click", "target": "options.source.profile.autosave" },
+    { "op": "assert_absent", "target": "options.source.profile.clear_ban" },
+    { "op": "click", "target": "main_menu.options.tab.graphics" },
+    { "op": "assert_region", "target": "main_menu.options.tab.graphics.content", "visible": true },
+    {
+      "op": "assert",
+      "target": "main_menu.options.tab.graphics",
+      "visible": true,
+      "relative_to": "main_menu.window",
+      "relative_rect": { "x": 128, "y": 36, "width": 101, "height": 16 },
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "options.source.graphics.cboResolution",
+      "type": "combo",
+      "enabled": false,
+      "relative_to": "main_menu.window",
+      "relative_rect": { "x": 221, "y": 70, "width": 150 },
+      "tolerance": 1.0
+    },
+    { "op": "click", "target": "main_menu.options.tab.sound" },
+    { "op": "assert_region", "target": "main_menu.options.tab.sound.content", "visible": true },
+    {
+      "op": "assert",
+      "target": "main_menu.options.tab.sound",
+      "visible": true,
+      "relative_to": "main_menu.window",
+      "relative_rect": { "x": 228, "y": 36, "width": 101, "height": 16 },
+      "tolerance": 0.01
+    },
+    { "op": "assert", "target": "options.source.sound.music", "label": "N/A", "visible": true },
+    { "op": "click", "target": "main_menu.options.tab.openpower" },
+    { "op": "assert_region", "target": "main_menu.options.tab.openpower.content", "visible": true },
+    {
+      "op": "assert",
+      "target": "main_menu.options.tab.openpower",
+      "visible": true,
+      "relative_to": "main_menu.window",
+      "relative_rect": { "x": 328, "y": 36, "width": 101, "height": 16 },
+      "tolerance": 0.01
+    },
+    { "op": "check", "target": { "label": "Reduce motion", "type": "checkbox" }, "value": true },
+    { "op": "click", "target": "main_menu.back" },
+    { "op": "click", "target": "main_menu.options" },
+    { "op": "assert", "target": { "label": "Reduce motion", "type": "checkbox" }, "value": false },
+    { "op": "check", "target": { "label": "Reduce motion", "type": "checkbox" }, "value": true },
+    { "op": "click", "target": "main_menu.close" },
+    { "op": "click", "target": "main_menu.options" },
+    { "op": "assert", "target": { "label": "Reduce motion", "type": "checkbox" }, "value": false },
+    { "op": "check", "target": { "label": "Reduce motion", "type": "checkbox" }, "value": true },
+    { "op": "click", "target": "main_menu.apply" },
+    { "op": "click", "target": "main_menu.options" },
+    { "op": "assert", "target": { "label": "Reduce motion", "type": "checkbox" }, "value": true },
+    { "op": "check", "target": { "label": "Reduce motion", "type": "checkbox" }, "value": false },
+    { "op": "click", "target": "main_menu.apply" },
+    { "op": "click", "target": "main_menu.options" },
+    {
+      "op": "assert",
+      "target": "main_menu.close",
+      "visible": true,
+      "relative_to": "main_menu.window",
+      "relative_rect": { "x": 435, "y": 8, "width": 17, "height": 17 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.apply",
+      "visible": true,
+      "relative_to": "main_menu.window",
+      "relative_rect": { "x": 231, "y": 298, "width": 106, "height": 18 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.back",
+      "visible": true,
+      "relative_to": "main_menu.window",
+      "relative_rect": { "x": 343, "y": 298, "width": 106, "height": 18 }
+    }
+  ]
+}

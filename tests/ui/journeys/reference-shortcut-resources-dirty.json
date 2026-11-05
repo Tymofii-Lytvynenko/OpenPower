@@ -1,0 +1,61 @@
+{
+  "fixture": "tests/ui/fixtures/reference-resource-policy.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.eco"
+    },
+    {
+      "op": "click",
+      "target": "economy.resources_btn"
+    },
+    {
+      "op": "click",
+      "target": "resources.category.energy"
+    },
+    {
+      "op": "click",
+      "target": "resources.resource.oil"
+    },
+    {
+      "op": "select",
+      "target": "resources.policy.management",
+      "value": "State Monopoly"
+    },
+    {
+      "op": "select",
+      "target": "resources.policy.status",
+      "value": "Banned"
+    },
+    {
+      "op": "input",
+      "target": "resources.policy.tax",
+      "value": 10
+    },
+    {
+      "op": "key",
+      "key": "r"
+    },
+    {
+      "op": "assert_region",
+      "target": "resources.close.confirmation",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "resources.close.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResourcePolicy",
+      "count": 1,
+      "fields": {
+        "country_tag": "UKR",
+        "resource_id": "oil",
+        "is_gov_controlled": true,
+        "is_legal": false,
+        "tax_rate": 0.1
+      }
+    }
+  ]
+}

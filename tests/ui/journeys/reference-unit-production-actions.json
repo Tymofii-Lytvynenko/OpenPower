@@ -1,0 +1,29 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-production-actions.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_production"},
+    {"op": "assert_region", "target": "unit_production.panel", "visible": true, "min_width": 842, "min_height": 462},
+    {"op": "assert", "target": "unit_production.category.ground", "visible": true, "relative_to": "unit_production.panel", "relative_rect": {"x": 16, "y": 57, "width": 66, "height": 27}},
+    {"op": "assert", "target": "unit_production.queue.priority.order-high", "visible": true, "enabled": true, "type": "combo", "relative_to": "unit_production.panel", "relative_rect": {"x": 739, "y": 70, "width": 72, "height": 16}, "relative_rect_min_viewport_width": 1280},
+    {"op": "click", "target": "unit_production.select_design.design-infantry-1"},
+    {"op": "assert", "target": "unit_production.manpower.value", "visible": true, "label": "20 000 000"},
+    {"op": "assert", "target": "unit_production.speed", "visible": true, "enabled": false, "type": "combo"},
+    {"op": "click", "target": "unit_production.quantity.up"},
+    {"op": "assert", "target": "unit_production.quantity", "value": "51"},
+    {"op": "click", "target": "unit_production.quantity.down"},
+    {"op": "assert", "target": "unit_production.quantity", "value": "50"},
+    {"op": "input", "target": "unit_production.quantity", "value": "25"},
+    {"op": "select", "target": "unit_production.build_priority", "value": "LOW"},
+    {"op": "assert", "target": "unit_production.eta", "visible": true},
+    {"op": "assert_region", "target": "unit_production.panel", "visible": true},
+    {"op": "select", "target": "unit_production.build_priority", "value": "MEDIUM"},
+    {"op": "click", "target": "unit_production.build"},
+    {"op": "assert_action", "type": "ActionQueueUnitProduction", "fields": {"country_tag": "UKR", "design_id": "design-infantry-1", "quantity": 25, "priority": 50, "training_level": "Recruit"}},
+    {"op": "select", "target": "unit_production.queue.priority.order-paused", "value": "LOW"},
+    {"op": "assert_action", "type": "ActionSetProductionPaused", "fields": {"order_id": "order-paused", "is_paused": false}},
+    {"op": "assert_action", "type": "ActionSetProductionPriority", "fields": {"order_id": "order-paused", "priority": 1}},
+    {"op": "select", "target": "unit_production.queue.priority.order-cancel", "value": "CANCEL"},
+    {"op": "assert_action", "type": "ActionCancelProductionOrder", "fields": {"order_id": "order-cancel"}}
+  ]
+}

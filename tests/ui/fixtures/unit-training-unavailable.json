@@ -1,0 +1,52 @@
+{
+  "tables": {
+    "units": [
+      {
+        "id": "unit-1",
+        "owner": "UKR",
+        "unit_type": "infantry",
+        "design_id": "design-1",
+        "unit_domain": "land",
+        "strength": 1000,
+        "equipment_quantity": 17,
+        "current_region_id": 1,
+        "latitude": 50.45,
+        "longitude": 30.52,
+        "is_moving": false,
+        "readiness_status": "ready",
+        "training_level": "Recruit",
+        "combat_posture": "hold",
+        "unit_lifecycle": "available"
+      },
+      {
+        "id": "unit-2",
+        "owner": "UKR",
+        "unit_type": "infantry",
+        "design_id": "design-1",
+        "unit_domain": "land",
+        "strength": 500,
+        "equipment_quantity": 9,
+        "current_region_id": 1,
+        "latitude": 50.45,
+        "longitude": 30.52,
+        "is_moving": false,
+        "readiness_status": "ready",
+        "training_level": "Recruit",
+        "combat_posture": "hold",
+        "unit_lifecycle": "available"
+      }
+    ],
+    "unit_training_quotes": [
+      {
+        "unit_id": "unit-1",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": null,
+        "required_days": null,
+        "available": false,
+        "reason": "No available training facility."
+      }
+    ]
+  }
+}

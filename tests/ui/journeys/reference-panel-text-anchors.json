@@ -1,0 +1,47 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.pol" },
+    { "op": "assert_region", "target": "politics.panel", "visible": true, "inside_viewport": true },
+    {
+      "op": "assert",
+      "target": { "label": "CONSTITUTIONAL FORM", "region": "politics.panel" },
+      "visible": true,
+      "relative_to": "politics.panel",
+      "relative_rect": { "x": 33, "y": 38 },
+      "tolerance": 1
+    },
+    { "op": "close_window", "target": "politics.panel" },
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "assert_region", "target": "military.panel", "visible": true, "inside_viewport": true },
+    {
+      "op": "assert",
+      "target": { "label": "CONVENTIONAL FORCES", "region": "military.panel" },
+      "visible": true,
+      "relative_to": "military.panel",
+      "relative_rect": { "x": 33, "y": 36 },
+      "tolerance": 1
+    },
+    { "op": "close_window", "target": "military.panel" },
+    { "op": "click", "target": "hud.panel.dem" },
+    { "op": "assert_region", "target": "demographics.panel", "visible": true, "inside_viewport": true },
+    {
+      "op": "assert",
+      "target": { "label": "POPULATION SUMMARY", "region": "demographics.panel" },
+      "visible": true,
+      "relative_to": "demographics.panel",
+      "relative_rect": { "x": 22, "y": 43 },
+      "tolerance": 1
+    },
+    { "op": "close_window", "target": "demographics.panel" },
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "assert_region", "target": "economy.panel", "visible": true, "inside_viewport": true },
+    {
+      "op": "assert",
+      "target": { "label": "ECONOMIC MODEL", "region": "economy.panel" },
+      "visible": true,
+      "relative_to": "economy.panel",
+      "relative_rect": { "x": 33, "y": 38 },
+      "tolerance": 1
+    }
+  ]
+}

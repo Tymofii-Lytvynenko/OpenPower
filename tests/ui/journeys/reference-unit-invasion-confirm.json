@@ -1,0 +1,84 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-invasion.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "map.move.unit-1.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.POL",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "unit.attack.country.POL",
+      "label": "Poland"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionInvadeTerritory",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "unit.attack.no.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.POL",
+      "visible": false
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionInvadeTerritory",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "map.move.unit-1.POL"
+    },
+    {
+      "op": "click",
+      "target": "map.move.unit-2.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.POL",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionInvadeTerritory",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "unit.attack.yes.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.POL",
+      "visible": false
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionInvadeTerritory",
+      "count": 2,
+      "fields": {
+        "unit_ids": [
+          "unit-2"
+        ],
+        "target_region_id": 2,
+        "expected_controller": "POL",
+        "target_latitude": 52.1,
+        "target_longitude": 21.1
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionMoveUnit",
+      "count": 0
+    }
+  ]
+}

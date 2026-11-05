@@ -1,0 +1,8 @@
+{
+  "fixture": "tests/ui/fixtures/reference-game-over-sandbox.json",
+  "steps": [
+    {"op": "assert_absent", "target": "game_over.dialog"},
+    {"op": "click", "target": "hud.system.objectives"},
+    {"op": "assert_region", "target": "objectives.panel", "visible": true}
+  ]
+}

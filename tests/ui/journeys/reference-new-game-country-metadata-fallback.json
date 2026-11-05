@@ -1,0 +1,38 @@
+{
+  "fixture": "tests/ui/fixtures/reference-new-game-country-metadata-fallback.json",
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "new_game.scenario.dialog",
+      "visible": true,
+      "min_width": 560,
+      "min_height": 354
+    },
+    {
+      "op": "click",
+      "target": "new_game.scenario.ui-test-campaign"
+    },
+    {
+      "op": "click",
+      "target": "new_game.scenario.continue"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.panel",
+      "visible": true,
+      "min_width": 346,
+      "min_height": 341
+    },
+    {
+      "op": "select",
+      "target": "new_game.country.select",
+      "value": "UKR - Ukraine"
+    },
+    {
+      "op": "assert",
+      "target": "new_game.selected_country",
+      "label": "COUNTRY: UKR",
+      "visible": true
+    }
+  ]
+}

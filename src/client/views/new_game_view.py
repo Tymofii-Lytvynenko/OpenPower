@@ -4,13 +4,21 @@ from typing import TYPE_CHECKING, Optional
 
 from src.client.views.base_view import BaseImGuiView
 from src.client.services.network_client_service import NetworkClient
-from src.client.services.campaign_selection import filter_selectable_countries, preview_campaign_scenario
-from src.client.ui.core.composer import UIComposer
+from src.client.services.campaign_selection import (
+    filter_playable_countries,
+    filter_selectable_countries,
+    preview_campaign_scenario,
+)
 from src.client.ui.core.theme import GAMETHEME
+from src.client.ui.core.composer import UIComposer
 from src.shared.config import GameConfig
 from src.client.utils.coords_util import calculate_centroid
 from src.client.utils.color_generator import generate_political_colors
 from src.client.ui.panels.shared.panel_data import resolve_country_name
+from src.client.ui.components.shared.country_profile_window import CountryProfileWindow
+from src.client.ui.components.shared.party_selection_window import PartySelectionWindow
+from src.client.ui.components.shared.campaign_scenario_selection_window import CampaignScenarioSelectionWindow
+from src.client.ui.components.shared.single_player_setup_window import SinglePlayerSetupWindow
 
 if TYPE_CHECKING:
     from src.shared.protocols import SessionPort
@@ -24,11 +32,18 @@ class NewGameView(BaseImGuiView):
         super().__init__()
         self.session = session 
         self.config = config
-        
-        self.net = NetworkClient(session)
+        # A navigation transition creates a fresh view, so it cannot reuse the main menu's composer.
         self.ui = UIComposer(GAMETHEME)
         
+        self.net = NetworkClient(session)
+        
+        self.setup_stage = "scenario"
+        self.scenario_selection_window = CampaignScenarioSelectionWindow()
+        self.single_player_setup_window = SinglePlayerSetupWindow()
         self.selected_country_id: Optional[str] = None
+        self.country_profile_window = CountryProfileWindow(self._select_country)
+        self.selected_party_id = ""
+        self.party_selection_window = PartySelectionWindow(self._select_party)
         self.all_playable_countries = self._fetch_playable_countries()
         self.campaign_scenarios = self._fetch_campaign_scenarios()
         self.selected_scenario_id: Optional[str] = (
@@ -103,7 +118,7 @@ class NewGameView(BaseImGuiView):
         try:
             state = self.net.get_state()
             df = state.get_table("countries")
-            return df.filter(pl.col("is_playable") == True).sort("id")
+            return filter_playable_countries(df).sort("id")
         except KeyError:
             return pl.DataFrame()
 
@@ -155,117 +170,98 @@ class NewGameView(BaseImGuiView):
 
     def _render_ui(self):
         screen_w, screen_h = self.window.get_size()
-        
-        # Increase height to 650 to fit content without clipping
-        if self.ui.begin_centered_panel("New Game", screen_w, screen_h, w=600, h=600):
-            self.ui.draw_title("SELECT NATION")
-            
-            from src.client.ui.core.instrumented_imgui import imgui
-            
-            # Left Column: Country List
-            # Height 400 allows enough space for list while leaving room for bottom buttons
-            imgui.begin_child("CountryList", (250, 400), True)
-            if not self.playable_countries.is_empty():
-                for row in self.playable_countries.iter_rows(named=True):
-                    c_id = row['id']
-                    # Production country tables use localized geography names,
-                    # rather than the optional fixture-only `name` column.
-                    label = f"{c_id} - {resolve_country_name(self.net.get_state(), c_id)}"
-                    is_selected = (self.selected_country_id == c_id)
-                    
-                    if imgui.selectable(label, is_selected)[0]:
-                        self.selected_country_id = c_id
-                        self._focus_camera_on_country(c_id)
-                        self._highlight_country(c_id)
+        state = self.net.get_state()
 
-                    if is_selected:
-                        imgui.set_item_default_focus()
-
-            else:
-                imgui.text_disabled(
-                    "No eligible countries are available for this scenario."
-                    if self._selected_scenario() is not None
-                    else "No countries loaded."
+        if self.setup_stage == "scenario":
+            self.scenario_selection_window.render(
+                screen_w,
+                screen_h,
+                self.campaign_scenarios,
+                self.selected_scenario_id,
+                self._select_scenario,
+                self._enter_country_setup,
+                self._return_to_main_menu,
+            )
+        else:
+            country_options = [
+                (
+                    str(row["id"]).strip().upper(),
+                    f"{str(row['id']).strip().upper()} - {resolve_country_name(state, str(row['id']).strip().upper())}",
                 )
-            imgui.end_child()
-            
-            imgui.same_line()
-            
-            # Right Column: Details
-            imgui.begin_group()
-            imgui.dummy((300, 0)) # Spacing
-            imgui.text("Campaign scenario")
-            imgui.begin_child("CampaignScenarioList", (300, 150), True)
-            for scenario in self.campaign_scenarios:
-                scenario_id = str(scenario.get("id") or "")
-                title = str(scenario.get("title") or scenario_id)
-                if imgui.selectable(
-                    f"{title}##scenario-{scenario_id}",
-                    self.selected_scenario_id == scenario_id,
-                )[0]:
-                    self._select_scenario(scenario_id)
-            if not self.campaign_scenarios:
-                imgui.text_disabled("No enabled scenarios are available.")
-            imgui.end_child()
-            selected_scenario = next(
-                (row for row in self.campaign_scenarios if str(row.get("id")) == self.selected_scenario_id),
+                for row in self.playable_countries.iter_rows(named=True)
+            ]
+            party_options = (
+                PartySelectionWindow.party_options(state, self.selected_country_id)
+                if self.selected_country_id else []
+            )
+            selected_party = next(
+                (
+                    row for row in party_options
+                    if str(row.get("party_id") or "").strip() == self.selected_party_id
+                ),
                 None,
             )
-            if selected_scenario is not None:
-                preview = preview_campaign_scenario(selected_scenario)
-                imgui.push_text_wrap_pos(0.0)
-                imgui.text_wrapped(str(selected_scenario.get("description") or ""))
-                imgui.pop_text_wrap_pos()
-                imgui.text_disabled(f"Scope: {preview.scope}")
-                imgui.text_disabled(f"Enabled rules: {', '.join(preview.enabled_rules) or 'none'}")
-                if preview.max_duration_minutes > 0:
-                    imgui.text_disabled(f"Campaign deadline: {preview.max_duration_minutes} minute(s) after start")
-                for objective in preview.objectives[:3]:
-                    imgui.bullet_text(f"{objective.title} — {objective.deadline}")
-                if len(preview.objectives) > 3:
-                    imgui.text_disabled(f"And {len(preview.objectives) - 3} more objective(s)")
-                imgui.text_disabled(
-                    "Sandbox continuation enabled" if selected_scenario.get("sandbox_allowed", True)
-                    else "Scenario outcome ends this campaign"
-                )
-            imgui.separator()
-            if self.selected_country_id:
-                imgui.text_colored(GAMETHEME.colors.accent, f"Selected: {self.selected_country_id}")
-                imgui.separator()
-                imgui.dummy((0, 10))
-                imgui.text_wrapped("Country Details:")
-                imgui.text_wrapped("")
-                imgui.text_wrapped("")
-            else:
-                imgui.text_disabled("Select a nation from the list.")
-            imgui.end_group()
-            
-            # Bottom Controls Area
-            imgui.dummy((0, 30)) # Vertical Spacer
-            imgui.separator()
-            imgui.dummy((0, 10)) # Vertical Spacer
-            
-            # Back Button
-            if imgui.button("BACK", (100, 40)):
-                self.renderer.clear_highlight()
-                self.renderer.set_overlay_style(enabled=False, opacity=0.0)
-                self.nav.show_main_menu(self.session, self.config)
-            
-            imgui.same_line()
-            
-            # Right Align "Start" Button
-            avail_w = imgui.get_content_region_avail().x
-            imgui.set_cursor_pos_x(imgui.get_cursor_pos_x() + avail_w - 150)
-            
-            if self.selected_country_id and self.selected_scenario_id:
-                if imgui.button("START CAMPAIGN", (150, 40)):
-                    self._start_game()
-            else:
-                imgui.begin_disabled()
-                imgui.button("START CAMPAIGN", (150, 40))
-                imgui.end_disabled()
+            self.single_player_setup_window.render(
+                screen_w,
+                screen_h,
+                country_options,
+                self.selected_country_id,
+                str(selected_party.get("display_name") or self.selected_party_id) if selected_party else "",
+                bool(party_options),
+                preview_campaign_scenario(self._selected_scenario()),
+                self._select_country,
+                lambda: self._open_country_profile(state),
+                lambda: self._open_party_selection(state),
+                self._start_game,
+                self._return_to_scenario_selection,
+            )
 
-            self.ui.end_panel()
+        self.country_profile_window.render(screen_w, screen_h)
+        self.party_selection_window.render(screen_w, screen_h)
+
+    def _enter_country_setup(self) -> None:
+        self.setup_stage = "country"
+
+    def _return_to_scenario_selection(self) -> None:
+        self.setup_stage = "scenario"
+
+    def _return_to_main_menu(self) -> None:
+        self.renderer.clear_highlight()
+        self.renderer.set_overlay_style(enabled=False, opacity=0.0)
+        self.nav.show_main_menu(self.session, self.config)
+
+    def _open_country_profile(self, state) -> None:
+        eligible_ids = (
+            self.playable_countries["id"].to_list()
+            if "id" in self.playable_countries.columns
+            else []
+        )
+        self.country_profile_window.show(state, eligible_ids)
+
+    def _open_party_selection(self, state) -> None:
+        if not self.selected_country_id:
+            return
+        self.country_profile_window.close()
+        self.party_selection_window.show(
+            state,
+            self.selected_country_id,
+            self.selected_party_id,
+        )
+
+    def _select_country(self, country_id: str) -> None:
+        self.selected_country_id = str(country_id or "").strip().upper() or None
+        if self.selected_country_id is None:
+            self.selected_party_id = ""
+            self.renderer.clear_highlight()
+            return
+        self.selected_party_id = PartySelectionWindow.default_party_id(
+            self.net.get_state(), self.selected_country_id
+        )
+        self._focus_camera_on_country(self.selected_country_id)
+        self._highlight_country(self.selected_country_id)
+
+    def _select_party(self, party_id: str) -> None:
+        self.selected_party_id = str(party_id or "").strip()
 
     def _highlight_country(self, country_tag: str):
         state = self.net.get_state()
@@ -328,6 +324,7 @@ class NewGameView(BaseImGuiView):
             self.config,
             self.selected_country_id,
             self.selected_scenario_id,
+            self.selected_party_id,
         )
         self.nav.show_loading(task, on_success=on_task_complete)
 

@@ -40,6 +40,14 @@ As a strategy player, I want simulation time to advance from `GAME_EPOCH` (Jan 1
   \[ \text{pop\_15\_64}_{\text{new}} = \text{pop\_15\_64} + (\text{pop\_14} \cdot \text{Aging}_{\text{kids}}) - (\text{pop\_15\_64} \cdot \text{Aging}_{\text{work}}) \]
   \[ \text{pop\_65}_{\text{new}} = \text{pop\_65} + (\text{pop\_15\_64} \cdot \text{Aging}_{\text{work}}) - (\text{pop\_65} \cdot \text{DeathStep}) \]
 
+## Functional Requirements
+
+- **FR-001**: Simulation time MUST advance from the configured epoch using one of the five supported speed levels and MUST stop advancing while paused.
+- **FR-002**: Hour, day, and real-second events MUST be emitted at their defined boundaries; the real-second heartbeat MUST remain available while simulation time is paused.
+- **FR-003**: Population updates MUST apply births, aging, and mortality to the supported demographic cohorts using elapsed simulation time.
+- **FR-004**: Invalid or missing cohort inputs MUST resolve to documented defaults, and demographic updates MUST NOT produce negative population values.
+- **FR-005**: The displayed calendar date and time MUST be derived deterministically from the persisted total-minute value and configured epoch.
+
 ## Success Criteria
 
 - **SC-001**: Date Accuracy: 100% of minute accumulators evaluate to exact `datetime` dates from `GAME_EPOCH` (2001-01-01 00:00).

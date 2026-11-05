@@ -1,0 +1,19 @@
+{
+  "fixture": "tests/ui/fixtures/reference-treaty-eligible-grid.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.pol"},
+    {"op": "click", "target": "politics.open_treaties"},
+    {"op": "click", "target": "treaties.active.treaty-ukr-pol-deu"},
+    {"op": "click", "target": "treaties.view_selected"},
+    {"op": "assert_region", "target": "treaties.details.dialog", "visible": true},
+    {"op": "assert", "target": "treaties.eligible.CAN", "visible": true, "label": "CAN"},
+    {"op": "assert", "target": "treaties.eligible.FRA", "visible": true, "label": "FRA"},
+    {"op": "assert", "target": "treaties.eligible.ITA", "visible": true, "label": "ITA"},
+    {"op": "assert", "target": "treaties.eligible.NOR", "visible": true, "label": "NOR"},
+    {"op": "assert", "target": "treaties.eligible.ESP", "visible": true, "label": "ESP"},
+    {"op": "assert", "target": "treaties.eligible.SWE", "visible": true, "label": "SWE"},
+    {"op": "assert", "target": "treaties.eligible.POL", "visible": true, "label": "POL"},
+    {"op": "assert", "target": "treaties.eligible.UKR", "visible": true, "label": "UKR"},
+    {"op": "assert_absent", "target": "treaties.eligible.DEU"}
+  ]
+}

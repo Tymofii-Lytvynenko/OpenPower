@@ -1,0 +1,88 @@
+{
+  "fixture": "tests/ui/fixtures/covert-multi-cell-mission.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_covert"},
+    {"op": "assert_region", "target": "covert_ops.panel", "visible": true},
+    {"op": "click", "target": "covert_ops.cell.cell-alpha.select"},
+    {"op": "key_down", "key": "left_ctrl"},
+    {"op": "click", "target": "covert_ops.cell.cell-beta.select"},
+    {"op": "key_up", "key": "left_ctrl"},
+    {"op": "assert", "target": "covert_ops.selected_cell", "label": "MISSION · 2 CELLS SELECTED"},
+    {"op": "assert", "target": "covert_ops.open_new_mission", "enabled": true},
+    {"op": "click", "target": "covert_ops.open_new_mission"},
+    {"op": "assert_region", "target": "covert.new_mission.dialog", "visible": true},
+    {"op": "assert", "target": "covert.new_mission.target_country", "label": "—"},
+    {"op": "assert", "target": "covert.new_mission.cover_country", "enabled": false},
+    {"op": "click", "target": "covert.new_mission.cancel"},
+    {"op": "assert_region", "target": "covert.new_mission.dialog", "visible": false},
+    {"op": "click", "target": "covert_ops.open_new_mission"},
+    {"op": "assert_region", "target": "covert.new_mission.dialog", "visible": true},
+    {"op": "click", "target": "covert.new_mission.submit"},
+    {"op": "assert_action", "type": "ActionStartCovertMission", "count": 2},
+    {
+      "op": "assert_action",
+      "type": "ActionStartCovertMission",
+      "count": 2,
+      "index": 0,
+      "fields": {
+        "cell_id": "cell-alpha",
+        "target_country_tag": "POL",
+        "mission_type": "military_espionage",
+        "target_unit_category": "ground"
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionStartCovertMission",
+      "count": 2,
+      "index": 1,
+      "fields": {
+        "cell_id": "cell-beta",
+        "target_country_tag": "UKR",
+        "mission_type": "military_espionage",
+        "target_unit_category": "ground"
+      }
+    },
+    {"op": "click", "target": "covert_ops.open_cell_training"},
+    {"op": "assert_region", "target": "covert.cell_training.dialog", "visible": true},
+    {"op": "click", "target": "covert.cell_training.cancel"},
+    {"op": "assert_region", "target": "covert.cell_training.dialog", "visible": false},
+    {"op": "click", "target": "covert_ops.open_cell_training"},
+    {"op": "assert_region", "target": "covert.cell_training.dialog", "visible": true},
+    {"op": "click", "target": "covert.cell_training.dialog.close"},
+    {"op": "assert_region", "target": "covert.cell_training.dialog", "visible": false},
+    {"op": "click", "target": "covert_ops.open_cell_training"},
+    {"op": "assert_region", "target": "covert.cell_training.dialog", "visible": true},
+    {"op": "click", "target": "covert.cell_training.submit"},
+    {
+      "op": "assert_action",
+      "type": "ActionTrainCovertCell",
+      "count": 2,
+      "index": 0,
+      "fields": {"cell_id": "cell-alpha", "training_points": 100.0}
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionTrainCovertCell",
+      "count": 2,
+      "index": 1,
+      "fields": {"cell_id": "cell-beta", "training_points": 100.0}
+    },
+    {"op": "click", "target": "covert_ops.retire"},
+    {
+      "op": "assert_action",
+      "type": "ActionRetireCovertCell",
+      "count": 2,
+      "index": 0,
+      "fields": {"cell_id": "cell-alpha"}
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionRetireCovertCell",
+      "count": 2,
+      "index": 1,
+      "fields": {"cell_id": "cell-beta"}
+    }
+  ]
+}

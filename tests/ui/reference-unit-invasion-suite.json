@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-unit-invasion-confirm.json",
+      "surface": "unit-movement"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-invasion-stale.json",
+      "surface": "unit-movement"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-invasion-countries.json",
+      "surface": "unit-movement"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-invasion-rejected.json",
+      "surface": "unit-movement"
+    }
+  ]
+}

@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from threading import RLock
 from typing import Iterator
 
+from src.client.ui.core.ui_anchor_registry import UIAnchorRegistry
+
 
 @dataclass(frozen=True, slots=True)
 class Rect:
@@ -98,8 +100,10 @@ class _WidgetRecord:
 class UIRunTelemetry:
     """Collect semantic widget state and geometry during an opted-in UI run."""
 
-    def __init__(self, viewport_size: tuple[int, int]):
+    def __init__(self, viewport_size: tuple[int, int], *, pin_windows: bool = True):
         self.viewport_size = viewport_size
+        self.pin_windows = pin_windows
+        self.movable_window_ids: set[str] = set()
         self.frame_count = 0
         self._regions: dict[str, _RegionRecord] = {}
         self._widgets: dict[str, _WidgetRecord] = {}
@@ -211,6 +215,12 @@ class UIRunTelemetry:
             record = self._widgets.get(test_id)
             return self._current(record) if record else None
 
+    def set_widget_value(self, test_id: str, value: object) -> None:
+        with self._lock:
+            record = self._widgets.get(test_id)
+            if record is not None:
+                record.value = value
+
     def region(self, test_id: str) -> dict[str, object] | None:
         with self._lock:
             record = self._regions.get(test_id)
@@ -314,13 +324,25 @@ def record_last_item(
     enabled: bool = True,
 ) -> None:
     recorder = _active_recorder.get()
-    if recorder is None:
+    if recorder is None and not UIAnchorRegistry.is_target(test_id):
         return
 
     from imgui_bundle import imgui
 
     minimum = imgui.get_item_rect_min()
     maximum = imgui.get_item_rect_max()
+    if UIAnchorRegistry.is_target(test_id) and imgui.is_item_visible():
+        # Composed controls assign their semantic ID after drawing the native item.
+        UIAnchorRegistry.record(
+            test_id,
+            float(minimum.x),
+            float(minimum.y),
+            float(maximum.x - minimum.x),
+            float(maximum.y - minimum.y),
+        )
+    if recorder is None:
+        return
+
     native_id = int(imgui.get_item_id())
     # Explicit semantic IDs replace automatic records for the same item.
     metadata = recorder.replace_automatic_item(native_id)
@@ -342,3 +364,9 @@ def record_last_item(
     )
     recorder.set_components(test_id, metadata.get("components", []))
     recorder.set_options(test_id, metadata.get("options", []))
+
+
+def set_widget_value(test_id: str, value: object) -> None:
+    recorder = _active_recorder.get()
+    if recorder is not None:
+        recorder.set_widget_value(test_id, value)

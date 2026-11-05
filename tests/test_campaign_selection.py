@@ -3,6 +3,7 @@ from __future__ import annotations
 import polars as pl
 
 from src.client.services.campaign_selection import (
+    filter_playable_countries,
     filter_selectable_countries,
     preview_campaign_scenario,
 )
@@ -22,6 +23,21 @@ def test_invalid_scenario_allowlist_fails_closed_and_empty_allowlist_preserves_s
 
     assert filter_selectable_countries(playable, {"selectable_country_ids_json": "{"}).is_empty()
     assert filter_selectable_countries(playable, {"selectable_country_ids_json": "[]"}).equals(playable)
+
+
+def test_playable_country_filter_uses_runtime_default_when_metadata_is_missing() -> None:
+    countries = pl.DataFrame({"id": ["ATA", "UKR"]})
+
+    assert filter_playable_countries(countries).equals(countries)
+
+
+def test_playable_country_filter_excludes_explicit_false_and_keeps_null_defaults() -> None:
+    countries = pl.DataFrame({
+        "id": ["ATA", "UKR", "USA"],
+        "is_playable": ["false", "true", None],
+    })
+
+    assert filter_playable_countries(countries)["id"].to_list() == ["UKR", "USA"]
 
 
 def test_scenario_preview_exposes_scope_rules_objectives_and_deadlines() -> None:

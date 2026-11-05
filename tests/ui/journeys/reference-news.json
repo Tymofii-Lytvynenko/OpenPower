@@ -1,0 +1,162 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.news"
+    },
+    {
+      "op": "assert_region",
+      "target": "news.panel",
+      "visible": true,
+      "min_width": 488,
+      "min_height": 199
+    },
+    {
+      "op": "assert_region",
+      "target": "news.events",
+      "visible": true,
+      "relative_to": "news.panel",
+      "relative_rect": {
+        "x": 6,
+        "y": 7,
+        "width": 446,
+        "height": 185
+      },
+      "tolerance": 1
+    },
+    {
+      "op": "assert",
+      "target": "news.filter.political",
+      "visible": true,
+      "inside": "news.panel",
+      "relative_to": "news.panel",
+      "relative_rect": {
+        "x": 454,
+        "y": 7,
+        "width": 27,
+        "height": 21
+      },
+      "tolerance": 1
+    },
+    {
+      "op": "assert",
+      "target": "news.goto",
+      "visible": true,
+      "enabled": false,
+      "inside": "news.panel",
+      "relative_to": "news.panel",
+      "relative_rect": {
+        "x": 454,
+        "y": 171,
+        "width": 27,
+        "height": 21
+      },
+      "tolerance": 1
+    },
+    {
+      "op": "click",
+      "target": "news.random_event_settings"
+    },
+    {
+      "op": "assert_region",
+      "target": "news.controls.popup",
+      "visible": true
+    },
+    {
+      "op": "key",
+      "key": "escape"
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/reference-news-arrival.json"
+    },
+    {
+      "op": "assert_region",
+      "target": "news.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "news.item.instance:arrival-event",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "news.item.news:arrival-1",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "news.item.instance:arrival-event"
+    },
+    {
+      "op": "assert",
+      "target": "news.goto",
+      "enabled": true
+    },
+    {
+      "op": "click",
+      "target": "news.goto"
+    },
+    {
+      "op": "click",
+      "target": "news.response.instance:arrival-event.relief_aid"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionRespondToRandomEvent",
+      "fields": {
+        "event_id": "arrival-event",
+        "response_id": "relief_aid",
+        "country_tag": "POL"
+      }
+    },
+    {
+      "op": "click",
+      "target": "news.filter.political"
+    },
+    {
+      "op": "assert_absent",
+      "target": "news.item.news:arrival-1"
+    },
+    {
+      "op": "assert",
+      "target": "news.item.instance:arrival-event",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "news.filter.political"
+    },
+    {
+      "op": "assert",
+      "target": "news.item.news:arrival-1",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "news.filter.demographic"
+    },
+    {
+      "op": "assert_absent",
+      "target": "news.item.instance:arrival-event"
+    },
+    {
+      "op": "click",
+      "target": "news.filter.demographic"
+    },
+    {
+      "op": "assert",
+      "target": "news.item.instance:arrival-event",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "hud.news"
+    },
+    {
+      "op": "assert_absent",
+      "target": "news.item.news:arrival-1"
+    }
+  ]
+}

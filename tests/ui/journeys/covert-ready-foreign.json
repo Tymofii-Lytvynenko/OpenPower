@@ -1,0 +1,61 @@
+{
+  "fixture": "tests/ui/fixtures/covert-ready-foreign.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.mil"
+    },
+    {
+      "op": "click",
+      "target": "military.open_covert"
+    },
+    {
+      "op": "click",
+      "target": "covert_ops.open_cell_training"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert.cell_training.dialog",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "covert.cell_training.cancel"
+    },
+    {
+      "op": "click",
+      "target": "hud.country"
+    },
+    {
+      "op": "click",
+      "target": "hud.country.option.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": true
+    },
+    {
+      "op": "assert_absent",
+      "target": "covert_ops.cell.cell-test.select"
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.open_cell_creation",
+      "enabled": false
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.open_new_mission",
+      "enabled": false
+    },
+    {
+      "op": "assert_absent",
+      "target": "covert_ops.cell.foreign-secret.select"
+    },
+    {
+      "op": "assert_absent",
+      "target": "covert.cell_training.submit"
+    }
+  ]
+}

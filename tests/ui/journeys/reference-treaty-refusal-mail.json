@@ -1,0 +1,76 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.mail"
+    },
+    {
+      "op": "server_event",
+      "target": "EventTreatyRefused",
+      "event_id": "foreign-refusal",
+      "payload": {
+        "treaty_id": "deleted-proposal",
+        "source_country_tag": "POL",
+        "title": "Refused compact",
+        "responder_country_tag": "POL",
+        "accepted_country_tags": [
+          "UKR"
+        ],
+        "reason": "Declined"
+      }
+    },
+    {
+      "op": "assert_absent",
+      "target": "mail.dispatch.foreign-refusal"
+    },
+    {
+      "op": "server_event",
+      "target": "EventTreatyRefused",
+      "event_id": "refusal-result",
+      "payload": {
+        "treaty_id": "deleted-proposal",
+        "source_country_tag": "UKR",
+        "title": "Refused compact",
+        "responder_country_tag": "POL",
+        "accepted_country_tags": [
+          "UKR"
+        ],
+        "reason": "Declined"
+      }
+    },
+    {
+      "op": "assert",
+      "target": "mail.item.dispatch:refusal-result.subject",
+      "label": "Treaty refused: Refused compact"
+    },
+    {
+      "op": "assert_region",
+      "target": "mail.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "mail.dispatch.refusal-result"
+    },
+    {
+      "op": "assert_region",
+      "target": "dispatch.report.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "dispatch.report.content",
+      "label": "Refused compact\n\nACCEPTED\nUkraine\n\nREFUSED\nPoland (Declined)"
+    },
+    {
+      "op": "click",
+      "target": "dispatch.report.ok"
+    },
+    {
+      "op": "assert_region",
+      "target": "dispatch.report.dialog",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

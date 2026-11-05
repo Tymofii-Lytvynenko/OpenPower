@@ -1,0 +1,31 @@
+{
+  "fixture": "tests/ui/fixtures/reference-game-over-victory.json",
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "game_over.dialog",
+      "label": "SCENARIO COMPLETED",
+      "visible": true,
+      "rect": {"width": 503, "height": 273},
+      "inside_viewport": true
+    },
+    {
+      "op": "assert",
+      "target": "game_over.summary",
+      "label": "The configured campaign win conditions are satisfied.",
+      "inside": "game_over.dialog"
+    },
+    {
+      "op": "assert",
+      "target": "game_over.objective.victory-objective.status",
+      "label": "COMPLETED",
+      "inside": "game_over.dialog"
+    },
+    {
+      "op": "assert",
+      "target": "game_over.main_menu",
+      "label": "MAIN MENU",
+      "inside": "game_over.dialog"
+    }
+  ]
+}

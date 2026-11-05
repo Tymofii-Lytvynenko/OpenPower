@@ -1,0 +1,10 @@
+{
+  "globals": {
+    "ui_command_results": {
+      "ActionSaveGame": [
+        {"status": "failed", "message": "The save destination is unavailable."},
+        {"status": "rejected", "message": "The next command was refused."}
+      ]
+    }
+  }
+}

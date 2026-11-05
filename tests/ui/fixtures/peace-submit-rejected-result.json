@@ -1,0 +1,14 @@
+{
+  "globals": {
+    "ui_command_results": {
+      "ActionSubmitPeaceDeal": [
+        {
+          "status": "rejected",
+          "reason": "The selected war is no longer active.",
+          "war_id": "war-controlled-1",
+          "country_id": "UKR"
+        }
+      ]
+    }
+  }
+}

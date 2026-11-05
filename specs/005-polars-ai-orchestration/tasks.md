@@ -25,6 +25,17 @@
 - [X] T011 Measure the complete framework ranking/action path and record the measured gap in `tests/test_ai_performance.py`; latest median is 8.40 ms versus the 2.00 ms target.
 - [X] T012 Run the full suite after the benchmark changes: `684 passed, 16 skipped, 116 warnings, 190 subtests passed in 162.89s`.
 
+## Requirement Traceability
+
+| Requirement | Existing implementation and acceptance tasks |
+| --- | --- |
+| FR-001 | T001, T009 |
+| FR-002 | T002, T003 |
+| FR-003 | T004, T006, T009, T010 |
+| FR-004 | T005, T007–T009 |
+| FR-005 | T002, T003, T009 |
+| FR-006 | T001, T009 |
+
 ## Dependencies & Execution Order
 
 - The generic protocol/resolver (T001–T003) is foundational for all scorer policies.

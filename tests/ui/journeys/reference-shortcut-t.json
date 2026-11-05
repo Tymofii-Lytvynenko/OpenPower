@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "op": "key",
+      "key": "t"
+    },
+    {
+      "op": "assert_region",
+      "target": "treaties.panel",
+      "visible": true
+    },
+    {
+      "op": "key",
+      "key": "t"
+    },
+    {
+      "op": "assert_region",
+      "target": "treaties.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

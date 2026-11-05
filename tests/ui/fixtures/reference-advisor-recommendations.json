@@ -1,0 +1,102 @@
+{
+  "tables": {
+    "campaign_scenarios": [
+      {
+        "id": "ui-advisor-review-scenario",
+        "title": "Advisor review scenario",
+        "description": "A campaign fixture used to verify the REFERENCE description, goals, and tips pages.",
+        "max_duration_minutes": 43200,
+        "sandbox_allowed": true
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "campaign-ui-advisor-review",
+        "scenario_id": "ui-advisor-review-scenario",
+        "actor_country_id": "UKR",
+        "started_at_minute": 0,
+        "outcome": "ongoing",
+        "sandbox_continuation": true
+      }
+    ],
+    "objectives": [
+      {
+        "id": "advisor-review-objective-active",
+        "campaign_id": "campaign-ui-advisor-review",
+        "country_id": "UKR",
+        "title": "Maintain economic stability",
+        "description": "Keep the national stability index above the campaign target.",
+        "objective_type": "country_stability",
+        "status": "active",
+        "progress": 0.75,
+        "current_value": 75.0,
+        "target_value": 100.0,
+        "remaining": 25.0,
+        "deadline_at_minute": 20160
+      },
+      {
+        "id": "advisor-review-objective-complete",
+        "campaign_id": "campaign-ui-advisor-review",
+        "country_id": "UKR",
+        "title": "Complete a read-only sample objective",
+        "description": "Completed objective row used to verify the disabled completion toggle.",
+        "status": "completed",
+        "progress": 1.0,
+        "deadline_at_minute": -1
+      }
+    ],
+    "advisor_recommendations": [
+      {
+        "id": "advisor:ai:UKR:budget-review",
+        "campaign_id": "",
+        "actor_country_id": "UKR",
+        "title": "Budget deficit requires an adjustment",
+        "reason": "Annual expenses exceed revenue. The advisor proposes changing budget allocations.",
+        "source_signal": "ai_policy:economy:budget:budget-review",
+        "affected_country_id": "UKR",
+        "affected_region_id": 0,
+        "confidence": 0.0,
+        "urgency": 0.0,
+        "expires_at_minute": 10080,
+        "optional_action_json": "{\"type\":\"ActionUpdateBudget\",\"fields\":{\"player_id\":\"ai_system\",\"country_tag\":\"UKR\",\"allocations\":{\"education\":0.5}}}",
+        "status": "active",
+        "created_at_minute": 0,
+        "stale_reason": ""
+      },
+      {
+        "id": "advisor:ai:UKR:budget-review-decline",
+        "campaign_id": "",
+        "actor_country_id": "UKR",
+        "title": "A second budget proposal",
+        "reason": "This proposal should remain unapplied when the player declines it.",
+        "source_signal": "ai_policy:economy:budget:budget-review-decline",
+        "affected_country_id": "UKR",
+        "affected_region_id": 0,
+        "confidence": 0.0,
+        "urgency": 0.0,
+        "expires_at_minute": 10080,
+        "optional_action_json": "{\"type\":\"ActionUpdateBudget\",\"fields\":{\"player_id\":\"ai_system\",\"country_tag\":\"UKR\",\"allocations\":{\"budget_health_ratio\":0.4}}}",
+        "status": "active",
+        "created_at_minute": 0,
+        "stale_reason": ""
+      },
+      {
+        "id": "advisor:campaign:data-review",
+        "campaign_id": "",
+        "actor_country_id": "UKR",
+        "title": "Campaign data needs attention",
+        "reason": "The latest campaign update is missing a supporting data source.",
+        "source_signal": "campaign:data:missing",
+        "affected_country_id": "UKR",
+        "affected_region_id": 0,
+        "confidence": 0.8,
+        "urgency": 0.2,
+        "expires_at_minute": 10080,
+        "optional_action_json": "",
+        "status": "active",
+        "created_at_minute": 0,
+        "stale_reason": ""
+      }
+    ]
+  }
+}

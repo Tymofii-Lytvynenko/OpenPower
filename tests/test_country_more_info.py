@@ -23,6 +23,8 @@ class CountryMoreInfoPresenterTest(unittest.TestCase):
                             "life_expectancy": 77.5,
                             "budget_infra_ratio": 0.42,
                             "budget_telecom_ratio": 0.33,
+                            "infrastructure_index": 0.17,
+                            "telecom_index": 0.61,
                         },
                         {"id": "CAN", "human_dev": 0.8},
                     ]
@@ -83,8 +85,11 @@ class CountryMoreInfoPresenterTest(unittest.TestCase):
         self.assertAlmostEqual(model.land_area_km2, 400.0)
         self.assertAlmostEqual(model.world_area_share_pct, 40.0)
         self.assertAlmostEqual(model.human_dev_pct, 90.0)
-        self.assertAlmostEqual(model.world_human_dev_pct, 85.0)
-        self.assertAlmostEqual(model.infrastructure_pct, 42.0)
+        self.assertIsNone(model.world_human_dev_pct)
+        self.assertAlmostEqual(model.infrastructure_pct, 17.0)
+        self.assertAlmostEqual(model.telecom_pct, 61.0)
+        self.assertTrue(model.population_available)
+        self.assertTrue(model.land_area_available)
         self.assertEqual(model.composition_rows[0].label, "State")
         self.assertEqual(model.production_rows[0].label, "Financial Services")
 

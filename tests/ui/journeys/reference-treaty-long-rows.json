@@ -1,0 +1,18 @@
+{
+  "fixture": "tests/ui/fixtures/reference-treaty-long-rows.json",
+  "steps": [
+    { "op": "click", "target": "hud.panel.pol" },
+    { "op": "click", "target": "politics.open_treaties" },
+    { "op": "assert_region", "target": "treaties.panel", "visible": true },
+    { "op": "assert", "target": "treaties.active.nato-long", "visible": true },
+    { "op": "assert", "target": "treaties.active.nato-long", "no_overlap": "treaties.active.nato-long.type" },
+    { "op": "assert", "target": "treaties.pending.proposal-long", "visible": true },
+    { "op": "assert", "target": "treaties.pending.proposal-long", "no_overlap": "treaties.pending.proposal-long.type" },
+    { "op": "hover", "target": "treaties.active.nato-long" },
+    { "op": "wait", "frames": 45 },
+    { "op": "assert_region", "target": "treaties.panel", "visible": true },
+    { "op": "hover", "target": "treaties.pending.proposal-long" },
+    { "op": "wait", "frames": 45 },
+    { "op": "assert_region", "target": "treaties.panel", "visible": true }
+  ]
+}

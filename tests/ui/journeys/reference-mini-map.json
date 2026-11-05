@@ -1,0 +1,91 @@
+{
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "mini_map.panel",
+      "visible": true,
+      "kind": "window",
+      "min_width": 228,
+      "min_height": 155,
+      "inside_viewport": true
+    },
+    {
+      "op": "assert",
+      "target": "mini_map.image",
+      "type": "image",
+      "visible": true,
+      "inside": "mini_map.panel",
+      "relative_rect": {"x": 39, "y": 57, "width": 180, "height": 90},
+      "relative_to": "mini_map.panel",
+      "tolerance": 1
+    },
+    {
+      "op": "assert",
+      "target": "mini_map.home",
+      "type": "invisible_button",
+      "visible": true,
+      "inside": "mini_map.panel",
+      "relative_rect": {"x": 152, "y": 9, "width": 27, "height": 27},
+      "relative_to": "mini_map.panel",
+      "tolerance": 1
+    },
+    {
+      "op": "assert",
+      "target": "mini_map.magnifier",
+      "type": "invisible_button",
+      "visible": true,
+      "inside": "mini_map.panel",
+      "relative_rect": {"x": 185, "y": 9, "width": 34, "height": 27},
+      "relative_to": "mini_map.panel",
+      "tolerance": 1
+    },
+    {
+      "op": "assert",
+      "target": "mini_map.zoom",
+      "type": "invisible_button",
+      "visible": true,
+      "inside": "mini_map.panel",
+      "relative_rect": {"x": 11, "y": 57, "width": 13, "height": 86},
+      "relative_to": "mini_map.panel",
+      "tolerance": 1
+    },
+    {
+      "op": "click",
+      "target": "mini_map.home"
+    },
+    {
+      "op": "assert_viewport_request",
+      "type": "country",
+      "fields": {"country": "UKR"}
+    },
+    {
+      "op": "click",
+      "target": "mini_map.map"
+    },
+    {
+      "op": "assert_viewport_request",
+      "type": "focus_map",
+      "fields": {"x_fraction": 0.5, "y_fraction": 0.5}
+    },
+    {
+      "op": "drag",
+      "target": "mini_map.zoom",
+      "fraction": 0.25
+    },
+    {
+      "op": "assert_viewport_request",
+      "type": "zoom",
+      "fields": {"fraction": 0.75},
+      "tolerance": 0.01
+    },
+    {
+      "op": "click",
+      "target": "mini_map.magnifier"
+    },
+    {
+      "op": "assert",
+      "target": "mini_map.magnifier",
+      "value": true
+    }
+  ]
+}

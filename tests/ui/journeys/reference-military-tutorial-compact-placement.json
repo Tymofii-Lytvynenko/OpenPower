@@ -1,0 +1,35 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.system.help" },
+    { "op": "click", "target": "help.tutorial.military" },
+    { "op": "assert_region", "target": "game.tutorial.window", "visible": true, "inside_viewport": true },
+    { "op": "assert_region", "target": "game.tutorial.arrow", "visible": true, "inside_viewport": true },
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "assert_region", "target": "military.panel", "visible": true, "inside_viewport": true },
+    { "op": "assert_region", "target": "game.tutorial.window", "visible": true, "inside_viewport": true, "no_overlap": "military.panel" },
+    { "op": "assert_region", "target": "game.tutorial.window", "visible": true, "inside_viewport": true, "no_overlap": "hud.system_bar" },
+    { "op": "assert_region", "target": "game.tutorial.arrow", "visible": true, "inside_viewport": true },
+    { "op": "click", "target": "military.open_unit_list" },
+    { "op": "assert_region", "target": "unit_list.panel", "visible": true, "inside_viewport": true },
+    { "op": "close_window", "target": "unit_list.panel" },
+    { "op": "assert", "target": "game.tutorial.step.military.3", "visible": true },
+    { "op": "assert_region", "target": "game.tutorial.window", "visible": true, "inside_viewport": true, "no_overlap": "military.panel" },
+    {
+      "op": "assert_region",
+      "target": "game.tutorial.arrow",
+      "visible": true,
+      "relative_to": "military.panel",
+      "relative_rect": { "x": 60, "y": 119, "width": 50, "height": 50 },
+      "tolerance": 0.1
+    },
+    {
+      "op": "assert",
+      "target": "military.open_research",
+      "visible": true,
+      "label": "RESEARCH",
+      "relative_to": "military.panel",
+      "relative_rect": { "x": 35, "y": 169, "width": 100, "height": 18 },
+      "tolerance": 0.1
+    }
+  ]
+}

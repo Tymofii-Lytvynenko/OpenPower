@@ -1,0 +1,139 @@
+{
+  "fixture": "tests/ui/fixtures/reference-battle-inspection.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "battle.map.marker.battle-own"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.flags.ally/gml:Battle_Window/lstFlagsYou",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.country.UKR",
+      "visible": true,
+      "inside": "battle.inspection.flags.ally/gml:Battle_Window/lstFlagsYou",
+      "relative_rect": {
+        "x": 1,
+        "y": 1,
+        "width": 22,
+        "height": 13
+      },
+      "relative_to": "battle.inspection.flags.ally/gml:Battle_Window/lstFlagsYou"
+    },
+    {
+      "op": "click",
+      "target": "battle.inspection.country.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.region",
+      "label": "Kyiv"
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.force.UKR.infantry",
+      "label": "UKR \u00b7 infantry \u00b7 1 unit \u00b7 1,000 personnel"
+    },
+    {
+      "op": "click",
+      "target": "battle.inspection.force.UKR.infantry"
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.loss.UKR.infantry",
+      "label": "Recorded casualties: 30 personnel"
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.posture.UKR.infantry",
+      "label": "Orders: Hold \u00d71"
+    },
+    {
+      "op": "assert_absent",
+      "target": "battle.inspection.posture.POL.tanks"
+    },
+    {
+      "op": "click",
+      "target": "battle.inspection.force.UKR.infantry.defend"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetBattleStrategy",
+      "count": 1,
+      "fields": {
+        "battle_id": "battle-own",
+        "country_tag": "UKR",
+        "unit_type": "infantry",
+        "strategy": "defend"
+      }
+    },
+    {
+      "op": "scroll",
+      "target": "battle.inspection.strategy"
+    },
+    {
+      "op": "select",
+      "target": "battle.inspection.strategy",
+      "value": "Attack Preset"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetBattleStrategy",
+      "count": 2,
+      "fields": {
+        "unit_type": "all",
+        "strategy": "attack_preset"
+      }
+    },
+    {
+      "op": "click",
+      "target": "battle.inspection.retreat"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetBattleStrategy",
+      "count": 3,
+      "fields": {
+        "battle_id": "battle-own",
+        "strategy": "retreat",
+        "country_tag": "UKR"
+      }
+    },
+    {
+      "op": "scroll",
+      "target": "battle.inspection.close"
+    },
+    {
+      "op": "click",
+      "target": "battle.inspection.close"
+    },
+    {
+      "op": "wait",
+      "frames": 5
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

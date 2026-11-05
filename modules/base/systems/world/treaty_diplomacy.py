@@ -18,15 +18,24 @@ import polars as pl
 
 from modules.base.systems.world.treaty_geography import TreatyGeography
 from modules.base.systems.world.annexation_policy import AnnexationPolicy
+from modules.base.systems.world.authority_policy import player_controls_country
+from modules.base.systems.military.territory_entry import validate_territory_entry
+from modules.base.systems.world.treaty_proposal_policy import (
+    country_diplomacy_restriction,
+    treaty_title_restriction,
+)
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.actions import (
     ActionCreateTreaty,
     ActionDeclareWar,
+    ActionInvadeTerritory,
     ActionExpelTreatyMember,
     ActionJoinTreaty,
     ActionLeaveTreaty,
+    ActionJoinWar,
     ActionOfferPeace,
     ActionRespondTreaty,
+    ActionUpdateTreatyParticipants,
 )
 from src.shared.events import (
     EventMessageCreated,
@@ -35,6 +44,7 @@ from src.shared.events import (
     EventTreatyRefused,
     EventWarStarted,
     EventWarEnded,
+    EventTerritoryEntryAuthorized,
     EventTreatyLifecycleChanged,
 )
 from src.shared.state import GAME_EPOCH, GameState
@@ -114,17 +124,20 @@ class DiplomacySystem(ISystem):
     """Processes treaty commands and publishes deterministic gameplay effects."""
 
     access = SystemAccess(
-        reads=frozenset({'countries', 'regions', 'units', 'countries_relations', 'countries_treaties', 'countries_wars', 'pending_treaties', 'treaty_effects', 'annexation_claims', 'coalition_pacts'}),
+        reads=frozenset({'countries', 'country_governments', 'regions', 'region_adjacency', 'units', 'countries_relations', 'countries_treaties', 'countries_wars', 'pending_treaties', 'treaty_effects', 'annexation_claims', 'coalition_pacts'}),
         writes=frozenset({'countries_relations', 'countries_treaties', 'countries_wars', 'pending_treaties', 'treaty_effects', 'annexation_claims', 'messages', 'news_items', 'regions'}),
         handles=frozenset(
             {
                 ActionCreateTreaty,
                 ActionDeclareWar,
+                ActionJoinWar,
+                ActionInvadeTerritory,
                 ActionExpelTreatyMember,
                 ActionJoinTreaty,
                 ActionLeaveTreaty,
                 ActionOfferPeace,
                 ActionRespondTreaty,
+                ActionUpdateTreatyParticipants,
             }
         ),
         phase=SystemPhase.DIPLOMACY,
@@ -141,7 +154,18 @@ class DiplomacySystem(ISystem):
     def update(self, state: GameState, delta_time: float) -> None:
         has_diplomatic_action = any(isinstance(
             action,
-            (ActionCreateTreaty, ActionRespondTreaty, ActionJoinTreaty, ActionExpelTreatyMember, ActionLeaveTreaty, ActionDeclareWar, ActionOfferPeace),
+            (
+                ActionCreateTreaty,
+                ActionRespondTreaty,
+                ActionJoinTreaty,
+                ActionExpelTreatyMember,
+                ActionUpdateTreatyParticipants,
+                ActionLeaveTreaty,
+                ActionDeclareWar,
+                ActionJoinWar,
+                ActionInvadeTerritory,
+                ActionOfferPeace,
+            ),
         ) for action in state.current_actions)
         treaties_table = state.tables.get("countries_treaties")
         claims_table = state.tables.get("annexation_claims")
@@ -170,10 +194,32 @@ class DiplomacySystem(ISystem):
                 treaties, messages = self._join_open_treaty(state, action, treaties, messages)
             elif isinstance(action, ActionExpelTreatyMember):
                 treaties, messages = self._expel_treaty_member(state, action, treaties, messages)
+            elif isinstance(action, ActionUpdateTreatyParticipants):
+                treaties, messages = self._update_treaty_participants(
+                    state, action, treaties, messages
+                )
             elif isinstance(action, ActionLeaveTreaty):
                 treaties, relations, messages, news = self._leave_treaty(
                     state, action, treaties, relations, messages, news
                 )
+            elif isinstance(action, ActionInvadeTerritory):
+                owner, reason = validate_territory_entry(state, action, wars.to_dicts())
+                if not reason:
+                    wars, relations, messages, news = self._start_war(
+                        state, source=owner, target=action.expected_controller,
+                        casus_belli="Confirmed territorial invasion", treaties=treaties, wars=wars,
+                        relations=relations, messages=messages, news=news,
+                    )
+                    state.events.append(EventTerritoryEntryAuthorized(
+                        action.order_id, action.player_id, tuple(action.unit_ids), owner,
+                        action.expected_controller, action.target_region_id,
+                        action.target_latitude, action.target_longitude,
+                    ))
+                state.journal.append_command_result({
+                    "tick": int(state.globals.get("tick", 0)), "player_id": str(action.player_id),
+                    "action_type": type(action).__name__, "status": "rejected" if reason else "accepted",
+                    "reason": reason or "Hostilities authorized; movement orders submitted.", "system_id": self.id,
+                })
             elif isinstance(action, ActionDeclareWar):
                 wars, relations, messages, news = self._start_war(
                     state,
@@ -185,6 +231,15 @@ class DiplomacySystem(ISystem):
                     relations=relations,
                     messages=messages,
                     news=news,
+                )
+            elif isinstance(action, ActionJoinWar):
+                wars, relations, messages, news = self._join_war(
+                    state,
+                    action,
+                    wars,
+                    relations,
+                    messages,
+                    news,
                 )
             elif isinstance(action, ActionOfferPeace):
                 wars, relations, messages, news = self._offer_peace(
@@ -225,6 +280,19 @@ class DiplomacySystem(ISystem):
         if definition is None or not source or not target or source == target:
             return pending, messages, news
 
+        title = str(action.title or definition.label).strip() or definition.label
+        # UI previews cannot protect against stale snapshots or direct clients.
+        # Reserve the name against the tables updated by earlier actions this tick.
+        reason = country_diplomacy_restriction(state.tables.get("country_governments"), source)
+        reason = reason or treaty_title_restriction(title, treaties, pending)
+        if reason:
+            state.journal.append_command_result({
+                "tick": int(state.globals.get("tick", 0)), "player_id": str(action.player_id),
+                "action_type": type(action).__name__, "status": "rejected",
+                "reason": reason, "system_id": self.id,
+            })
+            return pending, messages, news
+
         side_a = self._tags(action.side_a_country_tags) or (source,)
         side_b = self._tags(action.side_b_country_tags)
         if definition.two_sided:
@@ -248,7 +316,6 @@ class DiplomacySystem(ISystem):
 
         required = tuple(tag for tag in members if tag != source)
         proposal_id = self._next_identifier("treaty", pending["id"].to_list(), state)
-        title = str(action.title or definition.label)
         conditions = encode_conditions(action.conditions)
         row = {
             "id": proposal_id,
@@ -313,7 +380,13 @@ class DiplomacySystem(ISystem):
         source = self._tag(proposal.get("source_country_id"))
         if not action.accept:
             pending = pending.filter(pl.col("id") != str(action.treaty_id))
-            state.events.append(EventTreatyRefused(str(action.treaty_id), responder))
+            # The proposal is removed here, so callbacks cannot recover its
+            # sponsor, title or prior acceptances from a later client snapshot.
+            state.events.append(EventTreatyRefused(
+                str(action.treaty_id), responder, source_country_tag=source,
+                title=str(proposal.get("title") or ""),
+                accepted_country_tags=tuple(sorted(accepted)), reason="Declined",
+            ))
             relations = self._adjust_relation_pair(relations, source, responder, -5.0)
             messages = self._append_message(
                 state, messages, source, "diplomacy", f"Treaty rejected by {responder}",
@@ -360,6 +433,7 @@ class DiplomacySystem(ISystem):
         state.events.append(EventTreatyLifecycleChanged(
             str(record["id"]), treaty_type, "activated", tuple(sorted(members)),
             int(state.time.total_minutes), "All required parties accepted the agreement.",
+              proposal_id=str(action.treaty_id),
         ))
         relations = self._apply_activation_relations(relations, treaty_type, members)
         treaties, wars, relations, messages, news, claims = self._apply_punctual_effect(
@@ -429,7 +503,7 @@ class DiplomacySystem(ISystem):
         sponsor = self._tag(row.get("source_country_id"))
         member = self._tag(action.country_tag)
         members = self._tags(row.get("members"))
-        if sponsor != self._tag(action.player_id) or member not in members or member == sponsor:
+        if not player_controls_country(state, action.player_id, sponsor) or member not in members or member == sponsor:
             return treaties, messages
         remaining = tuple(tag for tag in members if tag != member)
         if len(remaining) < 2:
@@ -446,6 +520,167 @@ class DiplomacySystem(ISystem):
             f"You were removed from {row.get('name') or row.get('id')} by its sponsor.",
         )
         return treaties, messages
+
+    def _update_treaty_participants(
+        self,
+        state: GameState,
+        action: ActionUpdateTreatyParticipants,
+        treaties: pl.DataFrame,
+        messages: pl.DataFrame,
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        matches = treaties.filter(pl.col("id") == str(action.treaty_id))
+        if matches.is_empty():
+            return treaties, messages
+
+        row = matches.to_dicts()[0]
+        sponsor = self._tag(row.get("source_country_id"))
+        definition = treaty_definition(row.get("type"))
+        if (
+            not player_controls_country(state, action.player_id, sponsor)
+            or str(row.get("status") or "active").casefold() != "active"
+            or definition is None
+            or not definition.multi_member
+        ):
+            return treaties, messages
+
+        side_a = self._tags(action.side_a_country_tags)
+        side_b = self._tags(action.side_b_country_tags)
+        if definition.two_sided:
+            if not side_a or not side_b or not set(side_a).isdisjoint(side_b):
+                return treaties, messages
+            if sponsor not in side_a:
+                return treaties, messages
+            members = tuple(sorted(set(side_a) | set(side_b)))
+        else:
+            if side_b or sponsor not in side_a:
+                return treaties, messages
+            members = tuple(sorted(set(side_a)))
+
+        if len(members) < 2 or not self._all_known_countries(state, members):
+            return treaties, messages
+
+        proposed_treaty = {
+            **row,
+            "members": list(members),
+            "side_a": list(side_a) if definition.two_sided else list(members),
+            "side_b": list(side_b) if definition.two_sided else [],
+        }
+        ineligible = self.ineligible_treaty_members(state, proposed_treaty)
+        if ineligible:
+            state.journal.append_command_result({
+                "tick": int(state.globals.get("tick", 0)),
+                "player_id": str(action.player_id or ""),
+                "action_type": type(action).__name__,
+                "status": "rejected",
+                "reason": (
+                    "Treaty eligibility conditions are not met by: "
+                    + ", ".join(sorted(ineligible))
+                    + ". Remove those countries or update the participant sides."
+                ),
+            })
+            return treaties, messages
+
+        previous_members = set(self._tags(row.get("members")))
+        next_members = set(members)
+        if previous_members == next_members and set(self._tags(row.get("side_a"))) == set(side_a) and set(self._tags(row.get("side_b"))) == set(side_b):
+            return treaties, messages
+
+        updated = {
+            **row,
+            "members": list(members),
+            "side_a": list(side_a) if definition.two_sided else list(members),
+            "side_b": list(side_b) if definition.two_sided else [],
+            "suspended_members": [],
+        }
+        treaties = self._replace_row(treaties, TREATY_SCHEMA, str(action.treaty_id), updated)
+        state.events.append(EventTreatyLifecycleChanged(
+            str(action.treaty_id),
+            str(row.get("type") or ""),
+            "participants_updated",
+            members,
+            int(state.time.total_minutes),
+            "The sponsor updated the treaty's participant sides.",
+        ))
+
+        title = str(row.get("name") or row.get("id") or "Treaty")
+        for country_tag in sorted(next_members - previous_members):
+            messages = self._append_message(
+                state,
+                messages,
+                country_tag,
+                "diplomacy",
+                "Added to treaty",
+                f"{country_tag} was added to {title} by its sponsor.",
+            )
+        for country_tag in sorted(previous_members - next_members):
+            messages = self._append_message(
+                state,
+                messages,
+                country_tag,
+                "diplomacy",
+                "Removed from treaty",
+                f"{country_tag} was removed from {title} by its sponsor.",
+            )
+        return treaties, messages
+
+    def eligible_treaty_countries(
+        self,
+        state: GameState,
+        treaty: Mapping[str, Any],
+    ) -> frozenset[str]:
+        """Return countries meeting this treaty's current admission conditions."""
+        country_tags = {
+            self._tag(row.get("id"))
+            for row in self._country_rows(state)
+            if self._tag(row.get("id"))
+        }
+        members = set(self._tags(treaty.get("members")))
+        if not members:
+            members = set(self._tags(treaty.get("side_a"))) | set(self._tags(treaty.get("side_b")))
+        peer_map = {
+            candidate: tuple(sorted(members - {candidate}))
+            if candidate in members
+            else tuple(sorted(members))
+            for candidate in country_tags
+        }
+        return self._eligible_treaty_candidates(state, treaty, peer_map)
+
+    def ineligible_treaty_members(
+        self,
+        state: GameState,
+        treaty: Mapping[str, Any],
+    ) -> frozenset[str]:
+        """Return existing members that fail the treaty's current conditions."""
+        members = set(self._tags(treaty.get("members")))
+        if not members:
+            members = set(self._tags(treaty.get("side_a"))) | set(self._tags(treaty.get("side_b")))
+        peer_map = {
+            candidate: tuple(sorted(members - {candidate}))
+            for candidate in members
+        }
+        eligible = self._eligible_treaty_candidates(state, treaty, peer_map)
+        return frozenset(members - eligible)
+
+    def _eligible_treaty_candidates(
+        self,
+        state: GameState,
+        treaty: Mapping[str, Any],
+        peer_map: Mapping[str, tuple[str, ...]],
+    ) -> frozenset[str]:
+        wars = self._wars(state.tables.get("countries_wars"))
+        conditions = decode_conditions(treaty.get("conditions_json"))
+        relation_pairs = (
+            (candidate, peer)
+            for candidate, peers in peer_map.items()
+            for peer in peers
+            if candidate != peer
+        ) if self._number(conditions.get("minimum_relation"), -100.0) > -100.0 else ()
+        eligibility = self._eligibility_index(state, wars, relation_pairs)
+        return frozenset(
+            candidate
+            for candidate, peers in peer_map.items()
+            if self._eligible_for_treaty(state, treaty, candidate, peers, wars, eligibility)
+        )
 
     def _leave_treaty(
         self,
@@ -567,6 +802,83 @@ class DiplomacySystem(ISystem):
         )
         return wars, relations, messages, news
 
+    def _join_war(
+        self,
+        state: GameState,
+        action: ActionJoinWar,
+        wars: pl.DataFrame,
+        relations: pl.DataFrame,
+        messages: pl.DataFrame,
+        news: pl.DataFrame,
+    ) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+        war_id = str(action.war_id or "")
+        matches = wars.filter(pl.col("id") == war_id)
+        if matches.is_empty():
+            return wars, relations, messages, news
+
+        row = matches.to_dicts()[0]
+        country = self._tag(action.source_country_tag)
+        side = str(action.side or "").strip().lower()
+        if (
+            str(row.get("status") or "active").strip().lower() != "active"
+            or not country
+            or side not in {"attacker", "defender"}
+            or not player_controls_country(state, action.player_id, country)
+        ):
+            return wars, relations, messages, news
+
+        side_a = set(self._tags(row.get("side_a")))
+        side_b = set(self._tags(row.get("side_b")))
+        if country in side_a or country in side_b:
+            return wars, relations, messages, news
+
+        if side == "attacker":
+            side_a.add(country)
+            opposing_side = side_b
+            joined_side_name = "attacking"
+        else:
+            side_b.add(country)
+            opposing_side = side_a
+            joined_side_name = "defending"
+        if not opposing_side:
+            return wars, relations, messages, news
+
+        updated = {
+            **row,
+            "side_a": sorted(side_a),
+            "side_b": sorted(side_b),
+        }
+        wars = self._replace_row(wars, WAR_SCHEMA, war_id, updated)
+        hostile_pairs = {
+            pair
+            for opponent in opposing_side
+            for pair in ((country, opponent), (opponent, country))
+        }
+        relations = self._set_relation_pairs(relations, hostile_pairs, -100.0)
+        messages = self._append_messages(
+            state,
+            messages,
+            [
+                {
+                    "country_id": participant,
+                    "category": "war",
+                    "subject": f"{country} joined the war",
+                    "body": f"{country} joined the {joined_side_name} coalition in {row.get('name') or war_id}.",
+                }
+                for participant in sorted(side_a | side_b)
+            ],
+        )
+        news = self._append_news(
+            state,
+            news,
+            f"{country} joins the war",
+            f"{country} joined the {joined_side_name} coalition in {row.get('name') or war_id}.",
+            "war",
+            country,
+            "warning",
+        )
+        return wars, relations, messages, news
+
     def _offer_peace(
         self,
         state: GameState,
@@ -582,7 +894,10 @@ class DiplomacySystem(ISystem):
         row = matches.to_dicts()[0]
         source = self._tag(action.source_country_tag)
         leader_a, leader_b = self._tag(row.get("leader_a")), self._tag(row.get("leader_b"))
-        if source not in {leader_a, leader_b}:
+        if (
+            source not in {leader_a, leader_b}
+            or not player_controls_country(state, action.player_id, source)
+        ):
             return wars, relations, messages, news
         intent_key = "intent_a" if source == leader_a else "intent_b"
         updated = {**row, intent_key: "war" if str(action.terms).strip().lower() == "war" else "peace"}

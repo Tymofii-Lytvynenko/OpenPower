@@ -1,0 +1,20 @@
+{
+  "fixture": "tests/ui/fixtures/reference-used-unit-market-grouped.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_market"},
+    {"op": "select", "target": "unit_market.type", "value": "Tank"},
+    {"op": "click", "target": "unit_market.listing.listing-pol-tanks"},
+    {"op": "click", "target": "unit_market.quantity.input"},
+    {"op": "replace_text", "target": "unit_market.quantity.input", "value": "12.3-4"},
+    {"op": "assert", "target": "unit_market.quantity.input", "type": "input_text", "value": "1234"},
+    {"op": "key", "key": "enter"},
+    {"op": "assert", "target": "unit_market.quantity.display", "type": "text_colored", "label": "1 234"},
+    {"op": "click", "target": "unit_market.quantity.input"},
+    {"op": "replace_text", "target": "unit_market.quantity.input", "value": "700"},
+    {"op": "assert", "target": "unit_market.quantity.input", "type": "input_text", "value": "700"},
+    {"op": "key", "key": "escape"},
+    {"op": "assert", "target": "unit_market.quantity.display", "type": "text_colored", "label": "700"},
+    {"op": "assert_region", "target": "unit_market.panel", "visible": true}
+  ]
+}

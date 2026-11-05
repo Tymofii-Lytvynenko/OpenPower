@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "loading.error.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "loading.error.heading",
+      "label": "OPERATION FAILED"
+    },
+    {
+      "op": "assert",
+      "target": "loading.error.details",
+      "label": "NewGameTask failed: the server refused campaign setup."
+    },
+    {
+      "op": "click",
+      "target": "loading.error.return"
+    }
+  ]
+}

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from src.client.ui.core.instrumented_imgui import imgui
-
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.panels.military.presenter import (
     MilitaryPresenter,
@@ -11,23 +10,31 @@ from src.client.ui.panels.military.presenter import (
     battle_status_label,
 )
 from src.client.ui.panels.shared.panel_data import resolve_region_name
-from src.client.ui.panels.shared.panel_widgets import draw_empty_state, draw_required_tables
+from src.client.ui.panels.shared.panel_widgets import (
+    draw_empty_state,
+    draw_required_tables,
+)
 from src.shared.actions import ActionSetBattleStrategy
 
 
 class BattleOverviewPanel:
-    def __init__(self):
+    def __init__(self, open_battle_cb=None):
         self._presenter = MilitaryPresenter()
+        self._open_battle = open_battle_cb
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        with WindowManager.window("BATTLE OVERVIEW", x=800, y=250, w=560, h=500) as is_open:
+        with WindowManager.window(
+            "BATTLE OVERVIEW", x=800, y=250, w=560, h=500,
+            test_id="battle_overview.panel",
+        ) as is_open:
             if not is_open:
                 return False
             self._render_content(state, context)
             return True
 
     def _render_content(self, state, context: PanelRenderContext) -> None:
-        draw_required_tables(state, ("battles",))
+        if not draw_required_tables(state, ("battles",)):
+            return
         imgui.separator()
 
         viewer_country = self._viewer_country(state, context)
@@ -45,6 +52,8 @@ class BattleOverviewPanel:
             )
             balance_ratio = max(0.0, min(1.0, model.balance if model else float(row.get("balance") or 0.0)))
             imgui.text(battle_id)
+            if self._open_battle is not None and imgui.small_button("INSPECT", test_id=f"battle.overview.inspect.{battle_id}"):
+                self._open_battle(battle_id)
             imgui.same_line()
             imgui.text_disabled(region_name)
             mode = model.mode_label if model else battle_mode_label(row.get("mode") or "positional")

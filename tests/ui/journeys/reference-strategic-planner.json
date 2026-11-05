@@ -1,0 +1,236 @@
+{
+  "fixture": "tests/ui/fixtures/reference-strategic-planner.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "strategic.payload_profile.usa-icbm"
+    },
+    {
+      "op": "assert",
+      "target": "strategic.payload_profile.option.usa-icbm.2",
+      "visible": true,
+      "label": "Level 2: 200 kt · 4.25 km"
+    },
+    {
+      "op": "click",
+      "target": "strategic.payload_profile.option.usa-icbm.2"
+    },
+    {
+      "op": "assert",
+      "target": "strategic.payload_profile.usa-icbm",
+      "type": "begin_combo",
+      "visible": true,
+      "relative_to": "strategic_warfare.panel",
+      "relative_rect": {"x": 14, "y": 106, "width": 210, "height": 14}
+    },
+    {
+      "op": "click",
+      "target": "strategic.planner.open"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.target.country",
+      "visible": true
+    },
+    {
+      "op": "select",
+      "target": "strategic.target.country_choice",
+      "value": "Specific location"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.target.select",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "strategic.target.cancel"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.target.select",
+      "visible": false,
+      "present": false
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.target.country",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "strategic.target.prepare"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.launch.dialog",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "strategic.launch.abort"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.launch.dialog",
+      "visible": false,
+      "present": false
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.target.country",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionLaunchStrategicStrike",
+      "count": 0
+    },
+    {
+      "op": "select",
+      "target": "strategic.target.country_choice",
+      "value": "Multiple countries"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.target.multiple",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "strategic.multiple.missiles"
+    },
+    {
+      "op": "assert",
+      "target": "strategic.missiles.weapon.usa-icbm",
+      "label": "usa-icbm (2/2)"
+    },
+    {
+      "op": "assert",
+      "target": "strategic.missiles.yield.usa-icbm",
+      "label": "200 kt"
+    },
+    {
+      "op": "assert",
+      "target": "strategic.missiles.origin.usa-icbm",
+      "label": "Kyiv"
+    },
+    {
+      "op": "assert",
+      "target": "strategic.missiles.target.usa-icbm",
+      "label": "Warsaw"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.missiles.dialog",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "strategic.missiles.none"
+    },
+    {
+      "op": "click",
+      "target": "strategic.missiles.confirm"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.missiles.dialog",
+      "visible": false,
+      "present": false
+    },
+    {
+      "op": "assert",
+      "target": "strategic.multiple.prepare",
+      "enabled": false
+    },
+    {
+      "op": "click",
+      "target": "strategic.multiple.missiles"
+    },
+    {
+      "op": "click",
+      "target": "strategic.missiles.all"
+    },
+    {
+      "op": "close_window",
+      "target": "strategic.missiles.dialog"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.missiles.dialog",
+      "visible": false,
+      "present": false
+    },
+    {
+      "op": "assert",
+      "target": "strategic.multiple.prepare",
+      "enabled": false
+    },
+    {
+      "op": "click",
+      "target": "strategic.multiple.missiles"
+    },
+    {
+      "op": "click",
+      "target": "strategic.missiles.all"
+    },
+    {
+      "op": "click",
+      "target": "strategic.missiles.confirm"
+    },
+    {
+      "op": "click",
+      "target": "strategic.multiple.prepare"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.launch.dialog",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "strategic.launch.abort"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.target.multiple",
+      "visible": true
+    },
+    {
+      "op": "close_window",
+      "target": "strategic.target.multiple"
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.target.multiple",
+      "visible": false,
+      "present": false
+    },
+    {
+      "op": "assert_region",
+      "target": "strategic.target.country",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "strategic.target.prepare"
+    },
+    {
+      "op": "click",
+      "target": "strategic.launch.confirm"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionLaunchStrategicStrike",
+      "fields": {
+        "country_tag": "UKR",
+        "target_region_id": 2,
+        "target_country_tag": "POL",
+        "weapon_id": "usa-icbm",
+        "target_mode": "military",
+        "payload_level": 2
+      }
+    }
+  ]
+}

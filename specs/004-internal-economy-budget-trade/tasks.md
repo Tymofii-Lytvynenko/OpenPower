@@ -49,6 +49,17 @@
 - [X] T017 **Follow-up performance issue recorded; the <5 ms target remains open and no further optimization is permitted in this pass.** Three optimization iterations are exhausted. Attempt 1 cached canonical post-sort market indices (9.43 ms combined); attempt 2 cached population-row alignment while refreshing population values every tick (9.45 ms combined); attempt 3 moved fast-path numeric validation to NumPy arrays (final same-revision runs: 8.44 ms, 8.54 ms, and 8.22 ms; latest breakdown 3.48 ms trade, 3.40 ms economy, 1.33 ms budget, one Polars thread). An intermediate repeated-Polars-validation variant measured 14.63 ms and was replaced within attempt 3. Parity tests pass; SC-003 is explicitly deferred to a future dedicated optimization pass.
 - [X] T018 Run the full regression suite after the current economy, diplomacy, schema, and test changes; latest result: 684 passed, 16 skipped, 116 warnings, 190 subtests passed in 162.89 s. The opt-in SC-003 benchmark remains separately failing at 8.22 ms after the three allowed optimization iterations.
 
+## Requirement Traceability
+
+| Requirement | Existing implementation and acceptance tasks |
+| --- | --- |
+| FR-001 | T004–T006 |
+| FR-002 | T004–T006 |
+| FR-003 | T007–T010 |
+| FR-004 | T007, T009 |
+| FR-005 | T011–T013 |
+| FR-006 | T002, T003, T014–T018 |
+
 ## Dependencies & Execution Order
 
 - T001–T003 establish measurement and deterministic-input contracts.

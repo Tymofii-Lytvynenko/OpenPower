@@ -1,0 +1,8 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-unit-design-tabs.json",
+      "surface": "game-hud"
+    }
+  ]
+}

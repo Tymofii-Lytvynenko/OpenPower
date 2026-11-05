@@ -177,6 +177,14 @@ class CampaignSystem(ISystem):
         if not self._country_exists(state, actor):
             self._result(state, action, "rejected", "The selected country has no current country record.")
             return
+        player_party_id = str(action.player_party_id or "").strip()
+        if player_party_id and not any(
+            self._tag(row.get("country_id")) == actor
+            and str(row.get("party_id") or "").strip().casefold() == player_party_id.casefold()
+            for row in self._rows(state.tables.get("political_parties"))
+        ):
+            self._result(state, action, "rejected", "The selected political party is unavailable for this country.")
+            return
         try:
             selectable = self._json_list(scenario.get("selectable_country_ids_json") or "[]", "selectable countries")
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
@@ -243,6 +251,7 @@ class CampaignSystem(ISystem):
             "scenario_id": str(scenario["id"]),
             "player_id": str(action.player_id),
             "actor_country_id": actor,
+            "player_party_id": player_party_id,
             "actor_scope": actor_scope,
             "started_at_minute": now,
             "setup_applied": True,
@@ -1150,6 +1159,8 @@ class CampaignSystem(ISystem):
                 str(item.get("campaign_id") or ""),
                 str(item.get("source_signal") or ""),
             ) not in current_signals:
+                if str(item.get("source_signal") or "").startswith("ai_policy:"):
+                    continue
                 item["status"] = "stale"
                 item["stale_reason"] = "The source signal is no longer active."
                 changed = True

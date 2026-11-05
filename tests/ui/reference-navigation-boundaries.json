@@ -1,0 +1,44 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-budget-remember-apply.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-covert-train.json",
+      "surface": "covert-ops"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-resources-close-apply.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-advisor-close.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-request_war_declaration.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-alliance.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-free_region.inverted.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/main-bar-layout.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-unavailable.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-tutorial-compact-placement.json",
+      "surface": "game-hud"
+    }
+  ]
+}

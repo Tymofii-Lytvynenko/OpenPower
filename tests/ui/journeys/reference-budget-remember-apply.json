@@ -1,0 +1,40 @@
+{
+  "fixture": "tests/ui/fixtures/reference-resource-policy.json",
+  "steps": [
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "economy.budget_btn" },
+    { "op": "input", "target": "budget.income_tax_rate", "value": 35.0 },
+    { "op": "close_window", "target": "budget.panel" },
+    { "op": "check", "target": "budget.close.remember", "value": true },
+    { "op": "click", "target": "budget.close.apply" },
+    { "op": "click", "target": "economy.budget_btn" },
+    { "op": "input", "target": "budget.income_tax_rate", "value": 45.0 },
+    { "op": "close_window", "target": "budget.panel" },
+    { "op": "assert_absent", "target": "budget.close.apply" },
+    { "op": "click", "target": "economy.resources_btn" },
+    { "op": "click", "target": "resources.category.energy" },
+    { "op": "click", "target": "resources.resource.oil" },
+    { "op": "select", "target": "resources.policy.management", "value": "State Monopoly" },
+    { "op": "close_window", "target": "resources.panel" },
+    { "op": "assert_absent", "target": "resources.close.apply" },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateBudget",
+      "count": 2,
+      "fields": {
+        "country_tag": "UKR",
+        "allocations.personal_income_tax_rate": 0.45
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResourcePolicy",
+      "count": 1,
+      "fields": {
+        "country_tag": "UKR",
+        "resource_id": "oil",
+        "is_gov_controlled": true
+      }
+    }
+  ]
+}

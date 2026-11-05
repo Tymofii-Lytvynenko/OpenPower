@@ -1,0 +1,48 @@
+{
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "multiplayer.server_info.dialog",
+      "visible": true,
+      "inside_viewport": true,
+      "min_width": 346,
+      "min_height": 179
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.server_info.name",
+      "visible": true,
+      "label": "OpenPower Test Lobby"
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.server_info.address",
+      "visible": true,
+      "label": "192.0.2.10"
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.server_info.players",
+      "visible": true,
+      "label": "2/8"
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.server_info.mod",
+      "visible": true,
+      "label": "OpenPower"
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.server_info.scenario",
+      "visible": true,
+      "label": "Test Scenario"
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.server_info.join",
+      "visible": true,
+      "enabled": true
+    }
+  ]
+}

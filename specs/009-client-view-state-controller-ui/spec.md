@@ -32,6 +32,14 @@ As a player navigating OpenPower, I want a unified view management system (`Navi
 | `src/client/ui/components/hud/context_menu.py` | Mouse right-click context menu | `ContextMenu` |
 | `utils/validate_economy.py` | Offline TOML data validation tool | `validate_file`, `load_gdp_data` |
 
+## Functional Requirements
+
+- **FR-001**: A player MUST be able to navigate among the main menu, new-game, load-game, loading, and active-game views; each transition MUST release resources and handlers owned by the previous view.
+- **FR-002**: Loading flows MUST report progress, support cancellation, and ignore late completion from a view that is no longer active.
+- **FR-003**: New-game and load-game flows MUST create sessions through the injected session factory and release partially created sessions after failure or cancellation.
+- **FR-004**: Audio playback MUST support track replacement, looping, bounded volume, and recoverable missing-asset or playback errors.
+- **FR-005**: Startup progress and terminal status MUST be consumed without blocking the render loop, and window resize events MUST reach the active view.
+
 ## Success Criteria
 
 - **SC-001**: Smooth View Transitions: View switches complete within 1 frame (16ms) without memory leaks or dangling event handlers.

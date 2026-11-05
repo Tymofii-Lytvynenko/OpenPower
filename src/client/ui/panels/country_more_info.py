@@ -8,9 +8,14 @@ from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.renderers.country_region_map import CountryMapTexture, CountryRegionMapTextureCache
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.panel_context import PanelRenderContext
-from src.client.ui.core.primitives import UIPrimitives as Prims
 from src.client.ui.core.theme import GAMETHEME
+from src.client.ui.layouts.gml_layout import (
+    active_gml_layout,
+    draw_gml_separator,
+    get_gml_layout,
+)
 from src.client.ui.panels.shared.panel_data import (
     as_percent,
     get_country_row,
@@ -47,11 +52,13 @@ class CountryMoreInfoModel:
     world_area_share_pct: float
     population_total: int
     population_bands: tuple[PopulationBand, ...]
+    population_available: bool
     density_per_km2: float
     human_dev_pct: float
-    world_human_dev_pct: float
+    world_human_dev_pct: float | None
     infrastructure_pct: float
     telecom_pct: float
+    land_area_available: bool
     poverty_pct: float
     fertility_rate: float
     life_expectancy: float
@@ -73,6 +80,11 @@ class CountryMoreInfoPresenter:
         population_total = sum(band.value for band in population_bands)
         land_area = self._sum_column(country_regions, "area_km2")
         world_area = self._sum_column(getattr(state, "tables", {}).get("regions"), "area_km2")
+        population_available = (
+            not country_regions.is_empty()
+            and {"pop_14", "pop_15_64", "pop_65"}.issubset(country_regions.columns)
+        )
+        land_area_available = not country_regions.is_empty() and "area_km2" in country_regions.columns
 
         return CountryMoreInfoModel(
             tag=tag,
@@ -83,11 +95,16 @@ class CountryMoreInfoPresenter:
             world_area_share_pct=(land_area / world_area * 100.0) if world_area > 0 else 0.0,
             population_total=population_total,
             population_bands=population_bands,
+            population_available=population_available,
             density_per_km2=(population_total / land_area) if land_area > 0 else 0.0,
             human_dev_pct=as_percent(country_row.get("human_dev")),
-            world_human_dev_pct=self._world_average_pct(state, "human_dev"),
-            infrastructure_pct=as_percent(country_row.get("budget_infra_ratio")),
-            telecom_pct=as_percent(country_row.get("budget_telecom_ratio")),
+            # Averaging country HDI values would invent semantics for the missing world-level indicator.
+            # Source formula: GDataControlLayer::AverageHumanDevelopment.
+            world_human_dev_pct=None,
+            # These are national service indices; budget ratios describe spending allocation.
+            infrastructure_pct=as_percent(country_row.get("infrastructure_index")),
+            telecom_pct=as_percent(country_row.get("telecom_index")),
+            land_area_available=land_area_available,
             poverty_pct=as_percent(country_row.get("poverty_rate")),
             fertility_rate=safe_float(country_row.get("fertility_rate")),
             life_expectancy=safe_float(country_row.get("life_expectancy")),
@@ -227,15 +244,6 @@ class CountryMoreInfoPresenter:
 
         return "Regional metadata is not available."
 
-    def _world_average_pct(self, state, column: str) -> float:
-        countries = getattr(state, "tables", {}).get("countries")
-        if countries is None or countries.is_empty() or column not in countries.columns:
-            return 0.0
-        try:
-            return as_percent(countries[column].mean())
-        except Exception:
-            return 0.0
-
     def _sum_column(self, df: pl.DataFrame | None, column: str) -> float:
         if df is None or df.is_empty() or column not in df.columns:
             return 0.0
@@ -263,95 +271,215 @@ class CountryMoreInfoPanel:
     def render(self, state, context: PanelRenderContext) -> bool:
         model = self._presenter.build(state, context.target_tag)
         title = f"{model.name.upper()}##COUNTRY_MORE_INFO"
-        with WindowManager.window(title, x=420, y=100, w=780, h=620) as is_open:
+        layout = get_gml_layout("Country_Information_Window")
+        viewport = imgui.get_io().display_size
+        window_x = (float(viewport.x) - layout.width) / 2.0
+        window_y = min(60.0, max(0.0, float(viewport.y) - layout.height))
+        with WindowManager.window(
+            title,
+            x=window_x,
+            y=window_y,
+            w=layout.width,
+            h=layout.height,
+            test_id="country_more_info.panel",
+        ) as is_open:
             if not is_open:
                 return False
 
-            imgui.begin_child("CountryMoreInfoScroll", (0, 0), False)
-            try:
-                self._render_content(model)
-            finally:
-                imgui.end_child()
-
+            self._render_content(model)
             return True
 
     def _render_content(self, model: CountryMoreInfoModel) -> None:
-        table_flags = imgui.TableFlags_.sizing_stretch_prop | imgui.TableFlags_.borders_inner_v
-        if not imgui.begin_table("country_more_info_columns", 2, table_flags):
-            self._render_map_column(model)
-            imgui.separator()
-            self._render_stats_column(model)
+        ui = GMLWidgets("Country_Information_Window/frmInner")
+        # Child windows suspend the active GML slot mapper, so source frames are drawn on the parent canvas.
+        for frame in (
+            "frmLand",
+            "frmHumanDevelopment",
+            "frmPopulation",
+            "frmTerrain",
+            "frmClimate",
+            "frmLand/frmMap",
+            "frmHumanDevelopment/frmInner",
+            "frmClimate/frmInner",
+        ):
+            self._draw_source_frame(ui, frame)
+        self._render_land_frame(ui, model)
+        self._render_human_development_frame(ui, model)
+        self._render_population_frame(ui, model)
+        self._render_terrain_frame(ui, model)
+        self._render_climate_frame(ui)
+
+    def _render_land_frame(self, ui: GMLWidgets, model: CountryMoreInfoModel) -> None:
+        ui.picture(
+            "frmLand/frmMap/frmMap",
+            lambda width, height: self._draw_region_map(model, width, height),
+        )
+        for label_slot, meter_slot, value_slot, label in (
+            ("lblArableLand", "frmArableLand", "txtArableLand", "Arable land"),
+            ("lblForests", "frmForests", "txtForests", "Forests"),
+            ("lblNationalParks", "frmNationalParks", "txtNationalParks", "National parks"),
+            ("lblUnusable", "frmUnusable", "txtUnusable", "Unusable land"),
+        ):
+            ui.text(f"frmLand/{label_slot}", label)
+            ui.meter(f"frmLand/{meter_slot}", 0.0, GAMETHEME.colors.info)
+            ui.text(
+                f"frmLand/{value_slot}",
+                "—",
+                tooltip="Land-cover percentages are not available in OpenPower data.",
+                test_id=f"country.info.land_cover.{value_slot}",
+            )
+
+    def _render_human_development_frame(self, ui: GMLWidgets, model: CountryMoreInfoModel) -> None:
+        ui.text("frmHumanDevelopment/lblTitle", "HUMAN DEVELOPMENT")
+        country_value = self._format_percent(model.human_dev_pct)
+        world_value = (
+            self._format_percent(model.world_human_dev_pct)
+            if model.world_human_dev_pct is not None
+            else "—"
+        )
+        ui.text(
+            "frmHumanDevelopment/frmInner/lblCountry",
+            f"{model.name}: {country_value}",
+            tooltip="OpenPower human-development index for this country.",
+            test_id="country.info.hdi.country",
+        )
+        ui.meter(
+            "frmHumanDevelopment/frmInner/picCountry",
+            model.human_dev_pct / 100.0,
+            GAMETHEME.colors.positive,
+        )
+        ui.text(
+            "frmHumanDevelopment/frmInner/lblWorld",
+            f"World: {world_value}",
+            tooltip=(
+                "REFERENCE derives world HDI from aggregated life expectancy, schooling and GDP per capita. "
+                "OpenPower does not yet have all required inputs."
+            ),
+            test_id="country.info.hdi.world",
+        )
+        ui.meter(
+            "frmHumanDevelopment/frmInner/picWorld",
+            model.world_human_dev_pct / 100.0 if model.world_human_dev_pct is not None else 0.0,
+            GAMETHEME.colors.warning,
+        )
+        draw_gml_separator(ui.path("frmHumanDevelopment/picSep"), color=GAMETHEME.colors.text_dim)
+        ui.text("frmHumanDevelopment/lblInfrastructure", "Infrastructure")
+        ui.text(
+            "frmHumanDevelopment/txtInfrastructure",
+            self._format_percent(model.infrastructure_pct),
+            test_id="country.info.infrastructure.value",
+        )
+        ui.text("frmHumanDevelopment/lblTelecommunication", "Telecommunication")
+        ui.text(
+            "frmHumanDevelopment/txtTelecom",
+            self._format_percent(model.telecom_pct),
+            test_id="country.info.telecom.value",
+        )
+
+    def _render_population_frame(self, ui: GMLWidgets, model: CountryMoreInfoModel) -> None:
+        ui.text("frmPopulation/lblTitle", "POPULATION")
+        fields = (
+            ("lbl15", "txt15", "txt15Ratio", model.population_bands[0], "0–14"),
+            ("lbl1565", "txt1565", "txt1565Ratio", model.population_bands[1], "15–64"),
+            ("lbl65", "txt65", "txt65Ratio", model.population_bands[2], "65+"),
+        )
+        for label_slot, value_slot, ratio_slot, band, label in fields:
+            ui.text(f"frmPopulation/{label_slot}", label)
+            ui.text(
+                f"frmPopulation/{value_slot}",
+                self._format_population_value(model, band.value),
+                test_id=f"country.info.population.{label}.value",
+            )
+            ui.text(
+                f"frmPopulation/{ratio_slot}",
+                f"{band.percent:.1f} %" if model.population_available else "—",
+            )
+
+        ui.text("frmPopulation/lblTotal", "Total")
+        ui.text(
+            "frmPopulation/txtTotal",
+            self._format_population_value(model, model.population_total),
+            test_id="country.info.population.total",
+        )
+        ui.text(
+            "frmPopulation/txtTotalRatio",
+            "100.0 %" if model.population_available else "—",
+        )
+        draw_gml_separator(ui.path("frmPopulation/picSep"), color=GAMETHEME.colors.text_dim)
+        ui.text("frmPopulation/lblBirthRate", "Birth rate")
+        ui.text(
+            "frmPopulation/txtBirthRate",
+            "—",
+            tooltip="Birth-rate data is not available in OpenPower.",
+            test_id="country.info.birth_rate.value",
+        )
+        ui.text("frmPopulation/lblDeathRate", "Death rate")
+        ui.text(
+            "frmPopulation/txtDeathRate",
+            "—",
+            tooltip="Death-rate data is not available in OpenPower.",
+            test_id="country.info.death_rate.value",
+        )
+
+    def _render_terrain_frame(self, ui: GMLWidgets, model: CountryMoreInfoModel) -> None:
+        ui.text("frmTerrain/lblTitle", "TERRAIN")
+        ui.text("frmTerrain/lblLandArea", "Land area (km²)")
+        ui.text(
+            "frmTerrain/txtLandArea",
+            self._format_int(model.land_area_km2) if model.land_area_available else "—",
+            tooltip="Sum of OpenPower region areas under this country's control.",
+            test_id="country.info.land_area.value",
+        )
+        ui.text("frmTerrain/lblWaterArea", "Water area")
+        ui.text(
+            "frmTerrain/txtWaterArea",
+            "—",
+            tooltip="Water-area data is not available in OpenPower.",
+            test_id="country.info.water_area.value",
+        )
+        ui.text("frmTerrain/lblTotalArea", "Total area")
+        ui.text(
+            "frmTerrain/txtTotalArea",
+            "—",
+            tooltip="Total-area data is not available in OpenPower.",
+            test_id="country.info.total_area.value",
+        )
+
+    def _render_climate_frame(self, ui: GMLWidgets) -> None:
+        ui.text("frmClimate/lblTitle", "CLIMATE")
+        ui.text(
+            "frmClimate/frmInner/lblClimate",
+            "—",
+            tooltip="Climate identifiers are not available in OpenPower data.",
+            test_id="country.info.climate.value",
+        )
+
+    def _draw_source_frame(self, ui: GMLWidgets, slot: str) -> None:
+        session = active_gml_layout()
+        rect = ui.rect(slot)
+        if session is None or rect is None:
             return
 
-        try:
-            imgui.table_setup_column("Map", imgui.TableColumnFlags_.width_fixed, 365.0)
-            imgui.table_setup_column("Stats", imgui.TableColumnFlags_.width_stretch)
-            imgui.table_next_row()
+        x = session.window_position[0] + rect.x - imgui.get_scroll_x()
+        y = session.window_position[1] + rect.y - imgui.get_scroll_y()
+        draw_list = imgui.get_window_draw_list()
+        minimum = (x, y)
+        maximum = (x + rect.width, y + rect.height)
+        draw_list.add_rect_filled(
+            minimum,
+            maximum,
+            imgui.get_color_u32(GAMETHEME.colors.panel_bg_dark),
+        )
+        draw_list.add_rect(
+            minimum,
+            maximum,
+            imgui.get_color_u32((0.3, 0.3, 0.3, 0.55)),
+            0.0,
+            flags=0,
+            thickness=1.0,
+        )
 
-            imgui.table_next_column()
-            self._render_map_column(model)
-
-            imgui.table_next_column()
-            self._render_stats_column(model)
-        finally:
-            imgui.end_table()
-
-    def _render_map_column(self, model: CountryMoreInfoModel) -> None:
-        Prims.header("REGION MAP")
-        self._render_map_frame(model)
-
-        imgui.dummy((0, 8))
-        Prims.header("REGIONAL MAKEUP", show_bg=False)
-        if model.composition_rows:
-            for row in model.composition_rows:
-                Prims.meter_row(row.label, row.percent, row.color, row.value, label_width=125.0)
-        else:
-            imgui.text_disabled("No regional composition data.")
-
-        imgui.dummy((0, 8))
-        Prims.header("TERRAIN", show_bg=False)
-        Prims.value_row("Land area (km2)", self._format_int(model.land_area_km2))
-        Prims.value_row("World share", f"{model.world_area_share_pct:.2f} %")
-        Prims.value_row("Regions", self._format_int(model.region_count))
-        Prims.value_row("Density", f"{model.density_per_km2:.1f} / km2")
-
-    def _render_stats_column(self, model: CountryMoreInfoModel) -> None:
-        Prims.header("HUMAN DEVELOPMENT LEVEL")
-        Prims.meter_row(model.name, model.human_dev_pct, GAMETHEME.colors.positive)
-        Prims.meter_row("World average", model.world_human_dev_pct, GAMETHEME.colors.warning)
-
-        imgui.dummy((0, 8))
-        Prims.header("INFRASTRUCTURE", show_bg=False)
-        Prims.meter_row("Infrastructure", model.infrastructure_pct, GAMETHEME.colors.info)
-        Prims.meter_row("Telecom", model.telecom_pct, GAMETHEME.colors.demographics)
-        Prims.meter_row("Poverty", model.poverty_pct, GAMETHEME.colors.negative)
-
-        imgui.dummy((0, 8))
-        Prims.header("POPULATION")
-        for band in model.population_bands:
-            value = f"{self._format_int(band.value)}    {band.percent:.1f} %"
-            Prims.value_row(band.label, value, label_width=130.0)
-        Prims.value_row("Total", self._format_int(model.population_total), GAMETHEME.colors.accent, 130.0)
-
-        imgui.dummy((0, 6))
-        Prims.value_row("Fertility rate", f"{model.fertility_rate:.2f}", label_width=130.0)
-        Prims.value_row("Life expectancy", f"{model.life_expectancy:.1f}", label_width=130.0)
-
-        imgui.dummy((0, 8))
-        Prims.header("PRODUCTION MIX", show_bg=False)
-        if model.production_rows:
-            for row in model.production_rows:
-                Prims.meter_row(row.label, row.percent, row.color, row.value, label_width=150.0)
-        else:
-            imgui.text_disabled("No production data.")
-
-        imgui.dummy((0, 8))
-        Prims.header("CLIMATE / REGIONS", show_bg=False)
-        imgui.text_wrapped(model.region_summary)
-
-    def _render_map_frame(self, model: CountryMoreInfoModel) -> None:
-        frame_w = imgui.get_content_region_avail().x
-        frame_h = 245.0
+    def _draw_region_map(self, model: CountryMoreInfoModel, frame_w: float, frame_h: float) -> None:
         p = imgui.get_cursor_screen_pos()
         draw_list = imgui.get_window_draw_list()
         draw_list.add_rect_filled(
@@ -372,15 +500,14 @@ class CountryMoreInfoPanel:
         texture = self._map_textures.get_texture(map_data, model.region_ids)
         if texture is None:
             self._render_map_placeholder(p, frame_w, frame_h)
-            imgui.set_cursor_screen_pos((p.x, p.y + frame_h + 6.0))
             return
 
         draw_w, draw_h = self._fit_texture(texture, frame_w - 14.0, frame_h - 14.0)
         draw_x = p.x + (frame_w - draw_w) * 0.5
         draw_y = p.y + (frame_h - draw_h) * 0.5
         imgui.set_cursor_screen_pos((draw_x, draw_y))
-        self._map_textures.draw_texture(texture, draw_w, draw_h)
-        imgui.set_cursor_screen_pos((p.x, p.y + frame_h + 6.0))
+        self._map_textures.draw_texture(texture, draw_w, draw_h, test_id="country.info.region_map")
+        imgui.set_cursor_screen_pos((p.x, p.y))
 
     def _render_map_placeholder(self, origin, width: float, height: float) -> None:
         text = "No region map"
@@ -401,3 +528,9 @@ class CountryMoreInfoPanel:
 
     def _format_int(self, value: float | int) -> str:
         return f"{int(round(float(value))):,}".replace(",", " ")
+
+    def _format_percent(self, value: float) -> str:
+        return f"{value:.1f} %"
+
+    def _format_population_value(self, model: CountryMoreInfoModel, value: int) -> str:
+        return self._format_int(value) if model.population_available else "—"

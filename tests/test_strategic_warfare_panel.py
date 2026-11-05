@@ -7,9 +7,11 @@ import polars as pl
 
 from modules.base.schema import ensure_base_tables
 from src.client.ui.panels.military.presenter import MilitaryPresenter
+from src.client.ui.panels.military.strategic_planner import StrategicPlanner
 from src.client.ui.panels.military.strategic_warfare_panel import StrategicWarfarePanel
 from src.shared.actions import ActionProduceStrategicWeapon
 from src.shared.state import GameState
+from src.client.ui.panels.military.strategic_plan import StrategicPlan
 
 
 def _strategic_ui_state() -> GameState:
@@ -47,6 +49,65 @@ def _strategic_ui_state() -> GameState:
     }], schema=state.get_table("missile_defense_layers").schema))
     state.globals["strategic_authorization_policy"] = "war"
     return state
+
+
+def test_strategic_draft_builds_only_authorized_intent():
+    state = _strategic_ui_state()
+    plan = StrategicPlan(country="USA", target_region=2, selected_weapons={"usa-icbm"})
+    actions, reasons = plan.actions(state, MilitaryPresenter(), "local")
+    assert not reasons
+    assert len(actions) == 1
+    assert actions[0].target_country_tag == "CAN"
+    assert state.tables["strategic_launch_orders"].is_empty()
+
+
+def test_planner_preserves_selected_payload_profile_in_launch_action():
+    state = _strategic_ui_state()
+    presenter = MilitaryPresenter()
+    planner = StrategicPlanner(presenter)
+    selected_payloads = {"usa-icbm": 2}
+
+    planner.open("USA", 2, payload_levels=selected_payloads)
+    selected_payloads["usa-icbm"] = 1
+    planner.plan.selected_weapons.add("usa-icbm")
+
+    actions, reasons = planner.plan.actions(state, presenter, "local")
+
+    assert not reasons
+    assert len(actions) == 1
+    assert actions[0].payload_level == 2
+
+
+def test_strategic_draft_rechecks_inventory_before_dispatch():
+    state = _strategic_ui_state()
+    plan = StrategicPlan(country="USA", target_region=2, selected_weapons={"usa-icbm"})
+    state.update_table("strategic_weapons", state.tables["strategic_weapons"].with_columns(pl.lit(0).alias("ready")))
+    actions, reasons = plan.actions(state, MilitaryPresenter(), "local")
+    assert not actions
+    assert any("not ready" in reason for reason in reasons)
+
+
+def test_multiple_target_draft_is_not_partially_dispatched():
+    state = _strategic_ui_state()
+    weapon = state.tables["strategic_weapons"].to_dicts()[0]
+    weapon["launch_cost"] = 60.0
+    state.update_table("strategic_weapons", pl.DataFrame([weapon, dict(weapon,id="second")],
+                       schema=state.tables["strategic_weapons"].schema))
+    plan = StrategicPlan(country="USA", selected_weapons={"usa-icbm", "second"},
+                         assignments={"usa-icbm": 2, "second": 2})
+    actions, reasons = plan.actions(state, MilitaryPresenter(), "local", multiple=True)
+    assert not actions
+    assert any("complete launch plan" in reason for reason in reasons)
+
+
+def test_draft_needs_current_target_and_authorization():
+    state = _strategic_ui_state()
+    plan = StrategicPlan(country="USA", target_region=2, selected_weapons={"missing", "usa-icbm"})
+    assert not plan.actions(state, MilitaryPresenter(), "local")[0]
+    plan.selected_weapons = {"usa-icbm"}
+    state.update_table("countries_wars", state.tables["countries_wars"].clear())
+    actions, reasons = plan.actions(state, MilitaryPresenter(), "local")
+    assert not actions and reasons
 
 
 def test_strategic_previews_show_range_authorization_timing_and_layer_estimate() -> None:
@@ -102,7 +163,11 @@ def test_panel_renders_all_configured_payload_options_and_target_defense_estimat
 
     rendered = " ".join(
         str(call.args[0])
-        for call in mock_imgui.text.call_args_list + mock_imgui.text_disabled.call_args_list
+        for call in (
+            mock_imgui.text.call_args_list
+            + mock_imgui.text_disabled.call_args_list
+            + mock_imgui.text_wrapped.call_args_list
+        )
     )
     payload_options = " ".join(str(call.args[0]) for call in mock_imgui.selectable.call_args_list)
     assert "Level 2: 200 kt · 4.25 km" in payload_options
@@ -125,7 +190,7 @@ def test_panel_dispatches_production_action_for_configured_design() -> None:
     )
     mock_imgui = MagicMock()
     mock_imgui.begin_combo.return_value = False
-    mock_imgui.button.side_effect = [False, False, True]
+    mock_imgui.button.side_effect = lambda label, *args, **kwargs: label.startswith("PRODUCE ONE")
 
     with patch("src.client.ui.panels.military.strategic_warfare_panel.imgui", mock_imgui), patch(
         "src.client.ui.panels.military.strategic_warfare_panel.draw_required_tables"

@@ -129,11 +129,21 @@ def test_all_opposing_war_participants_must_accept_then_package_applies_atomical
 
     state.current_actions = [ActionRespondPeaceDeal("CAN", deal_id, "CAN", True)]
     system.update(state, 0.0)
+    response = state.journal.command_results[-1]
+    assert response["action_type"] == "ActionRespondPeaceDeal"
+    assert response["status"] == "applied"
+    assert response["deal_id"] == deal_id
+    assert response["country_id"] == "CAN"
     assert state.get_table("peace_deals").item(0, "status") == "pending"
     assert state.get_table("regions").filter(pl.col("id") == 2).item(0, "owner") == "USA"
 
     state.current_actions = [ActionRespondPeaceDeal("GBR", deal_id, "GBR", True)]
     system.update(state, 0.0)
+    response = state.journal.command_results[-1]
+    assert response["action_type"] == "ActionRespondPeaceDeal"
+    assert response["status"] == "applied"
+    assert response["deal_id"] == deal_id
+    assert response["country_id"] == "GBR"
 
     assert state.get_table("peace_deals").item(0, "status") == "accepted"
     assert state.get_table("debt_contracts").item(0, "debt_type") == "reparations"
@@ -173,16 +183,33 @@ def test_invalid_clause_or_unauthorized_responder_cannot_partially_apply_a_deal(
     ]
     system.update(state, 0.0)
     assert state.get_table("peace_deals").is_empty()
+    rejection = state.journal.command_results[-1]
+    assert rejection["action_type"] == "ActionSubmitPeaceDeal"
+    assert rejection["status"] == "rejected"
+    assert rejection["war_id"] == "war-1"
+    assert rejection["country_id"] == "USA"
+    assert "region" in rejection["reason"].lower()
 
     state.current_actions = [
         ActionSubmitPeaceDeal("USA", "war-1", "USA", offered_clauses=_clauses())
     ]
     system.update(state, 0.0)
+    submission = state.journal.command_results[-1]
+    assert submission["action_type"] == "ActionSubmitPeaceDeal"
+    assert submission["status"] == "applied"
+    assert submission["war_id"] == "war-1"
+    assert submission["country_id"] == "USA"
+    assert submission["deal_id"] == state.get_table("peace_deals").item(0, "id")
     deal_id = state.get_table("peace_deals").item(0, "id")
     before = state.get_table("countries").select("id", "money_reserves")
     state.current_actions = [ActionRespondPeaceDeal("USA", deal_id, "CAN", True)]
     system.update(state, 0.0)
 
+    rejection = state.journal.command_results[-1]
+    assert rejection["action_type"] == "ActionRespondPeaceDeal"
+    assert rejection["status"] == "rejected"
+    assert rejection["deal_id"] == deal_id
+    assert rejection["country_id"] == "CAN"
     assert state.get_table("peace_deals").item(0, "status") == "pending"
     assert state.get_table("countries").select("id", "money_reserves").equals(before)
     assert state.get_table("debt_contracts").is_empty()

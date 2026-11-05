@@ -42,6 +42,20 @@ def filter_selectable_countries(
     )
 
 
+def filter_playable_countries(countries: pl.DataFrame) -> pl.DataFrame:
+    """Filter non-playable countries when the snapshot includes that metadata."""
+    if countries.is_empty() or "id" not in countries.columns:
+        return countries
+    if "is_playable" not in countries.columns:
+        # Some snapshots expose only the runtime country schema; bootstrap treats missing metadata as playable.
+        return countries
+
+    playable = pl.col("is_playable")
+    if countries.schema["is_playable"] != pl.Boolean:
+        playable = playable.cast(pl.Utf8).str.to_lowercase().is_in(("true", "1", "yes"))
+    return countries.filter(playable.fill_null(True))
+
+
 def preview_campaign_scenario(scenario: Mapping[str, Any] | None) -> CampaignScenarioPreview:
     if scenario is None:
         return CampaignScenarioPreview("Country", (), (), 0)

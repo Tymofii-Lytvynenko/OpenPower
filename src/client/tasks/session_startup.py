@@ -13,6 +13,7 @@ from src.shared.state import GameState
 
 logger = logging.getLogger(__name__)
 ProgressCallback = Callable[[float, str], None]
+INITIAL_STATE_TIMEOUT_SECONDS = 30.0
 
 
 class TaskCancelledError(RuntimeError):
@@ -78,10 +79,14 @@ def wait_for_initial_state(
     session: ClientSessionPort,
     *,
     cancel_event: Event,
-    timeout: float = 5.0,
+    timeout: float = INITIAL_STATE_TIMEOUT_SECONDS,
     poll_interval: float = 0.05,
 ) -> GameState:
-    """Pump session IPC while waiting for the first authoritative snapshot."""
+    """Pump session IPC while waiting for the first authoritative snapshot.
+
+    A full world snapshot can take longer to serialize and decode than a test
+    fixture, so callers may cancel the wait while it uses a realistic deadline.
+    """
     deadline = time.monotonic() + timeout
     while True:
         check_cancelled(cancel_event)

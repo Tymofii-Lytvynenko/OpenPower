@@ -1,0 +1,14 @@
+{
+  "fixture": "tests/ui/fixtures/reference-resource-policy.json",
+  "steps": [
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "economy.resources_btn" },
+    { "op": "click", "target": "resources.category.energy" },
+    { "op": "click", "target": "resources.resource.oil" },
+    { "op": "select", "target": "resources.policy.management", "value": "State Monopoly" },
+    { "op": "close_window", "target": "resources.panel" },
+    { "op": "assert_region", "target": "resources.close.confirmation", "visible": true },
+    { "op": "click", "target": "resources.close.discard" },
+    { "op": "assert_action", "type": "ActionUpdateResourcePolicy", "count": 0 }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "tables": {
+    "countries_treaties": [
+      {
+        "id": "main-bar-transit",
+        "type": "military_trespassing_right",
+        "status": "active",
+        "members": ["UKR", "POL"],
+        "side_a": ["UKR"],
+        "side_b": ["POL"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-design-routes.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_design"},
+    {"op": "assert_region", "target": "unit_design.panel", "visible": true, "min_width": 324, "min_height": 414},
+    {"op": "assert", "target": "unit_design.tab.unit_view", "visible": true, "label": "UNIT VIEW", "relative_rect": {"x": 28, "y": 338, "width": 101, "height": 16}, "relative_to": "unit_design.panel", "tolerance": 1.0},
+    {"op": "assert", "target": "unit_design.tab.statistics", "visible": true, "label": "STATISTICS", "relative_rect": {"x": 128, "y": 338, "width": 101, "height": 16}, "relative_to": "unit_design.panel", "tolerance": 1.0},
+    {"op": "assert", "target": "unit_design.model.unavailable", "visible": true, "label": "3D model preview unavailable in OpenPower."},
+    {"op": "click", "target": "unit_design.tab.statistics"},
+    {"op": "assert_absent", "target": "unit_design.model.unavailable"},
+    {"op": "assert", "target": "unit_design.statistics.gun_range.label", "visible": true, "label": "Gun range", "relative_rect": {"x": 44, "y": 174, "width": 37, "height": 9}, "relative_to": "unit_design.panel", "tolerance": 0.1},
+    {"op": "assert_absent", "target": "unit_design.statistics.sensors.label"},
+    {"op": "drag", "target": "unit_design.statistics.scrollbar", "fraction": 1.0},
+    {"op": "assert_absent", "target": "unit_design.statistics.gun_range.label"},
+    {"op": "assert", "target": "unit_design.statistics.sensors.label", "visible": true, "label": "Sensors", "relative_rect": {"x": 44, "y": 317, "width": 28, "height": 9}, "relative_to": "unit_design.panel", "tolerance": 0.1},
+    {"op": "assert_region", "target": "unit_design.panel", "visible": true},
+    {"op": "click", "target": "unit_design.tab.unit_view"},
+    {"op": "assert", "target": "unit_design.model.unavailable", "visible": true}
+  ]
+}

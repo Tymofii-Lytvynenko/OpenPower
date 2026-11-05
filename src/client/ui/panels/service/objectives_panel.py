@@ -2,24 +2,39 @@ from __future__ import annotations
 
 import json
 
-from src.client.ui.core.instrumented_imgui import imgui
-
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.primitives import UIPrimitives as Prims
 from src.client.ui.core.theme import GAMETHEME
+from src.client.ui.layouts.gml_layout import get_gml_layout
 from src.client.ui.panels.service.campaign_presenter import CampaignPresenter
+from src.client.ui.panels.service.objectives_window_content import (
+    ObjectivesWindowContent,
+)
 from src.client.ui.panels.shared.panel_widgets import draw_empty_state
-from src.shared.actions import ActionSetSphereDelegation
+from src.shared.actions import (
+    ActionResolveAdvisorRecommendation,
+    ActionSetSphereDelegation,
+)
 
 
 class ObjectivesPanel:
     def __init__(self):
         self._presenter = CampaignPresenter()
         self._selected_sphere_id = ""
+        self._window_content = ObjectivesWindowContent()
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        with WindowManager.window("OBJECTIVES", x=980, y=120, w=520, h=430) as is_open:
+        layout = get_gml_layout("Objectives_Window")
+        viewport = imgui.get_main_viewport().size
+        x = min(980.0, max(0.0, float(viewport.x) - layout.width - 10.0))
+        y = min(120.0, max(0.0, float(viewport.y) - layout.height - 112.0))
+        with WindowManager.window(
+            "OBJECTIVES", x=x, y=y, w=layout.width, h=layout.height,
+            test_id="objectives.panel", gml_template="Objectives_Window",
+            avoid_overlaps=True, placement_margin=10.0, bottom_clearance=112.0,
+        ) as is_open:
             if not is_open:
                 return False
             self._render_content(state, context)
@@ -28,38 +43,107 @@ class ObjectivesPanel:
     def _render_content(self, state, context: PanelRenderContext) -> None:
         country_tag = context.target_tag
         overview = self._presenter.build_overview(state, country_tag)
-        campaign = overview.campaign
-        if campaign:
-            scenario = overview.scenario or {}
-            title = str(scenario.get("title") or campaign.get("scenario_id") or "Campaign")
-            imgui.text_colored(GAMETHEME.colors.accent, title)
-            outcome = str(campaign.get("outcome") or "ongoing").replace("_", " ").title()
-            Prims.right_align_text(outcome, GAMETHEME.colors.positive if outcome in {"Victory", "Sandbox"} else GAMETHEME.colors.info)
-            if campaign.get("outcome_reason"):
-                imgui.text_wrapped(str(campaign["outcome_reason"]))
-            if campaign.get("sandbox_continuation"):
-                imgui.text_disabled("You may continue playing after the scenario outcome.")
+        now = int(state.time.total_minutes)
+        self._window_content.render(
+            overview,
+            country_tag,
+            now,
+            render_openpower_advice=lambda: self._render_advice_controls(
+                state, context, overview, country_tag, now,
+            ),
+        )
 
-        objectives = overview.objectives
-        if not objectives:
-            draw_empty_state("No objectives are assigned. This campaign remains an open sandbox.")
-        else:
-            for row in objectives:
-                self._render_objective(row, int(state.time.total_minutes))
-
+    def _render_advice_controls(self, state, context, overview, country_tag: str, now: int) -> None:
         if overview.recommendations:
             imgui.separator()
-            imgui.text_colored(GAMETHEME.colors.accent, "Advisor priorities")
-            for item in overview.recommendations[:5]:
-                urgency = max(0, min(100, int(float(item.get("urgency") or 0.0) * 100)))
-                imgui.text(f"{urgency}%  {item.get('title') or 'Recommendation'}")
-                imgui.push_text_wrap_pos(0.0)
-                imgui.text_colored(GAMETHEME.colors.text_dim, str(item.get("reason") or ""))
-                imgui.pop_text_wrap_pos()
-                imgui.text_disabled(f"Expires in {max(0, int(item.get('expires_at_minute') or 0) - int(state.time.total_minutes)) // 1440} day(s)")
+            imgui.text_colored(GAMETHEME.colors.accent, "OpenPower advisor recommendations")
+            self._render_recommendations(context, overview.recommendations, country_tag, now)
+        if overview.campaign and context.is_own_country and context.net_client is not None:
+            self._render_delegation_controls(
+                state, context, list(overview.delegations), country_tag,
+            )
+        if not overview.recommendations and not overview.delegations:
+            draw_empty_state("No advisor recommendations or delegated scopes are available.")
 
-        if campaign and context.is_own_country and context.net_client is not None:
-            self._render_delegation_controls(state, context, overview.delegations, country_tag)
+    def _render_recommendations(self, context, recommendations, country_tag: str, now: int) -> None:
+        visible_recommendations = recommendations[:5]
+        for index, item in enumerate(visible_recommendations):
+            source_signal = str(item.get("source_signal") or "")
+            is_policy = source_signal.startswith("ai_policy:")
+            urgency = max(0, min(100, int(float(item.get("urgency") or 0.0) * 100)))
+            title = str(item.get("title") or "Recommendation")
+            title_line = f"{'AI PROPOSAL' if is_policy else f'{urgency}%'}  {title}"
+            visible_title = Prims.fit_text(title_line, 255.0)
+            imgui.text(visible_title)
+            if visible_title != title_line and imgui.is_item_hovered():
+                imgui.set_tooltip(title_line)
+            reason = str(item.get("reason") or "")
+            visible_reason = Prims.fit_text(reason, 255.0)
+            imgui.text_colored(GAMETHEME.colors.text_dim, visible_reason)
+            if visible_reason != reason and imgui.is_item_hovered():
+                imgui.set_tooltip(reason)
+            expires_in = max(
+                0,
+                int(item.get("expires_at_minute") or 0)
+                - now,
+            ) // 1440
+            imgui.text_disabled(f"Expires in {expires_in} day(s)")
+            imgui.same_line()
+            recommendation_id = str(item.get("id") or "")
+            action_label = self._presenter.recommendation_action_label(item)
+            review_callback = context.on_advisor_recommendation
+            if (
+                context.is_own_country
+                and action_label
+                and (review_callback is not None or context.on_question is not None)
+                and context.net_client is not None
+            ):
+                if imgui.small_button(
+                    f"Review##{recommendation_id}",
+                    test_id=f"objectives.recommendation.review.{recommendation_id}",
+                ):
+                    if review_callback is not None:
+                        review_callback(item)
+                    else:
+                        self._open_recommendation_question(context, country_tag, item, action_label)
+            elif context.is_own_country and context.on_notice is not None and context.net_client is not None:
+                if imgui.small_button(
+                    f"Read##{recommendation_id}",
+                    test_id=f"objectives.recommendation.read.{recommendation_id}",
+                ):
+                    context.on_notice(
+                        title,
+                        str(item.get("reason") or ""),
+                        on_acknowledge=lambda item_id=recommendation_id: self._resolve_recommendation(
+                            context, country_tag, item_id, accept=False,
+                        ),
+                    )
+            if index + 1 < len(visible_recommendations):
+                imgui.separator()
+
+    def _open_recommendation_question(self, context, country_tag: str, item: dict, action_label: str) -> None:
+        if context.on_question is None:
+            return
+        title = str(item.get("title") or "Advisor recommendation")
+        reason = str(item.get("reason") or "")
+        message = f"{title}\n\n{reason}\n\nSuggested action: {action_label}. Apply it?"
+        recommendation_id = str(item.get("id") or "")
+        context.on_question(
+            message,
+            lambda: self._resolve_recommendation(context, country_tag, recommendation_id, accept=True),
+            lambda: self._resolve_recommendation(context, country_tag, recommendation_id, accept=False),
+        )
+
+    @staticmethod
+    def _resolve_recommendation(context, country_tag: str, recommendation_id: str, *, accept: bool) -> None:
+        client = context.net_client
+        if client is None:
+            return
+        client.send_action(ActionResolveAdvisorRecommendation(
+            player_id=client.player_id,
+            recommendation_id=recommendation_id,
+            accept=accept,
+        ))
 
     def _render_delegation_controls(self, state, context, delegations: list[dict], country_tag: str) -> None:
         country = str(country_tag or "").strip().upper()
@@ -178,46 +262,3 @@ class ObjectivesPanel:
             if isinstance(members, (list, tuple, set)) and country in {str(item).upper() for item in members}:
                 result.append(str(row.get("id") or ""))
         return sorted(item for item in result if item)
-
-    @staticmethod
-    def _render_objective(row: dict, now: int) -> None:
-        title = str(row.get("title") or "Objective")
-        description = str(row.get("description") or "")
-        status = str(row.get("status") or "pending").upper()
-        progress = max(0.0, min(100.0, float(row.get("progress") or 0.0) * 100.0))
-        color = GAMETHEME.colors.positive if status == "COMPLETED" else GAMETHEME.colors.info
-
-        imgui.text_colored(GAMETHEME.colors.text_main, title)
-        imgui.same_line()
-        Prims.right_align_text(status, color)
-        if description:
-            imgui.push_text_wrap_pos(0.0)
-            imgui.text_colored(GAMETHEME.colors.text_dim, description)
-            imgui.pop_text_wrap_pos()
-        current = float(row.get("current_value") or 0.0)
-        target = float(row.get("target_value") or 0.0)
-        remaining = float(row.get("remaining") or 0.0)
-        if row.get("objective_type"):
-            imgui.text_disabled(f"Current {current:,.2f} / target {target:,.2f}; remaining {remaining:,.2f}")
-        deadline = int(row.get("deadline_at_minute", -1))
-        if deadline >= 0:
-            imgui.text_disabled(f"Deadline: {max(0, deadline - now) // 1440} day(s) remaining")
-        if int(row.get("hold_duration_minutes") or 0) > 0:
-            imgui.text_disabled(
-                f"Held {int(row.get('held_minutes') or 0)} / {int(row.get('hold_duration_minutes') or 0)} minute(s)"
-            )
-        if status == "BLOCKED":
-            imgui.text_colored(GAMETHEME.colors.warning, str(row.get("missing_data_reason") or row.get("reason") or "Required data is missing."))
-        elif row.get("reason"):
-            imgui.text_disabled(str(row.get("reason")))
-        evidence = CampaignPresenter.latest_evidence(row)
-        if evidence:
-            source = str(evidence.get("source_table") or "campaign state")
-            minute = int(evidence.get("game_minute") or 0)
-            imgui.text_disabled(
-                f"Latest evidence: {source} at minute {minute} "
-                f"({float(evidence.get('current_value') or 0.0):,.2f} / "
-                f"{float(evidence.get('target_value') or 0.0):,.2f})"
-            )
-        Prims.meter("", progress, color)
-        imgui.dummy((0.0, 6.0))

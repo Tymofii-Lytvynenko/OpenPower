@@ -1,0 +1,100 @@
+{
+  "fixture": "tests/ui/fixtures/reference-design-create-failure.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.mil"
+    },
+    {
+      "op": "assert_region",
+      "target": "military.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "military.open_design"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_design.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "unit_design.create.open"
+    },
+    {
+      "op": "input",
+      "target": "unit_design.create.name",
+      "value": "UI failure test design"
+    },
+    {
+      "op": "input",
+      "target": "unit_design.create.cost",
+      "value": 125.0
+    },
+    {
+      "op": "input",
+      "target": "unit_design.create.capability.gun_range",
+      "value": 3.0
+    },
+    {
+      "op": "input",
+      "target": "unit_design.create.maintenance",
+      "value": 2.5
+    },
+    {
+      "op": "click",
+      "target": "unit_design.create.submit"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionCreateUnitDesign",
+      "fields": {
+        "country_tag": "UKR",
+        "branch": "land",
+        "class_name": "infantry",
+        "display_name": "UI failure test design"
+      }
+    },
+    {
+      "op": "assert_region",
+      "target": "generic_message.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "unit_design.create.name",
+      "value": "UI failure test design"
+    },
+    {
+      "op": "assert",
+      "target": "unit_design.create.cost",
+      "value": 125.0
+    },
+    {
+      "op": "assert",
+      "target": "unit_design.create.capability.gun_range",
+      "value": 3.0
+    },
+    {
+      "op": "assert",
+      "target": "unit_design.create.maintenance",
+      "value": 2.5
+    },
+    {
+      "op": "assert",
+      "target": "generic_message.content",
+      "label": "Create Unit Design\nThe requested design could not be saved."
+    },
+    {
+      "op": "click",
+      "target": "generic_message.ok"
+    },
+    {
+      "op": "assert_region",
+      "target": "generic_message.dialog",
+      "visible": false
+    }
+  ]
+}

@@ -27,6 +27,10 @@ def _state() -> GameState:
             "countries": pl.DataFrame({
                 "id": ["USA", "CAN"], "gdp": [1000.0, 400.0], "human_dev": [0.9, 0.8],
                 "money_reserves": [100.0, 80.0], "economic_health": [0.8, 0.9],
+                "gvt_corruption": [0.3, 0.4],
+                "total_annual_revenue": [1000.0, 500.0],
+                "total_annual_expense": [650.0, 510.0],
+                "expense_military_upkeep": [230.0, 90.0],
             }),
             "regions": pl.DataFrame({
                 "id": [1, 2, 3], "owner": ["USA", "USA", "CAN"],
@@ -41,7 +45,13 @@ def _state() -> GameState:
             "countries_wars": pl.DataFrame({
                 "id": ["war-1"], "side_a": [["USA"]], "side_b": [["CAN"]], "status": ["active"],
             }),
-            "units": pl.DataFrame({"id": ["u1", "u2"], "country_id": ["USA", "USA"], "strength": [12.0, 8.0]}),
+            "units": pl.DataFrame({
+                "id": ["u1", "u2"], "country_id": ["USA", "USA"],
+                "unit_type": ["infantry", "strategic_missile"], "strength": [12.0, 8.0],
+            }),
+            "strategic_weapons": pl.DataFrame({
+                "id": ["w1"], "country_id": ["USA"], "quantity": [3],
+            }),
             "research_tracks": pl.DataFrame({
                 "id": ["usa-research"], "country_id": ["USA"], "research_level": [3], "progress": [0.5],
             }),
@@ -54,6 +64,7 @@ def _state() -> GameState:
             }),
             "resource_ledger": pl.DataFrame({
                 "country_id": ["USA", "USA", "CAN"], "consumption_usd": [100.0, 0.0, 100.0],
+                "game_resource_id": ["food", "fuel", "food"],
                 "balance_usd": [80.0, -20.0, 100.0],
             }),
             "economic_cause_records": pl.DataFrame({
@@ -87,8 +98,14 @@ def test_history_records_authoritative_and_derived_metrics_without_changing_sour
     assert values[("region.population", "1")] == 80.0
     assert values[("military.unit_count", "USA")] == 2.0
     assert values[("military.total_strength", "USA")] == 20.0
+    assert values[("military.conventional_strength", "USA")] == 12.0
+    assert values[("strategic.weapon_quantity", "USA")] == 3.0
     assert values[("relationship.relation_value", "CAN|USA")] == 25.0
     assert values[("country.population", "USA")] == 140.0
+    assert values[("politics.gvt_corruption", "USA")] == 0.3
+    assert values[("country.budget_balance", "USA")] == 350.0
+    assert values[("country.expense_military_upkeep", "USA")] == 230.0
+    assert values[("country.resource_balance", "USA")] == 60.0
     assert values[("country.resource_coverage", "USA")] == 0.8
     assert values[("diplomacy.active_treaties", "USA")] == 1.0
     assert values[("military.active_wars", "USA")] == 1.0
@@ -97,7 +114,84 @@ def test_history_records_authoritative_and_derived_metrics_without_changing_sour
     assert state.tables["countries"]["gdp"].to_list() == original_gdp
     assert {row["id"] for row in _rows(state, "history_indicator_definitions")} >= {
         "country.gdp", "country.gdp_per_capita", "region.population", "military.unit_count",
+        "politics.gvt_corruption", "country.budget_balance", "country.expense_military_upkeep",
+        "country.resource_balance",
     }
+
+
+def test_source_backed_history_measures_refresh_when_budget_or_resource_inputs_change() -> None:
+    state = _state()
+    system = HistorySystem()
+    system.update(state, 0.0)
+
+    state.update_table(
+        "countries",
+        state.tables["countries"].with_columns(
+            pl.when(pl.col("id") == "USA")
+            .then(310.0)
+            .otherwise(pl.col("expense_military_upkeep"))
+            .alias("expense_military_upkeep")
+        ),
+    )
+    state.update_table(
+        "resource_ledger",
+        state.tables["resource_ledger"].with_columns(
+            pl.when(pl.col("country_id") == "USA")
+            .then(pl.col("balance_usd") + 10.0)
+            .otherwise(pl.col("balance_usd"))
+            .alias("balance_usd")
+        ),
+    )
+    state.globals["tick"] = 2
+    system.update(state, 0.0)
+
+    latest = {
+        (row["indicator_id"], row["subject_id"]): row["value"]
+        for row in _rows(state, "history_snapshots")
+        if row["indicator_id"] in {"country.expense_military_upkeep", "country.resource_balance"}
+    }
+    assert latest[("country.expense_military_upkeep", "USA")] == 310.0
+    assert latest[("country.resource_balance", "USA")] == 80.0
+
+
+def test_country_resource_balance_does_not_hide_incomplete_resource_rows() -> None:
+    state = _state()
+    state.tables["resource_ledger"] = pl.DataFrame({
+        "country_id": ["USA", "USA", "CAN"],
+        "balance_usd": [80.0, None, 100.0],
+    })
+
+    values, kinds = HistorySystem()._measure_definition(state, {
+        "derivation": "resource_balance",
+        "source_table": "resource_ledger",
+    })
+
+    assert values == {"CAN": 100.0}
+    assert kinds == {"CAN": "derived"}
+
+
+def test_conventional_force_rollup_excludes_strategic_units_and_rejects_unknown_types() -> None:
+    state = _state()
+    definition = {
+        "derivation": "conventional_forces",
+        "source_table": "units",
+        "subject_id_field": "country_id",
+    }
+    values, kinds = HistorySystem()._measure_definition(state, definition)
+    assert values == {"USA": 12.0}
+    assert kinds == {"USA": "derived"}
+
+    strategic_only = state.tables["units"].filter(pl.col("unit_type") == "strategic_missile")
+    state.update_table("units", strategic_only)
+    assert HistorySystem()._measure_definition(state, definition) == (
+        {"USA": 0.0}, {"USA": "derived"},
+    )
+
+    state.update_table(
+        "units",
+        state.tables["units"].with_columns(pl.lit(None, dtype=pl.Utf8).alias("unit_type")),
+    )
+    assert HistorySystem()._measure_definition(state, definition) == ({}, {})
 
 
 def test_generic_history_measurements_preserve_aggregations_filters_and_relationships() -> None:
@@ -135,6 +229,60 @@ def test_generic_history_measurements_preserve_aggregations_filters_and_relation
         {**definition, "aggregation": "sum", "subject_type": "relationship"},
     )
     assert relationship_values == {"CAN|USA": 5.0, "CAN|MEX": 5.0}
+
+
+def test_overall_relations_matches_source_average_and_requires_complete_directed_matrix() -> None:
+    state = _state()
+    state.tables["countries"] = pl.DataFrame({"id": ["USA", "CAN", "MEX"]})
+    state.tables["countries_relations"] = pl.DataFrame({
+        "source": ["USA", "USA", "CAN", "CAN", "MEX", "MEX"],
+        "target": ["CAN", "MEX", "USA", "MEX", "USA", "CAN"],
+        "value": [10.0, 30.0, -10.0, 40.0, -30.0, 20.0],
+    })
+
+    values, kinds = HistorySystem()._measure_definition(state, {
+        "derivation": "overall_relations",
+        "source_table": "countries_relations",
+    })
+
+    assert values == {"CAN": 15.0, "MEX": -5.0, "USA": 20.0}
+    assert kinds == {country: "derived" for country in values}
+
+    state.tables["countries_relations"] = state.tables["countries_relations"].filter(
+        ~((pl.col("source") == "USA") & (pl.col("target") == "MEX"))
+    )
+    assert HistorySystem()._measure_definition(state, {
+        "derivation": "overall_relations",
+        "source_table": "countries_relations",
+    }) == ({}, {})
+
+
+def test_overall_relations_records_initial_and_changed_matrix_values() -> None:
+    state = _state()
+    state.update_table("countries_relations", pl.DataFrame({
+        "source": ["USA", "CAN"],
+        "target": ["CAN", "USA"],
+        "value": [25.0, -10.0],
+    }))
+    system = HistorySystem()
+    system.update(state, 0.0)
+
+    updated = state.tables["countries_relations"].with_columns(
+        pl.when(pl.col("source") == "USA").then(40.0).otherwise(pl.col("value")).alias("value")
+    )
+    state.update_table("countries_relations", updated)
+    state.globals["tick"] = 2
+    system.update(state, 0.0)
+
+    snapshots = [
+        row for row in _rows(state, "history_snapshots")
+        if row["indicator_id"] == "country.overall_relations"
+    ]
+    values_by_subject = {
+        subject: [row["value"] for row in snapshots if row["subject_id"] == subject]
+        for subject in ("USA", "CAN")
+    }
+    assert values_by_subject == {"USA": [25.0, 40.0], "CAN": [-10.0]}
 
 
 def test_observation_defaults_are_built_once_and_compaction_waits_for_thresholds() -> None:
@@ -196,6 +344,23 @@ def test_history_records_only_changed_or_due_values_and_marks_missing_data() -> 
     ]
     assert len(gdp_rows) == 3
 
+    countries = state.tables["countries"].with_columns(
+        pl.when(pl.col("id") == "USA")
+        .then(1200.0)
+        .otherwise(pl.col("total_annual_revenue"))
+        .alias("total_annual_revenue")
+    )
+    state.update_table("countries", countries)
+    state.globals["tick"] = 4
+    system.update(state, 0.0)
+    budget_rows = [
+        row for row in _rows(state, "history_snapshots")
+        if row["indicator_id"] == "country.budget_balance" and row["subject_id"] == "USA"
+    ]
+    assert [(row["value"], row["source_boundary"]) for row in budget_rows] == [
+        (350.0, "initial"), (550.0, "change"),
+    ]
+
     definition_table = state.tables["history_indicator_definitions"]
     definitions = definition_table.to_dicts()
     gdp_definition = next(row for row in definitions if row["id"] == "country.gdp")
@@ -204,7 +369,7 @@ def test_history_records_only_changed_or_due_values_and_marks_missing_data() -> 
     state.time.total_minutes = 60
     state.tables["regions"] = state.tables["regions"].filter(pl.col("id") != 1)
     state.update_table("regions", state.tables["regions"])
-    state.globals["tick"] = 4
+    state.globals["tick"] = 5
     system.update(state, 0.0)
     population_rows = [row for row in _rows(state, "history_snapshots") if row["indicator_id"] == "region.population" and row["subject_id"] == "1"]
     assert population_rows[-1]["value"] is None

@@ -11,15 +11,21 @@ from src.client.ui.components.hud.country_selector import (
     CountryOption,
     CountrySelector,
     CountryStatus,
+    country_status_label,
     country_options_from_state,
     resolve_country_status,
 )
 from src.client.ui.layouts import game_layout as game_layout_module
 from src.client.ui.layouts.game_layout import GameLayout
+from src.client.ui.components.shared.dirty_close_confirmation import SaveConfirmationPreferences
 from src.shared.state import GameState
 
 
 class TestCountryOptions(unittest.TestCase):
+    def test_status_labels_fit_the_source_slot_and_keep_the_full_status_name_separate(self) -> None:
+        self.assertEqual(country_status_label(CountryStatus.ALLIANCE), "ALLIED")
+        self.assertEqual(country_status_label(CountryStatus.MILITARY_ACCESS), "ACCESS")
+
     def test_options_are_reused_until_country_table_changes(self) -> None:
         selector = CountrySelector(flag_renderer=MagicMock())
         state = GameState(tables={"countries": pl.DataFrame({
@@ -77,12 +83,73 @@ class TestCountryOptions(unittest.TestCase):
         )
 
         self.assertIs(resolve_country_status(state, "UKR", "UKR"), CountryStatus.PLAYER)
+        self.assertIs(resolve_country_status(state, " ukr ", "ukr"), CountryStatus.PLAYER)
         self.assertIs(resolve_country_status(state, "UKR", "CAN"), CountryStatus.ALLIANCE)
         self.assertIs(resolve_country_status(state, "UKR", "USA"), CountryStatus.NEUTRAL)
 
+    def test_resolves_war_and_military_transit_statuses(self) -> None:
+        state = GameState(
+            tables={
+                "countries_treaties": pl.DataFrame(
+                    {
+                        "id": ["transit"],
+                        "type": ["military_trespassing_right"],
+                        "side_a": [["UKR"]],
+                        "side_b": [["POL"]],
+                        "status": ["active"],
+                    }
+                ),
+                "countries_wars": pl.DataFrame(
+                    {
+                        "id": ["war"],
+                        "side_a": [["UKR"]],
+                        "side_b": [["RUS"]],
+                        "status": ["active"],
+                    }
+                ),
+            }
+        )
+
+        self.assertIs(resolve_country_status(state, "UKR", "POL"), CountryStatus.MILITARY_ACCESS)
+        self.assertIs(resolve_country_status(state, "UKR", "RUS"), CountryStatus.HOSTILE)
+
+    def test_war_status_takes_precedence_over_an_active_alliance(self) -> None:
+        state = GameState(
+            tables={
+                "countries_treaties": pl.DataFrame(
+                    {"type": ["alliance"], "members": [["UKR", "CAN"]], "status": ["active"]}
+                ),
+                "countries_wars": pl.DataFrame(
+                    {"side_a": [["UKR"]], "side_b": [["CAN"]], "status": ["active"]}
+                ),
+            }
+        )
+
+        self.assertIs(resolve_country_status(state, "UKR", "CAN"), CountryStatus.HOSTILE)
+
+    def test_inactive_or_suspended_military_access_is_not_displayed(self) -> None:
+        state = GameState(
+            tables={
+                "countries_treaties": pl.DataFrame(
+                    {
+                        "type": ["military_trespassing_right", "military_trespassing_right"],
+                        "side_a": [["UKR"], ["UKR"]],
+                        "side_b": [["POL"], ["ROM"]],
+                        "suspended_members": [[], ["UKR"]],
+                        "status": ["active", "active"],
+                        "expires_at_minute": [10, 0],
+                    }
+                )
+            }
+        )
+        state.time.total_minutes = 10
+
+        self.assertIs(resolve_country_status(state, "UKR", "POL"), CountryStatus.NEUTRAL)
+        self.assertIs(resolve_country_status(state, "UKR", "ROM"), CountryStatus.NEUTRAL)
+
 
 class TestGameLayoutCountrySwitch(unittest.TestCase):
-    def test_ai_button_opens_campaign_overview_with_delegation_controls(self) -> None:
+    def test_advisor_button_toggles_advisor_settings(self) -> None:
         panel_manager = MagicMock()
         with (
             patch.object(game_layout_module, "PanelManager", return_value=panel_manager),
@@ -92,17 +159,43 @@ class TestGameLayoutCountrySwitch(unittest.TestCase):
             GameLayout(MagicMock(), "UKR", MagicMock())
 
         central_bar.call_args.kwargs["open_ai_cb"]()
-        panel_manager.set_visible.assert_called_once_with("OBJECTIVES", True)
+        panel_manager.toggle.assert_called_once_with("ADVISOR_SETTINGS")
 
     def test_applies_dropdown_choice_to_panels_and_viewport_in_same_frame(self) -> None:
         layout = GameLayout.__new__(GameLayout)
         layout.local_player_tag = "UKR"
         layout._cached_target_tag = "UKR"
         layout._last_selected_id = None
+        layout._on_deployment_drag_start = None
+        layout.save_confirmation_preferences = SaveConfirmationPreferences()
         layout.viewport_ctrl = MagicMock()
         layout.viewport_ctrl.focus_on_country.return_value = 7
         layout.net = MagicMock()
         layout.net.get_system_errors.return_value = []
+        layout.message_dialog = MagicMock()
+        layout.advisor_question_dialog = MagicMock()
+        # This test bypasses composition to isolate same-frame country switching;
+        # the other render ports still need their normal constructor contract.
+        for name in (
+            "autosave",
+            "game_over_dialog",
+            "advisor_recommendation_window",
+            "command_feedback",
+            "save_game_dialog",
+            "battle_summary_dialog",
+            "unit_order_feedback",
+            "unit_reorganization",
+            "covert_outcome_dialog",
+            "dispatch_report_dialog",
+            "battle_inspection",
+            "unit_attack_confirmation",
+            "thematic_map_legend",
+            "mini_map",
+            "tutorial_window",
+        ):
+            setattr(layout, name, MagicMock())
+        layout.autosave.update.return_value = set()
+        layout.game_over_dialog.is_game_over.return_value = False
         layout.feed_presenter = MagicMock()
         layout.feed_presenter.build_summary.side_effect = ["ukr-summary", "can-summary"]
         layout.system_bar = MagicMock()
@@ -112,9 +205,11 @@ class TestGameLayoutCountrySwitch(unittest.TestCase):
         layout.panel_manager = MagicMock()
         layout.context_menu = MagicMock()
         layout._render_fps = MagicMock()
+        layout._render_game_menu = MagicMock()
 
         state = SimpleNamespace(tables={})
-        with patch.object(game_layout_module.GAMETHEME, "apply"):
+        with (patch.object(game_layout_module.GAMETHEME, "apply"),
+              patch.object(game_layout_module, "consume_panel_shortcuts")):
             layout.render(None, 60.0, MagicMock(), state=state)
 
         panel_context = layout.panel_manager.render_all.call_args.args[1]
@@ -126,32 +221,17 @@ class TestGameLayoutCountrySwitch(unittest.TestCase):
 
 
 class TestCentralBarSizing(unittest.TestCase):
-    def test_uses_content_width_without_empty_flexible_space(self) -> None:
-        bar = CentralBar.__new__(CentralBar)
-        metrics = SimpleNamespace(em=14.0, outer_padding=6.0, total_width=500.0)
+    def test_source_bar_remains_centered_and_inside_supported_viewports(self) -> None:
+        for width, height in ((800, 600), (1024, 768), (1280, 720), (1920, 1080)):
+            bounds = central_bar_module.main_bar_bounds(width, height)
+            self.assertEqual((bounds.width, bounds.height), (689.0, 96.0))
+            self.assertEqual(bounds.x + bounds.width / 2.0, width / 2.0)
+            self.assertLessEqual(bounds.y + bounds.height, height)
 
-        self.assertEqual(bar._bar_width(1920.0, metrics), 500.0)
-        self.assertEqual(bar._bar_width(1280.0, metrics), 500.0)
-        self.assertEqual(bar._bar_width(480.0, metrics), 468.0)
-
-    def test_measured_controls_fit_two_line_clock_and_news_icon(self) -> None:
-        bar = CentralBar.__new__(CentralBar)
-        style = SimpleNamespace(frame_padding=SimpleNamespace(x=8.0, y=5.0))
-
-        with patch.multiple(
-            central_bar_module.imgui,
-            get_font_size=MagicMock(return_value=14.0),
-            get_style=MagicMock(return_value=style),
-            get_text_line_height=MagicMock(return_value=14.0),
-            calc_text_size=MagicMock(
-                side_effect=lambda text: SimpleNamespace(x=len(text) * 7.0, y=14.0)
-            ),
-        ):
-            metrics = bar._measure_layout(("2001/02/04", "03:32"))
-
-        self.assertLess(metrics.total_width, 550.0)
-        self.assertGreaterEqual(metrics.control_height, 28.0)
-        self.assertGreater(metrics.ticker_button_size, 14.0)
+    def test_source_bar_respects_the_viewport_origin(self) -> None:
+        bounds = central_bar_module.main_bar_bounds(1280, 720, 100, 200)
+        self.assertEqual(bounds.x + bounds.width / 2.0, 740.0)
+        self.assertEqual(bounds.y + bounds.height, 912.0)
 
 
 class TestViewportCountrySwitch(unittest.TestCase):

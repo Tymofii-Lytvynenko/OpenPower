@@ -1,0 +1,610 @@
+{
+  "tables": {
+    "units": [
+      {
+        "id": "unit-infantry-1",
+        "owner": "UKR",
+        "unit_type": "infantry",
+        "design_id": "design-infantry-1",
+        "strength": 1000,
+        "equipment_quantity": 1000,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available"
+      },
+      {
+        "id": "unit-fighter-01",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 21,
+        "equipment_quantity": 21,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-02",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 22,
+        "equipment_quantity": 22,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-03",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 23,
+        "equipment_quantity": 23,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-04",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 24,
+        "equipment_quantity": 24,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Regular"
+      },
+      {
+        "id": "unit-fighter-05",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 25,
+        "equipment_quantity": 25,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Veteran"
+      },
+      {
+        "id": "unit-fighter-06",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 26,
+        "equipment_quantity": 26,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Elite"
+      },
+      {
+        "id": "unit-fighter-07",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 27,
+        "equipment_quantity": 27,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-08",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 28,
+        "equipment_quantity": 28,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-09",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 29,
+        "equipment_quantity": 29,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-10",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 30,
+        "equipment_quantity": 30,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-11",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 31,
+        "equipment_quantity": 31,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-12",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 32,
+        "equipment_quantity": 32,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-13",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 33,
+        "equipment_quantity": 33,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-14",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 34,
+        "equipment_quantity": 34,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-15",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 35,
+        "equipment_quantity": 35,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-16",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 36,
+        "equipment_quantity": 36,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-17",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 37,
+        "equipment_quantity": 37,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-18",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 38,
+        "equipment_quantity": 38,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-19",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 39,
+        "equipment_quantity": 39,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-20",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 40,
+        "equipment_quantity": 40,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-21",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 41,
+        "equipment_quantity": 41,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-22",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 42,
+        "equipment_quantity": 42,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-23",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 43,
+        "equipment_quantity": 43,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-24",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 44,
+        "equipment_quantity": 44,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      },
+      {
+        "id": "unit-fighter-25",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 45,
+        "equipment_quantity": 45,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available",
+        "training_level": "Recruit"
+      }
+    ],
+    "unit_designs": [
+      {
+        "id": "design-fighter-1",
+        "country_id": "UKR",
+        "branch": "air",
+        "class_name": "fighter",
+        "display_name": "Multirole Fighter",
+        "quality": 0.7,
+        "cost": 125000.0,
+        "maintenance_cost": 2500.0,
+        "speed": 0.8,
+        "firepower": 0.75,
+        "domain": "air"
+      },
+      {
+        "id": "design-infantry-1",
+        "country_id": "UKR",
+        "branch": "land",
+        "class_name": "infantry",
+        "display_name": "Infantry",
+        "quality": 0.6,
+        "cost": 1000.0,
+        "maintenance_cost": 25.0,
+        "speed": 0.5,
+        "firepower": 0.5,
+        "domain": "land"
+      }
+    ],
+    "unit_market_listings": [
+      {
+        "id": "listing-fighter-07",
+        "seller_country_id": "UKR",
+        "design_id": "design-fighter-1",
+        "unit_id": "unit-fighter-07",
+        "quantity": 27,
+        "price": 125000.0,
+        "eligibility": "open",
+        "status": "listed",
+        "created_at_minute": 0
+      }
+    ],
+    "unit_training_quotes": [
+      {
+        "unit_id": "unit-fighter-01",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 21.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-02",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 22.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-03",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 23.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-04",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 24.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-05",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 25.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-06",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 26.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-07",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 27.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-08",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 28.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-09",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 29.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-10",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 30.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-11",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 31.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-12",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 32.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-13",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 33.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-14",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 34.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-15",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 35.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-16",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 36.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-17",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 37.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-18",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 38.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-19",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 39.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-20",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 40.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-21",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 41.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-22",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 42.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-23",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 43.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-24",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 44.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      },
+      {
+        "unit_id": "unit-fighter-25",
+        "country_id": "UKR",
+        "from_level": "Recruit",
+        "target_level": "Regular",
+        "cost": 45.0,
+        "required_days": 30.0,
+        "available": true,
+        "reason": ""
+      }
+    ]
+  }
+}

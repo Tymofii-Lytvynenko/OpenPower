@@ -1,0 +1,40 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine", "is_playable": true},
+      {"id": "POL", "name": "Poland", "is_playable": true, "gdp": 10000000.0, "gvt_approval": 50.0, "military_count": 0},
+      {"id": "MEX", "name": "Mexico", "is_playable": true, "gdp": 2000000.0, "gvt_approval": 25.0, "military_count": 0},
+      {"id": "DEU", "name": "Germany", "is_playable": true, "gdp": 100000000.0, "gvt_approval": 100.0, "military_count": 100}
+    ],
+    "country_governments": [
+      {"country_id": "UKR", "ruling_party_id": "ukr-ruling"},
+      {"country_id": "POL", "ruling_party_id": "pol-ruling"},
+      {"country_id": "MEX", "ruling_party_id": "mex-ruling"},
+      {"country_id": "DEU", "ruling_party_id": "deu-ruling"}
+    ],
+    "political_parties": [
+      {"country_id": "UKR", "party_id": "ukr-ruling", "display_name": "Civic Alliance", "support_share": 0.5, "is_ruling": true},
+      {"country_id": "POL", "party_id": "pol-ruling", "display_name": "National Union", "support_share": 0.5, "is_ruling": true},
+      {"country_id": "MEX", "party_id": "mex-ruling", "display_name": "National Movement", "support_share": 0.5, "is_ruling": true},
+      {"country_id": "DEU", "party_id": "deu-ruling", "display_name": "Civic Party", "support_share": 0.5, "is_ruling": true}
+    ],
+    "campaign_scenarios": [
+      {
+        "id": "profile-defaults-campaign",
+        "title": "Profile Default Check",
+        "description": "Country profile ranks use OpenPower model defaults when source fields are absent.",
+        "selectable_country_ids_json": "[\"UKR\",\"POL\",\"MEX\",\"DEU\"]",
+        "political_scope": "country",
+        "sphere_scope": "",
+        "starting_setup_json": "{}",
+        "objectives_json": "[]",
+        "enabled_rules_json": "{}",
+        "max_duration_minutes": 180,
+        "win_conditions_json": "[]",
+        "loss_conditions_json": "[]",
+        "sandbox_allowed": true,
+        "enabled": true
+      }
+    ]
+  }
+}

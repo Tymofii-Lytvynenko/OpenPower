@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from src.client.ui.core.instrumented_imgui import imgui
-
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
-from src.client.ui.panels.migration_presenter import MigrationCountrySummary, MigrationPresenter
+from src.client.ui.panels.migration_presenter import (
+    MigrationCountrySummary,
+    MigrationPresenter,
+)
+from src.client.ui.panels.shared.panel_widgets import draw_empty_state
 from src.shared.actions import ActionUpdateMigrationPolicy
 
 
@@ -32,6 +35,8 @@ class MigrationPolicyUI(Protocol):
     ) -> tuple[bool, float]: ...
 
     def button(self, label: str) -> bool: ...
+
+    def set_next_item_width(self, width: float) -> None: ...
 
 
 class MigrationPanel:
@@ -59,12 +64,12 @@ class MigrationPanel:
         self._enforcement_strength = 0.5
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        with WindowManager.window("MIGRATION", x=740, y=120, w=520, h=560) as is_open:
+        with WindowManager.window("MIGRATION", x=740, y=120, w=520, h=600) as is_open:
             if not is_open:
                 return False
             country = self._presenter.present_country(state, context.target_tag)
             if country is None:
-                imgui.text_disabled("No migration profile is available for this country.")
+                draw_empty_state("No migration profile is available for this country.")
                 return True
 
             self._render_country_summary(country)
@@ -74,23 +79,25 @@ class MigrationPanel:
             return True
 
     def _render_country_summary(self, summary: MigrationCountrySummary) -> None:
-        imgui.text(f"Country {summary.country_id} · {summary.migration_policy} migration · {summary.border_policy} border")
+        imgui.text_wrapped(
+            f"Country {summary.country_id} · {summary.migration_policy} migration · {summary.border_policy} border"
+        )
         imgui.separator()
-        imgui.text(
+        imgui.text_wrapped(
             f"Recent 30-day flows: +{summary.gross_inflow:,} / -{summary.gross_outflow:,} "
             f"(net {summary.net_flow:+,}; {summary.recent_trend})"
         )
-        imgui.text(
+        imgui.text_wrapped(
             f"Working-age change {summary.working_age_delta:+,} · services "
             f"{summary.service_pressure:.0%} · political pressure {summary.political_pressure:.0%} · "
             f"law pressure {summary.law_pressure:.0%}"
         )
-        imgui.text(
+        imgui.text_wrapped(
             f"Entry / exit {summary.entry_rate:.0%} / {summary.exit_rate:.0%} · "
             f"asylum {summary.asylum_rate:.0%} · family reunification "
             f"{summary.family_reunification_rate:.0%}"
         )
-        imgui.text(
+        imgui.text_wrapped(
             f"Skilled-worker preference {summary.skilled_worker_preference:.0%} · "
             f"enforcement {summary.enforcement_strength:.0%}"
         )
@@ -113,7 +120,7 @@ class MigrationPanel:
             return
         imgui.separator()
         capacity_text = "unknown" if region.capacity_pressure is None else f"{region.capacity_pressure:.0%}"
-        imgui.text(
+        imgui.text_wrapped(
             f"Selected region {region.region_id}: net {region.net_migration:+,} · "
             f"incoming {region.incoming_population:,} · pending {region.pending_population:,} · "
             f"capacity load {capacity_text}"
@@ -144,21 +151,29 @@ class MigrationPanel:
 
         self._policy_ui.separator()
         self._policy_ui.text("Policy controls")
+        self._policy_ui.set_next_item_width(270.0)
         _, self._migration_index = self._policy_ui.combo(
             "Migration posture", self._migration_index, self._MIGRATION_POSTURES
         )
+        self._policy_ui.set_next_item_width(270.0)
         _, self._border_index = self._policy_ui.combo(
             "Border posture", self._border_index, self._BORDER_POSTURES
         )
+        self._policy_ui.set_next_item_width(270.0)
         _, self._entry_rate = self._policy_ui.slider_float("Entry rate", self._entry_rate, 0.0, 1.0, "%.2f")
+        self._policy_ui.set_next_item_width(270.0)
         _, self._exit_rate = self._policy_ui.slider_float("Exit rate", self._exit_rate, 0.0, 1.0, "%.2f")
+        self._policy_ui.set_next_item_width(270.0)
         _, self._asylum_rate = self._policy_ui.slider_float("Asylum rate", self._asylum_rate, 0.0, 1.0, "%.2f")
+        self._policy_ui.set_next_item_width(270.0)
         _, self._family_reunification_rate = self._policy_ui.slider_float(
             "Family reunification rate", self._family_reunification_rate, 0.0, 1.0, "%.2f"
         )
+        self._policy_ui.set_next_item_width(270.0)
         _, self._skilled_worker_preference = self._policy_ui.slider_float(
             "Skilled worker preference", self._skilled_worker_preference, 0.0, 1.0, "%.2f"
         )
+        self._policy_ui.set_next_item_width(270.0)
         _, self._enforcement_strength = self._policy_ui.slider_float(
             "Enforcement strength", self._enforcement_strength, 0.0, 1.0, "%.2f"
         )

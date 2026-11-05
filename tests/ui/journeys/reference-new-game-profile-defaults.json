@@ -1,0 +1,18 @@
+{
+  "fixture": "tests/ui/fixtures/reference-new-game-profile-defaults.json",
+  "steps": [
+    {"op": "click", "target": "new_game.scenario.continue"},
+    {"op": "assert_region", "target": "new_game.panel", "visible": true},
+    {"op": "click", "target": "new_game.profile.open"},
+    {"op": "assert_region", "target": "new_game.country_profile.dialog", "visible": true},
+    {"op": "check", "target": "new_game.profile.filter.economic", "value": false},
+    {"op": "check", "target": "new_game.profile.filter.military", "value": false},
+    {"op": "click", "target": "new_game.profile.candidate.UKR"},
+    {"op": "assert", "target": "new_game.profile.selected_tag", "label": "UKR", "visible": true},
+    {"op": "assert_region", "target": "new_game.country_profile.dialog", "visible": true},
+    {"op": "assert", "target": "new_game.profile.rank_icon.political", "visible": true},
+    {"op": "click", "target": "new_game.profile.confirm"},
+    {"op": "assert_region", "target": "new_game.country_profile.dialog", "visible": false, "present": false},
+    {"op": "assert", "target": "new_game.selected_country", "label": "COUNTRY: UKR", "visible": true}
+  ]
+}

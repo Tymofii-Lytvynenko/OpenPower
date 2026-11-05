@@ -1,0 +1,58 @@
+{
+  "fixture": "tests/ui/fixtures/covert-ready.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.mail"
+    },
+    {
+      "op": "click",
+      "target": "mail.dispatch.covert-ready:mission-ready"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.selected_cell",
+      "label": "MISSION \u00b7 Ready cell"
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.execute",
+      "enabled": true
+    },
+    {
+      "op": "click",
+      "target": "covert_ops.cell.cell-first.select"
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.selected_cell",
+      "label": "MISSION \u00b7 First cell"
+    },
+    {
+      "op": "click",
+      "target": "covert_ops.open_new_mission"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert.new_mission.dialog",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "covert.new_mission.submit"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionStartCovertMission",
+      "fields": {
+        "cell_id": "cell-first",
+        "requires_execution_confirmation": true
+      }
+    }
+  ]
+}

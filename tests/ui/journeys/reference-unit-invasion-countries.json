@@ -1,0 +1,53 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-invasion.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "map.move.unit-1.POL"
+    },
+    {
+      "op": "click",
+      "target": "map.move.unit-2.DEU"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.DEU",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "unit.attack.no.DEU"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.DEU",
+      "visible": false
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.POL",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "unit.attack.yes.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.POL",
+      "visible": false
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionInvadeTerritory",
+      "count": 1,
+      "fields": {
+        "unit_ids": [
+          "unit-1"
+        ],
+        "target_region_id": 2,
+        "expected_controller": "POL"
+      }
+    }
+  ]
+}

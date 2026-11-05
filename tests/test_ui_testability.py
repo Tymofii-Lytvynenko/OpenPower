@@ -1,11 +1,42 @@
+from dataclasses import dataclass
 from types import SimpleNamespace
 
 import pytest
 
 from src.client.ui.core import instrumented_imgui as instrumentation
-from src.client.ui.core.testability import Rect, UIRunTelemetry
+from src.client.ui.core.testability import Rect, UIRunTelemetry, set_widget_value
 from src.client.ui.testing.driver import UITestDriver
+from src.client.ui.testing.journey import (
+    _assert_action,
+    _assert_rect,
+    _relative_rect_check_applies,
+)
 from src.client.ui.testing.layout_checks import analyze_layout
+
+
+def test_journey_rectangle_assertion_checks_selected_source_dimensions():
+    _assert_rect(
+        {"x": 15.0, "y": 30.0, "width": 274.0, "height": 362.0},
+        {"width": 274, "height": 362},
+        tolerance=0.25,
+    )
+
+
+def test_journey_rectangle_assertion_reports_dimension_mismatch():
+    with pytest.raises(AssertionError, match="Rectangle width"):
+        _assert_rect({"x": 0.0, "y": 0.0, "width": 500.0, "height": 360.0},
+                     {"width": 274.0, "height": 362.0})
+
+
+def test_relative_geometry_can_be_limited_to_reference_viewports():
+    step = {
+        "relative_rect_min_viewport_width": 1280,
+        "relative_rect_min_viewport_height": 720,
+    }
+
+    assert not _relative_rect_check_applies(step, (800, 600))
+    assert not _relative_rect_check_applies(step, (1280, 600))
+    assert _relative_rect_check_applies(step, (1280, 720))
 
 
 class FakeImGui:
@@ -117,6 +148,14 @@ def test_nested_regions_and_disabled_state_are_recorded(facade):
     assert child["parent_id"] is not None
 
 
+def test_custom_widget_value_can_update_after_native_item_recording():
+    recorder = UIRunTelemetry((200, 200))
+    with recorder.frame():
+        recorder.record_widget("lock", "", "invisible_button", True, True, Rect(0, 0, 20, 20))
+        set_widget_value("lock", True)
+    assert recorder.widget("lock")["value"] is True
+
+
 def test_removed_widgets_become_absent_instead_of_remaining_visible(facade):
     recorder = UIRunTelemetry((200, 200))
     with recorder.frame():
@@ -145,6 +184,24 @@ def test_selector_rejects_ambiguity(facade):
         UITestDriver(None, recorder).find({"label": "Save", "type": "button"})
 
 
+def test_action_assertion_accepts_an_expected_absence():
+    _assert_action({"type": "ActionSave", "count": 0}, [])
+
+
+def test_action_assertion_rejects_unexpected_absence():
+    with pytest.raises(AssertionError, match="Unexpected count for ActionSave: 0"):
+        _assert_action({"type": "ActionSave"}, [])
+
+
+def test_action_assertion_still_checks_the_selected_payload():
+    @dataclass
+    class ActionSave:
+        value: str
+
+    with pytest.raises(AssertionError, match="value: expected 'new', received 'old'"):
+        _assert_action({"type": "ActionSave", "fields": {"value": "new"}}, [ActionSave("old")])
+
+
 def test_layout_diagnostics_detect_invalid_geometry_and_viewport_overflow():
     snapshot = {"viewport": {"width": 100, "height": 100}, "widgets": [],
                 "regions": [{"id": "window", "kind": "window", "visible": True,
@@ -152,3 +209,65 @@ def test_layout_diagnostics_detect_invalid_geometry_and_viewport_overflow():
     assert analyze_layout(snapshot)[0]["code"] == "window_outside_viewport"
     snapshot["regions"][0]["rect"]["width"] = -1
     assert "invalid_geometry" in [f["code"] for f in analyze_layout(snapshot)]
+
+
+def test_layout_diagnostics_detect_text_over_disabled_actions():
+    snapshot = {"viewport": {"width": 200, "height": 200}, "regions": [], "widgets": [
+        {"id": "live_status", "type": "text_disabled", "visible": True, "enabled": True,
+         "parent_id": "military", "rect": Rect(20, 20, 100, 12).to_dict()},
+        {"id": "buy", "type": "button", "interactive": True, "visible": True, "enabled": False,
+         "parent_id": "military", "rect": Rect(20, 25, 100, 18).to_dict()},
+    ]}
+    assert any(f["code"] == "text_overlap" and f["severity"] == "error" for f in analyze_layout(snapshot))
+    snapshot["widgets"][1]["parent_id"] = "another_window"
+    assert not analyze_layout(snapshot)
+
+
+@pytest.mark.parametrize('opened, expected', [(False, ['begin', 'end']), (True, ['begin'])])
+def test_disabled_conditional_container_keeps_scope_only_when_open(facade, monkeypatch, opened, expected):
+    calls = []
+    monkeypatch.setattr(facade, 'begin_disabled', lambda value: calls.append('begin'))
+    monkeypatch.setattr(facade, 'end_disabled', lambda: calls.append('end'))
+    result = facade._invoke_unclipped(
+        'begin_combo', lambda: opened, (), {}, SimpleNamespace(enabled=False),
+    )
+    assert result is opened
+    assert calls == expected
+
+
+def test_disabled_widget_restores_scope_when_native_call_raises(facade, monkeypatch):
+    calls = []
+    monkeypatch.setattr(facade, 'begin_disabled', lambda value: calls.append('begin'))
+    monkeypatch.setattr(facade, 'end_disabled', lambda: calls.append('end'))
+
+    def fail():
+        raise RuntimeError('native failure')
+
+    with pytest.raises(RuntimeError, match='native failure'):
+        facade._invoke_unclipped('button', fail, (), {}, SimpleNamespace(enabled=False))
+    assert calls == ['begin', 'end']
+
+
+@pytest.mark.parametrize('name', ['text', 'text_wrapped'])
+def test_gml_text_clipping_restores_native_stacks_after_failure(facade, name):
+    calls = []
+    facade._native = SimpleNamespace(
+        get_scroll_x=lambda: 0, get_scroll_y=lambda: 0,
+        get_cursor_pos_x=lambda: 0,
+        push_clip_rect=lambda *args: calls.append('clip'),
+        pop_clip_rect=lambda: calls.append('unclip'),
+        push_text_wrap_pos=lambda *args: calls.append('wrap'),
+        pop_text_wrap_pos=lambda: calls.append('unwrap'),
+    )
+    session = SimpleNamespace(
+        window_position=(10, 20), rect_for=lambda component: Rect(0, 0, 100, 14),
+    )
+    component = SimpleNamespace(enabled=True, text_offset=(0, 0))
+
+    def fail():
+        raise RuntimeError('text failure')
+
+    with pytest.raises(RuntimeError, match='text failure'):
+        facade._invoke_layout_widget(name, fail, (), {}, session, component)
+    expected = ['clip', 'wrap', 'unwrap', 'unclip'] if name == 'text_wrapped' else ['clip', 'unclip']
+    assert calls == expected

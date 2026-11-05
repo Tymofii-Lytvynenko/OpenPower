@@ -1,0 +1,34 @@
+{
+  "fixture": "tests/ui/fixtures/reference-design-create-capability-rejection.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "assert_region", "target": "military.panel", "visible": true},
+    {"op": "click", "target": "military.open_design"},
+    {"op": "assert_region", "target": "unit_design.panel", "visible": true},
+    {"op": "click", "target": "unit_design.create.open"},
+    {"op": "select", "target": "unit_design.create.role", "value": "Tank"},
+    {"op": "input", "target": "unit_design.create.name", "value": "Incomplete Tank"},
+    {"op": "input", "target": "unit_design.create.cost", "value": 125.0},
+    {"op": "input", "target": "unit_design.create.capability.gun_range", "value": 0.0},
+    {"op": "click", "target": "unit_design.create.submit"},
+    {
+      "op": "assert_action",
+      "type": "ActionCreateUnitDesign",
+      "fields": {
+        "country_tag": "UKR",
+        "branch": "land",
+        "class_name": "tanks",
+        "display_name": "Incomplete Tank",
+        "stats.gun_range": 0.0
+      }
+    },
+    {"op": "assert_region", "target": "generic_message.dialog", "visible": true},
+    {"op": "assert", "target": "generic_message.content", "label": "Create Unit Design\nThe selected design is missing required capabilities: Gun Range."},
+    {"op": "assert", "target": "unit_design.create.name", "value": "Incomplete Tank"},
+    {"op": "assert", "target": "unit_design.create.cost", "value": 125.0},
+    {"op": "assert", "target": "unit_design.create.capability.gun_range", "value": 0.0},
+    {"op": "click", "target": "generic_message.ok"},
+    {"op": "assert_region", "target": "generic_message.dialog", "visible": false},
+    {"op": "assert_region", "target": "unit_design.create.dialog", "visible": true}
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/identity-draft-apply.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/identity-draft-discard.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/identity-policy.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/identity-last-recognized.json"
+    }
+  ]
+}

@@ -38,6 +38,7 @@ _COUNTRY_INDICATORS = {
     "real_income_index": "index",
     "total_annual_revenue": "USD/year",
     "total_annual_expense": "USD/year",
+    "expense_military_upkeep": "USD/year",
     "budget_research_ratio": "ratio",
     "budget_edu_ratio": "ratio",
     "budget_health_ratio": "ratio",
@@ -91,7 +92,11 @@ class HistorySystem(ISystem):
                 defaults.append(self._definition(
                     f"country.{field}", "country", "countries", field, "id", unit,
                 ))
-            for field, unit in (("gvt_approval", "index"), ("gvt_stability", "index")):
+            for field, unit in (
+                ("gvt_approval", "index"),
+                ("gvt_stability", "index"),
+                ("gvt_corruption", "index"),
+            ):
                 if field in countries.columns:
                     defaults.append(self._definition(
                         f"politics.{field}", "country", "countries", field, "id", unit,
@@ -105,7 +110,17 @@ class HistorySystem(ISystem):
                     "country.population", "country", "regions", "id", "owner", "people",
                     aggregation="sum", derivation="country_population",
                 ))
+            if {"total_annual_revenue", "total_annual_expense"}.issubset(countries.columns):
+                defaults.append(self._definition(
+                    "country.budget_balance", "country", "countries", "total_annual_revenue", "id",
+                    "USD/year", derivation="budget_balance",
+                ))
         ledger = state.tables.get("resource_ledger")
+        if ledger is not None and {"country_id", "balance_usd"}.issubset(ledger.columns):
+            defaults.append(self._definition(
+                "country.resource_balance", "country", "resource_ledger", "balance_usd", "country_id",
+                "USD/year", aggregation="sum", derivation="resource_balance",
+            ))
         if ledger is not None and {"country_id", "consumption_usd", "balance_usd"}.issubset(ledger.columns):
             defaults.append(self._definition(
                 "country.resource_coverage", "country", "resource_ledger", "balance_usd", "country_id",
@@ -173,6 +188,10 @@ class HistorySystem(ISystem):
                 "relationship.relation_value", "relationship", "countries_relations", "value",
                 "source", "relation points", related_id_field="target",
             ))
+            defaults.append(self._definition(
+                "country.overall_relations", "country", "countries_relations", "value",
+                "source", "relation points", derivation="overall_relations",
+            ))
         units = state.tables.get("units")
         if units is not None:
             # Production unit rows use `owner`; retain support for older custom schemas.
@@ -188,6 +207,11 @@ class HistorySystem(ISystem):
                 defaults.append(self._definition(
                     "military.total_strength", "country", "units", "strength", subject_field,
                     "strength", aggregation="sum",
+                ))
+            if {"strength", "unit_type"}.issubset(units.columns):
+                defaults.append(self._definition(
+                    "military.conventional_strength", "country", "units", "strength", subject_field,
+                    "OpenPower unit strength", aggregation="sum", derivation="conventional_forces",
                 ))
         weapons = state.tables.get("strategic_weapons")
         if weapons is not None and {"country_id", "quantity"}.issubset(weapons.columns):
@@ -403,6 +427,23 @@ class HistorySystem(ISystem):
         if derivation in {"region_population", "country_population"}:
             identity = "id" if derivation == "region_population" else "owner"
             columns = [identity, *[name for name in ("pop_14", "pop_15_64", "pop_65") if name in table.columns]]
+        elif derivation == "overall_relations":
+            countries = state.tables.get("countries")
+            if countries is None or "id" not in countries.columns:
+                return None
+            if not {"source", "target", "value"}.issubset(table.columns):
+                return None
+            relation_fingerprint = frame_fingerprint(table, ["source", "target", "value"])
+            country_fingerprint = frame_fingerprint(countries, ["id"])
+            return f"{country_fingerprint}:{relation_fingerprint}"
+        elif derivation == "budget_balance":
+            columns = [name for name in ("id", "total_annual_revenue", "total_annual_expense") if name in table.columns]
+        elif derivation == "resource_balance":
+            columns = [name for name in ("country_id", "game_resource_id", "balance_usd") if name in table.columns]
+        elif derivation == "resource_coverage":
+            columns = [name for name in ("country_id", "consumption_usd", "balance_usd") if name in table.columns]
+        elif derivation == "conventional_forces":
+            columns = [name for name in ("id", "owner", "country_id", "unit_type", "strength") if name in table.columns]
         elif derivation:
             return None
         else:
@@ -415,6 +456,8 @@ class HistorySystem(ISystem):
 
     def _measure_definition(self, state: GameState, definition: dict[str, Any]) -> tuple[dict[str, float], dict[str, str]]:
         derivation = str(definition.get("derivation") or "")
+        if derivation == "overall_relations":
+            return self._country_overall_relations(state)
         if derivation == "gdp_per_capita":
             return self._gdp_per_capita(state)
         if derivation == "country_population":
@@ -429,6 +472,12 @@ class HistorySystem(ISystem):
                 if row[0] is not None:
                     values[str(row[0])] = sum(float(value or 0.0) for value in row[1:])
             return values, {subject: "derived" for subject in values}
+        if derivation == "budget_balance":
+            return self._country_budget_balance(state)
+        if derivation == "resource_balance":
+            return self._country_resource_balance(state)
+        if derivation == "conventional_forces":
+            return self._country_conventional_forces(state, definition)
         if derivation == "resource_coverage":
             return self._resource_coverage(state)
         if derivation == "treaty_membership_count":
@@ -483,6 +532,75 @@ class HistorySystem(ISystem):
                 grouped.setdefault(subject, []).append(number)
         values = {subject: self._aggregate(samples, aggregation) for subject, samples in grouped.items()}
         return values, {subject: "authoritative" for subject in values}
+
+    def _country_budget_balance(self, state: GameState) -> tuple[dict[str, float], dict[str, str]]:
+        countries = state.tables.get("countries")
+        required = {"id", "total_annual_revenue", "total_annual_expense"}
+        if countries is None or not required.issubset(countries.columns):
+            return {}, {}
+
+        values: dict[str, float] = {}
+        for country_id, revenue, expense in countries.select(
+            ["id", "total_annual_revenue", "total_annual_expense"]
+        ).iter_rows(named=False):
+            country = self._tag(country_id)
+            if not country or revenue is None or expense is None:
+                continue
+            try:
+                balance = float(revenue) - float(expense)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(balance):
+                values[country] = balance
+        return values, {subject: "derived" for subject in values}
+
+    def _country_overall_relations(self, state: GameState) -> tuple[dict[str, float], dict[str, str]]:
+        countries = state.tables.get("countries")
+        relations = state.tables.get("countries_relations")
+        if countries is None or relations is None or "id" not in countries.columns:
+            return {}, {}
+        required = {"source", "target", "value"}
+        if not required.issubset(relations.columns):
+            return {}, {}
+
+        country_ids = sorted({self._tag(value) for value in countries.get_column("id").to_list()} - {""})
+        if not country_ids:
+            return {}, {}
+        if len(country_ids) == 1:
+            return {country_ids[0]: 100.0}, {country_ids[0]: "derived"}
+
+        known_countries = set(country_ids)
+        relation_values: dict[tuple[str, str], float] = {}
+        for source_value, target_value, relation_value in relations.select(
+            ["source", "target", "value"]
+        ).iter_rows(named=False):
+            source = self._tag(source_value)
+            target = self._tag(target_value)
+            if source not in known_countries or target not in known_countries or source == target:
+                continue
+            pair = (source, target)
+            if pair in relation_values or relation_value is None:
+                return {}, {}
+            try:
+                numeric_value = float(relation_value)
+            except (TypeError, ValueError):
+                return {}, {}
+            if not math.isfinite(numeric_value):
+                return {}, {}
+            relation_values[pair] = numeric_value
+
+        expected_pair_count = len(country_ids) * (len(country_ids) - 1)
+        if len(relation_values) != expected_pair_count:
+            return {}, {}
+
+        values = {
+            source: sum(
+                relation_values[(source, target)]
+                for target in country_ids if target != source
+            ) / (len(country_ids) - 1)
+            for source in country_ids
+        }
+        return values, {subject: "derived" for subject in values}
 
     @staticmethod
     def _aggregate(values: list[float], aggregation: str) -> float:
@@ -558,6 +676,78 @@ class HistorySystem(ISystem):
             for country, (consumption, shortage) in totals.items()
         }
         return coverage, {subject: "derived" for subject in coverage}
+
+    def _country_resource_balance(self, state: GameState) -> tuple[dict[str, float], dict[str, str]]:
+        ledger = state.tables.get("resource_ledger")
+        if ledger is None or not {"country_id", "balance_usd"}.issubset(ledger.columns):
+            return {}, {}
+
+        totals: dict[str, float] = {}
+        incomplete: set[str] = set()
+        for country_value, balance_value in ledger.select(
+            ["country_id", "balance_usd"]
+        ).iter_rows(named=False):
+            country = self._tag(country_value)
+            if not country:
+                continue
+            try:
+                balance = float(balance_value)
+            except (TypeError, ValueError):
+                incomplete.add(country)
+                continue
+            if not math.isfinite(balance):
+                incomplete.add(country)
+                continue
+            totals[country] = totals.get(country, 0.0) + balance
+
+        # A country-wide balance is meaningful only when every recorded resource row has a value.
+        values = {country: value for country, value in totals.items() if country not in incomplete}
+        return values, {subject: "derived" for subject in values}
+
+    def _country_conventional_forces(
+        self, state: GameState, definition: dict[str, Any],
+    ) -> tuple[dict[str, float], dict[str, str]]:
+        units = state.tables.get("units")
+        subject_field = str(definition.get("subject_id_field") or "")
+        if (
+            units is None
+            or not {subject_field, "unit_type", "strength"}.issubset(units.columns)
+        ):
+            return {}, {}
+
+        totals: dict[str, float] = {}
+        incomplete: set[str] = set()
+        for country_value, unit_type, strength_value in units.select(
+            [subject_field, "unit_type", "strength"]
+        ).iter_rows(named=False):
+            country = self._tag(country_value)
+            normalized_type = str(unit_type or "").strip()
+            if not country:
+                continue
+            totals.setdefault(country, 0.0)
+            if not normalized_type:
+                incomplete.add(country)
+                continue
+            if self._is_strategic_unit(normalized_type):
+                continue
+            try:
+                strength = float(strength_value)
+            except (TypeError, ValueError):
+                incomplete.add(country)
+                continue
+            if not math.isfinite(strength):
+                incomplete.add(country)
+                continue
+            totals[country] = totals.get(country, 0.0) + strength
+
+        # The OpenPower conventional-force aggregate follows the military panel's strategic-unit split.
+        values = {country: value for country, value in totals.items() if country not in incomplete}
+        return values, {subject: "derived" for subject in values}
+
+    @staticmethod
+    def _is_strategic_unit(unit_type: Any) -> bool:
+        normalized = str(unit_type or "").casefold()
+        return any(token in normalized for token in ("strategic", "missile", "rocket", "nuclear"))
 
     def _treaty_membership_count(self, state: GameState) -> tuple[dict[str, float], dict[str, str]]:
         treaties = state.tables.get("countries_treaties")
@@ -819,6 +1009,8 @@ class HistorySystem(ISystem):
         derivation = str(definition.get("derivation") or "")
         if derivation in {"gdp_per_capita", "region_population"}:
             sources.add("regions")
+        if derivation == "overall_relations":
+            sources.add("countries")
         if derivation == "resource_coverage":
             sources.add("resource_ledger")
         if derivation == "treaty_membership_count":

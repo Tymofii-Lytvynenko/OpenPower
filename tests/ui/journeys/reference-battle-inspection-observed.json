@@ -1,0 +1,125 @@
+{
+  "fixture": "tests/ui/fixtures/reference-battle-inspection-observed.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "battle.map.marker.battle-observer"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.info.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.observation_status",
+      "label": "Public unit totals"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.count.A.I",
+      "label": "1"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.count.A.G",
+      "label": "0"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.count.A.A",
+      "label": "0"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.count.A.N",
+      "label": "0"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.count.B.I",
+      "label": "0"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.count.B.G",
+      "label": "2"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.count.B.A",
+      "label": "0"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.count.B.N",
+      "label": "0"
+    },
+    {
+      "op": "assert_absent",
+      "target": "battle.inspection.force.POL.air_defense"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetBattleStrategy",
+      "count": 0
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/reference-battle-counts-stale.json"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.info.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.count.B.G",
+      "label": "\u2014"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.observation_status",
+      "label": "Counts not observed"
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/reference-battle-counts-refresh.json"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.info.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.count.B.G",
+      "label": "2"
+    },
+    {
+      "op": "click",
+      "target": "battle.info.apply"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.info.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetBattleStrategy",
+      "count": 0
+    },
+    {
+      "op": "close_window",
+      "target": "battle.info.dialog"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.info.dialog",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

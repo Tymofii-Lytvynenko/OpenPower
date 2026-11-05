@@ -1,0 +1,1016 @@
+{
+  "results": [
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/advisor-toggle-apply.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/advisor-toggle-discard.json"
+    },
+    {
+      "journey": "tests/ui/journeys/bilateral-trade.json",
+      "surface": "trade"
+    },
+    {
+      "journey": "tests/ui/journeys/budget.json",
+      "surface": "budget"
+    },
+    {
+      "journey": "tests/ui/journeys/covert-framed-dispatch.json",
+      "surface": "game-hud"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-cancel.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-execute.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-foreign.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-intelligence.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-long.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-rejected.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-retire.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-selection.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-ready-stale.json"
+    },
+    {
+      "surface": "covert-ops",
+      "journey": "tests/ui/journeys/covert-roster-activity.json"
+    },
+    {
+      "surface": "covert-ops",
+      "journey": "tests/ui/journeys/covert-roster-busy.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-roster-rejected.json"
+    },
+    {
+      "surface": "covert-ops",
+      "journey": "tests/ui/journeys/covert-roster-retarget.json"
+    },
+    {
+      "journey": "tests/ui/journeys/debt-input.json",
+      "surface": "economic-health"
+    },
+    {
+      "journey": "tests/ui/journeys/hud-budget.json",
+      "surface": "game-hud"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/identity-draft-apply.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/identity-draft-discard.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/identity-last-recognized.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/identity-law-combined.json"
+    },
+    {
+      "journey": "tests/ui/journeys/identity-policy.json",
+      "surface": "internal-laws"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/identity-row-scroll.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/internal-laws-layout.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/law-close-apply.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/law-close-discard.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/law-close-stale.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/law-policy-apply.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/law-policy-stale.json"
+    },
+    {
+      "journey": "tests/ui/journeys/main-bar-layout.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/main-bar-locate-unavailable.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-main-bar-alliance.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-main-bar-hostile.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-main-bar-military-access.json",
+      "surface": "game-hud"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/party-constitution-no.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/party-constitution-reverse.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/party-constitution-stale.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/party-constitution-yes.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/party-policy-stale.json"
+    },
+    {
+      "surface": "internal-laws",
+      "journey": "tests/ui/journeys/party-policy.json"
+    },
+    {
+      "journey": "tests/ui/journeys/settings.json",
+      "surface": "settings"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-advisor-close.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-advisor-settings.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-battle-inspection-observed.json",
+      "surface": "battle-map"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-battle-inspection-many-countries.json",
+      "surface": "battle-map"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-battle-inspection-observer.json",
+      "surface": "battle-map"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-battle-inspection-own.json",
+      "surface": "battle-map"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-battle-inspection-result.json",
+      "surface": "battle-map"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-budget-close-apply.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-budget-fixed-diplomacy.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-budget-fixed-military-upkeep.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-budget-fixed-security.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-budget-fixed-trade.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-budget-income-tax.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-budget-income-trade.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-budget-remember-apply.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-budget-remember-discard.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-command-feedback.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-country-info.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-covert-empty-name.json",
+      "surface": "covert-ops"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-covert-outcomes.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-economy-budget.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-economy-health.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/economic-health-source-apply.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/economic-health-rate-hold.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/economic-health-meter-drag.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-economy-resources.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-economy-trade.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-generic-message.json",
+      "surface": "game-hud"
+    },
+      {
+        "journey": "tests/ui/journeys/reference-advisor-message-view.json",
+        "surface": "game-hud"
+      },
+    {
+      "journey": "tests/ui/journeys/reference-history.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-live-combat-mail.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-mail-context.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-mail.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-main-bar-history.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-system-bar-layout.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-main-menu-credits-close.json",
+      "surface": "main-menu"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-main-menu-credits.json",
+      "surface": "main-menu"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-main-menu-options.json",
+      "surface": "main-menu"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-options-apply-discard.json",
+      "surface": "main-menu"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-region-control.json",
+      "surface": "map-information"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-alliance.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-annexation.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-assume_foreign_debt.inverted.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-assume_foreign_debt.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-common_market.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-cultural_exchanges.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-economic_aid.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-economic_embargo.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-economic_partnership.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-free_region.inverted.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-free_region.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-human_development_collaboration.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-military_trespassing_right.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-noble_cause.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-request_military_presence_removal.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-request_war_declaration.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-research_partnership.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-weapons_trade.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-weapons_trade_embargo.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-unit-composition.json",
+      "surface": "map-information"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-battle.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-close.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-covert-create.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-covert-mission.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-covert-train.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-covert.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-create-design.json",
+      "surface": "unit-design"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-design-create-failure-feedback.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-design-create-capability-rejection-feedback.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-design.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-design-tabs.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-market.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-market-hold-repeat.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-market-number-format.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-market-quantity-editor.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-market-empty.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-production.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-production-actions.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-production-quantity-hold.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-production-queue-limit.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-production-deployments.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-production-foreign.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-research.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-research-linked-allocation.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-research-close-apply.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-research-close-discard.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-reserves.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-strategic-overview.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-strategic-production.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-strategic-warfare.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-floating-panels-no-overlap.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-unit-list.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-list-foreign-estimates.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-war-list.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-war-list-gml.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-war-list-peace-package.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-war-list-peace-submit-applied.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-war-list-peace-submit-rejected.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-war-list-peace-response-accept.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-war-list-peace-response-reject.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-news.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-politics-close.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-politics-constitutional.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-politics-create-treaty.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-politics-laws.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-politics-treaties.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-filters.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-politics-treaty-details.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-response-accept.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-response-reject.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-remove-ineligible.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-ineligible-rejection.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-relations-data.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-relations.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-resource-production-dialog.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-resources-close-apply.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-resources-close-discard.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-resource-policy-multiple-drafts.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-resource-policy-rejection.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-save-dialog.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-load-saved-game-route.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-load-failure-feedback.json",
+      "surface": "loading-error-load"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-new-game-failure-feedback.json",
+      "surface": "loading-error-new"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-new-game-country-validation.json",
+      "surface": "new-game-selection"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-new-game-empty-scenarios.json",
+      "surface": "new-game-selection"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-new-game-country-metadata-fallback.json",
+      "surface": "new-game-selection"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-new-game-party-selection.json",
+      "surface": "new-game-selection"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-new-game-country-profile.json",
+      "surface": "new-game-selection"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-new-game-profile-defaults.json",
+      "surface": "new-game-selection"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-b.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-budget-dirty.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-c.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-d.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-f5.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-advisor-recommendation-review.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-f9.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-l.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-r.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-resources-dirty.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-t.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-u.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-shortcut-w.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-strategic-close.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-strategic-planner.json",
+      "surface": "strategic-warfare"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-anarchy.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-duplicate-name.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-lifecycle-accepted.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-lifecycle-removed.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-lifecycle-stale.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-refusal-mail.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-merge.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-split.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-unavailable.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-targeting.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-attack-targeting.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-group-list.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-invasion-confirm.json",
+      "surface": "unit-movement"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-movement-refusal-feedback.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-invasion-countries.json",
+      "surface": "unit-movement"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-invasion-rejected.json",
+      "surface": "unit-movement"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-invasion-stale.json",
+      "surface": "unit-movement"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-list-close.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-list-design-details.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-list-empty.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-list-operations.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-list-scroll.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-merge.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-merge-cancel.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-production-design-details.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-reorganization-cancel.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-split.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-war-list-close.json",
+      "surface": "game-hud"
+    },
+    {
+      "surface": "unit-context",
+      "journey": "tests/ui/journeys/unit-training-no.json"
+    },
+    {
+      "surface": "unit-context",
+      "journey": "tests/ui/journeys/unit-training-stale.json"
+    },
+    {
+      "surface": "unit-context",
+      "journey": "tests/ui/journeys/unit-training-unavailable.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-news-rolling-update.json"
+    },
+    {
+      "surface": "unit-context",
+      "journey": "tests/ui/journeys/unit-training-yes.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/economic-health-close-apply.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/economic-health-close-discard.json"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-context-occupation.json",
+      "surface": "map-context"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-unit-reserves-layout.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-unit-reserves-actions.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/region-control-change.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-constitutional-close-discard.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-constitutional-close-apply.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-government-form-change.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-government-form-apply.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-government-form-martial-law.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-government-form-override.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-government-form-rejected.json"
+    },
+    {
+      "surface": "map-legend",
+      "journey": "tests/ui/journeys/reference-map-thematic-legend.json"
+    },
+    {
+      "surface": "map-legend",
+      "journey": "tests/ui/journeys/reference-map-empire-legend.json"
+    },
+    {
+      "surface": "map-mode-navigation",
+      "journey": "tests/ui/journeys/reference-map-mode-opens-legend.json"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-mail-arrival.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-mail-layout.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-resource-tax-stepper.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-eligible-grid.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/trade-gml-layout.json",
+      "surface": "trade"
+    },
+    {
+      "journey": "tests/ui/journeys/trade-units-unavailable.json",
+      "surface": "trade"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-main-pillars-no-overlap.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-main-menu-navigation.json",
+      "surface": "main-menu"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-main-menu-load-from-multiplayer.json",
+      "surface": "main-menu"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-host-window-navigation.json",
+      "surface": "main-menu"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-multiplayer-input-dialog.json",
+      "surface": "multiplayer-input-dialog"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-multiplayer-server-info.json",
+      "surface": "multiplayer-server-info"
+    },
+    {
+      "surface": "mini-map",
+      "journey": "tests/ui/journeys/reference-mini-map.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-interface-guided-tour.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/reference-military-guided-tour.json"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-tutorial-compact-placement.json",
+      "surface": "game-hud"
+    }
+  ]
+}

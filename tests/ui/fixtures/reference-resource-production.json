@@ -1,0 +1,39 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "money_reserves": 2000000.0},
+      {"id": "POL", "money_reserves": 2000000.0}
+    ],
+    "resource_ledger": [
+      {
+        "country_id": "UKR",
+        "game_resource_id": "fossil_fuels",
+        "category": "Energy",
+        "production_usd": 1200000.0,
+        "consumption_usd": 900000.0,
+        "trade_usd": 100000.0,
+        "balance_usd": 300000.0
+      },
+      {
+        "country_id": "POL",
+        "game_resource_id": "fossil_fuels",
+        "category": "Energy",
+        "production_usd": 800000.0,
+        "consumption_usd": 700000.0,
+        "trade_usd": -50000.0,
+        "balance_usd": 100000.0
+      }
+    ],
+    "domestic_production": [
+      {
+        "country_id": "UKR",
+        "game_resource_id": "fossil_fuels",
+        "is_gov_controlled": false,
+        "is_legal": true,
+        "tax_rate": 0.05,
+        "domestic_production": 1200000.0
+      }
+    ],
+    "regional_production": []
+  }
+}

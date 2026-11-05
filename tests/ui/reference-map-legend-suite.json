@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-map-mode-opens-legend.json",
+      "surface": "map-mode-navigation"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-thematic-legend.json",
+      "surface": "map-legend"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-empire-legend.json",
+      "surface": "map-legend"
+    }
+  ]
+}

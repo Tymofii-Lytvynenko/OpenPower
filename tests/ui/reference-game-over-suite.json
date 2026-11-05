@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-game-over.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-game-over-close.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-game-over-victory.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-game-over-sandbox.json",
+      "surface": "game-hud"
+    }
+  ]
+}

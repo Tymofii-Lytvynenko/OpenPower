@@ -1,0 +1,32 @@
+{
+  "tables": {
+    "random_event_instances": [
+      {
+        "id": "arrival-event",
+        "event_type": "population_displacement",
+        "label": "Displacement near Warsaw",
+        "category": "demographic",
+        "target_scope": "region",
+        "region_id": 2,
+        "country_id": "POL",
+        "triggered_at_minute": 1,
+        "starts_at_minute": 1,
+        "expires_at_minute": 1441,
+        "severity": 0.6,
+        "status": "active",
+        "response_options_json": "[{\"response_id\":\"relief_aid\",\"cost\":1000}]"
+      }
+    ],
+    "news_items": [
+      {
+        "id": "arrival-1",
+        "headline": "Alliance declared",
+        "body": "Treaty obligations are now active.",
+        "category": "political",
+        "severity": "warning",
+        "related_country_id": "POL",
+        "created_at": "2001-01-01 00:01"
+      }
+    ]
+  }
+}

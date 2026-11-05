@@ -1,0 +1,12 @@
+{
+  "tables": {
+    "countries_wars": [
+      {
+        "id": "main-bar-war",
+        "side_a": ["UKR"],
+        "side_b": ["POL"],
+        "status": "active"
+      }
+    ]
+  }
+}

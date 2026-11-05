@@ -1,0 +1,37 @@
+{
+  "tables": {
+    "resource_ledger": [
+      {
+        "country_id": "UKR",
+        "game_resource_id": "electricity",
+        "category": "Energy",
+        "production_usd": 1200000.0,
+        "consumption_usd": 900000.0,
+        "trade_usd": 100000.0,
+        "balance_usd": 300000.0
+      }
+    ],
+    "domestic_production": [
+      {
+        "country_id": "UKR",
+        "game_resource_id": "electricity",
+        "is_gov_controlled": false,
+        "is_legal": true,
+        "tax_rate": 0.05,
+        "domestic_production": 120000.0
+      }
+    ]
+  },
+  "globals": {
+    "ui_command_results": {
+      "ActionUpdateResourcePolicy": [
+        {
+          "status": "rejected",
+          "reason": "The issuer does not control this country's resource policy.",
+          "country_id": "UKR",
+          "resource_id": "electricity"
+        }
+      ]
+    }
+  }
+}

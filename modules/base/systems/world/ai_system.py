@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 import polars as pl
 
@@ -23,11 +24,24 @@ from modules.base.systems.world.ai import (
     StrategicWarfarePolicy,
     WarPolicy,
 )
-from src.core.ai_framework import AITableContext, DeclarativeAIFramework, empty_decision_frame
+from src.core.ai_framework import (
+    AIEvaluation,
+    AITableContext,
+    DeclarativeAIFramework,
+    empty_decision_frame,
+)
 from src.shared.events import EventNewDay
+from src.shared.advisor_settings import ADVISOR_STATUS_COLUMNS
 from src.shared.state import GameState
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_HELPER
+
+
+@dataclass(frozen=True, slots=True)
+class _PlayerAdvisorEvaluation:
+    modes: dict[str, str]
+    player_tag: str
+    evaluation: AIEvaluation
 
 
 class AISystem(ISystem):
@@ -75,11 +89,23 @@ class AISystem(ISystem):
                 "research_tracks",
                 "strategic_weapons",
                 "strategic_launch_orders",
+                "advisor_recommendations",
             }
         ),
-        writes=frozenset(),
+        writes=frozenset({"advisor_recommendations"}),
         phase=SystemPhase.STRATEGY,
     )
+
+    _ADVISOR_POLICY_DOMAINS = {
+        "economy": frozenset({"budget", "budget_survival", "economic_health"}),
+        "politics": frozenset({"political_law", "political_election", "political_crisis"}),
+        "military": frozenset({"procurement", "military_training", "military_roi"}),
+    }
+    _POLICY_DOMAIN = {
+        policy_id: domain
+        for domain, policy_ids in _ADVISOR_POLICY_DOMAINS.items()
+        for policy_id in policy_ids
+    }
 
     runtime_state_contract = {
         "_framework": SYSTEM_STATE_HELPER,
@@ -140,7 +166,150 @@ class AISystem(ISystem):
         )
         evaluation = self._framework.evaluate(context)
         state.current_actions.extend(evaluation.actions)
-        self._last_decisions = evaluation.decisions.head(256)
+        player_evaluation = self._evaluate_player_advisor(state, context)
+        if player_evaluation is not None:
+            self._apply_player_advisor(state, player_evaluation)
+            self._last_decisions = pl.concat(
+                [evaluation.decisions, player_evaluation.evaluation.decisions], how="diagonal_relaxed"
+            ).head(256)
+        else:
+            self._last_decisions = evaluation.decisions.head(256)
+
+    def _evaluate_player_advisor(
+        self,
+        state: GameState,
+        context: AITableContext,
+    ) -> _PlayerAdvisorEvaluation | None:
+        countries = state.tables.get("countries")
+        player_tag = str(context.player_tag or "").strip().upper()
+        if not player_tag or countries is None or "id" not in countries.columns:
+            return None
+
+        rows = countries.filter(
+            pl.col("id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_uppercase()
+            == player_tag
+        )
+        if rows.height != 1:
+            return None
+
+        modes = {
+            domain: str(rows[column][0] or "manual").strip().lower()
+            if column in rows.columns
+            else "manual"
+            for domain, column in ADVISOR_STATUS_COLUMNS.items()
+        }
+        active_domains = {
+            domain for domain, mode in modes.items()
+            if mode in {"automatic", "confirmations"}
+        }
+        policy_ids = frozenset().union(
+            *(self._ADVISOR_POLICY_DOMAINS[domain] for domain in active_domains)
+        ) if active_domains else frozenset()
+        if not policy_ids:
+            return None
+
+        player_tables = dict(context.tables)
+        player_tables["countries"] = rows
+        player_context = AITableContext(
+            tables=player_tables,
+            day_ordinal=context.day_ordinal,
+            total_minutes=context.total_minutes,
+            date_text=context.date_text,
+            globals=context.globals,
+        )
+        evaluation = self._framework.evaluate(player_context, policy_ids=policy_ids)
+        return _PlayerAdvisorEvaluation(modes, player_tag, evaluation)
+
+    def _apply_player_advisor(
+        self,
+        state: GameState,
+        player_evaluation: _PlayerAdvisorEvaluation,
+    ) -> None:
+        modes = player_evaluation.modes
+        player_tag = player_evaluation.player_tag
+        evaluation = player_evaluation.evaluation
+        recommendation_table = state.tables.get("advisor_recommendations")
+        recommendation_rows = recommendation_table.to_dicts() if recommendation_table is not None else []
+        known_ids = {str(row.get("id") or "") for row in recommendation_rows}
+        changed = False
+
+        for decision, action in evaluation.resolved_actions:
+            if str(decision.get("country_id") or "").strip().upper() != player_tag:
+                continue
+            domain = self._POLICY_DOMAIN.get(str(decision.get("policy_id") or ""))
+            mode = modes.get(domain or "", "manual")
+            if mode == "automatic":
+                state.current_actions.append(action)
+            elif mode == "confirmations":
+                changed |= self._queue_recommendation(
+                    recommendation_rows,
+                    known_ids,
+                    player_tag,
+                    domain,
+                    decision,
+                    action,
+                    int(state.time.total_minutes),
+                    str(state.globals.get("active_campaign_id") or ""),
+                )
+
+        if changed and recommendation_table is not None:
+            state.update_table(
+                "advisor_recommendations",
+                pl.DataFrame(recommendation_rows, schema=recommendation_table.schema, strict=False),
+            )
+
+    @staticmethod
+    def _queue_recommendation(
+        rows: list[dict],
+        known_ids: set[str],
+        player_tag: str,
+        domain: str | None,
+        decision: dict,
+        action,
+        now: int,
+        campaign_id: str,
+    ) -> bool:
+        import hashlib
+        import json
+        from dataclasses import asdict
+
+        if not domain:
+            return False
+        action_payload = {
+            "type": type(action).__name__,
+            "fields": asdict(action),
+        }
+        encoded_action = json.dumps(action_payload, sort_keys=True, separators=(",", ":"))
+        identity = "|".join((player_tag, str(decision.get("policy_id") or ""), encoded_action))
+        digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20]
+        recommendation_id = f"advisor:ai:{player_tag}:{digest}"
+        if recommendation_id in known_ids:
+            return False
+
+        policy_label = str(decision.get("policy_id") or "AI policy").replace("_", " ").title()
+        reason_code = str(decision.get("reason_code") or "").replace("_", " ").strip()
+        reason = f"Generated by the {policy_label} policy."
+        if reason_code:
+            reason += f" Decision reason: {reason_code}."
+        rows.append({
+            "id": recommendation_id,
+            "campaign_id": campaign_id,
+            "actor_country_id": player_tag,
+            "title": f"{domain.title()} recommendation: {policy_label}",
+            "reason": reason,
+            "source_signal": f"ai_policy:{domain}:{decision.get('policy_id')}:{digest}",
+            "affected_country_id": player_tag,
+            "affected_region_id": 0,
+            "confidence": 0.0,
+            "urgency": 0.0,
+            "expires_at_minute": now + 7 * 24 * 60,
+            "optional_action_json": encoded_action,
+            "status": "active",
+            "created_at_minute": now,
+            "stale_reason": "",
+        })
+        known_ids.add(recommendation_id)
+        return True
 
     @staticmethod
     def _delegated_domains(state: GameState) -> dict[str, frozenset[str]]:

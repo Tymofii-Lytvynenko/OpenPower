@@ -8,6 +8,7 @@ import polars as pl
 
 from modules.base.systems.military.research_program_system import ResearchProgramSystem
 from modules.base.schema import ensure_base_tables
+from modules.base.systems.military.capability_catalog import DEFAULT_ROLE_PROFILES
 from modules.base.systems.military.military_system import MilitarySystem
 from src.shared.actions import (
     ActionCancelProductionOrder,
@@ -22,6 +23,59 @@ from src.shared.state import GameState
 
 
 class ResearchProgramSystemTest(unittest.TestCase):
+    def test_rejected_design_action_returns_a_user_facing_command_result(self) -> None:
+        state = self._state()
+        state.current_actions = [ActionCreateUnitDesign(
+            "unauthorized-player", "USA", "ground", "artillery", "Artillery Brigade", {"cost": 50.0},
+        )]
+
+        ResearchProgramSystem().update(state, 0.0)
+
+        self.assertTrue(state.get_table("unit_designs").is_empty())
+        result = state.journal.command_results[-1]
+        self.assertEqual(result["action_type"], "ActionCreateUnitDesign")
+        self.assertEqual(result["status"], "rejected")
+        self.assertEqual(result["reason"], "The issuer does not control this country's design program.")
+
+    def test_design_missing_source_required_capability_is_rejected_with_feedback(self) -> None:
+        state = self._state()
+        stats = dict(DEFAULT_ROLE_PROFILES["tanks"].capabilities)
+        stats.update({"cost": 50.0, "gun_range": 0.0})
+        state.current_actions = [ActionCreateUnitDesign(
+            "player", "USA", "land", "tanks", "Incomplete Tank", stats,
+        )]
+
+        ResearchProgramSystem().update(state, 0.0)
+
+        self.assertTrue(state.get_table("unit_designs").is_empty())
+        result = state.journal.command_results[-1]
+        self.assertEqual(result["status"], "rejected")
+        self.assertEqual(
+            result["reason"],
+            "The selected design is missing required capabilities: Gun Range.",
+        )
+
+    def test_naval_design_can_use_either_complete_weapon_profile(self) -> None:
+        state = self._state()
+        stats = dict(DEFAULT_ROLE_PROFILES["patrol_craft"].capabilities)
+        stats.update({
+            "cost": 50.0,
+            "countermeasures": 1.0,
+            "gun_range": 0.0,
+            "gun_precision": 0.0,
+            "gun_damage": 0.0,
+            "missile_payload": 10.0,
+        })
+        state.current_actions = [ActionCreateUnitDesign(
+            "player", "USA", "naval", "patrol_craft", "Missile Patrol Craft", stats,
+        )]
+
+        ResearchProgramSystem().update(state, 0.0)
+
+        designs = state.get_table("unit_designs")
+        self.assertEqual(designs.height, 1)
+        self.assertEqual(designs["display_name"][0], "Missile Patrol Craft")
+
     def test_idle_update_does_not_advance_research_table_revisions(self) -> None:
         state = self._state()
         before = dict(state.table_revisions)
@@ -48,6 +102,66 @@ class ResearchProgramSystemTest(unittest.TestCase):
         self.assertEqual(state.table_revisions["research_tracks"], before["research_tracks"] + 1)
         for table_name in ("unit_designs", "production_orders", "countries"):
             self.assertEqual(state.table_revisions[table_name], before[table_name], table_name)
+
+    def test_research_funding_actions_redistribute_authoritative_linked_groups(self) -> None:
+        state = self._state()
+        research_tracks = state.get_table("research_tracks")
+        ratios = {
+            "ground": 0.4,
+            "air": 0.3,
+            "naval": 0.2,
+            "strategic": 0.1,
+            "strategic_program": 0.2,
+            "strategic_weapons": 0.3,
+            "strategic_defense": 0.5,
+        }
+        rows = [
+            {
+                "id": f"research-USA-{branch}",
+                "country_id": "USA",
+                "branch": branch,
+                "funding_ratio": ratio,
+                "progress": 0.0,
+                "priority": 1,
+                "focus": "",
+                "research_level": 0,
+                "unlocks_json": "[]",
+                "blocking_reason": "",
+            }
+            for branch, ratio in ratios.items()
+        ]
+        state.update_table(
+            "research_tracks",
+            pl.DataFrame(rows, schema=research_tracks.schema),
+        )
+
+        state.current_actions = [ActionUpdateResearchFunding("player", "USA", "ground", 0.5)]
+        system = ResearchProgramSystem()
+        system.update(state, 0.0)
+        tracks = {
+            row["branch"]: row["funding_ratio"]
+            for row in state.get_table("research_tracks").to_dicts()
+        }
+
+        self.assertAlmostEqual(tracks["ground"], 0.5)
+        self.assertAlmostEqual(tracks["air"], 0.25)
+        self.assertAlmostEqual(tracks["naval"], 1.0 / 6.0)
+        self.assertAlmostEqual(tracks["strategic"], 1.0 / 12.0)
+        self.assertAlmostEqual(tracks["strategic_program"], 0.2)
+        self.assertAlmostEqual(tracks["strategic_weapons"], 0.3)
+        self.assertAlmostEqual(tracks["strategic_defense"], 0.5)
+
+        state.current_actions = [
+            ActionUpdateResearchFunding("player", "USA", "strategic_program", 0.5)
+        ]
+        system.update(state, 0.0)
+        tracks = {
+            row["branch"]: row["funding_ratio"]
+            for row in state.get_table("research_tracks").to_dicts()
+        }
+        self.assertAlmostEqual(tracks["strategic_program"], 0.5)
+        self.assertAlmostEqual(tracks["strategic_weapons"], 0.1875)
+        self.assertAlmostEqual(tracks["strategic_defense"], 0.3125)
 
     def test_treaty_research_capacity_accelerates_track_progress(self) -> None:
         state = self._state()
@@ -89,6 +203,50 @@ class ResearchProgramSystemTest(unittest.TestCase):
         self.assertEqual(delivered_units[0]["unit_lifecycle"], "deployment_queued")
         self.assertEqual(state.get_table("unit_deployment_orders")["status"][0], "queued")
         self.assertEqual(state.get_table("countries")["military_count"][0], 4)
+
+    def test_production_queue_rejects_order_after_source_row_limit(self) -> None:
+        state = self._state()
+        system = ResearchProgramSystem()
+        state.current_actions = [ActionCreateUnitDesign(
+            "player", "USA", "ground", "artillery", "Artillery Brigade",
+            {"cost": 1.0, "firepower": 2.0},
+        )]
+        system.update(state, 0.0)
+        design_id = state.get_table("unit_designs")["id"][0]
+
+        state.current_actions = [
+            ActionQueueUnitProduction("player", "USA", design_id, 1)
+            for _ in range(51)
+        ]
+        system.update(state, 0.0)
+
+        self.assertEqual(state.get_table("production_orders").height, 50)
+        rejection = state.journal.command_results[-1]
+        self.assertEqual(rejection["action_type"], "ActionQueueUnitProduction")
+        self.assertEqual(rejection["status"], "rejected")
+        self.assertIn("50 orders", rejection["reason"])
+
+    def test_production_queue_rejects_quantity_above_source_control_limit(self) -> None:
+        state = self._state()
+        system = ResearchProgramSystem()
+        state.current_actions = [ActionCreateUnitDesign(
+            "player", "USA", "ground", "artillery", "Artillery Brigade",
+            {"cost": 1.0, "firepower": 2.0},
+        )]
+        system.update(state, 0.0)
+        design_id = state.get_table("unit_designs")["id"][0]
+        starting_funds = state.get_table("countries")["money_reserves"][0]
+
+        state.current_actions = [ActionQueueUnitProduction(
+            "player", "USA", design_id, 1_000_001,
+        )]
+        system.update(state, 0.0)
+
+        self.assertTrue(state.get_table("production_orders").is_empty())
+        self.assertEqual(state.get_table("countries")["money_reserves"][0], starting_funds)
+        rejection = state.journal.command_results[-1]
+        self.assertEqual(rejection["status"], "rejected")
+        self.assertIn("1,000,000", rejection["reason"])
 
     def test_design_availability_and_ids_are_stable_across_snapshot_continuation(self) -> None:
         state = self._state()
@@ -226,6 +384,12 @@ class ResearchProgramSystemTest(unittest.TestCase):
         state.current_actions = [action]
         system.update(state, 0.0)
         self.assertTrue(state.get_table("unit_designs").is_empty())
+        rejection = state.journal.command_results[-1]
+        self.assertEqual(rejection["status"], "rejected")
+        self.assertEqual(
+            rejection["reason"],
+            "Required research is incomplete: Strategic Program level 1, Strategic Weapons level 1.",
+        )
 
         state.update_table("research_tracks", pl.DataFrame([
             {"id": "program", "country_id": "USA", "branch": "strategic_program", "research_level": 1},

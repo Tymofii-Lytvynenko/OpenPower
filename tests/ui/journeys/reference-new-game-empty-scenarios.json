@@ -1,0 +1,31 @@
+{
+  "fixture": "tests/ui/fixtures/reference-new-game-empty-scenarios.json",
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "new_game.scenario.dialog",
+      "visible": true,
+      "min_width": 560,
+      "min_height": 354
+    },
+    {
+      "op": "assert",
+      "target": "new_game.scenario.empty_list",
+      "label": "No enabled scenarios are available.",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "new_game.scenario.empty_details",
+      "label": "Select an enabled campaign scenario to view its details.",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "new_game.scenario.continue",
+      "label": "CONTINUE",
+      "visible": true,
+      "enabled": false
+    }
+  ]
+}

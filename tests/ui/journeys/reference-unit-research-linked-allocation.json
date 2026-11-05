@@ -1,0 +1,32 @@
+{
+  "steps": [
+    {"op":"server_snapshot","fixture":"tests/ui/fixtures/reference-unit-research-linked-initial.json"},
+    {"op":"click","target":"hud.panel.mil"},
+    {"op":"click","target":"military.open_research"},
+    {"op":"assert_region","target":"unit_research.panel","visible":true,"min_width":607,"min_height":455},
+    {"op":"drag","target":"unit_research.funding.ground","fraction":0.5},
+    {"op":"assert_action","type":"ActionUpdateResearchFunding","count":0},
+    {"op":"assert","target":"unit_research.funding_value.ground","label":"50%"},
+    {"op":"assert","target":"unit_research.funding_value.air","label":"25%"},
+    {"op":"assert","target":"unit_research.funding_value.naval","label":"17%"},
+    {"op":"assert","target":"unit_research.funding_value.strategic","label":"8%"},
+    {"op":"click","target":"unit_research.branch.strategic"},
+    {"op":"click","target":"unit_research.tab.funding"},
+    {"op":"drag","target":"unit_research.funding.strategic_program","fraction":0.5},
+    {"op":"assert_action","type":"ActionUpdateResearchFunding","count":0},
+    {"op":"assert","target":"unit_research.detail_funding_value.strategic_program","label":"50%"},
+    {"op":"assert","target":"unit_research.detail_funding_value.strategic_weapons","label":"19%"},
+    {"op":"assert","target":"unit_research.detail_funding_value.strategic_defense","label":"31%"},
+    {"op":"click","target":"unit_research.apply"},
+    {"op":"assert_action","type":"ActionUpdateResearchFunding","count":7,"index":0,"fields":{"branch":"ground","funding_ratio":0.5}},
+    {"op":"assert_action","type":"ActionUpdateResearchFunding","count":7,"index":1,"fields":{"branch":"air","funding_ratio":0.25}},
+    {"op":"assert_action","type":"ActionUpdateResearchFunding","count":7,"index":2,"fields":{"branch":"naval","funding_ratio":0.1666666667}},
+    {"op":"assert_action","type":"ActionUpdateResearchFunding","count":7,"index":3,"fields":{"branch":"strategic","funding_ratio":0.0833333333}},
+    {"op":"assert_action","type":"ActionUpdateResearchFunding","count":7,"index":4,"fields":{"branch":"strategic_program","funding_ratio":0.5}},
+    {"op":"assert_action","type":"ActionUpdateResearchFunding","count":7,"index":5,"fields":{"branch":"strategic_weapons","funding_ratio":0.1875}},
+    {"op":"assert_action","type":"ActionUpdateResearchFunding","count":7,"index":6,"fields":{"branch":"strategic_defense","funding_ratio":0.3125}},
+    {"op":"server_snapshot","fixture":"tests/ui/fixtures/reference-unit-research-linked-accepted.json"},
+    {"op":"assert","target":"unit_research.apply","enabled":false},
+    {"op":"assert_region","target":"unit_research.panel","visible":true}
+  ]
+}

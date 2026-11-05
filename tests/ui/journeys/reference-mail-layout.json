@@ -1,0 +1,23 @@
+{
+  "fixture": "tests/ui/fixtures/reference-dispatches.json",
+  "steps": [
+    {"op": "click", "target": "hud.mail"},
+    {"op": "assert_region", "target": "mail.panel", "visible": true, "min_width": 489, "min_height": 219},
+    {
+      "op": "assert_region",
+      "target": "mail.items",
+      "visible": true,
+      "min_width": 475,
+      "min_height": 180,
+      "relative_to": "mail.panel",
+      "relative_rect": {"x": 6, "y": 7}
+    },
+    {"op": "key", "key": "escape"},
+    {"op": "assert_region", "target": "mail.panel", "visible": false, "present": false},
+    {"op": "click", "target": "hud.mail"},
+    {"op": "click", "target": "mail.item.dispatch:treaty-mail.delete"},
+    {"op": "assert_absent", "target": "mail.dispatch.treaty-mail"},
+    {"op": "click", "target": "mail.delete_all"},
+    {"op": "assert_region", "target": "mail.panel", "visible": false, "present": false}
+  ]
+}

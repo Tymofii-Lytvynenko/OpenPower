@@ -35,6 +35,16 @@
 - [X] T012 Run focused map tests and record lookup median/p95 and hardware in `performance-log.md`.
 - [X] T013 Measure 4K globe/planar rendering at 60+ FPS on a live GPU; document the measured results and any optimization iterations in `performance-log.md`.
 
+## Requirement Traceability
+
+| Requirement | Existing implementation and acceptance tasks |
+| --- | --- |
+| FR-001 | T001, T002 |
+| FR-002 | T003–T005 |
+| FR-003 | T006 |
+| FR-004 | T001, T002, T010 |
+| FR-005 | T011 |
+
 ## Dependencies and execution order
 
 - T001–T002 preserve the CPU contract and are independent of GL rendering.

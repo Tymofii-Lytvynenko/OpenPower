@@ -1,0 +1,55 @@
+{
+  "fixture": "tests/ui/fixtures/identity-many-groups.json",
+  "steps": [
+    {
+      "op": "scroll",
+      "target": "identity.UKR.language.group-15.status"
+    },
+    {
+      "op": "assert",
+      "target": "identity.UKR.language.group-15.status",
+      "visible": true
+    },
+    {
+      "op": "select",
+      "target": "identity.UKR.language.group-15.status",
+      "value": "Restricted"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCountryIdentityPolicy",
+      "count": 0
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "laws.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCountryIdentityPolicy",
+      "count": 1,
+      "fields": {
+        "identity_id": "group-15",
+        "status": "restricted"
+      }
+    },
+    {
+      "op": "scroll",
+      "target": "identity.UKR.language.group-15.status"
+    },
+    {
+      "op": "click",
+      "target": "identity.UKR.language.group-15.details"
+    },
+    {
+      "op": "assert_region",
+      "target": "identity.source.details",
+      "visible": true
+    }
+  ]
+}

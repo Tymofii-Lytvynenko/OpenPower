@@ -1,0 +1,19 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "economy.health_btn" },
+    { "op": "hold", "target": "economic_health.interest.up", "duration_ms": 1350 },
+    { "op": "click", "target": "economic_health.apply" },
+    {
+      "op": "assert_action",
+      "type": "ActionChangeEconomicPolicy",
+      "count": 1,
+      "fields": {
+        "country_tag": "UKR",
+        "policy_name": "interest_rate",
+        "target_value": 0.055
+      },
+      "tolerance": 0.0001
+    }
+  ]
+}

@@ -12,7 +12,9 @@ data_*/
 
 # Ignore _utils
 _utils/*
-!_utils/utils.md# Byte-compiled / optimized / DLL files
+!_utils/utils.md
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
@@ -163,6 +165,9 @@ activemq-data/
 
 # Environments
 .env
+.env.*
+!.env.example
+!.env.*.example
 .envrc
 .venv
 env/
@@ -230,11 +235,30 @@ __marimo__/
 .streamlit/secrets.toml
 
 
-.temp
-profile_results.html
-imgui.ini
+/.temp/
+/profile_results.html
+/imgui.ini
 /DATA_SCHEMA.md
-/user_data
+/user_data/
 
-# UI reports and screenshots are generated locally; checked-in baselines belong in tests/ui.
-/artifacts/ui/
+# Local source references and generated repository intelligence.
+/.codex/
+/.repowise/
+
+# Generated reports, screenshots, and other temporary run outputs.
+/artifacts/
+
+# Empty pytest work directories can remain after interrupted test runs.
+/pytest-cache-files-*/
+
+# Local editor and operating-system scratch files.
+*.tmp
+/*.temp
+*.bak
+*.orig
+*.swp
+*.swo
+*~
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,31 @@
+{
+  "tables": {
+    "covert_missions": [
+      {
+        "id": "mission-framed",
+        "cell_id": "private-cell",
+        "owner_country_id": "POL",
+        "target_country_id": "DEU",
+        "framed_country_id": "UKR",
+        "attributed_country_id": "UKR",
+        "mission_type": "civilian_espionage",
+        "status": "cleanup",
+        "result": "success",
+        "discovered_by_target": true,
+        "attributed_to_owner": false,
+        "confidence": 0.9,
+        "output_json": "{\"secret\":\"private source details\"}"
+      }
+    ],
+    "covert_incidents": [
+      {
+        "id": "incident-framed",
+        "mission_id": "mission-framed",
+        "audience_country_ids": ["UKR"],
+        "incident_type": "discovery",
+        "summary": "Private actor details must not be shown.",
+        "created_at_minute": 10
+      }
+    ]
+  }
+}

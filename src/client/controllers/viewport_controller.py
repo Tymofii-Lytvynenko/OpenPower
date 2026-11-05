@@ -1,3 +1,4 @@
+import math
 import arcade
 import polars as pl
 from typing import Optional, Callable, Dict
@@ -271,6 +272,53 @@ class ViewportController:
             
             # Force selection
             self.select_region_by_id(region_id)
+
+    def focus_on_map_fraction(self, x_fraction: float, y_fraction: float) -> None:
+        """Center the active projection on a normalized top-left map position."""
+        x = min(1.0, max(0.0, float(x_fraction))) * self.renderer.width
+        y = min(1.0, max(0.0, float(y_fraction))) * self.renderer.height
+        if self.renderer.projection_mode == "planar":
+            self.renderer.focus_planar_pixel(x, y)
+        else:
+            self.cam.look_at_pixel_coords(x, y, self.renderer.width, self.renderer.height)
+
+    def map_center_fraction(self) -> tuple[float, float]:
+        """Return the visible map center as normalized top-left coordinates."""
+        if self.renderer.projection_mode == "planar":
+            transform = self.renderer._planar_renderer.transform
+            return float(transform.center_u), 1.0 - float(transform.center_v)
+
+        longitude_angle = (-float(self.cam.yaw) - (math.pi / 2.0)) % (2.0 * math.pi)
+        x_fraction = longitude_angle / (2.0 * math.pi)
+        y_fraction = (90.0 - math.degrees(self.cam.pitch)) / 180.0
+        return x_fraction, min(1.0, max(0.0, y_fraction))
+
+    def zoom_fraction(self) -> float:
+        """Return a normalized zoom value shared by the globe and planar maps."""
+        if self.renderer.projection_mode == "planar":
+            transform = self.renderer._planar_renderer.transform
+            low, high = transform.MIN_ZOOM, transform.MAX_ZOOM
+            if high <= low:
+                return 0.0
+            return math.log(max(low, transform.zoom) / low) / math.log(high / low)
+
+        low, high = float(self.cam.min_distance), float(self.cam.max_distance)
+        if high <= low:
+            return 0.0
+        return (high - float(self.cam.distance)) / (high - low)
+
+    def set_zoom_fraction(self, value: float) -> None:
+        """Apply a normalized mini-map zoom value without changing map center."""
+        fraction = min(1.0, max(0.0, float(value)))
+        if self.renderer.projection_mode == "planar":
+            transform = self.renderer._planar_renderer.transform
+            transform.zoom = transform.MIN_ZOOM * (
+                transform.MAX_ZOOM / transform.MIN_ZOOM
+            ) ** fraction
+            return
+
+        low, high = float(self.cam.min_distance), float(self.cam.max_distance)
+        self.cam.distance = high - fraction * (high - low)
 
     # --- INPUT HANDLING ---
     

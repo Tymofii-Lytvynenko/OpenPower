@@ -1,0 +1,122 @@
+{
+  "fixture": "tests/ui/fixtures/reference-new-game-country-validation.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "new_game.scenario.continue"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.panel",
+      "visible": true,
+      "min_width": 346,
+      "min_height": 341
+    },
+    {
+      "op": "click",
+      "target": "new_game.profile.open"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.country_profile.dialog",
+      "visible": true,
+      "min_width": 271,
+      "min_height": 359
+    },
+    {
+      "op": "assert",
+      "target": "new_game.profile.confirm",
+      "label": "SELECT",
+      "visible": true,
+      "enabled": false
+    },
+    {
+      "op": "drag",
+      "target": "new_game.profile.desired.economic",
+      "fraction": 0.72
+    },
+    {
+      "op": "check",
+      "target": "new_game.profile.filter.economic",
+      "value": false
+    },
+    {
+      "op": "assert",
+      "target": "new_game.profile.filter.economic",
+      "value": false
+    },
+    {
+      "op": "click",
+      "target": "new_game.profile.candidate.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.country_profile.dialog",
+      "visible": true,
+      "min_width": 271,
+      "min_height": 359
+    },
+    {
+      "op": "assert",
+      "target": "new_game.profile.confirm",
+      "label": "SELECT",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "assert",
+      "target": "new_game.profile.rank_icon.political",
+      "visible": true,
+      "min_width": 3,
+      "min_height": 3
+    },
+    {
+      "op": "assert",
+      "target": "new_game.profile.rank_icon.military",
+      "visible": true,
+      "min_width": 3,
+      "min_height": 3
+    },
+    {
+      "op": "assert",
+      "target": "new_game.profile.rank_icon.economic",
+      "visible": true,
+      "min_width": 3,
+      "min_height": 3
+    },
+    {
+      "op": "click",
+      "target": "new_game.profile.confirm"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.country_profile.dialog",
+      "visible": false,
+      "present": false
+    },
+    {
+      "op": "assert",
+      "target": "new_game.selected_country",
+      "label": "COUNTRY: POL",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "new_game.profile.open"
+    },
+    {
+      "op": "click",
+      "target": "new_game.profile.candidate.UKR"
+    },
+    {
+      "op": "click",
+      "target": "new_game.profile.cancel"
+    },
+    {
+      "op": "assert",
+      "target": "new_game.selected_country",
+      "label": "COUNTRY: POL",
+      "visible": true
+    }
+  ]
+}

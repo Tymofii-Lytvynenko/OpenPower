@@ -129,6 +129,22 @@ class BattleEffectRenderer:
     def last_layout(self) -> tuple[BattlePlacement, ...]:
         return self._last_layout
 
+    def battle_at(self, x: float, y: float, viewport_height: float) -> str | None:
+        """Resolve the drawn marker using Arcade's bottom-left mouse coordinates."""
+        top_y = viewport_height - y
+        labels = [((item.label_x + max(44.0, len(item.label) * 7.0 + 18.0) / 2 - x) ** 2
+                   + (item.label_y + 11 - top_y) ** 2, item.battle_id)
+                  for item in self._last_layout
+                  if item.label_x <= x <= item.label_x + max(44.0, len(item.label) * 7.0 + 18.0)
+                  and item.label_y <= top_y <= item.label_y + 22]
+        if labels:
+            return min(labels)[1]
+        candidates = [((item.anchor_x - x) ** 2 + (item.anchor_y - top_y) ** 2, item.battle_id)
+                      for item in self._last_layout
+                      if (item.anchor_x - x) ** 2 + (item.anchor_y - top_y) ** 2
+                      <= max(10.0, item.point.marker_radius) ** 2]
+        return min(candidates)[1] if candidates else None
+
     @property
     def conclusion_cache_size(self) -> int:
         return len(self._conclusion_cache)

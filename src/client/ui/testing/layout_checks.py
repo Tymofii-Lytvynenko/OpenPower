@@ -43,6 +43,15 @@ def analyze_layout(snapshot: dict) -> list[dict]:
         for right in controls[i + 1:]:
             if left.get("parent_id") == right.get("parent_id") and overlaps(left["rect"], right["rect"]):
                 emit("controls_overlap", left, "warning", right["id"])
+    # Text used to be excluded entirely, allowing unreadable live panels to pass.
+    texts = [w for w in snapshot["widgets"] if w.get("present", True) and w["visible"]
+             and w["type"] in {"text", "text_colored", "text_disabled", "text_unformatted", "text_wrapped"}]
+    buttons = [w for w in snapshot["widgets"] if w.get("present", True) and w["visible"]
+               and w["type"] in {"button", "small_button", "checkbox"}]
+    for index, text in enumerate(texts):
+        for other in texts[index + 1:] + buttons:
+            if text.get("parent_id") == other.get("parent_id") and overlaps(text["rect"], other["rect"], 2.0):
+                emit("text_overlap", text, "error", other["id"])
     native_ids = {}
     for item in controls:
         native_id = item.get("imgui_id", 0)

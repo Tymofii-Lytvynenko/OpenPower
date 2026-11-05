@@ -1,0 +1,13 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.mail"
+    },
+    {
+      "op": "assert_region",
+      "target": "mail.panel",
+      "visible": true
+    }
+  ]
+}

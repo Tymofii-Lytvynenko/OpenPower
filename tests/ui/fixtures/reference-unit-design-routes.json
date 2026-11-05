@@ -1,0 +1,56 @@
+{
+  "tables": {
+    "units": [
+      {
+        "id": "unit-infantry-1",
+        "owner": "UKR",
+        "unit_type": "infantry",
+        "design_id": "design-infantry-1",
+        "strength": 1000,
+        "equipment_quantity": 1000,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available"
+      },
+      {
+        "id": "unit-fighter-1",
+        "owner": "UKR",
+        "unit_type": "fighter",
+        "design_id": "design-fighter-1",
+        "strength": 24,
+        "equipment_quantity": 24,
+        "current_region_id": 1,
+        "readiness_status": "ready",
+        "unit_lifecycle": "available"
+      }
+    ],
+    "unit_designs": [
+      {
+        "id": "design-infantry-1",
+        "country_id": "UKR",
+        "branch": "land",
+        "class_name": "infantry",
+        "display_name": "Infantry",
+        "quality": 0.6,
+        "cost": 1000.0,
+        "maintenance_cost": 25.0,
+        "speed": 0.5,
+        "firepower": 0.5,
+        "domain": "land"
+      },
+      {
+        "id": "design-fighter-1",
+        "country_id": "UKR",
+        "branch": "air",
+        "class_name": "fighter",
+        "display_name": "Multirole Fighter",
+        "quality": 0.7,
+        "cost": 125000.0,
+        "maintenance_cost": 2500.0,
+        "speed": 0.8,
+        "firepower": 0.75,
+        "domain": "air"
+      }
+    ]
+  }
+}

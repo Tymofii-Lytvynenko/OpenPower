@@ -9,6 +9,8 @@ import polars as pl
 
 
 DEFAULT_PRODUCTION_COEFFICIENT = 48.0
+MAX_PRODUCTION_QUEUE_ORDERS = 50
+MAX_UNIT_PRODUCTION_QUANTITY = 1_000_000
 _DAYS_PER_YEAR = 365.25
 _TERMINAL_ORDER_STATES = {"cancelled", "completed", "delivered", "awaiting_deployment"}
 
@@ -24,6 +26,16 @@ def annual_production_capacity(
     health = min(1.0, max(0.0, _finite_nonnegative(economic_health)))
     scale = _finite_nonnegative(coefficient)
     return output * health * scale
+
+
+def initial_production_eta_days(priority: Any) -> int:
+    """Return the provisional queue ETA used before capacity allocation updates it."""
+
+    try:
+        normalized_priority = int(priority)
+    except (TypeError, ValueError, OverflowError):
+        normalized_priority = 1
+    return max(1, 30 // max(1, normalized_priority))
 
 
 def annual_production_capacity_frame(

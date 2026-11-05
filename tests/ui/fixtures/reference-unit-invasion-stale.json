@@ -1,0 +1,30 @@
+{
+  "tables": {
+    "regions": [
+      {
+        "id": 1,
+        "owner": "UKR",
+        "controller": "UKR",
+        "name": "Kyiv",
+        "latitude": 50.0,
+        "longitude": 30.0
+      },
+      {
+        "id": 2,
+        "owner": "POL",
+        "controller": "DEU",
+        "name": "Warsaw",
+        "latitude": 52.0,
+        "longitude": 21.0
+      },
+      {
+        "id": 3,
+        "owner": "DEU",
+        "controller": "DEU",
+        "name": "Berlin",
+        "latitude": 51.0,
+        "longitude": 13.0
+      }
+    ]
+  }
+}

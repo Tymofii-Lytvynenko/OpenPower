@@ -112,6 +112,10 @@ class AdvancedDiplomacySystem(ISystem):
         war = self._war(state, action.war_id)
         proposer = self._tag(action.proposer_country_id)
         if war is None or str(war.get("status") or "active").lower() != "active":
+            self._record_command_result(
+                state, action, "rejected", "The selected war is no longer active.",
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
         side_a, side_b = self._tags(war.get("side_a")), self._tags(war.get("side_b"))
         leader_a = self._tag(war.get("leader_a")) or (min(side_a) if side_a else "")
@@ -119,33 +123,72 @@ class AdvancedDiplomacySystem(ISystem):
         if proposer not in {leader_a, leader_b} or not player_controls_country(
             state, action.player_id, proposer
         ):
+            self._record_command_result(
+                state, action, "rejected",
+                "Only an authorized war leader can submit a peace package.",
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
 
         if not deals.filter(
             (pl.col("war_id") == str(action.war_id)) & (pl.col("status") == "pending")
         ).is_empty():
+            self._record_command_result(
+                state, action, "rejected",
+                "A peace package is already awaiting responses for this war.",
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
         offered, error = self._policy.normalize_clauses(action.offered_clauses)
         if error:
+            self._record_command_result(
+                state, action, "rejected", error,
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
         requested, error = self._policy.normalize_clauses(action.requested_clauses)
         if error:
+            self._record_command_result(
+                state, action, "rejected", error,
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
         clauses = offered + requested
         if len(clauses) > self._policy.MAX_CLAUSES:
+            self._record_command_result(
+                state, action, "rejected",
+                f"A peace package cannot contain more than {self._policy.MAX_CLAUSES} clauses.",
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
         error = self._policy.validate_clauses(state, war, proposer, clauses)
         if error:
+            self._record_command_result(
+                state, action, "rejected", error,
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
 
         try:
             expiry_days = int(action.expires_after_days)
         except (TypeError, ValueError, OverflowError):
+            self._record_command_result(
+                state, action, "rejected", "The response deadline must be a whole number of days.",
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
         if expiry_days < 1 or expiry_days > 365:
+            self._record_command_result(
+                state, action, "rejected", "The response deadline must be between 1 and 365 days.",
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
         responding_side = sorted(side_b if proposer in side_a else side_a)
         if not responding_side:
+            self._record_command_result(
+                state, action, "rejected", "The opposing side has no participants to receive the package.",
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
 
         now = max(0, int(state.time.total_minutes))
@@ -162,6 +205,10 @@ class AdvancedDiplomacySystem(ISystem):
         )
         deal_id = "peace-" + hashlib.sha256(signature.encode("utf-8")).hexdigest()[:20]
         if deal_id in set(deals.get_column("id").to_list()):
+            self._record_command_result(
+                state, action, "rejected", "This peace package has already been submitted.",
+                war_id=str(action.war_id), country_id=proposer,
+            )
             return deals
 
         row = {
@@ -189,6 +236,11 @@ class AdvancedDiplomacySystem(ISystem):
                 now,
             )
         )
+        self._record_command_result(
+            state, action, "applied",
+            "Peace package submitted; awaiting responses from the opposing side.",
+            war_id=str(action.war_id), country_id=proposer, deal_id=deal_id,
+        )
         return result
 
     def _respond(
@@ -201,6 +253,10 @@ class AdvancedDiplomacySystem(ISystem):
             (pl.col("id") == str(action.deal_id)) & (pl.col("status") == "pending")
         )
         if matches.is_empty():
+            self._record_command_result(
+                state, action, "rejected", "The peace package is no longer awaiting responses.",
+                deal_id=str(action.deal_id), country_id=self._tag(action.responder_country_id),
+            )
             return deals
         row = matches.row(0, named=True)
         responder = self._tag(action.responder_country_id)
@@ -211,28 +267,54 @@ class AdvancedDiplomacySystem(ISystem):
             or responder in accepted
             or not player_controls_country(state, action.player_id, responder)
         ):
+            self._record_command_result(
+                state, action, "rejected",
+                "This player cannot submit another response for the selected peace package.",
+                war_id=str(row.get("war_id") or ""),
+                deal_id=str(action.deal_id), country_id=responder,
+            )
             return deals
 
         now = max(0, int(state.time.total_minutes))
         if int(row.get("expires_at_minute") or 0) <= now:
-            return self._resolve_row(state, deals, row, "expired", "The response deadline passed.")
-        if not action.accept:
-            return self._resolve_row(
-                state,
-                deals,
-                row,
-                "rejected",
-                f"{responder} rejected the peace package.",
+            reason = "The response deadline passed."
+            result = self._resolve_row(state, deals, row, "expired", reason)
+            self._record_command_result(
+                state, action, "rejected", reason,
+                war_id=str(row.get("war_id") or ""),
+                deal_id=str(action.deal_id), country_id=responder,
             )
+            return result
+        if not action.accept:
+            reason = f"{responder} rejected the peace package."
+            result = self._resolve_row(state, deals, row, "rejected", reason)
+            self._record_command_result(
+                state, action, "applied", "Your response was recorded; the package was rejected.",
+                war_id=str(row.get("war_id") or ""),
+                deal_id=str(action.deal_id), country_id=responder,
+            )
+            return result
 
         accepted.add(responder)
         row["accepted_responses"] = sorted(accepted)
         if not required.issubset(accepted):
+            self._record_command_result(
+                state, action, "applied", "Your acceptance was recorded; other participants still need to respond.",
+                war_id=str(row.get("war_id") or ""),
+                deal_id=str(action.deal_id), country_id=responder,
+            )
             return self._replace(deals, row)
 
         war = self._war(state, row["war_id"])
         if war is None or str(war.get("status") or "active").lower() != "active":
-            return self._resolve_row(state, deals, row, "rejected", "The war is no longer active.")
+            reason = "The war is no longer active."
+            result = self._resolve_row(state, deals, row, "rejected", reason)
+            self._record_command_result(
+                state, action, "rejected", reason,
+                war_id=str(row.get("war_id") or ""),
+                deal_id=str(action.deal_id), country_id=responder,
+            )
+            return result
         clauses = self._decode_clauses(row.get("offered_clauses_json")) + self._decode_clauses(
             row.get("requested_clauses_json")
         )
@@ -243,7 +325,13 @@ class AdvancedDiplomacySystem(ISystem):
             clauses,
         )
         if error:
-            return self._resolve_row(state, deals, row, "rejected", error)
+            result = self._resolve_row(state, deals, row, "rejected", error)
+            self._record_command_result(
+                state, action, "rejected", error,
+                war_id=str(row.get("war_id") or ""),
+                deal_id=str(action.deal_id), country_id=responder,
+            )
+            return result
 
         regions = state.tables.get("regions")
         region_owners = (
@@ -294,6 +382,11 @@ class AdvancedDiplomacySystem(ISystem):
                 str(row["reason"]),
             )
         )
+        self._record_command_result(
+            state, action, "applied", "All participants accepted; peace terms were applied.",
+            war_id=str(row.get("war_id") or ""),
+            deal_id=str(action.deal_id), country_id=responder,
+        )
 
         leader_a = self._tag(war.get("leader_a")) or min(self._tags(war.get("side_a")))
         leader_b = self._tag(war.get("leader_b")) or min(self._tags(war.get("side_b")))
@@ -302,6 +395,26 @@ class AdvancedDiplomacySystem(ISystem):
                 ActionOfferPeace("server", str(row["war_id"]), leader, "peace")
             )
         return deals
+
+    @staticmethod
+    def _record_command_result(
+        state: GameState,
+        action: Any,
+        status: str,
+        reason: str,
+        **details: str,
+    ) -> None:
+        # The authoritative result lets the editor retain rejected drafts and clear accepted submissions.
+        actor_id = str(action.player_id or "")
+        state.journal.append_command_result({
+            "tick": int(state.globals.get("tick", 0)),
+            "player_id": actor_id,
+            "actor_id": actor_id,
+            "action_type": type(action).__name__,
+            "status": status,
+            "reason": reason,
+            **details,
+        })
 
     def _apply_clauses(
         self,

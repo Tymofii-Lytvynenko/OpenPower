@@ -22,11 +22,15 @@ class UnitInteractionController:
         map_renderer: MapRenderer,
         net_client: NetworkClient,
         on_unit_double_click: Callable[[str], None] | None = None,
+        on_move_requested: Callable | None = None,
+        can_box_select_unit: Callable[[ProjectedUnit], bool] | None = None,
     ):
         self._unit_renderer = unit_renderer
         self._map_renderer = map_renderer
         self._net = net_client
         self._on_unit_double_click = on_unit_double_click
+        self._on_move_requested = on_move_requested
+        self._can_box_select_unit = can_box_select_unit or (lambda _unit: True)
 
         self.selected_unit_id: Optional[str] = None
         self.selected_unit_ids: set[str] = set()
@@ -44,6 +48,44 @@ class UnitInteractionController:
         self._last_click_time = 0.0
         self._last_click_x = 0.0
         self._last_click_y = 0.0
+        self._order_target_mode: str | None = None
+        self._deselect_on_release_id: str | None = None
+
+    @property
+    def pending_order_mode(self) -> str | None:
+        return self._order_target_mode
+
+    def begin_move_order_targeting(self) -> bool:
+        return self._begin_order_targeting("move")
+
+    def begin_attack_move_targeting(self) -> bool:
+        return self._begin_order_targeting("attack_move")
+
+    def _begin_order_targeting(self, mode: str) -> bool:
+        if not self.selected_unit_ids:
+            return False
+        self._order_target_mode = mode
+        return True
+
+    def cancel_order_targeting(self) -> bool:
+        if self._order_target_mode is None:
+            return False
+        self._order_target_mode = None
+        return True
+
+    def resolve_order_target_click(self, x: float, y: float) -> bool:
+        """Consume a map click while a source-style unit order is waiting for a target."""
+        mode = self._order_target_mode
+        if mode is None:
+            return False
+
+        # OpenPower resolves hostile contact along a movement route. REFERENCE's
+        # attack-move mode chooses a map destination, not a specific unit.
+        accepted = self.move_selected_units_to_screen_pos(x, y)
+
+        if accepted:
+            self._order_target_mode = None
+        return True
 
     @property
     def drag_preview(self) -> Optional[UnitDragPreview]:
@@ -68,7 +110,7 @@ class UnitInteractionController:
         unit = self._unit_renderer.get_unit_at(x, y)
         self.hovered_unit_id = unit.unit_id if unit else None
 
-    def on_mouse_press(self, x: float, y: float, button: int) -> bool:
+    def on_mouse_press(self, x: float, y: float, button: int, modifiers: int = 0) -> bool:
         if button != arcade.MOUSE_BUTTON_LEFT:
             return False
 
@@ -77,7 +119,16 @@ class UnitInteractionController:
             self.hovered_unit_id = None
             return False
 
-        if unit.unit_id in self.selected_unit_ids and len(self.selected_unit_ids) > 1:
+        control = bool(modifiers & arcade.key.MOD_CTRL)
+        shift = bool(modifiers & arcade.key.MOD_SHIFT)
+        self._deselect_on_release_id = None
+        if control and unit.unit_id in self.selected_unit_ids:
+            self.selected_unit_id = unit.unit_id
+            self._deselect_on_release_id = unit.unit_id
+        elif control or shift:
+            self.selected_unit_ids.add(unit.unit_id)
+            self.selected_unit_id = unit.unit_id
+        elif unit.unit_id in self.selected_unit_ids and len(self.selected_unit_ids) > 1:
             self.selected_unit_id = unit.unit_id
         else:
             self.selected_unit_id = unit.unit_id
@@ -96,9 +147,13 @@ class UnitInteractionController:
 
         self._mouse_x = x
         self._mouse_y = y
+        if self._deselect_on_release_id is not None:
+            drag_distance_sq = (x - self._press_x) ** 2 + (y - self._press_y) ** 2
+            if drag_distance_sq >= self._drag_threshold * self._drag_threshold:
+                self._deselect_on_release_id = None
         return True
 
-    def on_mouse_release(self, x: float, y: float, button: int) -> bool:
+    def on_mouse_release(self, x: float, y: float, button: int, modifiers: int = 0) -> bool:
         if button != arcade.MOUSE_BUTTON_LEFT or self._dragging_unit is None:
             return False
 
@@ -110,9 +165,16 @@ class UnitInteractionController:
         self._mouse_y = y
 
         if not dragged_far_enough:
+            if self._deselect_on_release_id is not None:
+                self._deselect_selected_unit(self._deselect_on_release_id)
+                self._deselect_on_release_id = None
+                self._last_click_unit_id = None
+                self._last_click_time = 0.0
+                return True
             self._handle_click(unit, x, y)
             return True
 
+        self._deselect_on_release_id = None
         self._last_click_unit_id = None
         self._last_click_time = 0.0
 
@@ -154,6 +216,12 @@ class UnitInteractionController:
     def clear_selection(self) -> None:
         self.selected_unit_id = None
         self.selected_unit_ids.clear()
+        self._deselect_on_release_id = None
+
+    def _deselect_selected_unit(self, unit_id: str) -> None:
+        self.selected_unit_ids.discard(unit_id)
+        if self.selected_unit_id == unit_id:
+            self.selected_unit_id = min(self.selected_unit_ids, default=None)
 
     def select_unit_by_id(self, unit_id: str) -> bool:
         unit = self._unit_renderer.get_unit(unit_id)
@@ -163,26 +231,62 @@ class UnitInteractionController:
         self.selected_unit_id = unit.unit_id
         self.selected_unit_ids = {unit.unit_id}
         self.hovered_unit_id = unit.unit_id
+        self._deselect_on_release_id = None
         return True
+
+    def focus_context_unit(self, unit_id: str) -> bool:
+        """Preserve a multi-selection when its selected unit opens the order menu."""
+        if unit_id in self.selected_unit_ids:
+            unit = self._unit_renderer.get_unit(unit_id)
+            if unit is None:
+                return False
+            self.selected_unit_id = unit_id
+            self.hovered_unit_id = unit_id
+            return True
+        return self.select_unit_by_id(unit_id)
 
     def get_unit_at(self, x: float, y: float) -> Optional[ProjectedUnit]:
         return self._unit_renderer.get_unit_at(x, y)
 
-    def select_units_in_rect(self, x1: float, y1: float, x2: float, y2: float) -> bool:
+    def get_unit_by_id(self, unit_id: str) -> Optional[ProjectedUnit]:
+        return self._unit_renderer.get_unit(unit_id)
+
+    def select_units_in_rect(
+        self,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        modifiers: int = 0,
+    ) -> bool:
         left, right = sorted((x1, x2))
         bottom, top = sorted((y1, y2))
         selected = [
             unit
             for unit in self._unit_renderer.billboards
-            if self._unit_intersects_rect(unit, left, right, bottom, top)
+            if self._can_box_select_unit(unit)
+            and self._unit_intersects_rect(unit, left, right, bottom, top)
         ]
 
-        if not selected:
+        selected_ids = {unit.unit_id for unit in selected}
+        if modifiers & arcade.key.MOD_CTRL:
+            toggled = self.selected_unit_ids.symmetric_difference(selected_ids)
+        elif modifiers & arcade.key.MOD_SHIFT:
+            toggled = self.selected_unit_ids.union(selected_ids)
+        else:
+            toggled = selected_ids
+
+        if not toggled:
             self.clear_selection()
             return False
 
-        self.selected_unit_ids = {unit.unit_id for unit in selected}
-        self.selected_unit_id = selected[-1].unit_id
+        previous_primary = self.selected_unit_id
+        self.selected_unit_ids = toggled
+        if previous_primary in toggled:
+            self.selected_unit_id = previous_primary
+        else:
+            self.selected_unit_id = min(toggled)
+        self._deselect_on_release_id = None
         return True
 
     def has_selection(self) -> bool:
@@ -200,13 +304,12 @@ class UnitInteractionController:
         if target_geo is None:
             return False
 
-        self.move_units_to_target(
+        return self.move_units_to_target(
             self.selected_unit_ids,
             target_region_id,
             target_geo.latitude,
             target_geo.longitude,
         )
-        return True
 
     def move_units_to_target(
         self,
@@ -214,7 +317,10 @@ class UnitInteractionController:
         target_region_id: int,
         target_latitude: float,
         target_longitude: float,
-    ) -> None:
+    ) -> bool:
+        if self._on_move_requested is not None:
+            result = self._on_move_requested(unit_ids, target_region_id, target_latitude, target_longitude)
+            return result is not False
         for unit_id in sorted(unit_ids):
             self._net.send_action(
                 ActionMoveUnit(
@@ -225,6 +331,7 @@ class UnitInteractionController:
                     target_longitude=target_longitude,
                 )
             )
+        return bool(unit_ids)
 
     def attack_selected_units(self, defender_unit_id: str) -> bool:
         defender = self._unit_renderer.get_unit(defender_unit_id)

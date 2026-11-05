@@ -6,11 +6,32 @@ import polars as pl
 
 from src.client.ui.panels.politics.political_overview_presenter import PoliticalOverviewPresenter
 from src.client.ui.panels.politics.political_overview_panel import PoliticalOverviewPanel
+from src.client.ui.panels.politics.presenter import PoliticsPresenter
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.components.hud.panel_manager import PanelManager
 from src.client.ui.layouts.game_panel_registry import build_game_panel_specs
 from src.shared.state import GameState
 import src.client.ui.panels.politics.political_overview_panel as political_overview_panel_module
+
+
+def test_politics_summary_shows_martial_law_instead_of_the_underlying_government_form() -> None:
+    state = GameState(
+        tables={
+            "countries": pl.DataFrame({"id": ["AAA"]}),
+            "country_governments": pl.DataFrame(
+                {
+                    "country_id": ["AAA"],
+                    "government_type": ["Multi-party democracy"],
+                    "martial_law": [True],
+                }
+            ),
+        }
+    )
+
+    summary = PoliticsPresenter().build_summary(state, "AAA")
+
+    assert summary.government_type == "Martial law"
+    assert summary.martial_law is True
 
 
 def test_political_overview_projects_authoritative_state_and_deadlines() -> None:

@@ -1,0 +1,31 @@
+{
+  "tables": {
+    "covert_cells": [
+      {
+        "id": "cell-alpha",
+        "country_id": "UKR",
+        "target_country_id": "POL",
+        "cell_name": "Alpha cell",
+        "status": "active",
+        "origin_country_id": "UKR",
+        "location_country_id": "POL",
+        "assignment": "unassigned",
+        "skill_level": "Regular",
+        "communications_ready": true
+      },
+      {
+        "id": "cell-beta",
+        "country_id": "UKR",
+        "target_country_id": "UKR",
+        "cell_name": "Beta cell",
+        "status": "active",
+        "origin_country_id": "UKR",
+        "location_country_id": "UKR",
+        "assignment": "unassigned",
+        "skill_level": "Regular",
+        "communications_ready": true
+      }
+    ],
+    "covert_missions": []
+  }
+}

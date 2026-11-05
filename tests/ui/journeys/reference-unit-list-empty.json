@@ -1,0 +1,11 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-list-empty.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_unit_list"},
+    {"op": "assert", "target": "unit_list.empty", "visible": true},
+    {"op": "assert", "target": "unit_list.sell", "enabled": false},
+    {"op": "assert", "target": "unit_list.train", "enabled": false},
+    {"op": "assert", "target": "unit_list.disband", "enabled": false}
+  ]
+}

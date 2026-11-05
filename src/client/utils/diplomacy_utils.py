@@ -10,6 +10,12 @@ MILITARY_ALLIANCE_TYPES = {
     "military_pact",
 }
 
+MILITARY_ACCESS_TYPES = {
+    "military_access",
+    "military_access_agreement",
+    "military_trespassing_right",
+}
+
 def normalize_side(value) -> Set[str]:
     if value is None:
         return set()
@@ -61,6 +67,40 @@ def get_military_allies(state: GameState, country_tag: Optional[str]) -> Set[str
 
     allies.discard(selected_tag)
     return allies
+
+def get_military_access_partners(state: GameState, country_tag: Optional[str]) -> Set[str]:
+    if not country_tag or "countries_treaties" not in state.tables:
+        return set()
+
+    treaties = state.get_table("countries_treaties")
+    if treaties.is_empty() or "type" not in treaties.columns:
+        return set()
+
+    selected_tag = str(country_tag).strip().upper()
+    current_minute = int(state.time.total_minutes)
+    partners = set()
+    for row in treaties.iter_rows(named=True):
+        treaty_type = str(row.get("type") or "").strip().lower()
+        if treaty_type not in MILITARY_ACCESS_TYPES or not _is_active_treaty(row, current_minute):
+            continue
+
+        suspended = {tag.upper() for tag in normalize_side(row.get("suspended_members"))}
+        members = {tag.upper() for tag in normalize_side(row.get("members"))} - suspended
+        if selected_tag in members:
+            member_partners = members - {selected_tag}
+            if member_partners:
+                partners.update(member_partners)
+            continue
+
+        side_a = {tag.upper() for tag in normalize_side(row.get("side_a"))} - suspended
+        side_b = {tag.upper() for tag in normalize_side(row.get("side_b"))} - suspended
+        if selected_tag in side_a:
+            partners.update(side_b)
+        elif selected_tag in side_b:
+            partners.update(side_a)
+
+    partners.discard(selected_tag)
+    return partners
 
 def get_military_enemies(state: GameState, country_tag: Optional[str]) -> Set[str]:
     if not country_tag or "countries_wars" not in state.tables:

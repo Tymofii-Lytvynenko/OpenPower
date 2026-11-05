@@ -1,0 +1,39 @@
+{
+  "fixture": "tests/ui/fixtures/reference-covert-cell.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "assert_region", "target": "military.panel", "visible": true},
+    {"op": "click", "target": "military.open_covert"},
+    {"op": "assert_region", "target": "covert_ops.panel", "visible": true},
+    {"op": "click", "target": "covert_ops.open_cell_creation"},
+    {"op": "assert_region", "target": "covert.cell_creation.dialog", "visible": true},
+    {"op": "click", "target": "covert.cell_creation.dialog.close"},
+    {"op": "assert_region", "target": "covert.cell_creation.dialog", "visible": false},
+    {"op": "click", "target": "covert_ops.open_cell_creation"},
+    {"op": "assert_region", "target": "covert.cell_creation.dialog", "visible": true},
+    {"op": "assert", "target": "covert_ops.progress.heading", "label": "PROGRESS",
+     "inside": "covert_ops.panel", "relative_to": "covert_ops.panel",
+     "relative_rect": {"x": 529, "y": 52},
+     "no_overlap": "covert_ops.cell.cell-test.select"},
+    {"op": "select", "target": "covert.cell_creation.training_level", "value": "Veteran"},
+    {"op": "assert", "target": "covert.cell_creation.setup_cost", "label": "$10"},
+    {"op": "assert", "target": "covert.cell_creation.upkeep", "label": "$0.31"},
+    {"op": "assert", "target": "covert.cell_creation.deployment_time", "visible": true},
+    {"op": "assert_region", "target": "covert.cell_creation.dialog", "visible": true},
+    {"op": "click", "target": "covert.cell_creation.name"},
+    {"op": "input", "target": "covert.cell_creation.name", "value": "UI test cell"},
+    {"op": "click", "target": "covert.cell_creation.submit"},
+    {
+      "op": "assert_action",
+      "type": "ActionCreateCovertCell",
+      "fields": {
+        "country_tag": "UKR",
+        "target_country_tag": "POL",
+        "cell_name": "UI test cell",
+        "training_level": "Veteran"
+      }
+    },
+    {"op": "click", "target": "covert_ops.open_cell_creation"},
+    {"op": "assert_region", "target": "covert.cell_creation.dialog", "visible": true}
+  ]
+}

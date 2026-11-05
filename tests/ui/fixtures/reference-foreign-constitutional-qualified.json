@@ -1,0 +1,33 @@
+{
+  "tables": {
+    "regions": [
+      {"id": 1, "name": "Warsaw", "owner": "POL", "population": 1000000, "gdp": 10000000.0, "lat": 52.23, "lon": 21.01},
+      {"id": 2, "name": "Krakow", "owner": "POL", "population": 500000, "gdp": 5000000.0, "lat": 50.06, "lon": 19.94},
+      {"id": 3, "name": "Gdansk", "owner": "POL", "population": 500000, "gdp": 5000000.0, "lat": 54.35, "lon": 18.65},
+      {"id": 4, "name": "Poznan", "owner": "POL", "population": 500000, "gdp": 5000000.0, "lat": 52.41, "lon": 16.93}
+    ],
+    "occupations": [
+      {"region_id": 1, "controller_country_id": "UKR", "occupation_status": "active"},
+      {"region_id": 2, "controller_country_id": "UKR", "occupation_status": "active"},
+      {"region_id": 3, "controller_country_id": "UKR", "occupation_status": "active"}
+    ],
+    "country_governments": [
+      {"country_id": "POL", "government_type": "Transitional republic", "government_form_id": "transitional republic", "ruling_party_id": "pol-party", "capital_region_id": 1, "initialized": true, "election_eligible": true, "next_election_at_minute": 20000, "martial_law": false, "crisis_status": "none"}
+    ],
+    "government_form_rules": [
+      {"government_form_id": "transitional republic", "display_name": "Transitional republic", "election_eligible": true, "election_interval_minutes": 10000, "minimum_eligible_parties": 1, "maximum_eligible_parties": 0},
+      {"government_form_id": "single-party democracy", "display_name": "Single-party democracy", "election_eligible": true, "election_interval_minutes": 8000, "minimum_eligible_parties": 1, "maximum_eligible_parties": 1}
+    ],
+    "political_parties": [
+      {"country_id": "POL", "party_id": "pol-party", "display_name": "Polish party", "is_ruling": true, "eligible": true, "support_share": 1.0}
+    ],
+    "countries_relations": [
+      {"source": "UKR", "target": "POL", "value": -10.0},
+      {"source": "POL", "target": "UKR", "value": -10.0}
+    ],
+    "countries_wars": []
+  },
+  "globals": {
+    "player_country_map": {"ui-test-player": "UKR"}
+  }
+}

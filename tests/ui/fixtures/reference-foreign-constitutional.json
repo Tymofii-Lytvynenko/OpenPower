@@ -1,0 +1,26 @@
+{
+  "tables": {
+    "regions": [
+      {
+        "id": 1,
+        "name": "Warsaw",
+        "owner": "POL",
+        "controller": "POL",
+        "population": 1000000,
+        "gdp": 10000000.0,
+        "lat": 52.23,
+        "lon": 21.01
+      },
+      {
+        "id": 2,
+        "name": "Krakow",
+        "owner": "POL",
+        "controller": "POL",
+        "population": 500000,
+        "gdp": 5000000.0,
+        "lat": 50.06,
+        "lon": 19.94
+      }
+    ]
+  }
+}

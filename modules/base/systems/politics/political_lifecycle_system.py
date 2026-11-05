@@ -27,10 +27,17 @@ from modules.base.systems.politics.political_crisis_policy import (
     assess_regime_change,
     normalize_regime_change_paths,
 )
+from modules.base.systems.politics.government_transition import apply_government_transition
+from modules.base.systems.politics.party_eligibility_policy import process_party_changes
+from modules.base.systems.politics.country_capital_policy import process_country_capital_change
+from modules.base.systems.politics.government_form_policy import process_government_form_change
 from src.shared.actions import (
+    ActionSetPartyEligibility,
     ActionChangePoliticalLaw,
     ActionResolvePoliticalCrisis,
     ActionSetElectionOverride,
+    ActionSetCountryCapital,
+    ActionSetGovernmentForm,
 )
 from src.shared.determinism import DeterministicRuntime
 from src.shared.events import (
@@ -63,6 +70,7 @@ class PoliticalLifecycleSystem(ISystem):
         reads=frozenset(
             {
                 "countries",
+                "regions",
                 "country_governments",
                 "government_form_rules",
                 "political_parties",
@@ -70,6 +78,10 @@ class PoliticalLifecycleSystem(ISystem):
                 "law_transitions",
                 "political_crises",
                 "countries_relations",
+                "countries_wars",
+                "countries_treaties",
+                "treaty_effects",
+                "occupations",
                 "political_elections",
                 "political_history",
                 "political_effects",
@@ -90,12 +102,23 @@ class PoliticalLifecycleSystem(ISystem):
                 "political_elections",
                 "political_crises",
                 "countries_relations",
+                "countries_treaties",
+                "treaty_effects",
+                "regions",
+                "occupations",
                 "messages",
                 "news_items",
             }
         ),
         handles=frozenset(
-            {ActionChangePoliticalLaw, ActionSetElectionOverride, ActionResolvePoliticalCrisis}
+            {
+                ActionChangePoliticalLaw,
+                ActionSetElectionOverride,
+                ActionResolvePoliticalCrisis,
+                ActionSetPartyEligibility,
+                ActionSetCountryCapital,
+                ActionSetGovernmentForm,
+            }
         ),
         phase=SystemPhase.POLITICS,
     )
@@ -145,6 +168,12 @@ class PoliticalLifecycleSystem(ISystem):
             self._last_law_revision = state.table_revisions.get("country_laws", 0)
 
         now = max(0, int(state.time.total_minutes))
+        for action in state.current_actions:
+            if isinstance(action, ActionSetCountryCapital):
+                process_country_capital_change(state, action, now)
+            elif isinstance(action, ActionSetGovernmentForm):
+                process_government_form_change(state, action, now)
+
         transition_revision = state.table_revisions.get("law_transitions", 0)
         if transition_revision != self._last_transition_revision:
             self._refresh_next_law_deadline(state)
@@ -172,6 +201,10 @@ class PoliticalLifecycleSystem(ISystem):
         ]
         if regime_change_actions:
             self._process_regime_change_actions(state, regime_change_actions, now)
+
+        for action in state.current_actions:
+            if isinstance(action, ActionSetPartyEligibility):
+                process_party_changes(state, action, now)
 
         if self._next_law_deadline >= 0 and now >= self._next_law_deadline:
             self._resolve_due_law_transitions(state, now)
@@ -328,28 +361,11 @@ class PoliticalLifecycleSystem(ISystem):
                     if self._form_id(row.get("government_form_id"))
                     == assessment.government_form_id
                 )
-                government.update(
-                    {
-                        "government_form_id": assessment.government_form_id,
-                        "government_type": str(
-                            target_rule.get("display_name") or assessment.government_form_id
-                        ),
-                        "ruling_party_id": assessment.ruling_party_id,
-                        "succession_party_id": assessment.ruling_party_id,
-                        "election_eligible": bool(target_rule.get("election_eligible", False)),
-                        "next_election_at_minute": assessment.next_election_at_minute,
-                        "updated_at_minute": now,
-                    }
-                )
-                changed.add("country_governments")
-                for party in parties:
-                    if self._tag(party.get("country_id")) != country_id:
-                        continue
-                    is_ruling = self._party_id(party.get("party_id")) == assessment.ruling_party_id
-                    if bool(party.get("is_ruling")) != is_ruling:
-                        party["is_ruling"] = is_ruling
-                        party["updated_at_minute"] = now
-                        changed.add("political_parties")
+                changed.update(apply_government_transition(
+                    government, target_rule, assessment.government_form_id,
+                    assessment.ruling_party_id, assessment.next_election_at_minute,
+                    now, country_id, parties, transitions, elections,
+                ))
 
                 for law, target_value in self._validated_law_updates(
                     laws, country_id, path.law_values
@@ -390,34 +406,6 @@ class PoliticalLifecycleSystem(ISystem):
                             }
                         )
                         changed.add("political_effects")
-
-                for transition in transitions:
-                    if (
-                        self._tag(transition.get("country_id")) == country_id
-                        and str(transition.get("status") or "") == "scheduled"
-                        and str(transition.get("carry_over_rule") or "")
-                        == "cancel_on_regime_change"
-                    ):
-                        transition.update(
-                            {
-                                "status": "cancelled",
-                                "reason": "The regime change cancelled this pending law transition.",
-                            }
-                        )
-                        changed.add("law_transitions")
-                for election in elections:
-                    if (
-                        self._tag(election.get("country_id")) == country_id
-                        and str(election.get("status") or "") == "scheduled"
-                    ):
-                        election.update(
-                            {
-                                "status": "cancelled",
-                                "resolved_at_minute": now,
-                                "reason": "The regime change replaced the existing election schedule.",
-                            }
-                        )
-                        changed.add("political_elections")
 
                 if relations is not None:
                     for relation_effect in path.relation_effects:

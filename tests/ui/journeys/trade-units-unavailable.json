@@ -1,0 +1,11 @@
+{
+  "steps": [
+    { "op": "assert_region", "target": "trade.panel", "visible": true },
+    { "op": "assert_absent", "target": "trade.offer.unit.cboType" },
+    { "op": "assert_absent", "target": "trade.offer.unit.cboModel" },
+    { "op": "assert_absent", "target": "trade.offer.unit.cboUnit" },
+    { "op": "assert_absent", "target": "trade.request.unit.cboType" },
+    { "op": "assert_absent", "target": "trade.request.unit.cboModel" },
+    { "op": "assert_absent", "target": "trade.request.unit.cboUnit" }
+  ]
+}

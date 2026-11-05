@@ -1,0 +1,73 @@
+{
+  "tables": {
+    "battles": [
+      {
+        "id": "battle-own",
+        "region_id": 1,
+        "anchor_latitude": 0.0,
+        "anchor_longitude": -10.0,
+        "attacker_side": "UKR",
+        "defender_side": "POL",
+        "status": "active",
+        "mode": "assault",
+        "balance": 0.6,
+        "round": 3,
+        "side_a_strength": 1000.0,
+        "side_b_strength": 800.0
+      },
+      {
+        "id": "battle-observer",
+        "region_id": 2,
+        "anchor_latitude": 0.0,
+        "anchor_longitude": 15.0,
+        "attacker_side": "POL,FRA,ITA",
+        "defender_side": "DEU,CZE,ESP",
+        "status": "active",
+        "mode": "positional"
+      }
+    ],
+    "units": [
+      {
+        "id": "ukr-infantry",
+        "owner": "UKR",
+        "unit_type": "infantry",
+        "strength": 1000,
+        "latitude": 50.4,
+        "longitude": 30.5,
+        "current_region_id": 1,
+        "is_moving": false,
+        "readiness_status": "ready"
+      },
+      {
+        "id": "pol-armor",
+        "owner": "POL",
+        "unit_type": "tanks",
+        "strength": 800,
+        "latitude": 50.5,
+        "longitude": 30.6,
+        "current_region_id": 1,
+        "is_moving": false,
+        "readiness_status": "ready"
+      }
+    ],
+    "battle_units": [
+      {
+        "battle_id": "battle-own",
+        "unit_id": "ukr-infantry",
+        "country_id": "UKR",
+        "side": "SIDE_A"
+      },
+      {
+        "battle_id": "battle-own",
+        "unit_id": "pol-armor",
+        "country_id": "POL",
+        "side": "SIDE_B"
+      }
+    ]
+  },
+  "globals": {
+    "player_country_map": {
+      "ui-test-player": "UKR"
+    }
+  }
+}

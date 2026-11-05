@@ -1,0 +1,27 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-production-actions.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_production"},
+    {"op": "assert_region", "target": "unit_production.panel", "visible": true},
+    {"op": "click", "target": "unit_production.select_design.design-infantry-1"},
+    {"op": "assert", "target": "unit_production.quantity", "type": "input_text", "value": "50", "visible": true},
+    {"op": "click", "target": "unit_production.quantity.up"},
+    {"op": "assert", "target": "unit_production.quantity", "value": "51"},
+    {"op": "hold", "target": "unit_production.quantity.up", "duration_ms": 650},
+    {"op": "assert", "target": "unit_production.quantity", "value": "53"},
+    {"op": "assert_region", "target": "unit_production.panel", "visible": true},
+    {"op": "click", "target": "unit_production.build"},
+    {
+      "op": "assert_action",
+      "type": "ActionQueueUnitProduction",
+      "fields": {
+        "country_tag": "UKR",
+        "design_id": "design-infantry-1",
+        "quantity": 53,
+        "priority": 100,
+        "training_level": "Recruit"
+      }
+    }
+  ]
+}

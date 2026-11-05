@@ -1,0 +1,692 @@
+{
+  "tables": {
+    "countries": [
+      {
+        "id": "UKR",
+        "name": "Ukraine",
+        "annual_production_capacity": 10000.0,
+        "money_reserves": 100000000.0
+      },
+      {
+        "id": "POL",
+        "name": "Poland",
+        "annual_production_capacity": 8000.0,
+        "money_reserves": 100000000.0
+      }
+    ],
+    "regions": [
+      {
+        "id": 1,
+        "name": "Kyiv",
+        "owner": "UKR",
+        "controller": "UKR",
+        "pop_15_64": 20000000
+      },
+      {
+        "id": 2,
+        "name": "Warsaw",
+        "owner": "POL",
+        "controller": "POL",
+        "pop_15_64": 10000000
+      }
+    ],
+    "unit_designs": [
+      {
+        "id": "design-infantry-1",
+        "country_id": "UKR",
+        "branch": "land",
+        "class_name": "infantry",
+        "domain": "land",
+        "display_name": "Infantry",
+        "cost": 1000.0
+      },
+      {
+        "id": "design-tank-1",
+        "country_id": "UKR",
+        "branch": "land",
+        "class_name": "tank",
+        "domain": "land",
+        "display_name": "Main Battle Tank",
+        "cost": 500000.0
+      },
+      {
+        "id": "design-pol-infantry",
+        "country_id": "POL",
+        "branch": "land",
+        "class_name": "infantry",
+        "domain": "land",
+        "display_name": "Mechanized Infantry",
+        "cost": 1500.0
+      },
+      {
+        "id": "design-pol-fighter",
+        "country_id": "POL",
+        "branch": "air",
+        "class_name": "fighter",
+        "domain": "air",
+        "display_name": "Multirole Fighter",
+        "cost": 125000.0
+      }
+    ],
+    "production_orders": [
+      {
+        "id": "order-high",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-paused",
+        "country_id": "UKR",
+        "design_id": "design-infantry-1",
+        "quantity": 20,
+        "progress": 0.15,
+        "priority": 50,
+        "status": "paused",
+        "eta_days": -1,
+        "assigned_capacity": 0.0,
+        "blocking_reason": "Paused by the player."
+      },
+      {
+        "id": "order-cancel",
+        "country_id": "UKR",
+        "design_id": "design-infantry-1",
+        "quantity": 5,
+        "progress": 0.0,
+        "priority": 1,
+        "status": "queued",
+        "eta_days": 30,
+        "assigned_capacity": 100.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-04",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-05",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-06",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-07",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-08",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-09",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-10",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-11",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-12",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-13",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-14",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-15",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-16",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-17",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-18",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-19",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-20",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-21",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-22",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-23",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-24",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-25",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-26",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-27",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-28",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-29",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-30",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-31",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-32",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-33",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-34",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-35",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-36",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-37",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-38",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-39",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-40",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-41",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-42",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-43",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-44",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-45",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-46",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-47",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-48",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-49",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      },
+      {
+        "id": "order-limit-50",
+        "country_id": "UKR",
+        "design_id": "design-tank-1",
+        "quantity": 12,
+        "progress": 0.4,
+        "priority": 100,
+        "status": "queued",
+        "eta_days": 12,
+        "assigned_capacity": 4000.0,
+        "blocking_reason": ""
+      }
+    ],
+    "seller_acceptance_profiles": [
+      {
+        "country_id": "UKR",
+        "accepts_foreign_orders": false
+      },
+      {
+        "country_id": "POL",
+        "accepts_foreign_orders": true
+      }
+    ]
+  },
+  "globals": {
+    "foreign_order_permissions": [
+      [
+        "UKR",
+        "POL"
+      ]
+    ]
+  }
+}

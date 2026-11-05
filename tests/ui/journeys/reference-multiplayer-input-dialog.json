@@ -1,0 +1,35 @@
+{
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "multiplayer.input.dialog",
+      "visible": true,
+      "inside_viewport": true,
+      "min_width": 301,
+      "min_height": 62
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.input.answer",
+      "visible": true,
+      "enabled": true,
+      "type": "input_text"
+    },
+    {
+      "op": "click",
+      "target": "multiplayer.input.answer"
+    },
+    {
+      "op": "replace",
+      "target": "multiplayer.input.answer",
+      "value": "secret"
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.input.answer",
+      "visible": true,
+      "enabled": true,
+      "type": "input_text"
+    }
+  ]
+}

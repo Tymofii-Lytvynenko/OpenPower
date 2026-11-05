@@ -1,0 +1,19 @@
+{
+  "fixture": "tests/ui/fixtures/load-game-success.json",
+  "steps": [
+    {"op": "click", "target": "main_menu.singleplayer"},
+    {"op": "click", "target": "main_menu.load_game"},
+    {"op": "assert_navigation_request", "type": "load_game", "count": 1},
+    {"op": "assert_region", "target": "load_game.dialog", "visible": true},
+    {"op": "assert", "target": "load_game.submit", "enabled": false},
+    {"op": "click", "target": "load_game.slot.ui-load-fixture"},
+    {"op": "assert", "target": "load_game.submit", "enabled": true},
+    {"op": "click", "target": "load_game.submit"},
+    {
+      "op": "assert_navigation_request",
+      "type": "load_saved_game",
+      "fields": {"save_name": "ui-load-fixture"}
+    },
+    {"op": "assert_region", "target": "load_game.dialog", "visible": false}
+  ]
+}

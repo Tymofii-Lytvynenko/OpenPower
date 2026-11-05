@@ -1,0 +1,21 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-design-routes.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_unit_list"},
+    {"op": "assert_region", "target": "unit_list.panel", "visible": true},
+    {"op": "assert_absent", "target": "unit_list.view_design.unit-infantry-1"},
+    {"op": "click", "target": "unit_list.view_design.unit-fighter-1"},
+    {"op": "click", "target": "unit_list.view_design.unit-fighter-1"},
+    {"op": "assert_region", "target": "unit_design.panel", "visible": true},
+    {
+      "op": "assert",
+      "target": "unit_design.detail.selected",
+      "visible": true,
+      "label": "Viewing design: Multirole Fighter"
+    },
+    {"op": "click", "target": "unit_design.back_to_list"},
+    {"op": "assert", "target": "unit_design.catalog.heading", "visible": true},
+    {"op": "assert_absent", "target": "unit_design.detail.selected"}
+  ]
+}

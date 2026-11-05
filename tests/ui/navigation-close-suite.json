@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/advisor-toggle-apply.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/advisor-toggle-discard.json"
+    },
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/law-close-stale.json"
+    }
+  ]
+}

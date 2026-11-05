@@ -17,6 +17,19 @@ class NavigationService:
         print("[Nav] Switching to Main Menu")
         self.window.show_view(MainMenuView(session, config))
 
+    def stop_game(self):
+        """Replace the active campaign session with a clean menu session."""
+        from src.client.tasks.stop_game_task import StopGameTask
+        from src.client.views.main_menu_view import MainMenuView
+
+        config = self.window.game_config
+
+        def on_success(session):
+            self.window.session = session
+            return MainMenuView(session, config)
+
+        self.show_loading(StopGameTask(self.window, config), on_success)
+
     def show_loading(self, task, on_success, on_failure=None):
         from src.client.views.loading_view import LoadingView
         print("[Nav] Switching to Loading Screen")
@@ -33,6 +46,17 @@ class NavigationService:
         from src.client.views.load_game_view import LoadGameView
         print("[Nav] Switching to Load Game Screen")
         self.window.show_view(LoadGameView(config))
+
+    def load_saved_game(self, config: "GameConfig", save_name: str):
+        from src.client.tasks.load_game_task import LoadGameTask
+
+        def on_success(session):
+            self.window.session = session
+            state = session.get_state_snapshot()
+            player_tag = str(state.globals.get("player_tag", "USA")) if state else "USA"
+            self.show_game_view(session, config, player_tag)
+
+        self.show_loading(LoadGameTask(self.window, config, save_name), on_success)
 
     def show_game_view(self, session: "SessionPort", config: "GameConfig", player_tag: str, initial_pos=None):
         from src.client.views.game_view import GameView

@@ -1,0 +1,40 @@
+{
+  "fixture": "tests/ui/fixtures/party-constitution.json",
+  "steps": [
+    {
+      "op": "select",
+      "target": "laws.party.party-2.status",
+      "value": "Ineligible"
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.constitution.question",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPartyEligibility",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "laws.constitution.question.no"
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.constitution.question",
+      "visible": false,
+      "present": false
+    },
+    {
+      "op": "assert",
+      "target": "laws.apply",
+      "enabled": false
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPartyEligibility",
+      "count": 0
+    }
+  ]
+}

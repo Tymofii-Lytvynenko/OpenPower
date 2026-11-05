@@ -1,0 +1,99 @@
+{
+  "fixture": "tests/ui/fixtures/reference-map-foreign.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": {
+        "label": "Diplomacy",
+        "type": "begin_menu"
+      }
+    },
+    {
+      "op": "click",
+      "target": "map.treaty.alliance"
+    },
+    {
+      "op": "assert_region",
+      "target": "treaty_proposal.panel",
+      "visible": true
+    },
+    {
+      "op": "scroll",
+      "target": "treaty.proposal.edit_participants"
+    },
+    {
+      "op": "click",
+      "target": "treaty.proposal.edit_participants"
+    },
+    {
+      "op": "assert_region",
+      "target": "treaty.participants.dialog",
+      "visible": true,
+      "min_width": 635,
+      "min_height": 437
+    },
+    {
+      "op": "assert_region",
+      "target": "treaty.participants.list.a",
+      "visible": true,
+      "relative_to": "treaty.participants.dialog",
+      "relative_rect": {"x": 342, "y": 58, "width": 275, "height": 365}
+    },
+    {
+      "op": "assert",
+      "target": "treaty.participants.apply",
+      "relative_to": "treaty.participants.dialog",
+      "relative_rect": {"x": 588, "y": 8, "width": 17, "height": 17}
+    },
+    {
+      "op": "assert",
+      "target": "treaty.participants.dialog.close",
+      "relative_to": "treaty.participants.dialog",
+      "relative_rect": {"x": 608, "y": 8, "width": 17, "height": 17}
+    },
+    {
+      "op": "assert_absent",
+      "target": "treaty.participants.add_b"
+    },
+    {
+      "op": "assert_absent",
+      "target": "treaty.participants.remove_b"
+    },
+    {
+      "op": "assert_absent",
+      "target": "treaty.participants.side_b.POL"
+    },
+    {
+      "op": "assert",
+      "target": "treaty.participants.move_a_to_b",
+      "visible": true,
+      "enabled": false
+    },
+    {
+      "op": "click",
+      "target": "treaty.participants.dialog.close"
+    },
+    {
+      "op": "scroll",
+      "target": "treaty.proposal.submit"
+    },
+    {
+      "op": "click",
+      "target": "treaty.proposal.submit"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionCreateTreaty",
+      "fields": {
+        "source_country_tag": "UKR",
+        "target_country_tag": "POL",
+        "treaty_type": "alliance",
+        "side_a_country_tags": [
+          "POL",
+          "UKR"
+        ],
+        "side_b_country_tags": []
+      }
+    }
+  ]
+}

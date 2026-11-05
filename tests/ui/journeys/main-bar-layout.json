@@ -1,0 +1,300 @@
+{
+  "fixture": "tests/ui/fixtures/main-bar-locate.json",
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "hud.central_bar",
+      "visible": true
+    },
+    {
+      "op": "assert_region",
+      "target": "hud.panel_toggles",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "hud.panel.pol",
+      "inside": "hud.panel_toggles",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "hud.panel.mil",
+      "inside": "hud.panel_toggles",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "hud.panel.eco",
+      "inside": "hud.panel_toggles",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "hud.panel.dem",
+      "inside": "hud.panel_toggles",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "hud.country",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {
+        "x": 238,
+        "y": 30,
+        "width": 197,
+        "height": 16
+      },
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.country_focus",
+      "visible": true,
+      "enabled": true,
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 188, "y": 31, "width": 47, "height": 28},
+      "tolerance": 0.01
+    },
+    {
+      "op": "click",
+      "target": "hud.country_focus"
+    },
+    {
+      "op": "assert_viewport_request",
+      "type": "country",
+      "fields": {"country": "UKR"}
+    },
+    {
+      "op": "assert",
+      "target": "hud.country_status",
+      "inside": "hud.central_bar",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {
+        "x": 237,
+        "y": 47,
+        "width": 65,
+        "height": 13
+      },
+      "label": "PLAYER",
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.politic",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 12, "y": 70, "width": 50, "height": 13},
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.military",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 67, "y": 70, "width": 50, "height": 13},
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.economic",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 122, "y": 70, "width": 50, "height": 13},
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.locate",
+      "visible": true,
+      "enabled": true,
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 188, "y": 68, "width": 461, "height": 19},
+      "tolerance": 0.01
+    },
+    {
+      "op": "click",
+      "target": "hud.locate"
+    },
+    {
+      "op": "assert_viewport_request",
+      "type": "region",
+      "fields": {"region": 1}
+    },
+    {
+      "op": "click",
+      "target": "hud.country"
+    },
+    {
+      "op": "assert",
+      "target": "hud.country.option.POL",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "hud.country.option.POL"
+    },
+    {
+      "op": "assert_viewport_request",
+      "type": "country",
+      "count": 2,
+      "index": 1,
+      "fields": {
+        "country": "POL"
+      }
+    },
+    {
+      "op": "assert",
+      "target": "hud.country_status",
+      "label": "NEUTRAL"
+    },
+    {
+      "op": "assert_region",
+      "target": "hud.central_bar",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "hud.history",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {
+        "x": 479,
+        "y": 32,
+        "width": 27,
+        "height": 27
+      },
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.clock",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {
+        "x": 549,
+        "y": 32,
+        "width": 27,
+        "height": 27
+      },
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.news",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {
+        "x": 649,
+        "y": 68,
+        "width": 25,
+        "height": 19
+      },
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.date",
+      "visible": true,
+      "inside": "hud.central_bar",
+      "no_overlap": "hud.time"
+    },
+    {
+      "op": "assert",
+      "target": "hud.ticker",
+      "visible": true,
+      "label": "North Atlantic Treaty Organization remains active | Member coordina...",
+      "inside": "hud.central_bar",
+      "no_overlap": "hud.news"
+    },
+    {
+      "op": "click",
+      "target": "hud.clock"
+    },
+    {
+      "op": "assert_region",
+      "target": "hud.central_bar",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "hud.pause",
+      "visible": true,
+      "inside": "hud.central_bar"
+    },
+    {
+      "op": "assert",
+      "target": "hud.pause",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 581, "y": 37, "width": 16, "height": 18},
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.speed.1",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 599, "y": 37, "width": 16, "height": 18},
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.speed.2",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 617, "y": 37, "width": 16, "height": 18},
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.speed.3",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 635, "y": 37, "width": 16, "height": 18},
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.speed.4",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 653, "y": 37, "width": 16, "height": 18},
+      "tolerance": 0.01
+    },
+    {
+      "op": "assert",
+      "target": "hud.speed.5",
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 673, "y": 37, "width": 16, "height": 18},
+      "tolerance": 0.01
+    },
+    {
+      "op": "click",
+      "target": "hud.speed.3"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetGameSpeed",
+      "fields": {
+        "speed_level": 3
+      }
+    },
+    {
+      "op": "click",
+      "target": "hud.pause"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPaused",
+      "count": 2
+    },
+    {
+      "op": "click",
+      "target": "hud.clock"
+    },
+    {
+      "op": "assert",
+      "target": "hud.date",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "hud.news"
+    },
+    {
+      "op": "assert_region",
+      "target": "news.panel",
+      "visible": true
+    }
+  ]
+}

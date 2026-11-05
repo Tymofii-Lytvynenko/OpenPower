@@ -1,0 +1,40 @@
+{
+  "test_support": {
+    "player_country": "POL",
+    "selected_region_id": 2
+  },
+  "tables": {
+    "countries_wars": [
+      {
+        "id": "war-controlled-1",
+        "name": "Ukraine vs Poland",
+        "side_a": ["UKR"],
+        "side_b": ["POL"],
+        "status": "active",
+        "casus_belli": "Fixture conflict",
+        "created_at": "2001-01-01 00:00",
+        "leader_a": "UKR",
+        "leader_b": "POL",
+        "intent_a": "war",
+        "intent_b": "war"
+      }
+    ],
+    "peace_deals": [
+      {
+        "id": "peace-fixture-1",
+        "war_id": "war-controlled-1",
+        "proposer_country_id": "UKR",
+        "responding_side": ["POL"],
+        "accepted_responses": [],
+        "offered_clauses_json": "[{\"type\":\"war_reparations\",\"payer_country_id\":\"UKR\",\"recipient_country_id\":\"POL\",\"amount\":1200,\"duration_months\":12}]",
+        "requested_clauses_json": "[]",
+        "status": "pending",
+        "created_at_minute": 0,
+        "expires_at_minute": 43200,
+        "resolved_at_minute": 0,
+        "acceptance_utility": 0.0,
+        "reason": "Awaiting responses."
+      }
+    ]
+  }
+}

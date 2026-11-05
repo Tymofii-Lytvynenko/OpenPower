@@ -6,6 +6,51 @@ import polars as pl
 
 from src.client.ui.panels.service import history_panel as history_panel_module
 from src.client.ui.panels.service.history_panel import HistoryPanel
+from src.client.services.history_indicator_catalog import (
+    history_indicator_sort_key,
+    history_indicator_source_label,
+)
+
+
+def test_history_indicator_catalog_uses_source_names_and_enum_order_for_shared_metrics() -> None:
+    definitions = [
+        {"id": "country.telecom_index", "subject_type": "country"},
+        {"id": "country.gdp", "subject_type": "country"},
+        {"id": "country.population", "subject_type": "country"},
+        {"id": "politics.gvt_stability", "subject_type": "country"},
+        {"id": "politics.gvt_corruption", "subject_type": "country"},
+        {"id": "country.overall_relations", "subject_type": "country"},
+        {"id": "country.gdp_per_capita", "subject_type": "country"},
+        {"id": "country.budget_balance", "subject_type": "country"},
+        {"id": "politics.gvt_approval", "subject_type": "country"},
+        {"id": "country.human_dev", "subject_type": "country"},
+        {"id": "country.infrastructure_index", "subject_type": "country"},
+        {"id": "country.resource_production", "subject_type": "country"},
+        {"id": "country.economic_health", "subject_type": "country"},
+        {"id": "region.population", "subject_type": "region"},
+    ]
+
+    ordered_ids = [row["id"] for row in sorted(definitions, key=history_indicator_sort_key)]
+
+    assert ordered_ids == [
+        "politics.gvt_approval",
+        "politics.gvt_stability",
+        "politics.gvt_corruption",
+        "country.overall_relations",
+        "country.economic_health",
+        "country.gdp_per_capita",
+        "country.budget_balance",
+        "country.resource_production",
+        "country.population",
+        "country.human_dev",
+        "country.infrastructure_index",
+        "country.telecom_index",
+        "country.gdp",
+        "region.population",
+    ]
+    assert history_indicator_source_label("country.gdp_per_capita") == "GDP per Capita"
+    assert history_indicator_source_label("country.budget_balance") == "Budget"
+    assert history_indicator_source_label("country.gdp") is None
 
 
 def test_history_trend_supports_line_and_step_segments_without_bridging_gaps() -> None:

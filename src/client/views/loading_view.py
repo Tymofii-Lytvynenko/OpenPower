@@ -3,6 +3,7 @@ import threading
 from typing import Callable, Any
 from src.client.ui.core.composer import UIComposer
 from src.client.ui.core.theme import GAMETHEME
+from src.client.ui.components.shared.loading_status_panel import LoadingStatusPanel
 from src.client.interfaces.loading import LoadingTask
 
 class LoadingView(arcade.View):
@@ -17,6 +18,7 @@ class LoadingView(arcade.View):
         self.on_failure = on_failure
         
         self.ui = UIComposer(GAMETHEME)
+        self.status_panel = LoadingStatusPanel()
         
         # Threading Logic
         self.thread = threading.Thread(target=self._worker, daemon=True)
@@ -108,21 +110,12 @@ class LoadingView(arcade.View):
         self.window.imgui.new_frame()
         self.ui.setup_frame()
 
-        # 3. Render Loading UI
-        screen_w, screen_h = self.window.get_size()
-        
-        panel_height = min(320, screen_h - 40) if self.error else 150
-        if self.ui.begin_centered_panel("Loader", screen_w, screen_h, w=400, h=panel_height):
-            self.ui.draw_title("PROCESSING")
-            self.ui.draw_progress_bar(self.task.progress, self.task.status_text)
-            
-            if self.error:
-                from src.client.ui.core.instrumented_imgui import imgui
-                imgui.text_colored(GAMETHEME.colors.error, "OPERATION FAILED")
-                imgui.text_wrapped(str(self.error))
-                if imgui.button("RETURN TO START"):
-                    self.window.setup()
-
-            self.ui.end_panel()
+        self.status_panel.render(
+            self.ui,
+            self.task,
+            self.error,
+            self.window.get_size(),
+            on_return=self.window.setup,
+        )
 
         self.window.imgui.render()

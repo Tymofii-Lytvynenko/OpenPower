@@ -8,7 +8,9 @@ from src.client.ui.core.instrumented_imgui import imgui
 from src.client.renderers.flag_renderer import FlagRenderer
 from src.shared.actions import ActionRespondToRandomEvent, ActionSetRandomEventControls
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.panel_context import PanelRenderContext
+from src.client.ui.core.primitives import UIPrimitives
 from src.client.ui.core.theme import GAMETHEME, with_alpha
 from src.client.ui.panels.service.event_feed_presenter import (
     EventCategory,
@@ -20,14 +22,15 @@ from src.client.ui.panels.shared.panel_widgets import draw_empty_state
 
 class NewsPanel:
     _FILTERS = (
-        (EventCategory.GENERAL, icons_fontawesome_6.ICON_FA_GLOBE, "General events"),
-        (EventCategory.MILITARY, icons_fontawesome_6.ICON_FA_PERSON_MILITARY_RIFLE, "Military events"),
-        (EventCategory.POLITICAL, icons_fontawesome_6.ICON_FA_BUILDING_COLUMNS, "Political events"),
-        (EventCategory.ECONOMIC, icons_fontawesome_6.ICON_FA_SACK_DOLLAR, "Economic events"),
+        (EventCategory.POLITICAL, "togFilterPolitic", icons_fontawesome_6.ICON_FA_BUILDING_COLUMNS, "Political events"),
+        (EventCategory.ECONOMIC, "togFilterEconomic", icons_fontawesome_6.ICON_FA_SACK_DOLLAR, "Economic events"),
+        (EventCategory.MILITARY, "togFilterMilitary", icons_fontawesome_6.ICON_FA_PERSON_MILITARY_RIFLE, "Military events"),
+        (EventCategory.DEMOGRAPHIC, "togFilterDemographic", icons_fontawesome_6.ICON_FA_USERS, "Demographic events"),
     )
 
     _CATEGORY_COLORS = {
         EventCategory.GENERAL: GAMETHEME.colors.info,
+        EventCategory.DEMOGRAPHIC: GAMETHEME.colors.demographics,
         EventCategory.MILITARY: GAMETHEME.colors.military,
         EventCategory.POLITICAL: GAMETHEME.colors.politics,
         EventCategory.ECONOMIC: GAMETHEME.colors.economy,
@@ -36,45 +39,96 @@ class NewsPanel:
     def __init__(self):
         self._presenter = EventFeedPresenter()
         self._flag_renderer = FlagRenderer()
-        self._selected_category: EventCategory | None = None
+        self._enabled_filters = {category for category, *_ in self._FILTERS}
+        self._selected_event_id: str | None = None
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        with WindowManager.window("EVENT FEED", x=1120, y=120, w=700, h=320) as is_open:
+        viewport = imgui.get_io().display_size
+        width, height = 488.0, 199.0
+        x = max(0.0, (float(viewport.x) - width) / 2.0)
+        y = max(0.0, (float(viewport.y) - height) / 2.0)
+        with WindowManager.window(
+            "EVENT FEED",
+            x=x,
+            y=y,
+            w=width,
+            h=height,
+            closable=False,
+            flags=imgui.WindowFlags_.no_title_bar,
+            padding=(6.0, 4.0),
+            test_id="news.panel",
+            follow_position=True,
+        ) as is_open:
             if not is_open:
                 return False
             self._render_content(state, context)
             return True
 
     def _render_content(self, state, context: PanelRenderContext) -> None:
-        self._render_event_controls(state, context)
+        ui = GMLWidgets("Event_Log/frmInner")
         all_items = self._presenter.items(state)
         counts = {category: 0 for category in EventCategory}
         for item in all_items:
             counts[item.category] += 1
 
-        rail_width = 44.0
-        spacing = imgui.get_style().item_spacing.x
-        list_width = max(1.0, imgui.get_content_region_avail().x - rail_width - spacing)
-
+        # Event_Log has no source title frame; the HUD news toggle is its close affordance.
         imgui.push_style_var(imgui.StyleVar_.window_padding, (4.0, 4.0))
-        imgui.begin_child("event_feed_pool", (list_width, 0.0), True)
-        visible_items = (
-            all_items
-            if self._selected_category is None
-            else [item for item in all_items if item.category is self._selected_category]
-        )
-        if visible_items:
-            for item in visible_items:
-                self._render_item(item, context)
-        else:
-            draw_empty_state("No events match the selected category.")
-        imgui.end_child()
+        try:
+            # The source list starts one GML item-spacing below the content origin.
+            imgui.dummy((0.0, 0.0))
+            child_open = imgui.begin_child(
+                "event_feed_pool",
+                (446.0, 185.0),
+                True,
+                test_id="news.events",
+            )
+            visible_items = [
+                item for item in all_items
+                if item.category is EventCategory.GENERAL or item.category in self._enabled_filters
+            ]
+            if self._selected_event_id not in {item.id for item in visible_items}:
+                self._selected_event_id = None
+            if child_open:
+                if visible_items:
+                    for item in visible_items:
+                        self._render_item(item, context)
+                else:
+                    draw_empty_state("No events match the selected filters.")
+            imgui.dummy((0.0, 0.0))
+            imgui.end_child()
+        finally:
+            imgui.pop_style_var()
 
-        imgui.same_line()
-        imgui.begin_child("event_feed_filters", (rail_width, 0.0), True)
-        self._render_filters(counts)
-        imgui.end_child()
-        imgui.pop_style_var()
+        self._render_filters(ui, counts)
+        if ui.button_at(
+            "btnGoto",
+            icons_fontawesome_6.ICON_FA_GEAR,
+            "news.random_event_settings",
+            offset=(0.0, -63.0),
+            size=(27.0, 21.0),
+            tooltip="Random event controls",
+            padding=(1.0, 0.0),
+        ):
+            imgui.open_popup("NewsRandomEventControls")
+
+        if imgui.begin_popup("NewsRandomEventControls", test_id="news.controls.popup"):
+            self._render_event_controls(state, context)
+            imgui.end_popup()
+
+        selected = next(
+            (item for item in visible_items if item.id == self._selected_event_id),
+            None,
+        )
+        if ui.button(
+            "btnGoto",
+            icons_fontawesome_6.ICON_FA_LOCATION_CROSSHAIRS,
+            "news.goto",
+            enabled=selected is not None and selected.region_id is not None,
+            tooltip="Focus the selected event's region",
+            dynamic_enabled=True,
+        ) and selected is not None and selected.region_id is not None:
+            if context.on_focus_request is not None:
+                context.on_focus_request(int(selected.region_id))
 
     def _render_item(self, item: EventFeedItem, context: PanelRenderContext) -> None:
         row_height = 54.0 if item.response_options and item.status == "active" else 30.0
@@ -83,6 +137,14 @@ class NewsPanel:
         screen_start = imgui.get_cursor_screen_pos()
         color = self._CATEGORY_COLORS[item.category]
         draw_list = imgui.get_window_draw_list()
+        is_selected = self._selected_event_id == item.id
+
+        if is_selected:
+            draw_list.add_rect_filled(
+                screen_start,
+                (screen_start.x + available_width, screen_start.y + row_height),
+                imgui.get_color_u32(with_alpha(GAMETHEME.colors.accent, 0.22)),
+            )
 
         draw_list.add_rect_filled(
             screen_start,
@@ -104,29 +166,45 @@ class NewsPanel:
 
         tag = item.country_tag or "WORLD"
         tag_x = content_x + 35.0
+        tag_offset = tag_x - local_start.x
         draw_list.add_text(
-            (screen_start.x + tag_x - local_start.x, screen_start.y + 7.0),
+            (screen_start.x + tag_offset, screen_start.y + 7.0),
             imgui.get_color_u32(color),
             tag,
         )
         tag_width = max(34.0, imgui.calc_text_size(tag).x + 8.0)
+        summary_x = tag_offset + tag_width
+        summary_width = max(0.0, available_width - summary_x - 8.0)
+        summary = UIPrimitives.fit_text(item.summary, summary_width)
         draw_list.add_text(
-            (screen_start.x + tag_x - local_start.x + tag_width, screen_start.y + 7.0),
+            (screen_start.x + summary_x, screen_start.y + 7.0),
             imgui.get_color_u32(GAMETHEME.colors.text_main),
-            item.summary,
+            summary,
         )
 
         imgui.set_cursor_pos(local_start)
-        imgui.invisible_button(f"##event_feed_item_{item.id}", (available_width, row_height))
+        response_actions_visible = bool(
+            item.response_options and item.status == "active" and context.net_client is not None
+        )
+        selection_height = row_height - 20.0 if response_actions_visible else row_height
+        if imgui.invisible_button(
+            f"##event_feed_item_{item.id}",
+            (available_width, selection_height),
+            test_id=f"news.item.{item.id}",
+        ):
+            self._selected_event_id = item.id
         if imgui.is_item_hovered():
             self._render_item_tooltip(item)
 
-        if item.response_options and item.status == "active" and context.net_client is not None:
+        if response_actions_visible:
             imgui.set_cursor_pos((local_start.x + 44.0, local_start.y + 31.0))
             for option_index, (response_id, cost) in enumerate(item.response_options):
                 if option_index:
                     imgui.same_line()
-                if imgui.small_button(f"{response_id} · {cost:,.0f}##{item.id}-{response_id}"):
+                if imgui.small_button(
+                    f"{response_id} · {cost:,.0f}##{item.id}-{response_id}",
+                    test_id=f"news.response.{item.id}.{response_id}",
+                ):
                     context.net_client.send_action(
                         ActionRespondToRandomEvent(
                             player_id=context.net_client.player_id,
@@ -142,25 +220,24 @@ class NewsPanel:
             (screen_start.x + available_width, separator_y),
             imgui.get_color_u32(with_alpha(GAMETHEME.colors.text_dim, 0.16)),
         )
+        imgui.set_cursor_pos((local_start.x, local_start.y + row_height + 3.0))
 
-    def _render_filters(self, counts: dict[EventCategory, int]) -> None:
-        button_size = (30.0, 30.0)
-        for category, icon, tooltip in self._FILTERS:
-            is_active = self._selected_category is category
-            color = self._CATEGORY_COLORS[category]
-            if is_active:
-                imgui.push_style_color(imgui.Col_.button, with_alpha(color, 0.65))
-                imgui.push_style_color(imgui.Col_.button_hovered, with_alpha(color, 0.8))
-
-            if imgui.button(f"{icon}##event_filter_{category.value}", button_size):
-                self._selected_category = None if is_active else category
-
-            if is_active:
-                imgui.pop_style_color(2)
-
-            if imgui.is_item_hovered():
-                suffix = "; click again to show all" if is_active else ""
-                imgui.set_tooltip(f"{tooltip}: {counts[category]}{suffix}")
+    def _render_filters(self, ui: GMLWidgets, counts: dict[EventCategory, int]) -> None:
+        for category, component_id, icon, tooltip in self._FILTERS:
+            is_enabled = category in self._enabled_filters
+            changed, is_enabled = ui.toggle(
+                component_id,
+                is_enabled,
+                test_id=f"news.filter.{category.value}",
+                icon=icon,
+                color=self._CATEGORY_COLORS[category],
+                tooltip=f"{tooltip}: {counts[category]}",
+            )
+            if changed:
+                if is_enabled:
+                    self._enabled_filters.add(category)
+                else:
+                    self._enabled_filters.discard(category)
 
     @staticmethod
     def _render_event_controls(state, context: PanelRenderContext) -> None:
@@ -169,7 +246,10 @@ class NewsPanel:
             return
 
         enabled = NewsPanel._read_bool(state.globals.get("random_events_enabled"), True)
-        if imgui.button(f"Random events: {'ON' if enabled else 'OFF'}"):
+        if imgui.button(
+            f"Random events: {'ON' if enabled else 'OFF'}",
+            test_id="news.rules.enabled",
+        ):
             client.send_action(
                 ActionSetRandomEventControls(
                     player_id=client.player_id,
@@ -180,7 +260,7 @@ class NewsPanel:
         multiplier = NewsPanel._read_frequency_multiplier(
             state.globals.get("random_event_frequency_multiplier")
         )
-        if imgui.small_button(f"−##event_frequency_down"):
+        if imgui.small_button("−##event_frequency_down", test_id="news.rules.frequency.down"):
             client.send_action(
                 ActionSetRandomEventControls(
                     player_id=client.player_id,
@@ -190,7 +270,7 @@ class NewsPanel:
         imgui.same_line()
         imgui.text(f"Frequency {multiplier:.2f}×")
         imgui.same_line()
-        if imgui.small_button(f"+##event_frequency_up"):
+        if imgui.small_button("+##event_frequency_up", test_id="news.rules.frequency.up"):
             client.send_action(
                 ActionSetRandomEventControls(
                     player_id=client.player_id,
@@ -201,7 +281,7 @@ class NewsPanel:
             state.globals.get("random_event_seed"), state.determinism.seed
         )
         imgui.same_line()
-        if imgui.small_button(f"−##event_seed_down"):
+        if imgui.small_button("−##event_seed_down", test_id="news.rules.seed.down"):
             client.send_action(
                 ActionSetRandomEventControls(
                     player_id=client.player_id,
@@ -211,7 +291,7 @@ class NewsPanel:
         imgui.same_line()
         imgui.text(f"Seed {seed}")
         imgui.same_line()
-        if imgui.small_button(f"+##event_seed_up"):
+        if imgui.small_button("+##event_seed_up", test_id="news.rules.seed.up"):
             client.send_action(
                 ActionSetRandomEventControls(
                     player_id=client.player_id,
@@ -228,7 +308,8 @@ class NewsPanel:
             category_enabled = NewsPanel._read_bool(control.get("enabled"), True)
             imgui.same_line()
             if imgui.small_button(
-                f"{category.title()}: {'ON' if category_enabled else 'OFF'}##event-category-{category}"
+                f"{category.title()}: {'ON' if category_enabled else 'OFF'}##event-category-{category}",
+                test_id=f"news.rules.category.{category}",
             ):
                 client.send_action(
                     ActionSetRandomEventControls(

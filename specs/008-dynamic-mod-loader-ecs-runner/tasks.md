@@ -17,6 +17,18 @@
 
 - [X] T008 Add and run the opt-in cold scan/import/registration/graph benchmark; measured 179.678 ms for the base mod and 30 systems.
 - [X] T009 Rerun the full repository suite after the loader/scheduler changes: `684 passed, 16 skipped, 116 warnings, 190 subtests passed in 162.89s`.
+- [X] T010 Enforce declared system action and table-access contracts before dispatch in `src/server/command_policy.py` and `src/engine/command_pipeline.py`, with command-pipeline regression coverage.
+
+## Requirement Traceability
+
+| Requirement | Existing implementation and acceptance tasks |
+| --- | --- |
+| FR-001 | T001, T004 |
+| FR-002 | T002–T004 |
+| FR-003 | T005, T006 |
+| FR-004 | T001, T003, T006 |
+| FR-005 | T005, T007 |
+| FR-006 | T010 |
 
 ## Exit criteria
 

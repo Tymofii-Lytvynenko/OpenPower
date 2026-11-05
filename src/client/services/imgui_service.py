@@ -41,24 +41,8 @@ class ImGuiService:
         self.io.config_flags |= imgui.ConfigFlags_.nav_enable_keyboard
 
         # --- FONT LOADING ---
-        pixel_ratio = self.window.get_pixel_ratio()
-
         if font_path:
-            # 1. Load Big: Load texture at physical resolution (e.g., 28px)
-            base_font_size = 14.0
-            FontLoader.load_primary_font(
-                self.io, 
-                font_path, 
-                size_pixels=base_font_size * pixel_ratio, 
-                load_cjk=False,
-                load_icons=True
-            )
-
-            # 2. Scale Down: Use the new Style API to scale the UI back to logical size
-            #    Old API: self.io.font_global_scale = 1.0 / pixel_ratio  <-- REMOVED
-            #    New API: Use imgui.get_style().font_scale_main
-            style = imgui.get_style()
-            style.font_scale_main = 1.0 / pixel_ratio
+            FontLoader.configure_ui(self.io, font_path)
 
         # Initialize the programmable pipeline renderer
         self.renderer = OpenGL3Backend()
@@ -330,6 +314,9 @@ class ImGuiService:
             arcade.key.X: imgui.Key.x,
             arcade.key.Y: imgui.Key.y,
             arcade.key.Z: imgui.Key.z,
+            # Panel shortcuts and text editing both need the full alphabet.
+            **{getattr(arcade.key, letter.upper()): getattr(imgui.Key, letter)
+               for letter in "abcdefghijklmnopqrstuvwxyz"},
         }
         
     @staticmethod

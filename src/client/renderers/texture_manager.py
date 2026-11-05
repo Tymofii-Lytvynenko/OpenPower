@@ -2,7 +2,8 @@ import arcade
 import numpy as np
 import time
 from pathlib import Path
-from typing import Dict, Tuple, Optional, List, Set, Any
+from types import MappingProxyType
+from typing import Dict, Tuple, Optional, List, Set, Any, Mapping
 from PIL import Image
 
 from src.core.cache_service import CacheService
@@ -32,6 +33,7 @@ class TextureManager:
         
         # --- Color Mapping State ---
         self._active_color_map: Dict[int, Tuple[int, ...]] = {}
+        self._overlay_revision = 0
         self._previous_lut_data = self.lut_data.copy()
         self._transition_started_at: float | None = None
         self._transition_duration_seconds = 0.25
@@ -43,6 +45,15 @@ class TextureManager:
         # --- Region ID Mappings ---
         self.real_to_dense: Dict[int, int] = {}
         self.dense_to_real: List[int] = []
+
+    @property
+    def active_color_map(self) -> Mapping[int, Tuple[int, ...]]:
+        """Expose current region colors to UI renderers without allowing mutation."""
+        return MappingProxyType(self._active_color_map)
+
+    @property
+    def overlay_revision(self) -> int:
+        return self._overlay_revision
 
     def load_map_texture(self, 
         map_path: Path, 
@@ -252,6 +263,7 @@ class TextureManager:
             self._transition_started_at = None
 
         self._active_color_map = dict(color_map)
+        self._overlay_revision += 1
         self._rebuild_lut_array()
         if self.lookup_texture:
             self.lookup_texture.write(self.lut_data.tobytes())

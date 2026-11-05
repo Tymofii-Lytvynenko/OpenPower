@@ -52,6 +52,7 @@ class AIEvaluation:
     actions: tuple[GameAction, ...]
     decisions: pl.DataFrame
     skipped_policies: tuple[str, ...]
+    resolved_actions: tuple[tuple[Mapping[str, Any], GameAction], ...] = ()
 
 
 @runtime_checkable
@@ -90,12 +91,19 @@ class DeclarativeAIFramework:
     def policy_ids(self) -> tuple[str, ...]:
         return tuple(self._policies)
 
-    def evaluate(self, context: AITableContext) -> AIEvaluation:
+    def evaluate(
+        self,
+        context: AITableContext,
+        *,
+        policy_ids: frozenset[str] | None = None,
+    ) -> AIEvaluation:
         frames: list[pl.LazyFrame] = []
         skipped: list[str] = []
         available_tables = frozenset(context.tables)
 
         for policy in self._policies.values():
+            if policy_ids is not None and policy.id not in policy_ids:
+                continue
             if not policy.required_tables.issubset(available_tables):
                 skipped.append(policy.id)
                 continue
@@ -189,6 +197,7 @@ class DeclarativeAIFramework:
             decisions = pl.DataFrame(allowed_rows, schema=decisions.schema) if allowed_rows else decisions.head(0)
 
         actions: list[GameAction] = []
+        resolved_actions: list[tuple[Mapping[str, Any], GameAction]] = []
         resolvers = self._policies
         for row in decisions.iter_rows(named=True):
             policy = resolvers.get(str(row["policy_id"]))
@@ -197,8 +206,9 @@ class DeclarativeAIFramework:
             action = policy.resolve_action(row)
             if action is not None:
                 actions.append(action)
+                resolved_actions.append((dict(row), action))
 
-        return AIEvaluation(tuple(actions), decisions, tuple(skipped))
+        return AIEvaluation(tuple(actions), decisions, tuple(skipped), tuple(resolved_actions))
 
 
 def empty_decision_frame() -> pl.DataFrame:

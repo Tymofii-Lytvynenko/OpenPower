@@ -1,0 +1,15 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "economy.health_btn" },
+    { "op": "drag", "target": "economic_health.unemployment.cursor", "fraction": 0.65 },
+    {
+      "op": "assert",
+      "target": "economic_health.unemployment",
+      "label": "5.0%"
+    },
+    { "op": "assert_action", "type": "ActionChangeEconomicPolicy", "count": 0 },
+    { "op": "assert_action", "type": "ActionSetTax", "count": 0 },
+    { "op": "assert_region", "target": "economic_health.panel", "visible": true }
+  ]
+}

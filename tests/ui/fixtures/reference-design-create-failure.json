@@ -1,0 +1,12 @@
+{
+  "globals": {
+    "ui_command_results": {
+      "ActionCreateUnitDesign": [
+        {
+          "status": "rejected",
+          "message": "The requested design could not be saved."
+        }
+      ]
+    }
+  }
+}

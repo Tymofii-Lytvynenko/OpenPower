@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-politics-create-treaty.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-politics-treaty-details.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-treaty-alliance.json",
+      "surface": "map-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-mail-context.json",
+      "surface": "game-hud"
+    }
+  ]
+}

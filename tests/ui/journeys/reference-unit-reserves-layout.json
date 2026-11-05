@@ -1,0 +1,34 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-reserves-actions.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_reserves"},
+    {
+      "op": "assert_region",
+      "target": "unit_reserves.panel",
+      "visible": true,
+      "relative_to": "game.hud",
+      "min_width": 507,
+      "min_height": 390
+    },
+    {"op": "assert", "target": "unit_reserves.category.ground", "visible": true},
+    {"op": "assert", "target": "unit_reserves.count.ground", "label": "2"},
+    {"op": "assert", "target": "unit_reserves.count.air", "label": "1"},
+    {"op": "assert", "target": "unit_reserves.count.naval", "label": "1"},
+    {"op": "assert", "target": "unit_reserves.count.strategic", "label": "1"},
+    {"op": "assert", "target": "unit_reserves.category.ground", "relative_to": "unit_reserves.panel", "relative_rect": {"x": 28, "y": 70, "width": 71, "height": 16}},
+    {"op": "assert", "target": "unit_reserves.category.air", "relative_to": "unit_reserves.panel", "relative_rect": {"x": 98, "y": 70, "width": 71, "height": 16}},
+    {"op": "assert", "target": "unit_reserves.category.naval", "relative_to": "unit_reserves.panel", "relative_rect": {"x": 168, "y": 70, "width": 71, "height": 16}},
+    {"op": "assert", "target": "unit_reserves.category.strategic", "relative_to": "unit_reserves.panel", "relative_rect": {"x": 238, "y": 70, "width": 71, "height": 16}},
+    {"op": "assert", "target": "unit_reserves.row.reserve-tank-1", "visible": true},
+    {"op": "assert", "target": "unit_reserves.row.reserve-tank-1", "relative_to": "unit_reserves.panel", "relative_rect": {"x": 36, "y": 94, "width": 437, "height": 18}},
+    {"op": "assert", "target": "unit_reserves.category.ground", "no_overlap": "unit_reserves.row.reserve-tank-1"},
+    {"op": "click", "target": "unit_reserves.category.air"},
+    {"op": "assert", "target": "unit_reserves.row.reserve-fighter", "visible": true},
+    {"op": "click", "target": "unit_reserves.category.naval"},
+    {"op": "assert", "target": "unit_reserves.row.reserve-frigate", "visible": true},
+    {"op": "click", "target": "unit_reserves.category.strategic"},
+    {"op": "assert", "target": "unit_reserves.row.reserve-missile", "visible": true},
+    {"op": "assert", "target": "unit_reserves.deploy_capital", "enabled": false}
+  ]
+}

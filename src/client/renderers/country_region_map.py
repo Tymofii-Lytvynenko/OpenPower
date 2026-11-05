@@ -162,28 +162,76 @@ class CountryRegionMapTextureCache:
 
         return texture
 
-    def draw_texture(self, texture: CountryMapTexture, width: float, height: float) -> None:
-        self._render_imgui_image(texture.gl_id, width, height)
+    def draw_texture(self, texture: CountryMapTexture, width: float, height: float,
+                     *, test_id: str | None = None) -> None:
+        self._render_imgui_image(texture.gl_id, width, height, test_id=test_id)
 
     def _upload_to_gpu(self, image: Image.Image) -> Optional[CountryMapTexture]:
         try:
-            window = arcade.get_window()
-            ctx = window.ctx
-            gl_texture = ctx.texture(
-                (image.width, image.height),
-                components=4,
-                data=image.tobytes(),
-            )
-            gl_texture.filter = (ctx.NEAREST, ctx.NEAREST)
-            tex_id = self._extract_texture_id(gl_texture)
-            if tex_id <= 0:
-                return None
-            return CountryMapTexture(gl_texture, tex_id, image.width, image.height)
+            try:
+                window = arcade.get_window()
+            except Exception:
+                window = None
+            if window is not None:
+                ctx = window.ctx
+                gl_texture = ctx.texture(
+                    (image.width, image.height),
+                    components=4,
+                    data=image.tobytes(),
+                )
+                gl_texture.filter = (ctx.NEAREST, ctx.NEAREST)
+                tex_id = self._extract_texture_id(gl_texture)
+                if tex_id <= 0:
+                    return None
+                return CountryMapTexture(gl_texture, tex_id, image.width, image.height)
+
+            # The UI screenshot runner owns an OpenGL context without registering an Arcade window.
+            return self._upload_with_current_opengl_context(image)
         except Exception as exc:
             if not self._error_printed:
                 print(f"[CountryRegionMapTextureCache] GPU upload failed: {exc}")
                 self._error_printed = True
             return None
+
+    def _upload_with_current_opengl_context(self, image: Image.Image) -> Optional[CountryMapTexture]:
+        from OpenGL import GL
+
+        if GL.glGetString(GL.GL_VERSION) is None:
+            return None
+
+        texture_id = int(GL.glGenTextures(1))
+        if texture_id <= 0:
+            return None
+
+        active_texture = int(GL.glGetIntegerv(GL.GL_ACTIVE_TEXTURE))
+        GL.glActiveTexture(GL.GL_TEXTURE0)
+        previous_binding = int(GL.glGetIntegerv(GL.GL_TEXTURE_BINDING_2D))
+        previous_unpack_alignment = int(GL.glGetIntegerv(GL.GL_UNPACK_ALIGNMENT))
+        try:
+            GL.glBindTexture(GL.GL_TEXTURE_2D, texture_id)
+            GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 1)
+            GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_NEAREST)
+            GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_NEAREST)
+            GL.glTexImage2D(
+                GL.GL_TEXTURE_2D,
+                0,
+                GL.GL_RGBA,
+                image.width,
+                image.height,
+                0,
+                GL.GL_RGBA,
+                GL.GL_UNSIGNED_BYTE,
+                image.tobytes(),
+            )
+        except Exception:
+            GL.glDeleteTextures(1, [texture_id])
+            raise
+        finally:
+            GL.glBindTexture(GL.GL_TEXTURE_2D, previous_binding)
+            GL.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, previous_unpack_alignment)
+            GL.glActiveTexture(active_texture)
+
+        return CountryMapTexture(texture_id, texture_id, image.width, image.height)
 
     def _extract_texture_id(self, texture: Any) -> int:
         raw_glo = getattr(texture, "glo", None)
@@ -195,7 +243,8 @@ class CountryRegionMapTextureCache:
             return int(raw_glo.value)
         return int(raw_glo)
 
-    def _render_imgui_image(self, gl_id: int, width: float, height: float) -> None:
+    def _render_imgui_image(self, gl_id: int, width: float, height: float,
+                            *, test_id: str | None = None) -> None:
         size = imgui.ImVec2(width, height)
 
         for factory in (
@@ -205,15 +254,15 @@ class CountryRegionMapTextureCache:
             if factory is None:
                 continue
             try:
-                imgui.image(factory(gl_id), size)
+                imgui.image(factory(gl_id), size, test_id=test_id)
                 return
             except Exception:
                 pass
 
         try:
-            imgui.image(gl_id, size)
+            imgui.image(gl_id, size, test_id=test_id)
             return
         except TypeError:
             pass
 
-        imgui.image(ctypes.c_void_p(gl_id), size)
+            imgui.image(ctypes.c_void_p(gl_id), size, test_id=test_id)

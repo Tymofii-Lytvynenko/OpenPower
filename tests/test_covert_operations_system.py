@@ -14,7 +14,7 @@ from modules.base.systems.military.covert_policy import domestic_security_covera
 from src.client.ui.panels.military.presenter import MilitaryPresenter
 from src.server.io.data_load_manager import DataLoader
 from src.server.io.save_writer import SaveWriter
-from src.shared.actions import ActionCreateCovertCell, ActionStartCovertMission, ActionTrainCovertCell
+from src.shared.actions import ActionCreateCovertCell, ActionStartCovertMission, ActionTrainCovertCell, ActionExecuteCovertMission, ActionCancelCovertMission, ActionRetireCovertCell
 from src.shared.config import GameConfig
 from src.shared.events import EventUnitReadinessStarted
 from src.shared.state import GameState
@@ -38,6 +38,111 @@ class CovertOperationsSystemTest(unittest.TestCase):
         state.globals["covert_training_minutes_per_level"] = 60
         state.globals["covert_civilian_espionage_preparation_minutes"] = 60
         return state
+
+    def _ready_mission(self, cover_country_tag=None):
+        state = self._state()
+        if cover_country_tag:
+            countries = state.get_table("countries")
+            extra_country = dict(countries.filter(pl.col("id") == "CAN").row(0, named=True))
+            extra_country["id"] = cover_country_tag
+            state.update_table("countries", pl.concat([countries, pl.DataFrame([extra_country], schema=countries.schema)]))
+        system = CovertOperationsSystem()
+        state.current_actions = [ActionCreateCovertCell("USA", "USA", "CAN", "Ready cell")]
+        system.update(state, 0)
+        cell = state.get_table("covert_cells").to_dicts()[0]
+        state.time.total_minutes = cell["available_at_minute"]
+        state.current_actions, state.events = [], []
+        system.update(state, 0)
+        state.current_actions = [ActionTrainCovertCell("USA", cell["id"], 100)]
+        system.update(state, 0)
+        state.time.total_minutes += 60
+        state.current_actions = []
+        system.update(state, 0)
+        state.current_actions = [ActionStartCovertMission("USA", cell["id"], "civilian_espionage", "CAN",
+            cover_country_tag=cover_country_tag, requires_execution_confirmation=True)]
+        system.update(state, 0)
+        mission = state.get_table("covert_missions").to_dicts()[0]
+        state.time.total_minutes = mission["resolves_at_minute"]
+        state.current_actions, state.events = [], []
+        system.update(state, 0)
+        return state, system, mission["id"], cell["id"]
+
+    def test_manual_preparation_waits_and_execution_is_authoritative_once(self):
+        state, system, mission_id, cell_id = self._ready_mission()
+        self.assertEqual(state.get_table("covert_cells")["status"][0], "ready")
+        self.assertEqual(state.get_table("covert_missions")["status"][0], "ready")
+        ready = [event for event in state.events if type(event).__name__ == "EventCovertMissionReady"]
+        self.assertEqual([(e.mission_id, e.cell_id, e.country_id) for e in ready], [(mission_id, cell_id, "USA")])
+        state.events = []
+        state.time.total_minutes += 100
+        system.update(state, 0)
+        self.assertEqual(state.events, [])
+        self.assertEqual(state.get_table("covert_missions")["status"][0], "ready")
+        reserves = state.get_table("countries")["money_reserves"].to_list()
+        state.current_actions = [ActionExecuteCovertMission("USA", mission_id)]
+        system.update(state, 0)
+        self.assertEqual(state.get_table("covert_missions")["status"][0], "executing")
+        self.assertEqual(state.get_table("countries")["money_reserves"].to_list(), reserves)
+        system.update(state, 0)
+        self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+        state.current_actions = []
+        state.time.total_minutes = state.get_table("covert_missions")["resolves_at_minute"][0]
+        system.update(state, 0)
+        self.assertEqual(state.get_table("covert_missions")["status"][0], "cleanup")
+
+    def test_ready_mission_snapshot_and_cancel_preserve_paid_preparation(self):
+        original, _, mission_id, _ = self._ready_mission()
+        restored = GameState.from_ipc(original.to_ipc())
+        ensure_base_tables(restored)
+        for state in (original, restored):
+            reserves = state.get_table("countries")["money_reserves"].to_list()
+            state.current_actions = [ActionCancelCovertMission("USA", mission_id)]
+            CovertOperationsSystem().update(state, 0)
+            self.assertEqual(state.get_table("covert_cells")["status"][0], "active")
+            self.assertEqual(state.get_table("covert_missions")["status"][0], "cancelled")
+            self.assertEqual(state.get_table("countries")["money_reserves"].to_list(), reserves)
+        self.assertTrue(original.get_table("covert_missions").equals(restored.get_table("covert_missions")))
+
+    def test_execution_rejects_unauthorized_and_stale_conditions_atomically(self):
+        for change in ("foreign", "communications", "location", "target", "captured", "old-mission"):
+            with self.subTest(change=change):
+                state, system, mission_id, _ = self._ready_mission()
+                issuer = "CAN" if change == "foreign" else "USA"
+                if change in {"communications", "location", "captured"}:
+                    key, value = {"communications": ("communications_ready", False),
+                                  "location": ("location_country_id", "USA"),
+                                  "captured": ("status", "captured")}[change]
+                    state.update_table("covert_cells", state.get_table("covert_cells").with_columns(pl.lit(value).alias(key)))
+                if change == "target":
+                    state.update_table("regions", state.get_table("regions").with_columns(pl.lit("USA").alias("owner")))
+                if change == "old-mission":
+                    mission_id = "removed"
+                before = {key: state.get_table(key).clone() for key in ("covert_cells", "covert_missions", "countries")}
+                state.current_actions = [ActionExecuteCovertMission(issuer, mission_id)]
+                state.events = []
+                system.update(state, 0)
+                self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+                for key, value in before.items():
+                    self.assertTrue(value.equals(state.get_table(key)))
+
+    def test_preparing_mission_can_be_cancelled_before_readiness(self):
+        state, system, mission_id, _ = self._ready_mission()
+        state.update_table("covert_missions", state.get_table("covert_missions").with_columns(pl.lit("preparation").alias("status")))
+        state.update_table("covert_cells", state.get_table("covert_cells").with_columns(pl.lit("preparing").alias("status")))
+        state.current_actions = [ActionCancelCovertMission("USA", mission_id)]
+        system.update(state, 0)
+        self.assertEqual(state.get_table("covert_missions")["status"][0], "cancelled")
+        self.assertEqual(state.get_table("covert_cells")["status"][0], "active")
+
+    def test_retirement_cancels_the_ready_mission_and_cannot_execute_it(self):
+        state, system, mission_id, cell_id = self._ready_mission()
+        state.current_actions = [ActionRetireCovertCell("USA", cell_id)]
+        system.update(state, 0)
+        self.assertEqual(state.get_table("covert_missions")["status"][0], "cancelled")
+        state.current_actions = [ActionExecuteCovertMission("USA", mission_id)]
+        system.update(state, 0)
+        self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+        self.assertEqual(state.get_table("covert_cells")["status"][0], "retired")
 
     def test_cell_transit_training_mission_and_intelligence_are_persisted(self) -> None:
         state = self._state()
@@ -113,6 +218,37 @@ class CovertOperationsSystemTest(unittest.TestCase):
         CovertOperationsSystem().update(underfunded, 0.0)
         self.assertTrue(underfunded.get_table("covert_cells").is_empty())
         self.assertEqual(underfunded.get_table("countries").filter(pl.col("id") == "USA")["money_reserves"][0], 5.0)
+
+    def test_cell_creation_uses_selected_skill_and_quote_matches_deployment_route(self) -> None:
+        state = self._state()
+        system = CovertOperationsSystem()
+        quote = system.quote_cell_creation(state, "USA", "CAN", "Veteran")
+        self.assertEqual(quote.setup_cost, 10.0)
+        self.assertEqual(quote.daily_upkeep, 0.3125)
+        self.assertIsNotNone(quote.deployment_minutes)
+
+        state.current_actions = [
+            ActionCreateCovertCell("USA", "USA", "CAN", "Veteran cell", "Veteran")
+        ]
+        system.update(state, 0.0)
+        cell = state.get_table("covert_cells").row(0, named=True)
+        self.assertEqual(cell["skill_level"], "Veteran")
+        self.assertEqual(cell["concealment"], 0.61)
+        self.assertEqual(cell["base_upkeep"], 0.25)
+        self.assertEqual(cell["upkeep"], quote.daily_upkeep)
+        self.assertEqual(cell["available_at_minute"], quote.deployment_minutes)
+
+        before_reserves = state.get_table("countries").filter(pl.col("id") == "USA")["money_reserves"][0]
+        state.current_actions = [
+            ActionCreateCovertCell("USA", "USA", "USA", "Invalid level", "Legend")
+        ]
+        system.update(state, 0.0)
+        self.assertEqual(state.get_table("covert_cells").height, 1)
+        self.assertEqual(
+            state.get_table("countries").filter(pl.col("id") == "USA")["money_reserves"][0],
+            before_reserves,
+        )
+        self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
 
     def test_duplicate_mission_and_unfunded_preparation_are_rejected_without_side_effects(self) -> None:
         state = self._state()
@@ -309,7 +445,7 @@ class CovertOperationsSystemTest(unittest.TestCase):
         ]
         fake_digest = type("Digest", (), {"hexdigest": lambda self: "0" * 64})
 
-        with patch("modules.base.systems.military.covert_operations_system.hashlib.sha256", return_value=fake_digest()):
+        with patch("modules.base.systems.military.covert_mobilization_signals.hashlib.sha256", return_value=fake_digest()):
             result, _, _, _, output = CovertOperationsSystem()._resolve(
                 state, cell, mission, {"id": "CAN", "gdp": 900.0, "security_upkeep": 0.0}, all_cells, [],
             )
@@ -343,7 +479,7 @@ class CovertOperationsSystemTest(unittest.TestCase):
         )]
         fake_digest = type("Digest", (), {"hexdigest": lambda self: "0" * 64})
 
-        with patch("modules.base.systems.military.covert_operations_system.hashlib.sha256", return_value=fake_digest()):
+        with patch("modules.base.systems.military.covert_mobilization_signals.hashlib.sha256", return_value=fake_digest()):
             system = CovertOperationsSystem()
             system.update(state, 0.0)
             first = state.get_table("covert_findings").to_dicts()
@@ -388,6 +524,7 @@ class CovertOperationsSystemTest(unittest.TestCase):
         mission = {
             "id": "mission-1", "cell_id": "cell-1", "owner_country_id": "USA",
             "target_country_id": "CAN", "mission_type": "civilian_espionage",
+            "target_sector": "civilian", "complexity": "high", "target_resource_id": "cereals",
             "status": "cleanup", "result": "partial_success", "discovered_by_target": False,
             "attributed_to_owner": False, "confidence": 0.8, "output_json": '{"secret":"value"}',
         }
@@ -405,10 +542,39 @@ class CovertOperationsSystemTest(unittest.TestCase):
         self.assertEqual(len(visible), 1)
         self.assertEqual(visible[0]["mission_type"], "civilian_espionage")
         self.assertEqual(visible[0]["result"], "partial_success")
+        self.assertEqual(visible[0]["target_sector"], "civilian")
+        self.assertEqual(visible[0]["complexity"], "high")
+        self.assertEqual(visible[0]["target_resource_id"], "cereals")
         self.assertEqual(visible[0]["owner_country_id"], "Unknown")
         self.assertEqual(visible[0]["cell_id"], "")
         self.assertEqual(visible[0]["output_json"], "{}")
         self.assertEqual(visible[0]["confidence"], 0.0)
+
+    def test_framed_country_sees_anonymous_incident_without_agent_details(self):
+        state = self._state()
+        mission = {
+            "id": "mission-frame", "cell_id": "private-cell", "owner_country_id": "USA",
+            "target_country_id": "CAN", "framed_country_id": "MEX",
+            "attributed_country_id": "MEX", "mission_type": "civilian_espionage",
+            "target_sector": "civilian", "complexity": "high", "target_resource_id": "cereals",
+            "status": "cleanup", "result": "partial_success", "discovered_by_target": True,
+            "attributed_to_owner": False, "confidence": 0.8,
+            "output_json": '{"secret":"value"}',
+        }
+        table = state.get_table("covert_missions")
+        state.update_table("covert_missions", pl.DataFrame([mission], schema=table.schema, strict=False))
+
+        visible = MilitaryPresenter().covert_missions_for_country(state, "MEX")
+
+        self.assertEqual(len(visible), 1)
+        self.assertEqual(visible[0]["_viewer_role"], "framed")
+        self.assertEqual(visible[0]["owner_country_id"], "Unknown")
+        self.assertEqual(visible[0]["cell_id"], "")
+        self.assertEqual(visible[0]["output_json"], "{}")
+        self.assertEqual(visible[0]["confidence"], 0.0)
+        self.assertEqual(visible[0]["target_sector"], "")
+        self.assertEqual(visible[0]["complexity"], "")
+        self.assertEqual(visible[0]["target_resource_id"], "")
 
     def test_detected_operation_message_discloses_type_and_result_without_unattributed_owner(self) -> None:
         state = self._state()
@@ -428,6 +594,147 @@ class CovertOperationsSystemTest(unittest.TestCase):
         self.assertIn("partial_success", target_message["body"])
         self.assertIn("Attribution: unknown", target_message["body"])
         self.assertNotIn("USA", target_message["body"])
+
+        state.update_table("messages", pl.DataFrame(schema=state.get_table("messages").schema))
+        system._publish_messages(state, mission, "partial_success", True, False, attributed_country_id="MEX")
+        messages = {row["country_id"]: row["body"] for row in state.get_table("messages").to_dicts()}
+        self.assertIn("Attribution: MEX", messages["CAN"])
+        self.assertIn("implicated", messages["MEX"])
+        self.assertNotIn("USA", messages["MEX"])
+
+    def test_framing_is_validated_saved_and_applied_to_detected_attribution(self) -> None:
+        state, system, mission_id, cell_id = self._ready_mission("MEX")
+        mission = state.get_table("covert_missions").filter(pl.col("id") == mission_id).row(0, named=True)
+        self.assertEqual(mission["framed_country_id"], "MEX")
+
+        reserves_before = state.get_table("countries").filter(pl.col("id") == "USA")["money_reserves"][0]
+        mission.update(status="cancelled")
+        state.update_table("covert_missions", pl.DataFrame([mission], schema=state.get_table("covert_missions").schema))
+        state.update_table("covert_cells", state.get_table("covert_cells").with_columns(
+            pl.when(pl.col("id") == cell_id).then(pl.lit("active")).otherwise(pl.col("status")).alias("status")
+        ))
+        state.current_actions = [ActionStartCovertMission(
+            "USA", cell_id, "civilian_espionage", "CAN", cover_country_tag="CAN",
+        )]
+        system.update(state, 0.0)
+        self.assertEqual(state.get_table("covert_missions").height, 1)
+        self.assertEqual(state.get_table("countries").filter(pl.col("id") == "USA")["money_reserves"][0], reserves_before)
+        self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+        self.assertIn("frame", state.journal.command_results[-1]["reason"].lower())
+        state.current_actions = [ActionStartCovertMission(
+            "USA", cell_id, "civilian_espionage", "CAN", cover_country_tag="ZZZ",
+        )]
+        system.update(state, 0.0)
+        self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+        self.assertIn("frame", state.journal.command_results[-1]["reason"].lower())
+        self.assertEqual(state.get_table("countries").filter(pl.col("id") == "USA")["money_reserves"][0], reserves_before)
+
+        mission.update(status="executing", resolves_at_minute=int(state.time.total_minutes))
+        state.update_table("covert_missions", pl.DataFrame([mission], schema=state.get_table("covert_missions").schema))
+        state.update_table("covert_cells", state.get_table("covert_cells").with_columns(
+            pl.when(pl.col("id") == cell_id).then(pl.lit("active")).otherwise(pl.col("status")).alias("status")
+        ))
+        state.tables["countries_relations"] = pl.DataFrame({
+            "source": ["USA", "CAN"], "target": ["CAN", "USA"], "value": [0.0, 0.0],
+        })
+
+        class _Digest:
+            def __init__(self, value):
+                self.value = value
+
+            def hexdigest(self):
+                return f"{int(self.value * (1 << 64)):016x}"
+
+        with patch("modules.base.systems.military.covert_mobilization_signals.hashlib.sha256",
+                   side_effect=[_Digest(0.1), _Digest(0.01)]):
+            system.update(state, 0.0)
+
+        resolved = state.get_table("covert_missions").filter(pl.col("id") == mission_id).row(0, named=True)
+        self.assertTrue(resolved["discovered_by_target"])
+        self.assertFalse(resolved["attributed_to_owner"])
+        self.assertEqual(resolved["attributed_country_id"], "MEX")
+        audience = state.get_table("covert_incidents").filter(pl.col("mission_id") == mission_id)["audience_country_ids"][0]
+        self.assertEqual(set(audience), {"USA", "CAN", "MEX"})
+        messages = state.get_table("messages").filter(pl.col("country_id") == "MEX")
+        self.assertEqual(messages.height, 1)
+        self.assertNotIn("USA", messages["body"][0])
+        relations = state.get_table("countries_relations")
+        framed_penalty = relations.filter(
+            ((pl.col("source") == "MEX") & (pl.col("target") == "CAN"))
+            | ((pl.col("source") == "CAN") & (pl.col("target") == "MEX"))
+        )
+        self.assertEqual(framed_penalty["value"].to_list(), [-3.0, -3.0])
+        owner_target_relations = relations.filter(
+            ((pl.col("source") == "USA") & (pl.col("target") == "CAN"))
+            | ((pl.col("source") == "CAN") & (pl.col("target") == "USA"))
+        )
+        self.assertEqual(owner_target_relations["value"].to_list(), [0.0, 0.0])
+
+    def test_start_mission_saves_source_target_terms_and_validates_them(self) -> None:
+        state, system, previous_id, cell_id = self._ready_mission()
+        state.current_actions = [ActionCancelCovertMission("USA", previous_id)]
+        system.update(state, 0.0)
+
+        production = state.get_table("regional_production")
+        state.update_table("regional_production", pl.DataFrame(
+            [{
+                "id": "regional-can-cereals",
+                "country_id": "CAN",
+                "region_id": 2,
+                "game_resource_id": "cereals",
+                "domestic_production": 100.0,
+            }],
+            schema=production.schema,
+        ))
+        state.update_table("covert_cells", state.get_table("covert_cells").with_columns(
+            pl.lit("sabotage").alias("assignment")
+        ))
+
+        state.current_actions = [ActionStartCovertMission(
+            "USA", cell_id, "civilian_sabotage", "CAN",
+            requires_execution_confirmation=True, target_sector="civilian",
+            complexity="high", target_resource_id="cereals",
+        )]
+        system.update(state, 0.0)
+        mission = state.get_table("covert_missions").filter(pl.col("status") == "preparation").row(0, named=True)
+        self.assertEqual(
+            (mission["target_sector"], mission["complexity"], mission["target_resource_id"]),
+            ("civilian", "high", "cereals"),
+        )
+
+        state.current_actions = [ActionCancelCovertMission("USA", mission["id"])]
+        system.update(state, 0.0)
+        state.current_actions = [ActionStartCovertMission(
+            "USA", cell_id, "military_sabotage", "CAN",
+            target_sector="military", complexity="high", target_unit_category="air",
+        )]
+        system.update(state, 0.0)
+        military_mission = state.get_table("covert_missions").filter(pl.col("status") == "preparation").row(0, named=True)
+        self.assertEqual(
+            (military_mission["target_sector"], military_mission["complexity"], military_mission["target_unit_category"]),
+            ("military", "high", "air"),
+        )
+
+        state.current_actions = [ActionCancelCovertMission("USA", military_mission["id"])]
+        system.update(state, 0.0)
+        reserves_before = state.get_table("countries").filter(pl.col("id") == "USA")["money_reserves"][0]
+        state.current_actions = [ActionStartCovertMission(
+            "USA", cell_id, "civilian_sabotage", "CAN",
+            target_sector="civilian", target_resource_id="appliances",
+        )]
+        system.update(state, 0.0)
+        self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+        self.assertIn("resource", state.journal.command_results[-1]["reason"].lower())
+        self.assertEqual(state.get_table("countries").filter(pl.col("id") == "USA")["money_reserves"][0], reserves_before)
+
+        state.current_actions = [ActionStartCovertMission(
+            "USA", cell_id, "military_sabotage", "CAN",
+            target_sector="military", complexity="low", target_unit_category="ground",
+        )]
+        system.update(state, 0.0)
+        self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+        self.assertIn("complexity", state.journal.command_results[-1]["reason"].lower())
+        self.assertEqual(state.get_table("countries").filter(pl.col("id") == "USA")["money_reserves"][0], reserves_before)
 
     def test_foreign_cell_uses_accessible_region_route_and_waits_when_access_is_revoked(self) -> None:
         state = self._state()
@@ -557,7 +864,7 @@ class CovertOperationsSystemTest(unittest.TestCase):
         def fixed_hash(payload: bytes) -> FixedDigest:
             return FixedDigest(detection_hash if payload.endswith(b":detection") else "0" * 64)
 
-        with patch("modules.base.systems.military.covert_operations_system.hashlib.sha256", side_effect=fixed_hash):
+        with patch("modules.base.systems.military.covert_mobilization_signals.hashlib.sha256", side_effect=fixed_hash):
             no_guard = CovertOperationsSystem()._resolve(state, cell, mission, target, [], [])[1]
             in_transit = CovertOperationsSystem()._resolve(state, cell, mission, target, [transit_guard], [])[1]
             active = CovertOperationsSystem()._resolve(state, cell, mission, target, [active_guard], [])[1]

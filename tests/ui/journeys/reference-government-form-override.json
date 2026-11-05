@@ -1,0 +1,25 @@
+{
+  "fixture": "tests/ui/fixtures/reference-government-form-override.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.pol"},
+    {"op": "click", "target": "politics.open_constitution"},
+    {"op": "assert_region", "target": "constitutional_form.panel", "visible": true},
+    {"op": "assert", "target": "constitutional_form.override", "enabled": true},
+    {"op": "assert_action", "type": "ActionSetGovernmentForm", "count": 0},
+    {"op": "click", "target": "constitutional_form.override"},
+    {"op": "assert_region", "target": "constitutional_form.panel", "visible": true},
+    {"op": "assert", "target": "constitutional_form.government_form", "value": 0},
+    {"op": "assert", "target": "constitutional_form.apply", "enabled": true},
+    {"op": "assert_action", "type": "ActionSetGovernmentForm", "count": 0},
+    {"op": "click", "target": "constitutional_form.apply"},
+    {
+      "op": "assert_action",
+      "type": "ActionSetGovernmentForm",
+      "fields": {
+        "country_tag": "UKR",
+        "expected_form_id": "multi-party democracy",
+        "target_form_id": "military-led state"
+      }
+    }
+  ]
+}

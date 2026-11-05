@@ -19,19 +19,7 @@ class CampaignPresenter:
 
     def build_overview(self, state, country_tag: str) -> CampaignOverview:
         actor = str(country_tag or "").strip().upper()
-        campaigns = self._rows(state, "campaigns")
-        owned = [
-            row for row in campaigns
-            if str(row.get("actor_country_id") or "").strip().upper() == actor
-        ]
-        owned.sort(
-            key=lambda row: (
-                int(row.get("started_at_minute") or 0),
-                str(row.get("id") or ""),
-            ),
-            reverse=True,
-        )
-        campaign = owned[0] if owned else None
+        campaign = self.latest_campaign(state, actor)
         scenario = None
         campaign_id = str(campaign.get("id") or "") if campaign else ""
         if campaign:
@@ -85,6 +73,22 @@ class CampaignPresenter:
             delegations=tuple(delegations),
         )
 
+    def latest_campaign(self, state, country_tag: str) -> dict[str, Any] | None:
+        """Return the current campaign using the same ordering as the overview."""
+        actor = str(country_tag or "").strip().upper()
+        owned = [
+            row for row in self._rows(state, "campaigns")
+            if str(row.get("actor_country_id") or "").strip().upper() == actor
+        ]
+        owned.sort(
+            key=lambda row: (
+                int(row.get("started_at_minute") or 0),
+                str(row.get("id") or ""),
+            ),
+            reverse=True,
+        )
+        return owned[0] if owned else None
+
     @staticmethod
     def latest_evidence(objective: dict[str, Any]) -> dict[str, Any] | None:
         evidence = objective.get("evidence_json") or []
@@ -96,6 +100,51 @@ class CampaignPresenter:
         if not isinstance(evidence, list) or not evidence or not isinstance(evidence[-1], dict):
             return None
         return evidence[-1]
+
+    @staticmethod
+    def recommendation_action_label(recommendation: dict[str, Any]) -> str:
+        """Describe only the action payload that the authoritative resolver can execute."""
+        payload = CampaignPresenter._recommendation_payload(recommendation)
+        if payload is None:
+            return ""
+        action_type = payload[0]
+        fields = payload[1]
+        if action_type == "ActionUpdateBudget":
+            return "update budget allocations"
+        if action_type == "ActionChangeEconomicPolicy":
+            return f"change {str(fields.get('policy_name') or 'economic policy').replace('_', ' ')}"
+        if action_type == "ActionRequestDebtContract":
+            return "request a debt contract"
+        if action_type == "ActionResolveDebtContract":
+            return "accept a debt contract"
+        if action_type == "ActionChangePoliticalLaw":
+            return f"change {str(fields.get('law_id') or 'a political law').replace('_', ' ')}"
+        if action_type == "ActionSetElectionOverride":
+            return "set an election override"
+        if action_type == "ActionResolvePoliticalCrisis":
+            return "resolve a political crisis"
+        if action_type == "ActionBuildUnit":
+            return f"build {int(fields.get('count') or 0)} {str(fields.get('unit_type') or 'unit')}(s)"
+        if action_type == "ActionQueueUnitProduction":
+            return "queue unit production"
+        if action_type == "ActionBuyMarketUnit":
+            return "buy a listed unit"
+        if action_type == "ActionTrainUnit":
+            return f"train unit to {str(fields.get('target_level') or 'the selected level')}"
+        return ""
+
+    @staticmethod
+    def _recommendation_payload(recommendation: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+        raw = recommendation.get("optional_action_json")
+        if not isinstance(raw, str) or not raw.strip():
+            return None
+        try:
+            payload = json.loads(raw)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+        if not isinstance(payload, dict) or not isinstance(payload.get("fields"), dict):
+            return None
+        return str(payload.get("type") or ""), payload["fields"]
 
     @staticmethod
     def _rows(state, table_name: str) -> list[dict[str, Any]]:

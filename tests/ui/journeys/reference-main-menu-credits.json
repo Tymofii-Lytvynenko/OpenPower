@@ -1,0 +1,185 @@
+{
+  "steps": [
+    { "op": "assert_region", "target": "main_menu.window", "visible": true },
+    { "op": "click", "target": "main_menu.credits" },
+    { "op": "assert_region", "target": "main_menu.credits_screen", "visible": true },
+    {
+      "op": "assert_region",
+      "target": "main_menu.credits_screen",
+      "rect": { "width": 568, "height": 580 }
+    },
+    {
+      "op": "assert_region",
+      "target": "main_menu.credits_content/project_credits",
+      "relative_to": "main_menu.credits_screen",
+      "relative_rect": { "x": 28, "y": 36, "width": 512, "height": 531 }
+    },
+    { "op": "assert", "target": "main_menu.credits_back", "visible": true },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.title",
+      "label": "GolemLabs",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "x": 225.5, "y": 7, "height": 13 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.0.role",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "x": 235, "y": 41, "height": 9 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.0.people",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "x": 253, "y": 41, "height": 9 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.3.role",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "x": 201, "y": 113 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.3.people",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "x": 253, "y": 149 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.8.people",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "x": 253, "y": 460 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.section.art_team",
+      "label": "Art team",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.4.role",
+      "label": "2D Art",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "y": 209 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.4.people",
+      "label": "Adam Pilkington",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "y": 209 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.5.role",
+      "label": "Animation",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "y": 227 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.5.people",
+      "label": "Marc Lepage",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "y": 227 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.6.role",
+      "label": "Modeling",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "y": 245 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.6.person.0",
+      "label": "Steve Labrecque",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "y": 245 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.6.people",
+      "label": "Dominic Paquet",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "y": 263 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.7.role",
+      "label": "Textures",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "y": 281 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.7.people",
+      "label": "Nathalie Marineau",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "y": 281 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.group.nordic_games",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "x": 198, "y": 671 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.nordic_games.0.role",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "x": 85, "y": 706 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.group.dreamcatcher",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "x": 215, "y": 777 }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.dreamcatcher.0.role",
+      "relative_to": "main_menu.credits_content/project_credits",
+      "relative_rect": { "x": 176, "y": 812 }
+    },
+    { "op": "scroll", "target": "main_menu.credits.source.dreamcatcher.17.person.3" },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.dreamcatcher.17.person.3",
+      "label": "Vasso T. Kontoulis",
+      "visible": true
+    },
+    { "op": "scroll", "target": "main_menu.credits.source.golemlabs.music_contact" },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.music_contact",
+      "label": "(www.multimediarts.net)",
+      "visible": true
+    },
+    {
+      "op": "assert_region",
+      "target": "main_menu.credits_content/project_credits",
+      "visible": true
+    },
+    { "op": "scroll", "target": "main_menu.credits.source.golemlabs.copyright" },
+    {
+      "op": "assert",
+      "target": "main_menu.credits.source.golemlabs.copyright",
+      "label": "© GolemLabs 2004",
+      "visible": true
+    },
+    {
+      "op": "assert_region",
+      "target": "main_menu.credits_content/project_credits",
+      "visible": true
+    },
+    { "op": "scroll", "target": "main_menu.credits.source.dreamcatcher.18.people" },
+    { "op": "assert", "target": "main_menu.credits.source.dreamcatcher.18.people", "visible": true },
+    { "op": "scroll", "target": "main_menu.credits.openpower.license" },
+    { "op": "assert", "target": { "label": "Tymofii Lytvynenko", "type": "bullet_text" }, "visible": true },
+    { "op": "assert", "target": "main_menu.credits.openpower.license", "visible": true }
+  ]
+}

@@ -3,7 +3,11 @@ from typing import NamedTuple
 import numpy as np
 import polars as pl
 from src.shared.economy_meta import RESOURCE_MAPPING
+from src.shared.budget_policy import BUDGET_DEMAND_MULTIPLIER, BUDGET_SECTOR_WEIGHTS
 from modules.base.systems.world.random_event_effects import aggregate_active_effects
+from modules.base.systems.economy.unit_upkeep import (
+    BASE_UNIT_COST, readiness_upkeep_by_country, readiness_upkeep_factors,
+)
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
@@ -82,22 +86,10 @@ class BudgetSystem(ISystem):
     TOURISM_FOREIGN_LEVY_RATE = 0.20 
     
     # Base budget multiplier for social/infra demand
-    K_BUDGET = 0.15
+    K_BUDGET = BUDGET_DEMAND_MULTIPLIER
     
     # Sector expense ratios (multipliers for total demand)
-    M_SECTOR = {
-        "budget_health_ratio": 0.25,
-        "budget_edu_ratio": 0.23,
-        "budget_social_ratio": 0.15,
-        "budget_gov_ratio": 0.14,
-        "budget_env_ratio": 0.10,
-        "budget_research_ratio": 0.09,
-        "budget_infra_ratio": 0.07,
-        "budget_telecom_ratio": 0.04,
-        "budget_imf_ratio": 0.04,
-        "budget_propaganda_ratio": 0.03,
-        "budget_tourism_promo_ratio": 0.01
-    }
+    M_SECTOR = dict(BUDGET_SECTOR_WEIGHTS)
 
     def __init__(self):
         self._missing_columns = set()
@@ -288,7 +280,6 @@ class BudgetSystem(ISystem):
         lf = lf.with_columns((pl.col("gdp") * pl.col("budget_gov_ratio") * pl.col("corruption_index")).alias("expense_corruption"))
 
         # 3. Military Upkeep
-        BASE_UNIT_COST = 500_000.0
         readiness_factors = self._readiness_upkeep_factors(state)
         readiness_frame = self._readiness_upkeep_by_country(state, readiness_factors)
         if readiness_frame is not None:
@@ -483,7 +474,8 @@ class BudgetSystem(ISystem):
         )
         military_upkeep = (
             numeric_values["military_count"]
-            * 500_000.0
+            # Keep the vector path aligned with the authoritative fallback policy.
+            * BASE_UNIT_COST
             * numeric_values["human_dev"]
         )
         debt_interest = np.where(
@@ -630,64 +622,9 @@ class BudgetSystem(ISystem):
         )
 
     def _readiness_upkeep_factors(self, state: GameState) -> dict[str, float]:
-        configured = state.globals.get("military_readiness_upkeep_factors", {})
-        if not isinstance(configured, dict):
-            return {}
-        factors: dict[str, float] = {}
-        for status in ("parked", "ready", "fortified"):
-            if status not in configured:
-                continue
-            try:
-                value = float(configured[status])
-            except (TypeError, ValueError, OverflowError):
-                continue
-            if value == value and abs(value) != float("inf"):
-                factors[status] = max(0.0, min(2.0, value))
-        return factors
+        return readiness_upkeep_factors(state)
 
-    def _readiness_upkeep_by_country(self, state: GameState, factors: dict[str, float]) -> pl.DataFrame | None:
-        units = state.tables.get("units")
-        if units is None or "owner" not in units.columns or "strength" not in units.columns:
-            return None
-        unit_lf = units.lazy().with_columns(
-            pl.col("owner").cast(pl.Utf8).alias("id"),
-            pl.col("strength").cast(pl.Float64).fill_null(0.0).clip(lower_bound=0.0).alias("_maintenance_strength"),
-        )
-        if "readiness_status" in units.columns and factors:
-            status = pl.col("readiness_status").cast(pl.Utf8).str.to_lowercase()
-            factor_expr = pl.lit(1.0)
-            for readiness, factor in factors.items():
-                factor_expr = pl.when(status == readiness).then(pl.lit(factor)).otherwise(factor_expr)
-            unit_lf = unit_lf.with_columns(factor_expr.alias("_readiness_factor"))
-        else:
-            unit_lf = unit_lf.with_columns(pl.lit(1.0).alias("_readiness_factor"))
-
-        maintenance_lf = None
-        designs = state.tables.get("unit_designs")
-        if designs is not None and "id" in designs.columns and "maintenance_cost" in designs.columns and "design_id" in units.columns:
-            design_lf = designs.lazy().select(
-                pl.col("id").cast(pl.Utf8).alias("_maintenance_design_id"),
-                pl.col("maintenance_cost").cast(pl.Float64).fill_null(0.0).clip(0.0, 1_000_000_000_000.0).alias("_maintenance_per_unit"),
-            )
-            maintenance_lf = (
-                unit_lf.join(design_lf, left_on="design_id", right_on="_maintenance_design_id", how="left")
-                .group_by("id")
-                .agg((pl.col("_maintenance_strength") * pl.col("_maintenance_per_unit").fill_null(0.0)).sum().alias("_design_maintenance"))
-            )
-        readiness_lf = unit_lf.group_by("id").agg(
-            pl.col("_maintenance_strength").sum().alias("_total_unit_strength"),
-            (pl.col("_maintenance_strength") * pl.col("_readiness_factor")).sum().alias("_weighted_unit_strength"),
-        )
-        if maintenance_lf is not None:
-            readiness_lf = readiness_lf.join(maintenance_lf, on="id", how="left")
-        else:
-            readiness_lf = readiness_lf.with_columns(pl.lit(0.0).alias("_design_maintenance"))
-        return readiness_lf.with_columns(
-            pl.when(pl.col("_total_unit_strength") > 0.0)
-            .then(pl.col("_weighted_unit_strength") / pl.col("_total_unit_strength"))
-            .otherwise(1.0)
-            .alias("_readiness_upkeep_factor")
-        ).select("id", "_readiness_upkeep_factor", "_design_maintenance").collect()
+    _readiness_upkeep_by_country = staticmethod(readiness_upkeep_by_country)
 
     def _handle_update_budget(self, state: GameState, action: ActionUpdateBudget) -> None:
         if "countries" not in state.tables:

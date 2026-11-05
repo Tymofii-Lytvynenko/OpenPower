@@ -1,0 +1,21 @@
+{
+  "tables": {
+    "political_parties": [
+      {
+        "country_id": "UKR",
+        "party_id": "party-1",
+        "display_name": "Demonstration party",
+        "support_share": 0.65,
+        "eligible": true,
+        "is_ruling": true
+      },
+      {
+        "country_id": "UKR",
+        "party_id": "party-3",
+        "display_name": "New party",
+        "support_share": 0.1,
+        "eligible": false
+      }
+    ]
+  }
+}

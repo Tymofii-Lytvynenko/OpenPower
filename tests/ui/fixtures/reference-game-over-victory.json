@@ -1,0 +1,31 @@
+{
+  "tables": {
+    "campaign_scenarios": [
+      {
+        "id": "ui-victory-result",
+        "title": "UI Victory Result Fixture",
+        "sandbox_allowed": false
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "campaign-ui-victory-result",
+        "scenario_id": "ui-victory-result",
+        "actor_country_id": "UKR",
+        "started_at_minute": 0,
+        "outcome": "victory",
+        "outcome_reason": "The configured campaign win conditions are satisfied.",
+        "sandbox_continuation": false
+      }
+    ],
+    "objectives": [
+      {
+        "id": "victory-objective",
+        "campaign_id": "campaign-ui-victory-result",
+        "title": "Complete the campaign objectives",
+        "status": "completed",
+        "deadline_at_minute": -1
+      }
+    ]
+  }
+}

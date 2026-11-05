@@ -1,0 +1,35 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.eco"
+    },
+    {
+      "op": "assert_region",
+      "target": "economy.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "economy.health_btn"
+    },
+    {
+      "op": "assert_region",
+      "target": "economic_health.panel",
+      "visible": true,
+      "rect": { "width": 264, "height": 333 },
+      "inside_viewport": true,
+      "no_overlap": "economy.panel"
+    },
+    {
+      "op": "assert",
+      "target": "economic_health.interest.value",
+      "inside": "economic_health.panel"
+    },
+    {
+      "op": "assert",
+      "target": "economic_health.tax.value",
+      "inside": "economic_health.panel"
+    }
+  ]
+}

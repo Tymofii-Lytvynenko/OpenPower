@@ -1,0 +1,30 @@
+{
+  "steps": [
+    { "op": "click", "target": "main_menu.multiplayer" },
+    { "op": "click", "target": "main_menu.multiplayer.lan" },
+    {
+      "op": "assert_region",
+      "target": "multiplayer.join.window",
+      "visible": true,
+      "min_width": 566,
+      "min_height": 454
+    },
+    { "op": "click", "target": "multiplayer.join.host" },
+    {
+      "op": "assert_region",
+      "target": "multiplayer.host.window",
+      "visible": true,
+      "rect": { "width": 341, "height": 342 }
+    },
+    { "op": "assert", "target": "multiplayer.host.server_name", "visible": true, "enabled": true },
+    { "op": "assert", "target": "multiplayer.host.password", "visible": true, "enabled": true },
+    { "op": "assert", "target": "multiplayer.host.game_speed", "visible": true, "enabled": true },
+    { "op": "assert", "target": "multiplayer.host.objective_time.1", "visible": true, "enabled": false },
+    { "op": "click", "target": "multiplayer.host.objective.1" },
+    { "op": "assert", "target": "multiplayer.host.objective_time.1", "visible": true, "enabled": true },
+    { "op": "assert", "target": "multiplayer.host.start", "visible": true, "enabled": false },
+    { "op": "click", "target": "multiplayer.host.cancel" },
+    { "op": "assert_region", "target": "multiplayer.host.window", "visible": false },
+    { "op": "assert_region", "target": "multiplayer.join.window", "visible": true }
+  ]
+}

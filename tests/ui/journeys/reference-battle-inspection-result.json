@@ -1,0 +1,153 @@
+{
+  "fixture": "tests/ui/fixtures/reference-battle-inspection.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "battle.map.marker.battle-own"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": true
+    },
+    {
+      "op": "server_event",
+      "target": "EventBattleEnded",
+      "event_id": "other-result",
+      "payload": {
+        "battle_id": "other",
+        "participant_countries": [
+          "UKR",
+          "POL"
+        ],
+        "side_a_country_ids": [
+          "UKR"
+        ],
+        "side_b_country_ids": [
+          "POL"
+        ],
+        "region_id": 1,
+        "victor_side": "SIDE_A",
+        "victor_tag": "UKR",
+        "side_a_losses": 21,
+        "side_b_losses": 87
+      }
+    },
+    {
+      "op": "assert_absent",
+      "target": "battle.inspection.summary.region"
+    },
+    {
+      "op": "server_event",
+      "target": "EventBattleEnded",
+      "event_id": "selected-result",
+      "payload": {
+        "battle_id": "battle-own",
+        "participant_countries": [
+          "UKR",
+          "POL"
+        ],
+        "side_a_country_ids": [
+          "UKR"
+        ],
+        "side_b_country_ids": [
+          "POL"
+        ],
+        "region_id": 1,
+        "victor_side": "SIDE_A",
+        "victor_tag": "UKR",
+        "side_a_losses": 21,
+        "side_b_losses": 87
+      }
+    },
+    {
+      "op": "assert_absent",
+      "target": "battle.inspection.summary.region"
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/reference-battle-inspection-final.json"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.summary.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.summary.region",
+      "label": "Kyiv"
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.summary.category.A.G",
+      "label": "87"
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.summary.outcome.A",
+      "label": "Defeat"
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.summary.countries.A.0",
+      "label": "POL"
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.summary.category.B.I",
+      "label": "21"
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.summary.outcome.B",
+      "label": "Victory"
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.summary.countries.B.0",
+      "label": "UKR"
+    },
+    {
+      "op": "close_window",
+      "target": "battle.inspection.summary.dialog"
+    },
+    {
+      "op": "scroll",
+      "target": "battle.inspection.strategy"
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.strategy",
+      "enabled": false
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetBattleStrategy",
+      "count": 0
+    },
+    {
+      "op": "scroll",
+      "target": "battle.inspection.close"
+    },
+    {
+      "op": "click",
+      "target": "battle.inspection.close"
+    },
+    {
+      "op": "wait",
+      "frames": 5
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

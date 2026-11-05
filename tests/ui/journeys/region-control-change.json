@@ -1,0 +1,94 @@
+{
+  "steps": [
+    {
+      "op": "server_event",
+      "target": "EventTerritoryOwnershipChanged",
+      "event_id": "territory-gained",
+      "payload": {
+        "region_id": 2,
+        "previous_owner": "POL",
+        "owner": "UKR",
+        "source": "ActionAnnexRegion",
+        "at_minute": 0
+      }
+    },
+    {
+      "op": "assert_absent",
+      "target": "dispatch.report.dialog"
+    },
+    {
+      "op": "click",
+      "target": "hud.mail"
+    },
+    {
+      "op": "assert_region",
+      "target": "mail.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "mail.item.dispatch:region-gained:territory-gained.subject",
+      "label": "Territory Gained (1)"
+    },
+    {
+      "op": "click",
+      "target": "mail.dispatch.region-gained:territory-gained"
+    },
+    {
+      "op": "assert_region",
+      "target": "dispatch.report.dialog",
+      "visible": true,
+      "min_width": 358,
+      "min_height": 248
+    },
+    {
+      "op": "assert",
+      "target": "dispatch.report.content",
+      "visible": true,
+      "label": "TERRITORY GAINED\nWarsaw"
+    },
+    {
+      "op": "click",
+      "target": "dispatch.report.ok"
+    },
+    {"op": "assert_region", "target": "dispatch.report.dialog", "visible": false, "present": false},
+    {"op": "assert_region", "target": "mail.panel", "visible": false, "present": false},
+    {"op": "server_event", "target": "EventTerritoryOwnershipChanged", "event_id": "territory-gained-later", "payload": {
+      "region_id": 3,
+      "previous_owner": "POL",
+      "owner": "UKR",
+      "source": "ActionAnnexRegion",
+      "at_minute": 0
+    }},
+    {"op": "click", "target": "hud.mail"},
+    {"op": "assert", "target": "mail.item.dispatch:region-gained:territory-gained-later.subject", "label": "Territory Gained (1)"},
+    {"op": "click", "target": "mail.dispatch.region-gained:territory-gained-later"},
+    {"op": "assert", "target": "dispatch.report.content", "visible": true, "label": "TERRITORY GAINED\nRegion 3"},
+    {"op": "click", "target": "dispatch.report.ok"},
+    {"op": "assert_region", "target": "mail.panel", "visible": false, "present": false},
+    {"op": "server_event", "target": "EventTerritoryOwnershipChanged", "event_id": "territory-lost", "payload": {
+      "region_id": 1,
+      "previous_owner": "UKR",
+      "owner": "POL",
+      "source": "ActionAnnexRegion",
+      "at_minute": 0
+    }},
+    {"op": "click", "target": "hud.mail"},
+    {"op": "assert_region", "target": "mail.panel", "visible": true},
+    {"op": "assert", "target": "mail.item.dispatch:region-lost:territory-lost.subject", "label": "Territory Lost (1)"},
+    {"op": "click", "target": "mail.dispatch.region-lost:territory-lost"},
+    {
+      "op": "assert_region",
+      "target": "dispatch.report.dialog",
+      "visible": true,
+      "min_width": 358,
+      "min_height": 248
+    },
+    {
+      "op": "assert",
+      "target": "dispatch.report.content",
+      "visible": true,
+      "label": "TERRITORY LOST\nKyiv"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.pol"
+    },
+    {
+      "op": "assert_region",
+      "target": "politics.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "politics.open_constitution"
+    },
+    {
+      "op": "assert_region",
+      "target": "constitutional_form.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "constitutional_form.government_form",
+      "visible": true,
+      "enabled": false,
+      "inside": "constitutional_form.panel"
+    },
+    {
+      "op": "assert",
+      "target": "constitutional_form.capital",
+      "visible": true,
+      "enabled": true,
+      "inside": "constitutional_form.panel"
+    },
+    {
+      "op": "assert",
+      "target": "constitutional_form.override",
+      "visible": true,
+      "enabled": false,
+      "inside": "constitutional_form.panel"
+    },
+    {
+      "op": "assert",
+      "target": "constitutional_form.martial_law",
+      "visible": true,
+      "enabled": true,
+      "inside": "constitutional_form.panel"
+    },
+    {
+      "op": "assert",
+      "target": "constitutional_form.apply",
+      "visible": true,
+      "enabled": false,
+      "inside": "constitutional_form.panel"
+    },
+    {
+      "op": "select",
+      "target": "constitutional_form.capital",
+      "value": "Kyiv"
+    },
+    {
+      "op": "assert_region",
+      "target": "constitutional_form.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "constitutional_form.apply",
+      "visible": true,
+      "enabled": true,
+      "inside": "constitutional_form.panel"
+    },
+    {
+      "op": "click",
+      "target": "constitutional_form.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCountryCapital",
+      "fields": {
+        "country_tag": "UKR",
+        "expected_capital_region_id": 0,
+        "target_region_id": 1
+      }
+    }
+  ]
+}

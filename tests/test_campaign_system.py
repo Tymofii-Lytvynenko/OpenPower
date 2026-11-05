@@ -133,6 +133,46 @@ def test_scenario_setup_is_applied_once_and_authoritative_objective_can_win() ->
     assert state.journal.command_results[-1]["status"] == "rejected"
 
 
+def test_campaign_records_a_valid_selected_player_party() -> None:
+    state = _state()
+    _add_scenario(state, [])
+    state.update_table(
+        "political_parties",
+        pl.DataFrame(
+            [{"country_id": "USA", "party_id": "usa-party", "display_name": "Civic Party"}],
+            schema=state.tables["political_parties"].schema,
+            strict=False,
+        ),
+    )
+    state.current_actions = [ActionStartCampaign("local_admin", "test", "USA", "usa-party")]
+
+    CampaignSetupSystem().update(state, 0.0)
+    CampaignSystem().update(state, 0.0)
+
+    assert state.tables["campaigns"][0, "player_party_id"] == "usa-party"
+    assert state.journal.command_results[-1]["status"] == "applied"
+
+
+def test_campaign_rejects_a_party_from_another_country() -> None:
+    state = _state()
+    _add_scenario(state, [])
+    state.update_table(
+        "political_parties",
+        pl.DataFrame(
+            [{"country_id": "CAN", "party_id": "can-party", "display_name": "Canadian Party"}],
+            schema=state.tables["political_parties"].schema,
+            strict=False,
+        ),
+    )
+    state.current_actions = [ActionStartCampaign("local_admin", "test", "USA", "can-party")]
+
+    CampaignSetupSystem().update(state, 0.0)
+    CampaignSystem().update(state, 0.0)
+
+    assert state.tables["campaigns"].is_empty()
+    assert state.journal.command_results[-1]["status"] == "rejected"
+
+
 def test_region_control_hold_duration_requires_continuous_control() -> None:
     state = _state()
     _add_scenario(

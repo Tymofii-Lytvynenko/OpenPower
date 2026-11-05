@@ -1,0 +1,8 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.pol" },
+    { "op": "assert_region", "target": "politics.panel", "visible": true },
+    { "op": "close_window", "target": "politics.panel" },
+    { "op": "assert_region", "target": "politics.panel", "visible": false, "present": false }
+  ]
+}

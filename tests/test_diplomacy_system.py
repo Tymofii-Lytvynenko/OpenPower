@@ -7,6 +7,7 @@ from modules.base.schema import ensure_base_tables
 from src.shared.actions import (
     ActionCreateTreaty,
     ActionDeclareWar,
+    ActionJoinWar,
     ActionLeaveTreaty,
     ActionOfferPeace,
     ActionRespondTreaty,
@@ -167,7 +168,7 @@ class TestDiplomacySystem(unittest.TestCase):
         state.events.clear()
         state.current_actions = [
             ActionOfferPeace(
-                player_id="tester",
+                player_id="USA",
                 war_id=war_id,
                 source_country_tag="USA",
                 terms="Immediate ceasefire",
@@ -179,7 +180,7 @@ class TestDiplomacySystem(unittest.TestCase):
         self.assertEqual(len(state.get_table("countries_wars")), 1)
         state.current_actions = [
             ActionOfferPeace(
-                player_id="tester",
+                player_id="GBR",
                 war_id=war_id,
                 source_country_tag="GBR",
                 terms="peace",
@@ -191,6 +192,140 @@ class TestDiplomacySystem(unittest.TestCase):
         relations = state.get_table("countries_relations")
         self.assertEqual(self._relation_value(relations, "USA", "GBR"), -85.0)
         self.assertEqual(self._relation_value(relations, "GBR", "USA"), -85.0)
+
+    def test_peace_intent_requires_authority_over_the_war_leader(self):
+        state = self._build_state()
+        state.update_table(
+            "countries_wars",
+            pl.DataFrame(
+                [
+                    {
+                        "id": "war-1",
+                        "name": "USA vs CAN",
+                        "side_a": ["USA"],
+                        "side_b": ["CAN"],
+                        "status": "active",
+                        "casus_belli": "Test",
+                        "created_at": "2001-01-01 00:00",
+                        "leader_a": "USA",
+                        "leader_b": "CAN",
+                        "intent_a": "war",
+                        "intent_b": "war",
+                    }
+                ]
+            ),
+        )
+        state.current_actions = [
+            ActionOfferPeace(
+                player_id="tester",
+                war_id="war-1",
+                source_country_tag="USA",
+                terms="peace",
+            )
+        ]
+
+        self.system.update(state, 0.1)
+
+        war = state.get_table("countries_wars").row(0, named=True)
+        self.assertEqual(war["intent_a"], "war")
+        self.assertTrue(state.get_table("messages").is_empty())
+
+    def test_player_can_join_an_active_war_on_the_selected_side(self):
+        state = self._build_state()
+        state.update_table(
+            "countries_wars",
+            pl.DataFrame(
+                [
+                    {
+                        "id": "war-1",
+                        "name": "USA vs CAN",
+                        "side_a": ["USA"],
+                        "side_b": ["CAN"],
+                        "status": "active",
+                        "casus_belli": "Test",
+                        "created_at": "2001-01-01 00:00",
+                        "leader_a": "USA",
+                        "leader_b": "CAN",
+                        "intent_a": "war",
+                        "intent_b": "war",
+                    }
+                ]
+            ),
+        )
+        state.current_actions = [
+            ActionJoinWar(
+                player_id="FRA",
+                war_id="war-1",
+                source_country_tag="FRA",
+                side="defender",
+            )
+        ]
+
+        self.system.update(state, 0.1)
+
+        war = state.get_table("countries_wars").row(0, named=True)
+        self.assertEqual(set(war["side_a"]), {"USA"})
+        self.assertEqual(set(war["side_b"]), {"CAN", "FRA"})
+        relations = state.get_table("countries_relations")
+        self.assertEqual(self._relation_value(relations, "FRA", "USA"), -100.0)
+        self.assertEqual(self._relation_value(relations, "USA", "FRA"), -100.0)
+        self.assertEqual(
+            state.get_table("messages")
+            .filter(pl.col("country_id") == "FRA")["subject"][0],
+            "FRA joined the war",
+        )
+        self.assertIn("FRA joins the war", state.get_table("news_items")["headline"].to_list())
+
+    def test_joining_war_rejects_an_unauthorized_player_and_duplicate_member(self):
+        state = self._build_state()
+        state.update_table(
+            "countries_wars",
+            pl.DataFrame(
+                [
+                    {
+                        "id": "war-1",
+                        "name": "USA vs CAN",
+                        "side_a": ["USA"],
+                        "side_b": ["CAN"],
+                        "status": "active",
+                        "casus_belli": "Test",
+                        "created_at": "2001-01-01 00:00",
+                        "leader_a": "USA",
+                        "leader_b": "CAN",
+                        "intent_a": "war",
+                        "intent_b": "war",
+                    }
+                ]
+            ),
+        )
+        original_relations = state.get_table("countries_relations")
+        state.current_actions = [
+            ActionJoinWar(
+                player_id="tester",
+                war_id="war-1",
+                source_country_tag="FRA",
+                side="attacker",
+            )
+        ]
+
+        self.system.update(state, 0.1)
+
+        war = state.get_table("countries_wars").row(0, named=True)
+        self.assertEqual(set(war["side_a"]), {"USA"})
+        self.assertTrue(state.get_table("countries_relations").equals(original_relations))
+
+        state.current_actions = [
+            ActionJoinWar(
+                player_id="USA",
+                war_id="war-1",
+                source_country_tag="USA",
+                side="defender",
+            )
+        ]
+        self.system.update(state, 0.1)
+        war = state.get_table("countries_wars").row(0, named=True)
+        self.assertEqual(set(war["side_a"]), {"USA"})
+        self.assertEqual(set(war["side_b"]), {"CAN"})
 
     def _build_state(self) -> GameState:
         state = GameState(

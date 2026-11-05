@@ -1,0 +1,52 @@
+{
+  "fixture": "tests/ui/fixtures/reference-resource-policy-multiple.json",
+  "steps": [
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "economy.resources_btn" },
+    { "op": "click", "target": "resources.category.energy" },
+    { "op": "click", "target": "resources.resource.electricity" },
+    { "op": "assert", "target": "resources.policy.global_tax_modifier", "visible": true, "enabled": false },
+    { "op": "assert", "target": "resources.policy.desired_trade", "visible": true, "enabled": false },
+    { "op": "assert", "target": "resources.policy.trade", "visible": true, "enabled": false },
+    { "op": "assert", "target": "resources.policy.meet_consumption", "visible": true, "enabled": false },
+    { "op": "assert", "target": "resources.actual_trade", "label": "$ 100.0 k" },
+    { "op": "select", "target": "resources.policy.status", "value": "Banned" },
+    { "op": "input", "target": "resources.policy.tax", "value": 10 },
+    { "op": "click", "target": "resources.resource.fossil_fuels" },
+    { "op": "select", "target": "resources.policy.management", "value": "State Monopoly" },
+    { "op": "input", "target": "resources.policy.tax", "value": 3 },
+    { "op": "click", "target": "resources.resource.electricity" },
+    { "op": "assert", "target": "resources.policy.tax", "value": 10 },
+    { "op": "assert", "target": "resources.actual_trade", "label": "$ 100.0 k" },
+    { "op": "click", "target": "resources.resource.fossil_fuels" },
+    { "op": "assert", "target": "resources.policy.tax", "value": 3 },
+    { "op": "assert", "target": "resources.actual_trade", "label": "$ 25.0 k" },
+    { "op": "click", "target": "resources.apply" },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResourcePolicy",
+      "count": 2,
+      "index": 0,
+      "fields": {
+        "country_tag": "UKR",
+        "resource_id": "electricity",
+        "is_gov_controlled": false,
+        "is_legal": false,
+        "tax_rate": 0.1
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateResourcePolicy",
+      "count": 2,
+      "index": 1,
+      "fields": {
+        "country_tag": "UKR",
+        "resource_id": "fossil_fuels",
+        "is_gov_controlled": true,
+        "is_legal": true,
+        "tax_rate": 0.03
+      }
+    }
+  ]
+}

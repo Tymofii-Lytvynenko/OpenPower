@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "op": "key",
+      "key": "b"
+    },
+    {
+      "op": "assert_region",
+      "target": "budget.panel",
+      "visible": true
+    },
+    {
+      "op": "key",
+      "key": "b"
+    },
+    {
+      "op": "assert_region",
+      "target": "budget.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

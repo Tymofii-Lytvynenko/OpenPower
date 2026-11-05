@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-save-dialog.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-command-feedback.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-mail-context.json",
+      "surface": "game-hud"
+    }
+  ]
+}

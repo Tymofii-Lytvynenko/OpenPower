@@ -1,0 +1,21 @@
+{
+  "time": { "total_minutes": 42 },
+  "tables": {
+    "countries": [
+      { "id": "UKR", "name": "Ukraine", "gdp": 120000000.0, "money_reserves": 100000000.0 },
+      { "id": "MEX", "name": "Mexico", "gdp": 90000000.0, "money_reserves": 100000000.0 }
+    ],
+    "covert_findings": [
+      {
+        "id": "mex-observation-ukr",
+        "owner_country_id": "MEX",
+        "target_country_id": "UKR",
+        "category": "military",
+        "value_json": "{\"unit_count_estimate\":10,\"unit_role_count_estimates\":{\"tanks\":3},\"confidence_factors\":{\"observer_telecom\":0.8,\"target_telecom\":0.5,\"intelligence_coverage\":\"sustained\"}}",
+        "confidence": 0.75,
+        "discovered_at_minute": 13,
+        "expires_at_minute": 71
+      }
+    ]
+  }
+}

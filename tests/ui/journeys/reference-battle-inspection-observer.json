@@ -1,0 +1,48 @@
+{
+  "fixture": "tests/ui/fixtures/reference-battle-inspection.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "battle.map.marker.battle-observer"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.info.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.countries.A.0",
+      "label": "DEU"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.countries.B.0",
+      "label": "POL"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.observation_status",
+      "label": "Counts not observed"
+    },
+    {
+      "op": "assert_absent",
+      "target": "battle.inspection.strategy"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetBattleStrategy",
+      "count": 0
+    },
+    {
+      "op": "close_window",
+      "target": "battle.info.dialog"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.info.dialog",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

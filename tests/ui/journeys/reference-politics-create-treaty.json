@@ -1,0 +1,21 @@
+{
+  "steps": [
+    {"op": "click", "target": "hud.panel.pol"},
+    {"op": "click", "target": "politics.open_treaties"},
+    {"op": "click", "target": "treaties.new_treaty"},
+    {"op": "assert_region", "target": "treaty_proposal.panel", "visible": true},
+    {"op": "input", "target": "treaty.proposal.title", "value": "UI test compact"},
+    {"op": "input", "target": "treaty.proposal.terms", "value": "UI test terms"},
+    {"op": "click", "target": "treaty.proposal.submit"},
+    {
+      "op": "assert_action",
+      "type": "ActionCreateTreaty",
+      "fields": {
+        "source_country_tag": "UKR",
+        "target_country_tag": "POL",
+        "title": "UI test compact",
+        "terms": "UI test terms"
+      }
+    }
+  ]
+}

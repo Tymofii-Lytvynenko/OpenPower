@@ -7,7 +7,11 @@ from src.client.ui.core.instrumented_imgui import imgui
 
 from src.client.renderers.flag_renderer import FlagRenderer
 from src.client.ui.core.theme import GAMETHEME
-from src.client.utils.diplomacy_utils import get_military_allies
+from src.client.utils.diplomacy_utils import (
+    get_military_access_partners,
+    get_military_allies,
+    get_military_enemies,
+)
 
 
 @dataclass(frozen=True)
@@ -18,15 +22,36 @@ class CountryOption:
 
 class CountryStatus(Enum):
     PLAYER = "PLAYER"
-    NEUTRAL = "NEUTRAL"
     ALLIANCE = "ALLIANCE"
+    MILITARY_ACCESS = "MILITARY_ACCESS"
+    HOSTILE = "HOSTILE"
+    NEUTRAL = "NEUTRAL"
+
+
+COUNTRY_STATUS_LABELS = {
+    CountryStatus.PLAYER: "PLAYER",
+    CountryStatus.ALLIANCE: "ALLIED",
+    CountryStatus.MILITARY_ACCESS: "ACCESS",
+    CountryStatus.HOSTILE: "HOSTILE",
+    CountryStatus.NEUTRAL: "NEUTRAL",
+}
+
+
+def country_status_label(status: CountryStatus) -> str:
+    return COUNTRY_STATUS_LABELS[status]
 
 
 def resolve_country_status(state, player_tag: str, target_tag: str) -> CountryStatus:
-    if target_tag == player_tag:
+    player = str(player_tag or "").strip().upper()
+    target = str(target_tag or "").strip().upper()
+    if target == player:
         return CountryStatus.PLAYER
-    if target_tag in get_military_allies(state, player_tag):
+    if target in {tag.upper() for tag in get_military_enemies(state, player)}:
+        return CountryStatus.HOSTILE
+    if target in {tag.upper() for tag in get_military_allies(state, player)}:
         return CountryStatus.ALLIANCE
+    if target in get_military_access_partners(state, player):
+        return CountryStatus.MILITARY_ACCESS
     return CountryStatus.NEUTRAL
 
 
@@ -134,6 +159,7 @@ class CountrySelector:
                         is_selected,
                         0,
                         (0.0, row_height),
+                        test_id=f"hud.country.option.{option.tag}",
                     )[0]
                     if is_selected:
                         imgui.set_item_default_focus()

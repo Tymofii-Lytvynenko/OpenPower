@@ -1,0 +1,15 @@
+{
+  "tables": {
+    "covert_cells":[{"id":"cell-a","country_id":"UKR","cell_name":"Alpha"}],
+    "covert_missions":[
+      {"id":"own-result","cell_id":"cell-a","owner_country_id":"UKR","target_country_id":"POL","mission_type":"military_espionage","status":"completed","result":"success","discovered_by_target":false,"attributed_to_owner":false},
+      {"id":"incoming-result","cell_id":"secret-cell","owner_country_id":"POL","target_country_id":"UKR","mission_type":"civilian_sabotage","status":"completed","result":"partial_success","discovered_by_target":true,"attributed_to_owner":false,"output_json":"{\"secret\":\"private intelligence\"}"},
+      {"id":"hidden-result","cell_id":"hidden-cell","owner_country_id":"POL","target_country_id":"UKR","mission_type":"military_espionage","status":"completed","result":"success","discovered_by_target":false,"attributed_to_owner":false}
+    ],
+    "covert_incidents":[
+      {"id":"own-note","mission_id":"own-result","audience_country_ids":["UKR"],"summary":"Military intelligence collected."},
+      {"id":"public-note","mission_id":"incoming-result","audience_country_ids":["UKR"],"summary":"A sabotage incident was detected."},
+      {"id":"private-note","mission_id":"incoming-result","audience_country_ids":["POL"],"summary":"Private source identity."}
+    ]
+  }
+}

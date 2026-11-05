@@ -1,0 +1,9 @@
+{
+  "steps": [
+    { "op": "assert_region", "target": "main_menu.window", "visible": true },
+    { "op": "click", "target": "main_menu.credits" },
+    { "op": "assert_region", "target": "main_menu.credits_screen", "visible": true },
+    { "op": "click", "target": "main_menu.credits_back" },
+    { "op": "assert_region", "target": "main_menu.window", "visible": true }
+  ]
+}

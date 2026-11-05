@@ -1,0 +1,35 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine"},
+      {"id": "POL", "name": "Poland"},
+      {"id": "DEU", "name": "Germany"},
+      {"id": "CAN", "name": "Canada"},
+      {"id": "ZZZ", "name": "Inactive example", "active": false}
+    ],
+    "countries_treaties": [
+      {
+        "id": "treaty-ukr-pol",
+        "name": "Ukraine–Poland Test Compact",
+        "source_country_id": "UKR",
+        "target_country_id": "POL",
+        "type": "mobility_agreement",
+        "status": "active",
+        "members": ["UKR", "POL"],
+        "side_a": ["UKR"],
+        "side_b": ["POL"],
+        "terms": "Shared market access for the participating countries.",
+        "open_to_new_members": false
+      }
+    ],
+    "treaty_effects": [
+      {
+        "treaty_id": "treaty-ukr-pol",
+        "country_id": "UKR",
+        "effect": "trade_access",
+        "value": 1.0,
+        "detail": "Trade access is active."
+      }
+    ]
+  }
+}

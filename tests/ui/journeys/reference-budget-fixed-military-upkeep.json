@@ -1,0 +1,26 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.eco"
+    },
+    {
+      "op": "click",
+      "target": "economy.budget_btn"
+    },
+    {
+      "op": "assert_region",
+      "target": "budget.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "budget.navigate.fixed-military-upkeep"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_list.panel",
+      "visible": true
+    }
+  ]
+}

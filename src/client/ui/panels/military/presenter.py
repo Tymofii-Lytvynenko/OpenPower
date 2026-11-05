@@ -8,6 +8,7 @@ import polars as pl
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate
 from src.shared.strategic_profiles import DEFAULT_DEFENSE, PAYLOAD_PROFILES
 from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
+from modules.base.systems.economy.unit_upkeep import unit_upkeep_by_id
 
 from src.client.ui.panels.shared.panel_data import (
     as_ratio,
@@ -20,6 +21,7 @@ from src.client.ui.panels.shared.panel_data import (
     safe_int,
     safe_text,
 )
+from src.client.ui.panels.military.design_selection import supports_design_details
 
 
 BATTLE_MODE_LABELS = {
@@ -33,6 +35,11 @@ BATTLE_STATUS_LABELS = {
     "concluded": "Concluded",
     "inactive": "Inactive",
 }
+
+
+def _unit_design_matches_owner(design: dict, owner_tag: str) -> bool:
+    design_country = safe_text(design.get("country_id"), "").strip().upper()
+    return not design_country or design_country == owner_tag.strip().upper()
 
 
 def battle_mode_label(mode: object) -> str:
@@ -80,6 +87,12 @@ class UnitListRow:
     status: str
     progress_pct: float
     route_summary: str = ""
+    design_id: str = ""
+    design_name: str = ""
+    design_cost: float | None = None
+    upkeep: float | None = None
+    training_level: str = "Recruit"
+    for_sale: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,8 +201,30 @@ class MilitaryPresenter:
             safe_text(row.get("unit_id"), ""): row
             for row in ([] if routes is None else routes.to_dicts())
         }
+        design_table = state.tables.get("unit_designs")
+        designs_by_id = {
+            safe_text(design.get("id"), ""): design
+            for design in ([] if design_table is None else design_table.to_dicts())
+        }
+        market_table = state.tables.get("unit_market_listings")
+        listed_unit_ids = set() if market_table is None else {
+            safe_text(listing.get("unit_id"), "")
+            for listing in market_table.to_dicts()
+            if safe_text(listing.get("status"), "listed").lower() == "listed"
+            and safe_int(listing.get("quantity"), 0) > 0
+        }
+        upkeep_by_id = unit_upkeep_by_id(state)
         for row in self._country_units(state, country_tag):
             owner_tag = safe_text(row.get("owner"), country_tag)
+            requested_design_id = safe_text(row.get("design_id"), "")
+            design = designs_by_id.get(requested_design_id)
+            owns_design = design is not None and _unit_design_matches_owner(design, owner_tag)
+            design_id = requested_design_id
+            if (
+                not owns_design
+                or not supports_design_details(design)
+            ):
+                design_id = ""
             lifecycle = safe_text(row.get("unit_lifecycle"), "available").lower()
             readiness = safe_text(row.get("readiness_status"), "ready").lower()
             transitioning = safe_text(row.get("readiness_transition_id"), "") != ""
@@ -235,6 +270,18 @@ class MilitaryPresenter:
                         route_by_unit.get(safe_text(row.get("id"), "")),
                         lifecycle,
                     ),
+                    design_id=design_id,
+                    design_name=(
+                        safe_text(design.get("display_name"), safe_text(design.get("name"), "Unknown design"))
+                        if owns_design else "Unknown design"
+                    ),
+                    design_cost=(
+                        safe_float(design.get("cost"), 0.0)
+                        if owns_design and design.get("cost") is not None else None
+                    ),
+                    upkeep=upkeep_by_id.get(safe_text(row.get("id"), "")),
+                    training_level=safe_text(row.get("training_level"), "Recruit"),
+                    for_sale=safe_text(row.get("id"), "") in listed_unit_ids,
                 )
             )
 
@@ -278,7 +325,9 @@ class MilitaryPresenter:
             return []
         if "country_id" not in orders.columns:
             return orders.to_dicts()
-        return orders.filter(pl.col("country_id") == country_tag).sort("priority").to_dicts()
+        return orders.filter(pl.col("country_id") == country_tag).sort(
+            "priority", descending=True,
+        ).to_dicts()
 
     def deployment_orders_for_country(self, state, country_tag: str) -> list[dict]:
         orders = state.tables.get("unit_deployment_orders")
@@ -299,6 +348,56 @@ class MilitaryPresenter:
             row["destination_name"] = resolve_region_name(state, safe_int(row.get("destination_region_id"), 0))
         return sorted(rows, key=lambda item: (str(item.get("status") or ""), str(item.get("id") or "")))
 
+    def reserve_units_for_country(self, state, country_tag: str) -> list[dict]:
+        """Return only this country's groups waiting for deployment or reserve training."""
+        units = state.tables.get("units")
+        units_by_id = {} if units is None else {
+            str(row.get("id") or ""): row for row in units.to_dicts()
+        }
+        designs = state.tables.get("unit_designs")
+        designs_by_id = {} if designs is None else {
+            str(row.get("id") or ""): row for row in designs.to_dicts()
+        }
+        training_table = state.tables.get("unit_training_orders")
+        training_by_unit = {}
+        if training_table is not None and not training_table.is_empty():
+            training_by_unit = {
+                str(row.get("unit_id") or ""): row
+                for row in training_table.to_dicts()
+                if str(row.get("status") or "").lower() in {"active", "paused", "blocked"}
+            }
+
+        rows = []
+        for deployment in self.deployment_orders_for_country(state, country_tag):
+            unit_id = safe_text(deployment.get("unit_id"), "")
+            unit = units_by_id.get(unit_id, {})
+            design = designs_by_id.get(str(unit.get("design_id") or ""), {})
+            lifecycle = safe_text(unit.get("unit_lifecycle"), "").lower()
+            if lifecycle not in {
+                "deployment_queued", "deployment_blocked", "training",
+            }:
+                continue
+            deployment = dict(deployment)
+            deployment.update(
+                lifecycle=lifecycle,
+                design_name=safe_text(
+                    design.get("display_name"),
+                    safe_text(design.get("name"), safe_text(unit.get("unit_type"), "Unit")),
+                ),
+                unit_domain=safe_text(
+                    unit.get("unit_domain"), safe_text(design.get("branch"), ""),
+                ),
+                training_level=safe_text(unit.get("training_level"), "Recruit"),
+                training_state=safe_text(unit.get("training_state"), ""),
+                training_progress=max(
+                    0.0,
+                    min(1.0, safe_float(unit.get("training_progress"), 0.0)),
+                ),
+                training_order=training_by_unit.get(unit_id, {}),
+            )
+            rows.append(deployment)
+        return rows
+
     def covert_missions_for_country(self, state, country_tag: str) -> list[dict]:
         table = state.tables.get("covert_missions")
         if table is None or table.is_empty():
@@ -310,14 +409,26 @@ class MilitaryPresenter:
             target = safe_text(source.get("target_country_id"), "").upper()
             mine = owner == country
             discovered_target = target == country and bool(source.get("discovered_by_target"))
-            if not mine and not discovered_target:
+            framed_viewer = country == safe_text(source.get("attributed_country_id"), "").upper() and bool(source.get("discovered_by_target"))
+            if not mine and not discovered_target and not framed_viewer:
                 continue
             row = dict(source)
             if discovered_target and not mine:
                 row["cell_id"] = ""
-                row["owner_country_id"] = safe_text(source.get("owner_country_id"), "Unknown") if bool(source.get("attributed_to_owner")) else "Unknown"
+                row["owner_country_id"] = safe_text(source.get("attributed_country_id"), "") or (safe_text(source.get("owner_country_id"), "Unknown") if bool(source.get("attributed_to_owner")) else "Unknown")
                 row["output_json"] = "{}"
                 row["confidence"] = 0.0
+                row["_viewer_role"] = "target"
+            elif framed_viewer and not mine:
+                row["cell_id"] = ""
+                row["owner_country_id"] = "Unknown"
+                row["output_json"] = "{}"
+                row["confidence"] = 0.0
+                row["target_sector"] = ""
+                row["complexity"] = ""
+                row["target_resource_id"] = ""
+                row["target_unit_category"] = ""
+                row["_viewer_role"] = "framed"
             rows.append(row)
         return sorted(rows, key=lambda row: (safe_int(row.get("created_at_minute"), 0), safe_text(row.get("id"), "")), reverse=True)
 
@@ -877,7 +988,12 @@ class MilitaryPresenter:
             })
             row["unit_count"] += 1
             row["strength"] += max(0, safe_int(unit.get("strength"), 0))
-            row["relative_positions"].append((safe_float(unit.get("latitude"), 0.0), safe_float(unit.get("longitude"), 0.0)))
+            # Unknown coordinates must not appear as an observed force at (0, 0).
+            latitude, longitude = unit.get("latitude"), unit.get("longitude")
+            if (latitude is not None and longitude is not None
+                    and math.isfinite(float(latitude)) and math.isfinite(float(longitude))
+                    and -90 <= float(latitude) <= 90 and -180 <= float(longitude) <= 180):
+                row["relative_positions"].append((float(latitude), float(longitude)))
         return [grouped[key] for key in sorted(grouped)]
 
     def battle_postures_for_country(self, state, battle_id: str, country_tag: str) -> list[dict]:

@@ -1,0 +1,19 @@
+{
+  "fixture": "tests/ui/fixtures/unit-training-unavailable.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "unit.context.view_list"
+    },
+    {
+      "op": "assert",
+      "target": "unit.group.train",
+      "enabled": false
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "count": 0
+    }
+  ]
+}

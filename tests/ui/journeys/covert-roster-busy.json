@@ -1,0 +1,25 @@
+{
+  "fixture": "tests/ui/fixtures/covert-ready.json",
+  "steps": [
+    {
+      "op": "assert",
+      "target": "covert_ops.cell.cell-test.country",
+      "enabled": false
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.cell.cell-test.status",
+      "enabled": false
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionRetargetCovertCell",
+      "count": 0
+    }
+  ]
+}

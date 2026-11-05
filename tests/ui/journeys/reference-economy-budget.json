@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.eco"
+    },
+    {
+      "op": "assert_region",
+      "target": "economy.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "economy.budget_btn"
+    },
+    {
+      "op": "assert_region",
+      "target": "budget.panel",
+      "visible": true
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "steps": [
+    { "op": "assert_region", "target": "trade.panel", "visible": true }
+  ]
+}

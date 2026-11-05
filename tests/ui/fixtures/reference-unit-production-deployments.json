@@ -1,0 +1,17 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine"}
+    ],
+    "regions": [
+      {"id": 1, "name": "Kyiv", "owner": "UKR", "controller": "UKR"},
+      {"id": 2, "name": "Lviv", "owner": "UKR", "controller": "UKR"}
+    ],
+    "units": [
+      {"id": "completed-group", "owner": "UKR", "unit_type": "tank", "unit_domain": "land", "strength": 6, "current_region_id": 1, "unit_lifecycle": "deployment_queued"}
+    ],
+    "unit_deployment_orders": [
+      {"id": "deployment-ready", "unit_id": "completed-group", "country_id": "UKR", "quantity": 6, "source_region_id": 1, "destination_region_id": 0, "status": "queued"}
+    ]
+  }
+}

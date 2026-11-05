@@ -1,0 +1,31 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.advisor"
+    },
+    {
+      "op": "click",
+      "target": "advisor.settings.economy.manual"
+    },
+    {
+      "op": "click",
+      "target": "hud.advisor"
+    },
+    {
+      "op": "assert_region",
+      "target": "advisor.settings.close.confirmation",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "advisor.settings.close.discard"
+    },
+    {
+      "op": "assert_region",
+      "target": "advisor.settings.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

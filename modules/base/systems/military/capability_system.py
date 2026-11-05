@@ -43,6 +43,7 @@ _TRAINING_ORDER_SCHEMA: dict[str, pl.DataType] = {
     "cost": pl.Float64,
     "status": pl.Utf8,
     "return_region_id": pl.Int32,
+    "return_lifecycle": pl.Utf8,
     "return_latitude": pl.Float64,
     "return_longitude": pl.Float64,
     "started_at_minute": pl.Int64,
@@ -61,6 +62,12 @@ _TRAINING_FACILITY_SCHEMA: dict[str, pl.DataType] = {
     "capacity": pl.Int32,
     "instructor_count": pl.Int32,
     "enabled": pl.Boolean,
+}
+_TRAINING_QUOTE_SCHEMA: dict[str, pl.DataType] = {
+    "unit_id": pl.Utf8, "country_id": pl.Utf8,
+    "from_level": pl.Utf8, "target_level": pl.Utf8,
+    "cost": pl.Float64, "required_days": pl.Float64,
+    "available": pl.Boolean, "reason": pl.Utf8,
 }
 _PROJECTION_SCHEMA: dict[str, pl.DataType] = {
     "unit_id": pl.Utf8,
@@ -91,8 +98,8 @@ class MilitaryCapabilitySystem(ISystem):
         self._role_profile_cache: dict[tuple[str, str], Any] = {}
 
     access = SystemAccess(
-        reads=frozenset({"units", "unit_designs", "unit_training_orders", "unit_training_facilities", "unit_capability_projections", "countries", "regions", "battle_units", "research_tracks"}),
-        writes=frozenset({"units", "countries", "unit_training_orders", "unit_capability_projections"}),
+        reads=frozenset({"units", "unit_designs", "unit_training_orders", "unit_training_facilities", "unit_capability_projections", "unit_training_quotes", "countries", "regions", "battle_units", "research_tracks"}),
+        writes=frozenset({"units", "countries", "unit_training_orders", "unit_capability_projections", "unit_training_quotes"}),
         handles=frozenset({ActionTrainUnit, ActionCancelUnitTraining, ActionSetUnitTrainingPaused}),
         phase=SystemPhase.MILITARY - 1,
     )
@@ -162,6 +169,9 @@ class MilitaryCapabilitySystem(ISystem):
             self._write_frame_if_changed(state, "countries", country_frame)
         projections = self._build_projections(state, unit_rows, orders)
         self._write_if_changed(state, "unit_capability_projections", _PROJECTION_SCHEMA, projections)
+        quotes = self._training_quotes(state, by_unit, country_by_id, orders, facilities)
+        self._write_if_changed(state, "unit_training_quotes", _TRAINING_QUOTE_SCHEMA, quotes)
+
 
     def _start_training(
         self,
@@ -172,44 +182,34 @@ class MilitaryCapabilitySystem(ISystem):
         facilities: list[dict[str, Any]],
         action: ActionTrainUnit,
     ) -> str:
+        plan, reason = self._training_plan(state, units, countries, orders, facilities, action)
+        if reason:
+            return reason
         unit_id = str(action.unit_id or "")
-        unit = units.get(unit_id)
+        unit, country = plan["unit"], plan["country"]
         owner = self._tag(action.country_tag)
-        country = countries.get(owner)
-        target = str(action.target_level or "").strip().title()
-        current = str(unit.get("training_level") or "Recruit").strip().title() if unit else ""
-        if unit is None or country is None or self._tag(unit.get("owner")) != owner:
-            return "The unit or owning country is unavailable."
-        level_steps = training_level_steps(current, target)
-        if target not in TRAINING_LEVELS or level_steps <= 0:
-            return "Training must advance to a supported higher level."
-        if bool(unit.get("is_moving")) or self._integer(unit.get("current_region_id")) <= 0 or str(unit.get("engagement_mode") or ""):
-            return "The unit must be deployed and outside movement or engagement to train."
-        if str(unit.get("training_state") or "") == "training" or any(
-            row.get("unit_id") == unit_id and row.get("status") == "active" for row in orders
-        ):
-            return "The unit already has an active training order."
-        battle_units = state.tables.get("battle_units")
-        if battle_units is not None and not battle_units.is_empty() and "unit_id" in battle_units.columns:
-            if battle_units.filter(pl.col("unit_id") == unit_id).height > 0:
-                return "A participating battle force cannot begin training."
-
-        facility, facility_error = self._select_training_facility(state, unit, owner, facilities, orders)
-        if facility_error:
-            return facility_error
-
-        days_per_level = self._bounded_config(state, "unit_training_days_per_level", 30.0, 1.0, 3650.0)
-        cost_per_strength = self._bounded_config(state, "unit_training_cost_per_strength_level", 1.0, 0.0, 1_000_000.0)
-        cost = training_cost(unit.get("strength"), level_steps, cost_per_strength)
-        if self._number(country.get("money_reserves")) < cost:
-            return "The country cannot fund the requested training."
+        target, current = plan["target"], plan["current"]
+        training_region_id, reserve_lifecycle = plan["training_region_id"], plan["reserve_lifecycle"]
+        facility, cost = plan["facility"], plan["cost"]
         country["money_reserves"] = self._number(country.get("money_reserves")) - cost
 
         regions = state.tables.get("regions")
         region = None
         if regions is not None:
-            region_id = self._integer(unit.get("current_region_id"))
-            region = next((row for row in regions.to_dicts() if self._integer(row.get("id")) == region_id), None)
+            region = next((
+                row for row in regions.to_dicts()
+                if self._integer(row.get("id")) == training_region_id
+            ), None)
+        return_latitude = (
+            self._number(unit.get("source_latitude"))
+            if reserve_lifecycle
+            else self._number(region.get("latitude")) if region else self._number(unit.get("latitude"))
+        )
+        return_longitude = (
+            self._number(unit.get("source_longitude"))
+            if reserve_lifecycle
+            else self._number(region.get("longitude")) if region else self._number(unit.get("longitude"))
+        )
         unit["training_state"] = "training"
         unit["unit_lifecycle"] = "training"
         unit["training_progress"] = 0.0
@@ -228,12 +228,13 @@ class MilitaryCapabilitySystem(ISystem):
             "from_level": current,
             "target_level": target,
             "progress": 0.0,
-            "required_days": days_per_level * level_steps,
+            "required_days": plan["required_days"],
             "cost": cost,
             "status": "active",
-            "return_region_id": self._integer(region.get("id")) if region else 0,
-            "return_latitude": self._number(region.get("latitude")) if region else 0.0,
-            "return_longitude": self._number(region.get("longitude")) if region else 0.0,
+            "return_region_id": training_region_id,
+            "return_lifecycle": reserve_lifecycle or "available",
+            "return_latitude": return_latitude,
+            "return_longitude": return_longitude,
             "started_at_minute": int(state.time.total_minutes),
             "updated_at_minute": int(state.time.total_minutes),
             "completed_at_minute": 0,
@@ -244,6 +245,98 @@ class MilitaryCapabilitySystem(ISystem):
         })
         return ""
 
+    def _training_plan(self, state, units, countries, orders, facilities, action, quote_context=None):
+        unit_id = str(action.unit_id or "")
+        unit = units.get(unit_id)
+        owner = self._tag(action.country_tag)
+        country = countries.get(owner)
+        target = str(action.target_level or "").strip().title()
+        current = str(unit.get("training_level") or "Recruit").strip().title() if unit else ""
+        if unit is None or country is None or self._tag(unit.get("owner")) != owner:
+            return None, "The unit or owning country is unavailable."
+        level_steps = training_level_steps(current, target)
+        if target not in TRAINING_LEVELS or level_steps <= 0:
+            return None, "Training must advance to a supported higher level."
+        lifecycle = str(unit.get("unit_lifecycle") or "available").strip().lower()
+        reserve_lifecycle = lifecycle if lifecycle in {"deployment_queued", "deployment_blocked"} else ""
+        training_region_id = (
+            self._integer(unit.get("source_region_id"))
+            if reserve_lifecycle
+            else self._integer(unit.get("current_region_id"))
+        )
+        if (
+            bool(unit.get("is_moving"))
+            or training_region_id <= 0
+            or str(unit.get("engagement_mode") or "")
+        ):
+            return None, "The unit must be available at a training location and outside movement or engagement."
+        has_order = (unit_id in quote_context["active_units"] if quote_context is not None else any(
+            row.get("unit_id") == unit_id and row.get("status") == "active" for row in orders))
+        if str(unit.get("training_state") or "") == "training" or has_order:
+            return None, "The unit already has an active training order."
+        battle_units = state.tables.get("battle_units")
+        in_battle = unit_id in quote_context["battle_units"] if quote_context is not None else (
+            battle_units is not None and not battle_units.is_empty() and "unit_id" in battle_units.columns
+            and battle_units.filter(pl.col("unit_id") == unit_id).height > 0)
+        if in_battle:
+            return None, "A participating battle force cannot begin training."
+
+        training_unit = dict(unit)
+        training_unit["current_region_id"] = training_region_id
+        facility, facility_error = self._select_training_facility(
+            state, training_unit, owner, facilities, orders,
+            designs=quote_context["designs"] if quote_context is not None else None,
+        )
+        if facility_error:
+            return None, facility_error
+
+        days_per_level = self._bounded_config(state, "unit_training_days_per_level", 30.0, 1.0, 3650.0)
+        cost_per_strength = self._bounded_config(state, "unit_training_cost_per_strength_level", 1.0, 0.0, 1_000_000.0)
+        cost = training_cost(unit.get("strength"), level_steps, cost_per_strength)
+        # A confirmation must never authorize a changed charge or training term.
+        for expected, actual in ((action.expected_cost, cost),
+                                 (action.expected_required_days, days_per_level * level_steps)):
+            if expected is not None and (type(expected) not in {int, float} or expected != actual):
+                return None, "The training estimate changed. Review and confirm it again."
+        if action.expected_from_level and action.expected_from_level != current:
+            return None, "The unit's training level changed. Review and confirm it again."
+        if self._number(country.get("money_reserves")) < cost:
+            return None, "The country cannot fund the requested training."
+        return dict(unit=unit, country=country, target=target, current=current,
+                    training_region_id=training_region_id, reserve_lifecycle=reserve_lifecycle,
+                    facility=facility, required_days=days_per_level * level_steps, cost=cost), ""
+
+    def _training_quotes(self, state, units, countries, orders, facilities):
+        # Index once: a quote per group must not rescan every design/order/site.
+        designs = state.tables.get("unit_designs")
+        battles = state.tables.get("battle_units")
+        context = dict(designs={} if designs is None else {str(r["id"]): r for r in designs.to_dicts()},
+            active_units={str(r.get("unit_id")) for r in orders if r.get("status") == "active"},
+            battle_units=set() if battles is None or "unit_id" not in battles.columns else set(battles["unit_id"].to_list()))
+        sites_by_location, orders_by_site = {}, {}
+        for site in facilities:
+            sites_by_location.setdefault((self._tag(site.get("country_id")), self._integer(site.get("region_id"))), []).append(site)
+        for order in orders:
+            if order.get("status") == "active":
+                orders_by_site.setdefault(str(order.get("facility_id")), []).append(order)
+        result = []
+        for unit_id, unit in units.items():
+            owner = self._tag(unit.get("owner"))
+            current = str(unit.get("training_level") or "Recruit").strip().title()
+            index = TRAINING_LEVELS.index(current) if current in TRAINING_LEVELS else -1
+            target = TRAINING_LEVELS[index + 1] if 0 <= index < len(TRAINING_LEVELS) - 1 else ""
+            action = ActionTrainUnit("", owner, unit_id, target)
+            reserve = str(unit.get("unit_lifecycle") or "") in {"deployment_queued", "deployment_blocked"}
+            region = self._integer(unit.get("source_region_id") if reserve else unit.get("current_region_id"))
+            sites = sites_by_location.get((owner, region), [])
+            site_orders = [order for site in sites for order in orders_by_site.get(str(site.get("id")), [])]
+            plan, reason = self._training_plan(state, units, countries, site_orders, sites, action, context)
+            result.append(dict(unit_id=unit_id, country_id=owner, from_level=current, target_level=target,
+                               cost=plan["cost"] if plan else None,
+                               required_days=plan["required_days"] if plan else None,
+                               available=not reason, reason=reason))
+        return result
+
     def _select_training_facility(
         self,
         state: GameState,
@@ -251,6 +344,7 @@ class MilitaryCapabilitySystem(ISystem):
         owner: str,
         facilities: list[dict[str, Any]],
         orders: list[dict[str, Any]],
+        designs=None,
     ) -> tuple[dict[str, Any] | None, str]:
         region_id = self._integer(unit.get("current_region_id"))
         local_sites = [
@@ -262,9 +356,12 @@ class MilitaryCapabilitySystem(ISystem):
             return None, "No training facility is configured at the unit's location."
 
         design_id = str(unit.get("design_id") or "")
-        designs = state.tables.get("unit_designs")
+        if designs is None:
+            designs = state.tables.get("unit_designs")
         design = None
-        if designs is not None and not designs.is_empty() and "id" in designs.columns:
+        if isinstance(designs, dict):
+            design = designs.get(design_id)
+        elif designs is not None and not designs.is_empty() and "id" in designs.columns:
             design = next((row for row in designs.to_dicts() if str(row.get("id") or "") == design_id), None)
         domain = str((design or {}).get("domain") or unit.get("unit_domain") or "land").strip().lower()
         return select_training_facility(unit, owner, domain, local_sites, orders)
@@ -411,7 +508,7 @@ class MilitaryCapabilitySystem(ISystem):
         unit["training_progress"] = 0.0
         unit["training_facility_id"] = ""
         unit["training_location_region_id"] = 0
-        unit["unit_lifecycle"] = "available"
+        unit["unit_lifecycle"] = str(order.get("return_lifecycle") or "available")
 
     def _build_projections(
         self,

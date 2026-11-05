@@ -59,6 +59,20 @@ class TestCombatSystem(unittest.TestCase):
         self.assertTrue(any(isinstance(event, EventBattleStarted) for event in state.events))
         self.assertFalse(any(isinstance(event, EventBattleEnded) for event in state.events))
 
+    def test_active_combat_publishes_category_totals_without_unit_identities(self):
+        state = self._build_state(
+            units=[
+                {"id": "usa-1", "owner": "USA", "unit_type": "infantry", "strength": 120, "current_region_id": 1, "is_moving": False},
+                {"id": "can-1", "owner": "CAN", "unit_type": "tanks", "strength": 110, "current_region_id": 1, "is_moving": False},
+            ], wars=[{"side_a": ["USA"], "side_b": ["CAN"]}],
+        )
+        self.system.update(state, 0.1)
+        counts = state.get_table("battle_public_counts")
+        self.assertEqual(counts.height, 8)
+        self.assertTrue(counts["complete"].all())
+        self.assertNotIn("unit_id", counts.columns)
+        self.assertEqual(counts.filter((pl.col("side") == "A") & (pl.col("category") == "I"))["unit_quantity"][0], 120)
+
     def test_hourly_resolution_occupies_region_for_victor(self):
         state = self._build_state(
             units=[
@@ -85,6 +99,25 @@ class TestCombatSystem(unittest.TestCase):
         self.assertEqual(countries.filter(pl.col("id") == "CAN")["military_count"][0], 0)
         self.assertTrue(any(isinstance(event, EventBattleStarted) for event in state.events))
         self.assertTrue(any(isinstance(event, EventBattleEnded) for event in state.events))
+
+    def test_simultaneous_results_retain_their_own_participant_countries(self):
+        state = self._build_state(
+            units=[
+                {"id": "usa-1", "owner": "USA", "strength": 240, "current_region_id": 1, "is_moving": False},
+                {"id": "can-1", "owner": "CAN", "strength": 60, "current_region_id": 1, "is_moving": False},
+                {"id": "ukr-1", "owner": "UKR", "strength": 240, "current_region_id": 2, "is_moving": False},
+                {"id": "pol-1", "owner": "POL", "strength": 60, "current_region_id": 2, "is_moving": False},
+            ],
+            wars=[{"side_a": ["USA"], "side_b": ["CAN"]}, {"side_a": ["UKR"], "side_b": ["POL"]}],
+        )
+        state.update_table("regions", pl.DataFrame({"id": [1, 2], "owner": ["CAN", "POL"], "controller": ["CAN", "POL"]}))
+        state.events.append(EventNewHour(hour=1, total_minutes=60))
+        self.system.update(state, 0.1)
+        results = {event.region_id: event for event in state.events if isinstance(event, EventBattleEnded)}
+        self.assertEqual(set(results), {1, 2})
+        for region, tags in ((1, {"USA", "CAN"}), (2, {"UKR", "POL"})):
+            self.assertEqual(set(results[region].participant_countries), tags)
+            self.assertEqual(set(results[region].side_a_country_ids) | set(results[region].side_b_country_ids), tags)
 
     def test_undefended_enemy_region_becomes_occupied(self):
         state = self._build_state(

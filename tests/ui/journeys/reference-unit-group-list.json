@@ -1,0 +1,121 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-reorganization.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "unit.context.view_list"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.group.list",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "unit.group.merge"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.merge.dialog",
+      "visible": true
+    },
+    {
+      "op": "check",
+      "target": "unit.merge.select.unit-2",
+      "value": true
+    },
+    {
+      "op": "click",
+      "target": "unit.merge.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionMergeUnits",
+      "fields": {
+        "target_unit_id": "unit-1",
+        "source_unit_ids": ["unit-2"]
+      }
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.merge.dialog",
+      "visible": false,
+      "present": false
+    },
+    {
+      "op": "click",
+      "target": "unit.group.split"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.split.quantity",
+      "visible": true
+    },
+    {
+      "op": "input",
+      "target": "unit.split.quantity.transfer",
+      "value": 250
+    },
+    {
+      "op": "click",
+      "target": "unit.split.quantity.close"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSplitUnit",
+      "fields": {
+        "unit_id": "unit-1",
+        "detached_strength": 250
+      }
+    },
+    {
+      "op": "click",
+      "target": "unit.group.train"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.training.question",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "unit.training.question.yes"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "fields": {
+        "unit_id": "unit-1",
+        "country_tag": "UKR",
+        "target_level": "Regular"
+      }
+    },
+    {
+      "op": "click",
+      "target": "unit.group.sell"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionListUsedUnit",
+      "fields": {
+        "unit_id": "unit-1",
+        "country_tag": "UKR"
+      }
+    },
+    {
+      "op": "close_window",
+      "target": "unit.group.list"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.group.list",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

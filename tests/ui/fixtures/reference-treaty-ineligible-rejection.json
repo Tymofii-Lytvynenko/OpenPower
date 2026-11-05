@@ -1,0 +1,40 @@
+{
+  "globals": {
+    "ui_command_results": {
+      "ActionUpdateTreatyParticipants": [
+        {
+          "status": "rejected",
+          "message": "Treaty eligibility conditions are not met by: DEU. Remove those countries or update the participant sides."
+        }
+      ]
+    }
+  },
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine"},
+      {"id": "POL", "name": "Poland"},
+      {"id": "DEU", "name": "Germany"}
+    ],
+    "country_governments": [
+      {"country_id": "UKR", "government_type": "democracy"},
+      {"country_id": "POL", "government_type": "democracy"},
+      {"country_id": "DEU", "government_type": "autocracy"}
+    ],
+    "countries_treaties": [
+      {
+        "id": "treaty-ukr-pol",
+        "name": "Ukraine–Poland Test Compact",
+        "source_country_id": "UKR",
+        "target_country_id": "POL",
+        "type": "mobility_agreement",
+        "status": "active",
+        "members": ["UKR", "POL"],
+        "side_a": ["UKR"],
+        "side_b": ["POL"],
+        "terms": "Participants must have democratic governments.",
+        "conditions_json": "{\"government_type\":\"democracy\"}",
+        "open_to_new_members": false
+      }
+    ]
+  }
+}

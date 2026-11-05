@@ -1,0 +1,75 @@
+{
+  "fixture": "tests/ui/fixtures/reference-country-info.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.more_info"
+    },
+    {
+      "op": "assert_region",
+      "target": "country_more_info.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "country.info.region_map",
+      "type": "image",
+      "visible": true,
+      "inside": "country_more_info.panel"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.hdi.country",
+      "label": "Ukraine: 76.0 %",
+      "inside": "country_more_info.panel",
+      "relative_to": "country_more_info.panel",
+      "relative_rect": {
+        "x": 287,
+        "y": 67
+      },
+      "tolerance": 1
+    },
+    {
+      "op": "assert",
+      "target": "country.info.hdi.world",
+      "label": "World: —",
+      "inside": "country_more_info.panel"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.population.total",
+      "label": "40 165 000",
+      "inside": "country_more_info.panel"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.infrastructure.value",
+      "label": "58.0 %",
+      "inside": "country_more_info.panel"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.telecom.value",
+      "label": "72.0 %",
+      "inside": "country_more_info.panel"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.land_area.value",
+      "label": "599 079",
+      "inside": "country_more_info.panel"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.water_area.value",
+      "label": "—",
+      "inside": "country_more_info.panel"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.climate.value",
+      "label": "—",
+      "inside": "country_more_info.panel"
+    }
+  ]
+}

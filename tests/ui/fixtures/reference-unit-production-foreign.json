@@ -1,0 +1,28 @@
+{
+  "globals": {
+    "foreign_order_permissions": [["UKR", "POL"]]
+  },
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine", "annual_production_capacity": 10000.0, "money_reserves": 100000000.0},
+      {"id": "POL", "name": "Poland", "annual_production_capacity": 8000.0, "money_reserves": 100000000.0}
+    ],
+    "regions": [
+      {"id": 1, "name": "Kyiv", "owner": "UKR", "controller": "UKR", "pop_15_64": 20000000},
+      {"id": 2, "name": "Warsaw", "owner": "POL", "controller": "POL", "pop_15_64": 10000000}
+    ],
+    "unit_designs": [
+      {"id": "design-infantry-1", "country_id": "UKR", "branch": "land", "class_name": "infantry", "domain": "land", "display_name": "Infantry", "cost": 1000.0},
+      {"id": "design-pol-infantry", "country_id": "POL", "branch": "land", "class_name": "infantry", "domain": "land", "display_name": "Mechanized Infantry", "cost": 1500.0},
+      {"id": "design-pol-fighter", "country_id": "POL", "branch": "air", "class_name": "fighter", "domain": "air", "display_name": "Multirole Fighter", "cost": 125000.0}
+    ],
+    "seller_acceptance_profiles": [
+      {"country_id": "UKR", "accepts_foreign_orders": false},
+      {"country_id": "POL", "accepts_foreign_orders": true}
+    ],
+    "foreign_unit_orders": [
+      {"id": "incoming-ukr", "buyer_country_id": "POL", "seller_country_id": "UKR", "design_id": "design-infantry-1", "quantity": 3, "price": 4500.0, "status": "pending_seller_acceptance", "created_at_minute": 100},
+      {"id": "outgoing-ukr", "buyer_country_id": "UKR", "seller_country_id": "POL", "design_id": "design-pol-infantry", "quantity": 4, "price": 6000.0, "status": "pending_seller_acceptance", "created_at_minute": 90}
+    ]
+  }
+}

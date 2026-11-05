@@ -1,0 +1,35 @@
+{
+  "tables": {
+    "countries_relations": [
+      {"source": "UKR", "target": "POL", "value": 40.0},
+      {"source": "POL", "target": "UKR", "value": 30.0}
+    ],
+    "history_snapshots": [
+      {
+        "id": "relation-ukr-pol-0",
+        "subject_type": "relationship",
+        "subject_id": "POL|UKR",
+        "indicator_id": "relationship.relation_value",
+        "value": 12.0,
+        "unit": "relation points",
+        "game_minute": 0,
+        "tick": 0,
+        "source_boundary": "interval",
+        "completeness": "complete"
+      },
+      {
+        "id": "relation-ukr-pol-1440",
+        "subject_type": "relationship",
+        "subject_id": "POL|UKR",
+        "indicator_id": "relationship.relation_value",
+        "value": 35.0,
+        "unit": "relation points",
+        "game_minute": 1440,
+        "tick": 1,
+        "source_boundary": "interval",
+        "completeness": "complete"
+      }
+    ]
+  },
+  "globals": {"tick": 1}
+}

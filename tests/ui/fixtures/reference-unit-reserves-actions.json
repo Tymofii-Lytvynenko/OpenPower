@@ -1,0 +1,37 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine"}
+    ],
+    "country_governments": [
+      {"country_id": "UKR", "capital_region_id": 1}
+    ],
+    "regions": [
+      {"id": 1, "name": "Kyiv"}
+    ],
+    "unit_designs": [
+      {"id": "design-tank", "country_id": "UKR", "branch": "land", "display_name": "Main Battle Tank"},
+      {"id": "design-fighter", "country_id": "UKR", "branch": "air", "display_name": "Multirole Fighter"},
+      {"id": "design-frigate", "country_id": "UKR", "branch": "naval", "display_name": "Frigate"},
+      {"id": "design-missile", "country_id": "UKR", "branch": "nuclear", "display_name": "Strategic Missile"}
+    ],
+    "units": [
+      {"id": "reserve-tank-1", "owner": "UKR", "unit_type": "tank", "unit_domain": "land", "design_id": "design-tank", "strength": 120, "current_region_id": 1, "unit_lifecycle": "deployment_queued", "training_level": "Recruit"},
+      {"id": "reserve-tank-2", "owner": "UKR", "unit_type": "tank", "unit_domain": "land", "design_id": "design-tank", "strength": 80, "current_region_id": 1, "unit_lifecycle": "deployment_queued", "training_level": "Recruit"},
+      {"id": "reserve-fighter", "owner": "UKR", "unit_type": "fighter", "unit_domain": "air", "design_id": "design-fighter", "strength": 12, "current_region_id": 1, "unit_lifecycle": "deployment_queued", "training_level": "Recruit"},
+      {"id": "reserve-frigate", "owner": "UKR", "unit_type": "frigate", "unit_domain": "naval", "design_id": "design-frigate", "strength": 4, "current_region_id": 1, "unit_lifecycle": "deployment_queued", "training_level": "Recruit"},
+      {"id": "reserve-missile", "owner": "UKR", "unit_type": "missile", "unit_domain": "strategic", "design_id": "design-missile", "strength": 2, "current_region_id": 1, "unit_lifecycle": "deployment_queued", "training_level": "Recruit"}
+    ],
+    "unit_deployment_orders": [
+      {"id": "deploy-tank-1", "unit_id": "reserve-tank-1", "country_id": "UKR", "source_region_id": 1, "destination_region_id": 0, "status": "queued"},
+      {"id": "deploy-tank-2", "unit_id": "reserve-tank-2", "country_id": "UKR", "source_region_id": 1, "destination_region_id": 0, "status": "queued"},
+      {"id": "deploy-fighter", "unit_id": "reserve-fighter", "country_id": "UKR", "source_region_id": 1, "destination_region_id": 0, "status": "queued"},
+      {"id": "deploy-frigate", "unit_id": "reserve-frigate", "country_id": "UKR", "source_region_id": 1, "destination_region_id": 0, "status": "queued"},
+      {"id": "deploy-missile", "unit_id": "reserve-missile", "country_id": "UKR", "source_region_id": 1, "destination_region_id": 0, "status": "queued"}
+    ],
+    "unit_training_quotes": [
+      {"unit_id": "reserve-tank-1", "country_id": "UKR", "from_level": "Recruit", "target_level": "Regular", "cost": 125.0, "required_days": 8, "available": true},
+      {"unit_id": "reserve-tank-2", "country_id": "UKR", "from_level": "Recruit", "target_level": "Regular", "cost": 100.0, "required_days": 8, "available": true}
+    ]
+  }
+}

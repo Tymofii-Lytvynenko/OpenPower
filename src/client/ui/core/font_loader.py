@@ -17,6 +17,17 @@ class FontLoader:
     _keep_alive_storage: List[ctypes.Array] = []
 
     @staticmethod
+    def configure_ui(io, font_path: Path) -> None:
+        """Use one logical font size in the game and the UI harness."""
+        # ImGui 1.92 rasterizes dynamic fonts at framebuffer density. Applying
+        # the legacy load-size/inverse-scale pair here makes text metrics diverge
+        # from GML slot geometry on HiDPI displays.
+        # See https://github.com/ocornut/imgui/blob/master/docs/FONTS.md#how-should-i-handle-dpi-in-my-application
+        FontLoader.load_primary_font(io, font_path, size_pixels=14.0,
+                                     load_cjk=False, load_icons=True)
+        imgui.get_style().font_scale_main = 1.0
+
+    @staticmethod
     def get_imgui_bundle_assets_path() -> str:
         """
         Reliably finds the 'assets' folder inside the installed imgui_bundle package.

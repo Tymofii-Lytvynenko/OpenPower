@@ -1,0 +1,52 @@
+{
+  "tables": {
+    "campaign_scenarios": [
+      {
+        "id": "ui-game-over",
+        "title": "UI Game Over Fixture",
+        "sandbox_allowed": false
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "campaign-ui-game-over",
+        "scenario_id": "ui-game-over",
+        "actor_country_id": "UKR",
+        "started_at_minute": 0,
+        "outcome": "defeat",
+        "outcome_reason": "A required campaign condition was not met.",
+        "sandbox_continuation": false
+      }
+    ],
+    "objectives": [
+      {
+        "id": "stability",
+        "campaign_id": "campaign-ui-game-over",
+        "title": "Maintain stability",
+        "status": "completed",
+        "deadline_at_minute": 2880
+      },
+      {
+        "id": "territory",
+        "campaign_id": "campaign-ui-game-over",
+        "title": "Retain national territory",
+        "status": "failed",
+        "deadline_at_minute": -1
+      },
+      {
+        "id": "economy",
+        "campaign_id": "campaign-ui-game-over",
+        "title": "Keep the economy solvent",
+        "status": "expired",
+        "deadline_at_minute": 1440
+      },
+      {
+        "id": "optional",
+        "campaign_id": "campaign-ui-game-over",
+        "title": "Optional objective",
+        "status": "cancelled",
+        "deadline_at_minute": -1
+      }
+    ]
+  }
+}

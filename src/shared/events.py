@@ -28,6 +28,19 @@ class DomainGameEvent(GameEvent):
 
 
 @dataclass
+class EventTerritoryEntryAuthorized(GameEvent):
+    """Ephemeral diplomacy-to-military authorization for one validated invasion."""
+    order_id: str
+    player_id: str
+    unit_ids: tuple[str, ...]
+    source_country: str
+    target_country: str
+    target_region_id: int
+    target_latitude: float
+    target_longitude: float
+
+
+@dataclass
 class JournalState:
     """Persistent append-only records used for debugging, replay, and UI delivery."""
 
@@ -138,6 +151,10 @@ class EventTreatyRefused(DomainGameEvent):
 
     treaty_id: str
     responder_country_tag: str
+    source_country_tag: str = ""
+    title: str = ""
+    accepted_country_tags: tuple[str, ...] = ()
+    reason: str = ""
 
 
 @dataclass
@@ -248,6 +265,8 @@ class EventBattleEnded(DomainGameEvent):
     side_a_losses: int = 0
     side_b_losses: int = 0
     participant_countries: tuple[str, ...] = ()
+    side_a_country_ids: tuple[str, ...] = ()
+    side_b_country_ids: tuple[str, ...] = ()
 
 
 @dataclass
@@ -300,6 +319,7 @@ class EventTreatyLifecycleChanged(DomainGameEvent):
     country_ids: tuple[str, ...]
     at_minute: int
     reason: str = ""
+    proposal_id: str = ""
 
 
 @dataclass
@@ -375,6 +395,19 @@ class EventBudgetChanged(DomainGameEvent):
     """
 
     country_tag: str
+
+
+@dataclass
+class EventResourceProductionIncreased(DomainGameEvent):
+    """Records an accepted country-level resource production investment."""
+
+    country_id: str
+    resource_id: str
+    increase_percent: int
+    previous_production: float
+    new_production: float
+    investment_cost_usd: float
+    at_minute: int
 
 
 @dataclass
@@ -610,3 +643,41 @@ class EventGovernmentFormChanged(DomainGameEvent):
     ruling_party_id: str
     at_minute: int
     reason: str
+
+
+@dataclass
+class EventMartialLawChanged(DomainGameEvent):
+    """Records an authoritative martial-law status change."""
+
+    country_id: str
+    previous_status: bool
+    new_status: bool
+    at_minute: int
+    reason: str
+
+
+@dataclass
+class EventGovernmentCapitalChanged(DomainGameEvent):
+    """Records an authoritative change to the capital region."""
+
+    country_id: str
+    previous_region_id: int
+    new_region_id: int
+    at_minute: int
+    reason: str
+
+
+@dataclass
+class EventPoliticalPartyEligibilityChanged(DomainGameEvent):
+    country_id: str
+    changes: dict[str, bool]
+    government_form_id: str
+    at_minute: int
+
+
+@dataclass
+class EventCovertMissionReady(DomainGameEvent):
+    country_id: str
+    cell_id: str
+    mission_id: str
+    at_minute: int

@@ -1,0 +1,14 @@
+{
+  "fixture": "tests/ui/fixtures/reference-resource-policy.json",
+  "steps": [
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "economy.resources_btn" },
+    { "op": "click", "target": "resources.category.energy" },
+    { "op": "click", "target": "resources.resource.oil" },
+    { "op": "click", "target": "resources.policy.tax.increment" },
+    { "op": "assert", "target": "resources.policy.tax", "value": 6 },
+    { "op": "click", "target": "resources.policy.tax.decrement" },
+    { "op": "assert", "target": "resources.policy.tax", "value": 5 },
+    { "op": "assert_action", "type": "ActionUpdateResourcePolicy", "count": 0 }
+  ]
+}

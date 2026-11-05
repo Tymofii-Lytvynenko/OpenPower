@@ -1,0 +1,12 @@
+{
+  "tables": {
+    "countries_treaties": [
+      {
+        "id": "main-bar-alliance",
+        "type": "alliance",
+        "status": "active",
+        "members": ["UKR", "POL"]
+      }
+    ]
+  }
+}

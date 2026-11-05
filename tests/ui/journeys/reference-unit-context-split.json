@@ -1,0 +1,10 @@
+{
+  "fixture":"tests/ui/fixtures/reference-unit-reorganization.json",
+  "steps":[
+    {"op":"click","target":"unit.context.split"},
+    {"op":"assert_region","target":"unit.split.group","visible":true},
+    {"op":"click","target":"unit.split.equally"},
+    {"op":"click","target":"unit.split.apply"},
+    {"op":"assert_action","type":"ActionSplitUnit","fields":{"unit_id":"unit-1","detached_strength":500}}
+  ]
+}

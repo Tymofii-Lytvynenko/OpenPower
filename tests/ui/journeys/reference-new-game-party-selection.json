@@ -1,0 +1,94 @@
+{
+  "fixture": "tests/ui/fixtures/reference-new-game-country-validation.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "new_game.scenario.continue"
+    },
+    {
+      "op": "select",
+      "target": "new_game.country.select",
+      "value": "UKR - Ukraine"
+    },
+    {
+      "op": "assert",
+      "target": "new_game.selected_party",
+      "label": "Civic Alliance"
+    },
+    {
+      "op": "click",
+      "target": "new_game.party_selection.open"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.party_selection.dialog",
+      "visible": true,
+      "min_width": 339,
+      "min_height": 197
+    },
+    {
+      "op": "assert",
+      "target": "new_game.party_selection.party.ukr-ruling",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "new_game.party_selection.party.ukr-opposition"
+    },
+    {
+      "op": "click",
+      "target": "new_game.party_selection.confirm"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.party_selection.dialog",
+      "visible": false,
+      "present": false
+    },
+    {
+      "op": "assert",
+      "target": "new_game.selected_party",
+      "label": "People's Coalition"
+    },
+    {
+      "op": "click",
+      "target": "new_game.party_selection.open"
+    },
+    {
+      "op": "click",
+      "target": "new_game.party_selection.party.ukr-ruling"
+    },
+    {
+      "op": "click",
+      "target": "new_game.party_selection.cancel"
+    },
+    {
+      "op": "assert",
+      "target": "new_game.selected_party",
+      "label": "People's Coalition"
+    },
+    {
+      "op": "select",
+      "target": "new_game.country.select",
+      "value": "POL - Poland"
+    },
+    {
+      "op": "assert",
+      "target": "new_game.selected_party",
+      "label": "National Union"
+    },
+    {
+      "op": "click",
+      "target": "new_game.party_selection.open"
+    },
+    {
+      "op": "click",
+      "target": "new_game.party_selection.dialog.close"
+    },
+    {
+      "op": "assert",
+      "target": "new_game.selected_party",
+      "label": "National Union"
+    }
+  ]
+}

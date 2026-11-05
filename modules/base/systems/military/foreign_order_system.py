@@ -27,6 +27,8 @@ from src.shared.state import GameState
 from src.shared.system_state import SYSTEM_STATE_HELPER
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 
+USED_UNIT_RESALE_FACTOR = 0.75
+
 
 class EventForeignOrderChanged(DomainGameEvent):
     def __init__(self, order_id: str, status: str, buyer: str, seller: str, at_minute: int):
@@ -453,7 +455,9 @@ class ForeignOrderSystem(ISystem):
             return listings
         design = self._design(state, str(unit.get("design_id") or ""), owner)
         unit_cost = max(0.0, self._finite(unit.get("original_cost"))) or (0.0 if design is None else max(0.0, self._finite(design.get("cost"))))
-        price = self._finite(action.price) if self._finite(action.price) > 0 else unit_cost * 0.75
+        # REFERENCE applies a 25% used-unit rebate; OpenPower applies it when creating a listing.
+        requested_price = self._finite(action.price)
+        price = requested_price if requested_price > 0 else unit_cost * USED_UNIT_RESALE_FACTOR
         listings.append({
             "id": self._next_id("used-listing", listings), "seller_country_id": owner,
             "design_id": str(unit.get("design_id") or ""), "unit_id": str(action.unit_id),

@@ -1,3 +1,6 @@
+import math
+from typing import Any
+
 import numpy as np
 import polars as pl
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
@@ -19,9 +22,16 @@ from modules.base.systems.politics.political_effect_policy import (
     aggregate_political_effects_by_type,
     bounded_modifier,
 )
-from src.shared.events import EventRealSecond
-from src.shared.actions import ActionUpdateResourcePolicy
+from modules.base.systems.world.authority_policy import player_controls_country
+from src.shared.events import EventRealSecond, EventResourceProductionIncreased
+from src.shared.actions import ActionIncreaseResourceProduction, ActionUpdateResourcePolicy
+from src.shared.determinism import DeterministicRuntime
 from src.shared.economy_meta import RESOURCE_MAPPING
+from src.shared.resource_production_policy import (
+    PRODUCTION_INCREASE_PERCENTAGES,
+    estimate_production_increase_cost,
+    production_increase_basis,
+)
 
 _RESOURCE_LEDGER_METADATA = pl.DataFrame(
     [
@@ -55,9 +65,9 @@ class InternalEconomySystem(ISystem):
     """
 
     access = SystemAccess(
-        reads=frozenset({'countries', 'domestic_production', 'regions', 'units', 'random_event_effects', 'political_effects'}),
-        writes=frozenset({'countries', 'domestic_production', 'resource_ledger'}),
-        handles=frozenset({ActionUpdateResourcePolicy}),
+        reads=frozenset({'countries', 'domestic_production', 'regional_production', 'regions', 'units', 'random_event_effects', 'political_effects'}),
+        writes=frozenset({'countries', 'domestic_production', 'regional_production', 'resource_ledger'}),
+        handles=frozenset({ActionIncreaseResourceProduction, ActionUpdateResourcePolicy}),
         phase=SystemPhase.ECONOMY,
     )
     
@@ -158,12 +168,13 @@ class InternalEconomySystem(ISystem):
 
     def update(self, state: GameState, delta_time: float) -> None:
         # 1. Process Actions
+        rebuild_ledger = False
         for action in state.current_actions:
             if isinstance(action, ActionUpdateResourcePolicy):
                 self._handle_update_resource_policy(state, action)
+            elif isinstance(action, ActionIncreaseResourceProduction):
+                rebuild_ledger |= self._handle_increase_resource_production(state, action)
 
-        rebuild_ledger = False
-        
         if "resource_ledger" not in state.tables and "domestic_production" in state.tables and "trade_network" in state.tables:
             rebuild_ledger = True
 
@@ -183,8 +194,165 @@ class InternalEconomySystem(ISystem):
         if rebuild_ledger:
             self._build_resource_ledger(state, population)
 
+    def _handle_increase_resource_production(
+        self,
+        state: GameState,
+        action: ActionIncreaseResourceProduction,
+    ) -> bool:
+        country = str(action.country_tag or "").strip().upper()
+        resource = str(action.resource_id or "").strip().lower()
+        reason = self._validate_production_increase_action(state, action, country, resource)
+        if reason:
+            self._record_production_increase_result(state, action, "rejected", reason, country, resource)
+            return False
+
+        basis = production_increase_basis(state, country, resource)
+        cost = estimate_production_increase_cost(basis.annual_value_usd, action.increase_percent)
+        increase_ratio = action.increase_percent / 100.0
+        production = state.get_table("domestic_production")
+        current_production = float(
+            production.filter(
+                (pl.col("country_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_uppercase() == country)
+                & (pl.col("game_resource_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_lowercase() == resource)
+            )["domestic_production"][0]
+        )
+        production_match = (
+            (pl.col("country_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_uppercase() == country)
+            & (pl.col("game_resource_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_lowercase() == resource)
+        )
+        updated_production = production.with_columns(
+            pl.when(production_match)
+            .then(pl.col("domestic_production") + pl.lit(cost))
+            .otherwise(pl.col("domestic_production"))
+            .alias("domestic_production")
+        )
+
+        if basis.source == "regional":
+            regional = state.get_table("regional_production")
+            regional_match = (
+                pl.col("id").cast(pl.Utf8, strict=False).is_in(list(basis.regional_row_ids))
+                & (pl.col("country_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_uppercase() == country)
+                & (pl.col("game_resource_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_lowercase() == resource)
+            )
+            state.update_table(
+                "regional_production",
+                regional.with_columns(
+                    pl.when(regional_match)
+                    .then(pl.col("domestic_production") * (1.0 + increase_ratio))
+                    .otherwise(pl.col("domestic_production"))
+                    .alias("domestic_production")
+                ),
+            )
+
+        countries = state.get_table("countries")
+        updated_countries = countries.with_columns(
+            pl.when(pl.col("id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_uppercase() == country)
+            .then(pl.col("money_reserves") - pl.lit(cost))
+            .otherwise(pl.col("money_reserves"))
+            .alias("money_reserves")
+        )
+        state.update_table("countries", updated_countries)
+        state.update_table("domestic_production", updated_production)
+        state.events.append(
+            EventResourceProductionIncreased(
+                country_id=country,
+                resource_id=resource,
+                increase_percent=action.increase_percent,
+                previous_production=current_production,
+                new_production=current_production + cost,
+                investment_cost_usd=cost,
+                at_minute=int(state.time.total_minutes),
+            )
+        )
+        self._record_production_increase_result(
+            state,
+            action,
+            "applied",
+            "Production increase funded at one year of added output value.",
+            country,
+            resource,
+            cost_usd=cost,
+            production_increase=cost,
+            production_basis=basis.source,
+        )
+        return True
+
+    @staticmethod
+    def _validate_production_increase_action(
+        state: GameState,
+        action: ActionIncreaseResourceProduction,
+        country: str,
+        resource: str,
+    ) -> str:
+        if not country:
+            return "Select a country before increasing resource production."
+        countries = state.tables.get("countries")
+        if countries is None or not {"id", "money_reserves"}.issubset(countries.columns):
+            return "Country treasury data is unavailable."
+        country_rows = countries.filter(
+            pl.col("id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_uppercase() == country
+        )
+        if country_rows.height != 1:
+            return "The selected country is unavailable or ambiguous."
+        if not player_controls_country(state, action.player_id, country):
+            return "The issuer does not control this country's production."
+        if resource not in RESOURCE_MAPPING:
+            return "The selected resource is unavailable."
+        if type(action.increase_percent) is not int or action.increase_percent not in PRODUCTION_INCREASE_PERCENTAGES:
+            return "Select a supported production increase percentage."
+        try:
+            reserves = float(country_rows["money_reserves"][0])
+        except (TypeError, ValueError, OverflowError):
+            return "Country treasury data is unavailable."
+        if not math.isfinite(reserves):
+            return "Country treasury data is unavailable."
+        production = state.tables.get("domestic_production")
+        if production is None or not {"country_id", "game_resource_id", "domestic_production"}.issubset(production.columns):
+            return "Domestic production data is unavailable."
+        production_rows = production.filter(
+            (pl.col("country_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_uppercase() == country)
+            & (pl.col("game_resource_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_lowercase() == resource)
+        )
+        if production_rows.height != 1:
+            return "The domestic production row is missing or ambiguous."
+        basis = production_increase_basis(state, country, resource)
+        if basis is None or estimate_production_increase_cost(basis.annual_value_usd, action.increase_percent) is None:
+            return "No positive production value is available in this country for the selected resource."
+        return ""
+
+    @staticmethod
+    def _record_production_increase_result(
+        state: GameState,
+        action: ActionIncreaseResourceProduction,
+        status: str,
+        reason: str,
+        country: str,
+        resource: str,
+        **details: Any,
+    ) -> None:
+        state.journal.append_command_result(
+            {
+                "result_id": DeterministicRuntime(state.determinism).next_id(
+                    "resource-production-command", int(state.globals.get("tick", 0))
+                ),
+                "action_type": type(action).__name__,
+                "player_id": str(action.player_id),
+                "status": status,
+                "reason": reason,
+                "game_minute": int(state.time.total_minutes),
+                "country_id": country,
+                "resource_id": resource,
+                "increase_percent": action.increase_percent,
+                **details,
+            }
+        )
+
     def _handle_update_resource_policy(self, state: GameState, action: ActionUpdateResourcePolicy) -> None:
-        if "domestic_production" not in state.tables:
+        country = str(action.country_tag or "").strip().upper()
+        resource = str(action.resource_id or "").strip().lower()
+        reason = self._validate_resource_policy_action(state, action, country, resource)
+        if reason:
+            self._record_resource_policy_result(state, action, "rejected", reason, country, resource)
             return
 
         df = state.get_table("domestic_production")
@@ -198,10 +366,11 @@ class InternalEconomySystem(ISystem):
         if expressions:
             df = df.with_columns(expressions)
 
-        tax_rate = max(0.0, min(1.0, float(action.tax_rate)))
+        tax_rate = float(action.tax_rate)
+        # Match policy rows without allowing caller-supplied casing to create a second key.
         target = (
-            (pl.col("country_id") == action.country_tag)
-            & (pl.col("game_resource_id") == action.resource_id)
+            (pl.col("country_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_uppercase() == country)
+            & (pl.col("game_resource_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_lowercase() == resource)
         )
 
         updated = df.with_columns([
@@ -219,6 +388,76 @@ class InternalEconomySystem(ISystem):
             .alias("tax_rate"),
         ])
         state.update_table("domestic_production", updated)
+        self._record_resource_policy_result(
+            state,
+            action,
+            "applied",
+            "Resource policy updated.",
+            country,
+            resource,
+        )
+
+    @staticmethod
+    def _validate_resource_policy_action(
+        state: GameState,
+        action: ActionUpdateResourcePolicy,
+        country: str,
+        resource: str,
+    ) -> str:
+        if not country:
+            return "Select a country before changing its resource policy."
+        countries = state.tables.get("countries")
+        if countries is None or "id" not in countries.columns or not any(
+            str(value or "").strip().upper() == country for value in countries["id"].to_list()
+        ):
+            return "The selected country is unavailable."
+        if not player_controls_country(state, action.player_id, country):
+            return "The issuer does not control this country's resource policy."
+        if resource not in RESOURCE_MAPPING:
+            return "The selected resource is unavailable."
+        if type(action.is_gov_controlled) is not bool or type(action.is_legal) is not bool:
+            return "Resource management and legal status must be boolean values."
+        try:
+            tax_rate = float(action.tax_rate)
+        except (TypeError, ValueError, OverflowError):
+            return "Resource tax must be a finite ratio from 0 to 1."
+        if not math.isfinite(tax_rate) or not 0.0 <= tax_rate <= 1.0:
+            return "Resource tax must be a finite ratio from 0 to 1."
+
+        production = state.tables.get("domestic_production")
+        if production is None or not {"country_id", "game_resource_id"}.issubset(production.columns):
+            return "Domestic production policy data is unavailable."
+        row_count = production.filter(
+            (pl.col("country_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_uppercase() == country)
+            & (pl.col("game_resource_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_lowercase() == resource)
+        ).height
+        if row_count != 1:
+            return "The domestic production policy row is missing or ambiguous."
+        return ""
+
+    @staticmethod
+    def _record_resource_policy_result(
+        state: GameState,
+        action: ActionUpdateResourcePolicy,
+        status: str,
+        reason: str,
+        country: str,
+        resource: str,
+    ) -> None:
+        state.journal.append_command_result(
+            {
+                "result_id": DeterministicRuntime(state.determinism).next_id(
+                    "resource-policy-command", int(state.globals.get("tick", 0))
+                ),
+                "action_type": type(action).__name__,
+                "player_id": str(action.player_id),
+                "status": status,
+                "reason": reason,
+                "game_minute": int(state.time.total_minutes),
+                "country_id": country,
+                "resource_id": resource,
+            }
+        )
 
     def _get_population(self, state: GameState) -> pl.DataFrame:
         regions = state.get_table("regions")

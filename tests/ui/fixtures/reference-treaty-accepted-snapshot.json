@@ -1,0 +1,34 @@
+{
+  "tables": {
+    "pending_treaties": [],
+    "countries_treaties": [
+      {
+        "id": "agreement-server",
+        "name": "Mail-selected compact",
+        "type": "alliance",
+        "status": "active",
+        "members": [
+          "UKR",
+          "POL"
+        ]
+      }
+    ]
+  },
+  "journal": {
+    "domain_events": [
+      {
+        "event_id": "activated-proposal",
+        "event_type": "EventTreatyLifecycleChanged",
+        "payload": {
+          "treaty_id": "agreement-server",
+          "proposal_id": "proposal-mail",
+          "transition": "activated",
+          "country_ids": [
+            "UKR",
+            "POL"
+          ]
+        }
+      }
+    ]
+  }
+}

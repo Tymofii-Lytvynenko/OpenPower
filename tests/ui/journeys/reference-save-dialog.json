@@ -1,0 +1,14 @@
+{
+  "steps": [
+    {"op": "key", "key": "f3"},
+    {"op": "assert_region", "target": "save_game.dialog", "visible": true},
+    {"op": "input", "target": "save_game.name", "value": "navigation-check"},
+    {"op": "click", "target": "save_game.submit"},
+    {"op": "assert_action", "type": "ActionSaveGame", "fields": {"save_name": "navigation-check"}},
+    {"op": "assert_region", "target": "save_game.dialog", "visible": false},
+    {"op": "key", "key": "f4"},
+    {"op": "assert_region", "target": "load_game.dialog", "visible": true},
+    {"op": "key", "key": "f4"},
+    {"op": "assert_region", "target": "load_game.dialog", "visible": false}
+  ]
+}

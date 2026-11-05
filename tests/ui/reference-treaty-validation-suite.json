@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-treaty-anarchy.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-duplicate-name.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-ineligible-rejection.json",
+      "surface": "game-hud"
+    }
+  ]
+}

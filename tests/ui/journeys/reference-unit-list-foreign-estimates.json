@@ -1,0 +1,22 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-list-foreign-estimates.json",
+  "steps": [
+    { "op": "click", "target": "hud.country" },
+    { "op": "click", "target": "hud.country.option.MEX" },
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "economy.budget_btn" },
+    { "op": "click", "target": "budget.navigate.fixed-military-upkeep" },
+    { "op": "assert_region", "target": "unit_list.panel", "visible": true },
+    { "op": "assert", "target": "unit_list.estimate.confidence", "label": "75%" },
+    { "op": "assert", "target": "unit_list.row.type.1", "label": "Estimated forces" },
+    { "op": "assert", "target": "unit_list.row.quantity.1", "label": "7–13" },
+    { "op": "assert", "target": "unit_list.row.name.1", "label": "Ukraine" },
+    { "op": "assert", "target": "unit_list.row.position.1", "label": "MEX · t=13" },
+    { "op": "assert", "target": "unit_list.row.status.1", "label": "Estimate" },
+    { "op": "assert", "target": "unit_list.row.type.2", "label": "Tank" },
+    { "op": "assert", "target": "unit_list.row.quantity.2", "label": "2–4" },
+    { "op": "hover", "target": "unit_list.row.name.1" },
+    { "op": "wait", "frames": 15 },
+    { "op": "assert_region", "target": "unit_list.panel", "visible": true }
+  ]
+}

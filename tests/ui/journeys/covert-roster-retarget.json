@@ -1,0 +1,53 @@
+{
+  "fixture": "tests/ui/fixtures/covert-roster.json",
+  "steps": [
+    {
+      "op": "select",
+      "target": "covert_ops.cell.cell-test.country",
+      "value": "Ukraine"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionRetargetCovertCell",
+      "fields": {
+        "cell_id": "cell-test",
+        "target_country_tag": "UKR",
+        "expected_target_country_tag": "POL",
+        "expected_status": "active"
+      }
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.cell.cell-test.country",
+      "enabled": false
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/covert-roster-transit.json"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.cell.cell-test.status",
+      "enabled": false
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/covert-roster-arrived.json"
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.cell.cell-test.country",
+      "enabled": true
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": true
+    }
+  ]
+}

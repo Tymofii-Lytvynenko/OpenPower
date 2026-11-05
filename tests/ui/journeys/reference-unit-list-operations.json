@@ -1,0 +1,97 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-list-actions.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_unit_list"},
+    {
+      "op": "assert_region",
+      "target": "unit_list.panel",
+      "visible": true,
+      "min_width": 800,
+      "min_height": 427
+    },
+    {
+      "op": "assert",
+      "target": "unit_list.filter",
+      "type": "combo",
+      "enabled": true,
+      "relative_to": "unit_list.panel",
+      "relative_rect": {"x": 128, "y": 45, "width": 218, "height": 16},
+      "tolerance": 10.0
+    },
+    {
+      "op": "assert",
+      "target": "unit_list.row.name.unit-fighter-01",
+      "visible": true,
+      "relative_to": "unit_list.panel",
+      "relative_rect": {"x": 256, "y": 83},
+      "tolerance": 11.0
+    },
+    {"op": "assert", "target": "unit_list.sell", "enabled": false},
+    {"op": "click", "target": "unit_list.filter"},
+    {"op": "assert_region", "target": "unit_list.panel", "visible": true},
+    {"op": "click", "target": "unit_list.filter"},
+    {"op": "select", "target": "unit_list.filter", "value": "Tank"},
+    {"op": "select", "target": "unit_list.filter", "value": "Infantry"},
+    {"op": "assert", "target": "unit_list.row.name.unit-infantry-1", "visible": true},
+    {"op": "select", "target": "unit_list.filter", "value": "Fighter Aircraft"},
+    {"op": "assert", "target": "unit_list.sort.upkeep", "enabled": true},
+    {"op": "assert", "target": "unit_list.row.upkeep.unit-fighter-01", "label": "52 500"},
+    {"op": "click", "target": "unit_list.sort.upkeep.arrow"},
+    {"op": "assert", "target": "unit_list.row.upkeep.unit-fighter-01", "label": "52 500"},
+    {"op": "click", "target": "unit_list.sort.upkeep"},
+    {"op": "assert", "target": "unit_list.row.upkeep.unit-fighter-25", "label": "112 500"},
+    {"op": "click", "target": "unit_list.sort.quantity"},
+    {"op": "click", "target": "unit_list.view_design.unit-fighter-01"},
+    {"op": "assert", "target": "unit_list.sell", "enabled": true},
+    {"op": "click", "target": "unit_list.sell"},
+    {
+      "op": "assert_action",
+      "type": "ActionListUsedUnit",
+      "fields": {"country_tag": "UKR", "unit_id": "unit-fighter-01", "price": 0.0}
+    },
+    {"op": "click", "target": "unit_list.view_design.unit-fighter-01"},
+    {"op": "key_down", "key": "left_ctrl"},
+    {"op": "click", "target": "unit_list.view_design.unit-fighter-02"},
+    {"op": "key_up", "key": "left_ctrl"},
+    {"op": "assert", "target": "unit_list.train", "enabled": true},
+    {"op": "click", "target": "unit_list.train"},
+    {"op": "assert_region", "target": "unit.training.question", "visible": true},
+    {"op": "assert_action", "type": "ActionTrainUnit", "count": 0},
+    {"op": "click", "target": "unit.training.question.no"},
+    {"op": "assert_region", "target": "unit.training.question", "visible": false},
+    {"op": "assert", "target": "unit_list.train", "enabled": true},
+    {"op": "assert_action", "type": "ActionTrainUnit", "count": 0},
+    {"op": "click", "target": "unit_list.train"},
+    {"op": "assert_region", "target": "unit.training.question", "visible": true},
+    {"op": "click", "target": "unit.training.question.yes"},
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "count": 2,
+      "index": 0,
+      "fields": {"country_tag": "UKR", "unit_id": "unit-fighter-01", "target_level": "Regular"}
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "count": 2,
+      "index": 1,
+      "fields": {"country_tag": "UKR", "unit_id": "unit-fighter-02", "target_level": "Regular"}
+    },
+    {"op": "assert", "target": "unit_list.train", "enabled": false},
+    {"op": "assert", "target": "unit_list.sell", "enabled": false},
+    {"op": "hover", "target": "unit_list.panel.close"},
+    {"op": "assert_region", "target": "unit_list.panel", "visible": true},
+    {"op": "click", "target": "unit_list.view_design.unit-fighter-03"},
+    {"op": "assert", "target": "unit_list.disband", "enabled": true},
+    {"op": "assert_region", "target": "unit_list.panel", "visible": true},
+    {"op": "click", "target": "unit_list.disband"},
+    {
+      "op": "assert_action",
+      "type": "ActionDisbandUnits",
+      "fields": {"player_id": "ui-test-player", "unit_ids": ["unit-fighter-03"]}
+    },
+    {"op": "assert", "target": "unit_list.disband", "enabled": false}
+  ]
+}

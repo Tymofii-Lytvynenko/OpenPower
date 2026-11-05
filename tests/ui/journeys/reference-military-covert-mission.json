@@ -1,0 +1,44 @@
+{
+  "fixture": "tests/ui/fixtures/reference-covert-mission-targets.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "assert_region", "target": "military.panel", "visible": true},
+    {"op": "click", "target": "military.open_covert"},
+    {"op": "assert_region", "target": "covert_ops.panel", "visible": true},
+    {"op": "click", "target": "covert_ops.open_new_mission"},
+    {"op": "assert_region", "target": "covert.new_mission.dialog", "visible": true},
+    {"op": "assert", "target": "covert_ops.progress.heading", "label": "PROGRESS",
+     "inside": "covert_ops.panel", "relative_to": "covert_ops.panel",
+     "relative_rect": {"x": 529, "y": 52},
+     "no_overlap": "covert_ops.cell.cell-test.select"},
+    {"op": "select", "target": "covert.new_mission.type", "value": "Assassination"},
+    {"op": "assert", "target": "covert.new_mission.sector", "enabled": false, "value": 0},
+    {"op": "assert_region", "target": "covert.new_mission.dialog", "visible": true},
+    {"op": "select", "target": "covert.new_mission.type", "value": "Espionage"},
+    {"op": "assert", "target": "covert.new_mission.sector", "enabled": true, "value": 0},
+    {"op": "select", "target": "covert.new_mission.type", "value": "Sabotage"},
+    {"op": "select", "target": "covert.new_mission.sector", "value": "Civilian"},
+    {"op": "select", "target": "covert.new_mission.target", "value": "Cereals"},
+    {"op": "select", "target": "covert.new_mission.complexity", "value": "High"},
+    {"op": "select", "target": "covert.new_mission.cover_country", "value": "UKR — Ukraine"},
+    {"op": "assert_region", "target": "covert.new_mission.dialog", "visible": true},
+    {"op": "click", "target": "covert.new_mission.submit"},
+    {
+      "op": "assert_action",
+      "type": "ActionStartCovertMission",
+      "fields": {
+        "cell_id": "cell-test",
+        "mission_type": "civilian_sabotage",
+        "target_country_tag": "POL",
+        "cover_country_tag": "UKR",
+        "target_sector": "civilian",
+        "complexity": "high",
+        "target_resource_id": "cereals"
+      }
+    },
+    {"op": "click", "target": "covert_ops.open_new_mission"},
+    {"op": "assert_region", "target": "covert.new_mission.dialog", "visible": true},
+    {"op": "click", "target": "covert.new_mission.dialog.close"},
+    {"op": "assert_region", "target": "covert.new_mission.dialog", "visible": false}
+  ]
+}

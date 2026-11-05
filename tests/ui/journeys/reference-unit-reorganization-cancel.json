@@ -1,0 +1,9 @@
+{
+  "fixture":"tests/ui/fixtures/reference-unit-reorganization.json",
+  "steps":[
+    {"op":"click","target":"unit.context.split"},
+    {"op":"click","target":"unit.split.equally"},
+    {"op":"close_window","target":"unit.split.group"},
+    {"op":"assert_action","type":"ActionSplitUnit","count":0}
+  ]
+}

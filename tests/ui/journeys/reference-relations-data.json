@@ -1,0 +1,31 @@
+{
+  "fixture": "tests/ui/fixtures/reference-relations.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.relations"
+    },
+    {
+      "op": "assert_region",
+      "target": "relations.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "relations.summary",
+      "visible": true,
+      "label": "UKR \u2192 POL: +40.0"
+    },
+    {
+      "op": "select",
+      "target": "relations.country_a",
+      "value": "Poland (POL)"
+    },
+    {
+      "op": "assert",
+      "target": "relations.summary",
+      "visible": true,
+      "label": "POL \u2192 UKR: +30.0"
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "fixture": "tests/ui/fixtures/reference-new-game-country-validation.json",
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "new_game.scenario.dialog",
+      "visible": true,
+      "min_width": 560,
+      "min_height": 354
+    },
+    {
+      "op": "assert",
+      "target": "new_game.scenario.description",
+      "label": "A deterministic campaign selection fixture.",
+      "visible": true
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.scenario.list/campaign_scenarios",
+      "visible": true,
+      "relative_to": "new_game.scenario.dialog",
+      "relative_rect": {"x": 34, "y": 240, "width": 189, "height": 76}
+    },
+    {
+      "op": "click",
+      "target": "new_game.scenario.ui-test-campaign"
+    },
+    {
+      "op": "click",
+      "target": "new_game.scenario.tab.objectives"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.scenario.dialog",
+      "visible": true,
+      "min_width": 560,
+      "min_height": 354
+    },
+    {
+      "op": "assert",
+      "target": "new_game.scenario.tab.objectives",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "new_game.scenario.objective.1",
+      "label": "Maintain stability (within 60 minute(s))",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "new_game.scenario.time_limit",
+      "label": "180 min",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "new_game.scenario.tab.rules"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.scenario.dialog",
+      "visible": true,
+      "min_width": 560,
+      "min_height": 354
+    },
+    {
+      "op": "assert",
+      "target": "new_game.scenario.rule.1",
+      "label": "Democratic elections",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "new_game.scenario.continue"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.panel",
+      "visible": true,
+      "min_width": 346,
+      "min_height": 341
+    },
+    {
+      "op": "assert",
+      "target": "new_game.country.select",
+      "visible": true,
+      "relative_to": "new_game.panel",
+      "relative_rect": {"x": 36, "y": 58, "width": 194, "height": 16}
+    },
+    {
+      "op": "assert",
+      "target": "new_game.party_selection.open",
+      "visible": true,
+      "relative_to": "new_game.panel",
+      "relative_rect": {"x": 35, "y": 157, "width": 184, "height": 18}
+    },
+    {
+      "op": "assert",
+      "target": "new_game.start",
+      "visible": true,
+      "relative_to": "new_game.panel",
+      "relative_rect": {"x": 226, "y": 313, "width": 106, "height": 18}
+    },
+    {
+      "op": "assert",
+      "target": "new_game.objective.1",
+      "label": "Maintain stability",
+      "visible": true,
+      "relative_to": "new_game.panel",
+      "relative_rect": {"x": 49, "y": 223}
+    },
+    {
+      "op": "assert",
+      "target": "new_game.start",
+      "label": "START CAMPAIGN",
+      "visible": true,
+      "enabled": false
+    },
+    {
+      "op": "select",
+      "target": "new_game.country.select",
+      "value": "UKR - Ukraine"
+    },
+    {
+      "op": "assert_region",
+      "target": "new_game.panel",
+      "visible": true,
+      "min_width": 346,
+      "min_height": 341
+    },
+    {
+      "op": "assert",
+      "target": "new_game.start",
+      "label": "START CAMPAIGN",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "assert",
+      "target": "new_game.selected_country",
+      "label": "COUNTRY: UKR",
+      "visible": true
+    }
+  ]
+}

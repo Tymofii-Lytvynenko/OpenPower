@@ -1,0 +1,40 @@
+{
+  "fixture": "tests/ui/fixtures/war-list-controlled-war.json",
+  "steps": [
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "click", "target": "military.open_war_list" },
+    { "op": "server_snapshot", "fixture": "tests/ui/fixtures/peace-submit-rejected-result.json" },
+    { "op": "click", "target": "war_list.page" },
+    { "op": "assert_region", "target": "war_list.peace.builder", "visible": true },
+    { "op": "select", "target": "war_list.peace.clause_type", "value": "War reparations" },
+    { "op": "select", "target": "war_list.peace.direction", "value": "Offer to the other side" },
+    { "op": "input", "target": "war_list.peace.amount", "value": 1200 },
+    { "op": "input", "target": "war_list.peace.duration_months", "value": 12 },
+    { "op": "click", "target": "war_list.peace.add_clause" },
+    { "op": "click", "target": "war_list.peace.submit" },
+    {
+      "op": "assert_action",
+      "type": "ActionSubmitPeaceDeal",
+      "fields": { "war_id": "war-controlled-1", "proposer_country_id": "UKR" }
+    },
+    {
+      "op": "assert_region",
+      "target": "generic_message.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "generic_message.content",
+      "label": "Submit Peace Deal\nThe selected war is no longer active.",
+      "relative_to": "generic_message.dialog",
+      "no_overlap": "generic_message.ok"
+    },
+    { "op": "click", "target": "generic_message.ok" },
+    {
+      "op": "assert",
+      "target": "war_list.peace.offered",
+      "label": "Offered: war_reparations"
+    },
+    { "op": "assert", "target": "war_list.peace.submit", "enabled": true }
+  ]
+}

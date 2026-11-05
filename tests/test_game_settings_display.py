@@ -548,6 +548,25 @@ class TestGameSettingsServiceDisplayFlow(unittest.TestCase):
 
         self.assertEqual(repository.saved_settings, [])
 
+    def test_advisor_preferences_are_saved_as_one_local_settings_update(self):
+        repository = RecordingRepository(GameSettings())
+        service = GameSettingsService(repository, self.catalog)
+
+        service.set_advisor_preferences({
+            "advisor_economy_manual": False,
+            "advisor_economy_automatic": True,
+        })
+
+        self.assertFalse(service.settings.advisor_economy_manual)
+        self.assertTrue(service.settings.advisor_economy_automatic)
+        self.assertEqual(repository.saved_settings, [service.settings])
+
+        service.set_advisor_preferences({
+            "advisor_economy_manual": False,
+            "advisor_economy_automatic": True,
+        })
+        self.assertEqual(repository.saved_settings, [service.settings])
+
 
 class TestGameSettingsContentWiring(unittest.TestCase):
     def setUp(self):

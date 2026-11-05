@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from src.shared.military_constants import UNIT_TRAINING_LEVELS, ROLE_ALIASES
+
 
 CAPABILITY_BOUNDS: dict[str, tuple[float, float]] = {
     "hit_points": (0.0, 10000.0),
@@ -70,7 +72,7 @@ CAPABILITY_METADATA: dict[str, dict[str, Any]] = {
     for name, description in _CAPABILITY_DESCRIPTIONS.items()
 }
 
-TRAINING_LEVELS = ("Recruit", "Regular", "Veteran", "Elite")
+TRAINING_LEVELS = UNIT_TRAINING_LEVELS
 TRAINING_BONUS_DEFAULTS = {"Recruit": 0.0, "Regular": 0.05, "Veteran": 0.10, "Elite": 0.15}
 TRAINING_AFFECTED_CAPABILITIES = frozenset({
     "speed", "maneuverability", "sensors", "gun_precision", "missile_precision", "stealth", "countermeasures",
@@ -84,6 +86,12 @@ class UnitRoleProfile:
     capabilities: Mapping[str, float]
     valid_targets: tuple[str, ...]
     vulnerabilities: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DesignCapabilityRequirement:
+    required: tuple[str, ...] = ()
+    weapon_alternatives: tuple[tuple[str, ...], ...] = ()
 
 
 def _profile(
@@ -161,39 +169,115 @@ DEFAULT_ROLE_PROFILES: dict[str, UnitRoleProfile] = {
     "missile_defense": _profile("missile_defense", "strategic", 0, 0, 0, 0, 5000, 1, ("missile",), ("saturation",), maneuverability=0, sensors=5000, missile_precision=0.8),
 }
 
-ROLE_ALIASES = {
-    "army": "infantry",
-    "infantry_vehicle": "infantry_vehicles",
-    "infantry_vehicle_brigade": "infantry_vehicles",
-    "artillery_gun": "artillery",
-    "ifv": "infantry_vehicles",
-    "apc": "infantry_vehicles",
-    "air_defence": "air_defense",
-    "mobile_launcher": "mobile_launchers",
-    "tank": "tanks",
-    "artillery_brigade": "artillery",
-    "transport_helicopter": "transport_helicopters",
-    "attack_helicopter": "attack_helicopters",
-    "asw_helicopter": "anti_submarine_helicopters",
-    "anti_submarine_helicopter": "anti_submarine_helicopters",
-    "fighter_aircraft": "fighters",
-    "fighter": "fighters",
-    "bomber": "bombers",
-    "patrol_boat": "patrol_craft",
-    "corvette": "corvettes",
-    "frigate": "frigates",
-    "destroyer": "destroyers",
-    "attack_submarine": "attack_submarines",
-    "ballistic_missile_submarine": "ballistic_missile_submarines",
-    "aircraft_carrier": "aircraft_carriers",
-    "strategic_missile": "strategic_missiles",
-    "ballistic_missile": "strategic_missiles",
+
+
+
+# Keep source SaveDesign minimums while retaining OpenPower's role names and value ranges.
+# Source: docs/ui/reference/source_links.md
+SOURCE_DESIGN_CAPABILITY_REQUIREMENTS: dict[str, DesignCapabilityRequirement] = {
+    **{
+        role: DesignCapabilityRequirement(
+            required=("sensors", "speed", "countermeasures", "armor"),
+            weapon_alternatives=(
+                ("gun_range", "gun_precision", "gun_damage"),
+                ("missile_range", "missile_precision", "missile_damage", "missile_payload"),
+            ),
+        )
+        for role in ("patrol_craft", "corvettes", "frigates", "destroyers")
+    },
+    **{
+        role: DesignCapabilityRequirement(required=(
+            "speed", "sensors", "missile_payload", "missile_range",
+            "missile_precision", "missile_damage", "countermeasures", "armor",
+        ))
+        for role in ("attack_submarines", "ballistic_missile_submarines")
+    },
+    "aircraft_carriers": DesignCapabilityRequirement(required=(
+        "speed", "sensors", "countermeasures", "armor", "missile_payload", "missile_range",
+    )),
+    "strategic_missiles": DesignCapabilityRequirement(required=(
+        "missile_range", "missile_precision", "missile_damage",
+    )),
+    "bombers": DesignCapabilityRequirement(required=(
+        "speed", "sensors", "missile_payload", "missile_range", "missile_precision",
+        "missile_damage", "countermeasures", "armor",
+    )),
+    **{
+        role: DesignCapabilityRequirement(required=(
+            "speed", "sensors", "gun_range", "gun_precision", "gun_damage",
+            "missile_payload", "missile_range", "missile_precision", "missile_damage",
+            "countermeasures", "armor",
+        ))
+        for role in ("attack_aircraft", "fighters", "attack_helicopters")
+    },
+    "anti_submarine_helicopters": DesignCapabilityRequirement(required=(
+        "speed", "sensors", "missile_payload", "missile_range", "missile_precision",
+        "missile_damage", "countermeasures", "armor",
+    )),
+    "transport_helicopters": DesignCapabilityRequirement(required=(
+        "speed", "sensors", "gun_range", "gun_precision", "gun_damage",
+        "countermeasures", "armor",
+    )),
+    **{
+        role: DesignCapabilityRequirement(required=(
+            "speed", "sensors", "gun_range", "gun_precision", "gun_damage", "armor",
+        ))
+        for role in ("artillery", "tanks")
+    },
+    "mobile_launchers": DesignCapabilityRequirement(required=(
+        "speed", "sensors", "missile_payload", "missile_range", "missile_precision",
+        "missile_damage", "armor",
+    )),
+    "air_defense": DesignCapabilityRequirement(
+        required=("sensors", "speed", "armor"),
+        weapon_alternatives=(
+            ("gun_range", "gun_precision", "gun_damage"),
+            ("missile_range", "missile_precision", "missile_damage", "missile_payload"),
+        ),
+    ),
+    "infantry_vehicles": DesignCapabilityRequirement(required=(
+        "speed", "sensors", "gun_range", "gun_precision", "gun_damage", "armor",
+    )),
 }
 
 
 def canonical_role(value: Any) -> str:
     role = re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
     return ROLE_ALIASES.get(role, role)
+
+
+def design_capability_error(role: Any, capabilities: Mapping[str, Any]) -> str | None:
+    """Return an explanation when a source-mapped design is missing required stats."""
+
+    requirement = SOURCE_DESIGN_CAPABILITY_REQUIREMENTS.get(canonical_role(role))
+    if requirement is None:
+        return None
+
+    missing = [
+        key for key in requirement.required
+        if not _meets_design_minimum(key, capabilities.get(key))
+    ]
+    weapon_missing = bool(requirement.weapon_alternatives) and not any(
+        all(_meets_design_minimum(key, capabilities.get(key)) for key in group)
+        for group in requirement.weapon_alternatives
+    )
+    if missing and weapon_missing:
+        names = ", ".join(key.replace("_", " ").title() for key in missing)
+        return f"The selected design is missing required capabilities: {names} and needs a complete gun or missile profile."
+    if missing:
+        names = ", ".join(key.replace("_", " ").title() for key in missing)
+        return f"The selected design is missing required capabilities: {names}."
+    if weapon_missing:
+        return "The selected design needs a complete gun or missile profile."
+    return None
+
+
+def _meets_design_minimum(capability: str, value: Any) -> bool:
+    normalized = _finite(value)
+    if capability in {"gun_precision", "missile_precision"}:
+        # OpenPower stores precision as a fraction, so any positive value meets the source's nonzero minimum.
+        return normalized > 0.0
+    return _integer(normalized) >= 1
 
 
 def get_role_profile(role: Any, domain_hint: Any = "") -> UnitRoleProfile:

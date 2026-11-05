@@ -1,0 +1,47 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine"},
+      {"id": "POL", "name": "Poland"},
+      {"id": "DEU", "name": "Germany"},
+      {"id": "ZZZ", "name": "Inactive example", "active": false}
+    ],
+    "countries_treaties": [
+      {
+        "id": "filter-alliance",
+        "name": "Ukraine–Poland Alliance",
+        "type": "alliance",
+        "status": "active",
+        "members": ["UKR", "POL"],
+        "side_a": ["UKR"],
+        "side_b": ["POL"]
+      },
+      {
+        "id": "filter-market",
+        "name": "Ukraine–Germany Economic Partnership",
+        "type": "economic_partnership",
+        "status": "active",
+        "members": ["UKR", "DEU"],
+        "side_a": ["UKR"],
+        "side_b": ["DEU"]
+      }
+    ],
+    "pending_treaties": [
+      {
+        "id": "filter-proposal",
+        "title": "Germany–Ukraine Economic Partnership Proposal",
+        "treaty_type": "economic_partnership",
+        "status": "pending",
+        "source_country_id": "DEU",
+        "target_country_id": "UKR",
+        "side_a": ["DEU"],
+        "side_b": ["UKR"],
+        "required_responses": ["UKR"],
+        "accepted_members": ["DEU"]
+      }
+    ],
+    "countries_relations": [
+      {"source": "UKR", "target": "POL", "value": 50.0}
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "op": "key",
+      "key": "f9"
+    },
+    {
+      "op": "assert_region",
+      "target": "console.panel",
+      "visible": true
+    },
+    {
+      "op": "key",
+      "key": "f9"
+    },
+    {
+      "op": "assert_region",
+      "target": "console.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

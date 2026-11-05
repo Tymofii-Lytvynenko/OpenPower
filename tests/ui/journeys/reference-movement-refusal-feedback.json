@@ -1,0 +1,28 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-invasion.json",
+  "steps": [
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/reference-unit-order-refusal.json"
+    },
+    {
+      "op": "assert_region",
+      "target": "generic_message.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "generic_message.content",
+      "label": "Movement refused\n2 units could not move. No legal route is available."
+    },
+    {
+      "op": "click",
+      "target": "generic_message.ok"
+    },
+    {
+      "op": "assert_region",
+      "target": "generic_message.dialog",
+      "visible": false
+    }
+  ]
+}

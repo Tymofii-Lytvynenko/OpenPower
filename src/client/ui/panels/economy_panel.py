@@ -1,11 +1,12 @@
 import polars as pl
+from src.client.ui.core.formatting import format_currency
 from src.client.ui.core.instrumented_imgui import imgui
-from src.client.ui.core.testability import record_last_item
 
 from src.client.ui.core.theme import GAMETHEME
-from src.client.ui.core.primitives import UIPrimitives as Prims
+from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.panel_context import PanelRenderContext
+from src.client.ui.layouts.main_pillar_positions import main_pillar_position
 
 
 class EconomyPanel:
@@ -22,8 +23,12 @@ class EconomyPanel:
         self.toggle_trade_cb = toggle_trade_cb
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        # Matched width from screenshot proportions
-        with WindowManager.window("ECONOMY", x=1600, y=100, w=280, h=480) as is_open:
+        x, y = main_pillar_position("economy")
+        with WindowManager.window(
+            "ECONOMY", x=x, y=y, w=280, h=480, test_id="economy.panel",
+            horizontal_anchor="right", horizontal_margin=19.0,
+            flags=imgui.WindowFlags_.no_resize | imgui.WindowFlags_.no_scrollbar | imgui.WindowFlags_.no_scroll_with_mouse,
+        ) as is_open:
             if not is_open:
                 return False
             self._render_content(state, context.target_tag, context.is_own_country)
@@ -64,52 +69,44 @@ class EconomyPanel:
 
         balance = revenue - expenses
 
-        # --- 2. Render UI ---
-        imgui.push_style_var(imgui.StyleVar_.item_spacing, (8, 6))
-
-        # ECONOMIC MODEL Section
-        self._draw_header("ECONOMIC MODEL", "model_btn")
-        
-        imgui.push_style_color(imgui.Col_.frame_bg, imgui.get_color_u32((0.15, 0.15, 0.15, 1.0)))
-        imgui.push_style_color(imgui.Col_.slider_grab, imgui.get_color_u32((0.4, 0.8, 0.4, 1.0)))
-        
-        imgui.begin_disabled()
-        imgui.set_next_item_width(-1)
-        imgui.slider_float("##eco_model", market_model_val, 0.0, 1.0, "")
-        imgui.end_disabled()
-        imgui.pop_style_color(2)
-        
-        imgui.text_disabled("State-Controlled")
-        imgui.same_line()
-        Prims.right_align_text("Free Market", GAMETHEME.colors.text_dim)
-        imgui.dummy((0, 5))
-
-        # ECONOMIC HEALTH Section
-        self._draw_header("ECONOMIC HEALTH", "health_btn", callback=self.toggle_health_cb)
-        self._draw_meter_row(eco_health)
-        imgui.dummy((0, 5))
-
-        # BUDGET Section
-        self._draw_header("BUDGET", "budget_btn", callback=self.toggle_budget_cb)
-        self._draw_value_box("INCOME", revenue)
-        self._draw_value_box("EXPENSES", expenses)
-        self._draw_value_box("BALANCE", balance)
-        self._draw_value_box("AVAILABLE", reserves, is_available=True)
-        imgui.dummy((0, 5))
-
-        # RESOURCES Section
-        self._draw_header("RESOURCES", "resources_btn", callback=self.toggle_resources_cb)
-        self._draw_meter_row(resources_health, has_plus=True)
-        imgui.dummy((0, 15))
-
-        # TRADE Button
-        imgui.push_style_color(imgui.Col_.button, imgui.get_color_u32((0.15, 0.15, 0.15, 1.0)))
-        imgui.push_style_color(imgui.Col_.button_hovered, imgui.get_color_u32((0.25, 0.25, 0.25, 1.0)))
-        if imgui.button("TRADE", (-1, 28)) and self.toggle_trade_cb:
+        ui = GMLWidgets("Economic_Window/frmInner")
+        ui.text("frmEconomicModel/lblTitle", "ECONOMIC MODEL")
+        ui.meter("frmEconomicModel/frmModelCursor", market_model_val,
+                 GAMETHEME.colors.positive, cursor=True)
+        ui.text("frmEconomicModel/lblStateControlled", "State",
+                color=GAMETHEME.colors.text_dim)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip("State-controlled model")
+        ui.text("frmEconomicModel/lblFreeMarket", "Market",
+                color=GAMETHEME.colors.text_dim, right=True)
+        if imgui.is_item_hovered():
+            imgui.set_tooltip("Free-market model")
+        for section, label, button, test_id, callback in (
+            ("frmEconomicHealth", "ECONOMIC HEALTH", "btnMoreEconomicHealth", "economy.health_btn", self.toggle_health_cb),
+            ("frmBudget", "BUDGET", "btnMoreBudget", "economy.budget_btn", self.toggle_budget_cb),
+            ("frmResources", "RESOURCES", "btnMoreResources", "economy.resources_btn", self.toggle_resources_cb),
+        ):
+            ui.text(f"{section}/lblTitle", label)
+            if ui.button(f"{section}/{button}", "more", test_id, enabled=callback is not None):
+                callback()
+        for section, value in (("frmEconomicHealth", eco_health), ("frmResources", resources_health)):
+            ui.text(f"{section}/txtValue", f"{value * 100:.0f}%")
+            ui.meter(f"{section}/frmGradient", value, GAMETHEME.colors.positive)
+        for label_id, value_id, label, value in (
+            ("lblIncome", "txtIncome", "INCOME", revenue),
+            ("lblExpenses", "txtExpenses", "EXPENSES", expenses),
+            ("lblBalance", "txtBalance", "BALANCE", balance),
+            ("lblAvailable", "txtDebt", "AVAILABLE", reserves),
+        ):
+            # The source GML slot clips "AVAILABLE" at the configured UI font size.
+            display_label = "FUNDS" if label_id == "lblAvailable" else label
+            ui.text(f"frmBudget/{label_id}", display_label)
+            if label_id == "lblAvailable" and imgui.is_item_hovered():
+                imgui.set_tooltip("Available country reserves")
+            ui.text(f"frmBudget/{value_id}", self._fmt_money(value), right=True,
+                    color=GAMETHEME.colors.negative if value < 0 else GAMETHEME.colors.text_main)
+        if ui.button("btnTrade", "TRADE", "economy.trade_btn", enabled=self.toggle_trade_cb is not None):
             self.toggle_trade_cb()
-        imgui.pop_style_color(2)
-
-        imgui.pop_style_var()
 
     def _get_market_model_value(self, state, target_tag) -> float:
         """Returns the free-market share of domestic production from live policy data."""
@@ -177,112 +174,6 @@ class EconomyPanel:
         except Exception:
             return 0.0
 
-    # =========================================================================
-    # Helpers & Custom Drawing Routines for exact screenshot matching
-    # =========================================================================
-
-    def _fmt_money(self, val: float) -> str:
-        """Formats numbers with space separators and specific negative formatting."""
-        sign = "- " if val < 0 else ""
-        return f"$ {sign}{abs(val):,.0f}".replace(",", " ")
-
-    def _draw_header(self, title: str, btn_id: str, callback=None):
-        """Draws a section header with an optional right-aligned 'more' button."""
-        imgui.text(title)
-        
-        if callback is not None:
-            # Right-aligned small button
-            imgui.same_line(imgui.get_window_width() - 55)
-            imgui.push_style_var(imgui.StyleVar_.frame_padding, (4, 1))
-            imgui.push_style_color(imgui.Col_.button, imgui.get_color_u32((0.2, 0.2, 0.2, 1.0)))
-            
-            clicked = imgui.button(f"more##{btn_id}")
-            record_last_item(f"economy.{btn_id}", f"Open {title}", "button")
-            if clicked:
-                callback()
-                
-            imgui.pop_style_color()
-            imgui.pop_style_var()
-            
-        # Draw underline separator manually to control spacing
-        p = imgui.get_cursor_screen_pos()
-        avail_w = imgui.get_content_region_avail().x
-        draw_list = imgui.get_window_draw_list()
-        draw_list.add_line((p.x, p.y), (p.x + avail_w, p.y), imgui.get_color_u32((0.15, 0.15, 0.15, 1.0)), 2.0)
-        imgui.dummy((0, 4))
-
-    def _draw_value_box(self, label: str, value: float, is_available: bool = False):
-        """Draws a budget row with a left label and a dark background box for the right-aligned value."""
-        imgui.text(label)
-        imgui.same_line(85)  # Fixed offset so all value boxes align vertically
-        
-        p = imgui.get_cursor_screen_pos()
-        avail_w = imgui.get_content_region_avail().x
-        h = 18.0
-        
-        draw_list = imgui.get_window_draw_list()
-        
-        # Dark fill
-        draw_list.add_rect_filled(
-            p, (p.x + avail_w, p.y + h), 
-            imgui.get_color_u32((0.12, 0.12, 0.12, 1.0))
-        )
-        # Inner black border
-        draw_list.add_rect(
-            p, (p.x + avail_w, p.y + h), 
-            imgui.get_color_u32((0.0, 0.0, 0.0, 1.0))
-        )
-        imgui.dummy((avail_w, h))
-        
-        # Overlay the formatted text
-        imgui.same_line()
-        color = GAMETHEME.colors.text_main
-        if is_available and value < 0:
-            color = GAMETHEME.colors.negative
-            
-        val_str = self._fmt_money(value)
-        Prims.right_align_text(val_str, color)
-
-    def _draw_meter_row(self, percentage: float, has_plus=False):
-        """Draws a percentage text followed by a custom green gradient progress bar."""
-        percentage = max(0.0, min(float(percentage), 1.0))
-        pct_str = f"{percentage * 100:.1f} %"
-        if percentage >= 1.0:
-            pct_str = "100 %"
-            
-        imgui.text(pct_str)
-        imgui.same_line(65)
-        
-        p = imgui.get_cursor_screen_pos()
-        avail_w = imgui.get_content_region_avail().x
-        h = 14.0
-        
-        draw_list = imgui.get_window_draw_list()
-        
-        # Background box (Dark)
-        draw_list.add_rect_filled(
-            p, (p.x + avail_w, p.y + h), 
-            imgui.get_color_u32((0.15, 0.15, 0.15, 1.0))
-        )
-        
-        # Fill (Green)
-        fill_w = avail_w * percentage
-        if fill_w > 0:
-            # Simulating the gradient/bright green from screenshot
-            draw_list.add_rect_filled(
-                p, (p.x + fill_w, p.y + h), 
-                imgui.get_color_u32((0.3, 0.6, 0.2, 1.0)) 
-            )
-            
-        # Draw the black border
-        draw_list.add_rect(
-            p, (p.x + avail_w, p.y + h), 
-            imgui.get_color_u32((0.0, 0.0, 0.0, 1.0))
-        )
-        
-        # Add the tiny '+' character for the resources bar
-        if has_plus:
-            imgui.set_cursor_screen_pos((p.x + avail_w - 15, p.y - 1))
-            imgui.text("+")
-            
-        imgui.set_cursor_screen_pos((p.x, p.y + h))
+    @staticmethod
+    def _fmt_money(value: float) -> str:
+        return format_currency(value)

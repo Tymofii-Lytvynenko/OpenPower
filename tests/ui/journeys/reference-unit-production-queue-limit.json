@@ -1,0 +1,18 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-production-queue-limit.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_production"},
+    {"op": "click", "target": "unit_production.select_design.design-infantry-1"},
+    {"op": "assert_region", "target": "unit_production.panel", "visible": true, "min_width": 842, "min_height": 462},
+    {"op": "assert", "target": "unit_production.build", "visible": true, "enabled": false},
+    {"op": "assert_action", "type": "ActionQueueUnitProduction", "count": 0},
+    {"op": "select", "target": "unit_production.builder", "value": "Poland (POL)"},
+    {"op": "click", "target": "unit_production.category.air"},
+    {"op": "click", "target": "unit_production.select_design.design-pol-fighter"},
+    {"op": "assert", "target": "unit_production.build", "visible": true, "enabled": true},
+    {"op": "input", "target": "unit_production.quantity", "value": "3"},
+    {"op": "click", "target": "unit_production.build"},
+    {"op": "assert_action", "type": "ActionRequestForeignUnitOrder", "count": 1, "fields": {"buyer_country_tag": "UKR", "seller_country_tag": "POL", "design_id": "design-pol-fighter", "quantity": 3}}
+  ]
+}

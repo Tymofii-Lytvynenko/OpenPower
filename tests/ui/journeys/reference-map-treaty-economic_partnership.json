@@ -1,0 +1,43 @@
+{
+  "fixture": "tests/ui/fixtures/reference-map-foreign.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": {
+        "label": "Diplomacy",
+        "type": "begin_menu"
+      }
+    },
+    {
+      "op": "click",
+      "target": "map.treaty.economic_partnership"
+    },
+    {
+      "op": "assert_region",
+      "target": "treaty_proposal.panel",
+      "visible": true
+    },
+    {
+      "op": "scroll",
+      "target": "treaty.proposal.submit"
+    },
+    {
+      "op": "click",
+      "target": "treaty.proposal.submit"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionCreateTreaty",
+      "fields": {
+        "source_country_tag": "UKR",
+        "target_country_tag": "POL",
+        "treaty_type": "economic_partnership",
+        "side_a_country_tags": [
+          "POL",
+          "UKR"
+        ],
+        "side_b_country_tags": []
+      }
+    }
+  ]
+}

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from src.client.ui.core.instrumented_imgui import imgui
-
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
-from src.client.ui.panels.politics.political_overview_presenter import PoliticalOverviewPresenter
+from src.client.ui.panels.politics.political_overview_presenter import (
+    PoliticalOverviewPresenter,
+)
 from src.client.ui.panels.politics.presenter import PoliticsPresenter
+from src.client.ui.panels.shared.panel_widgets import draw_empty_state
 from src.shared.actions import ActionSetElectionOverride
 
 
@@ -16,7 +18,10 @@ class PoliticalOverviewPanel:
         self._override_durations: dict[tuple[str, str], int] = {}
 
     def render(self, state, context: PanelRenderContext) -> bool:
-        with WindowManager.window("POLITICAL OVERVIEW", x=260, y=120, w=520, h=640) as is_open:
+        with WindowManager.window(
+            "POLITICAL OVERVIEW", x=260, y=120, w=520, h=640,
+            test_id="political_overview.panel",
+        ) as is_open:
             if not is_open:
                 return False
             self._render_content(state, context)
@@ -56,7 +61,7 @@ class PoliticalOverviewPanel:
                 suffix = " — ruling" if party.is_ruling else ""
                 imgui.text(f"{party.display_name}: {support}{suffix}")
         else:
-            imgui.text_disabled("No party records are available.")
+            draw_empty_state("No party records are available.")
 
         imgui.spacing()
         imgui.text("ACTIVE LAWS")
@@ -65,7 +70,7 @@ class PoliticalOverviewPanel:
             for law in overview.laws:
                 imgui.text(f"{law.title}: {law.value} ({law.status})")
         else:
-            imgui.text_disabled("No law records are available.")
+            draw_empty_state("No law records are available.")
         for transition in overview.pending_law_transitions:
             imgui.text_disabled(
                 f"Pending {transition.law_id}: {transition.target_value} "
@@ -79,14 +84,14 @@ class PoliticalOverviewPanel:
             for cause in overview.recent_causes:
                 imgui.text(f"{cause.event_type}: {cause.reason}")
         else:
-            imgui.text_disabled("No recorded political causes are available.")
+            draw_empty_state("No recorded political causes are available.")
 
     def _render_election_overrides(self, overview, context: PanelRenderContext) -> None:
         imgui.spacing()
         imgui.text("ELECTION OVERRIDES")
         imgui.separator()
         if not overview.election_override_options:
-            imgui.text_disabled("No election override rules are configured for this government.")
+            draw_empty_state("No election override rules are configured for this government.")
             return
 
         for option in overview.election_override_options:
@@ -132,7 +137,7 @@ class PoliticalOverviewPanel:
     def _render_recent_elections(self, overview) -> None:
         imgui.text("RECENT ELECTION RECORDS")
         if not overview.recent_elections:
-            imgui.text_disabled("No election results or override records are available.")
+            draw_empty_state("No election results or override records are available.")
             return
         for election in overview.recent_elections:
             if election.status == "resolved":

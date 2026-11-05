@@ -1,0 +1,42 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine"},
+      {"id": "POL", "name": "Poland"},
+      {"id": "DEU", "name": "Germany"},
+      {"id": "CAN", "name": "Canada"},
+      {"id": "FRA", "name": "France"},
+      {"id": "ITA", "name": "Italy"},
+      {"id": "ESP", "name": "Spain"},
+      {"id": "SWE", "name": "Sweden"},
+      {"id": "NOR", "name": "Norway"}
+    ],
+    "country_governments": [
+      {"country_id": "UKR", "government_type": "democracy"},
+      {"country_id": "POL", "government_type": "democracy"},
+      {"country_id": "DEU", "government_type": "autocracy"},
+      {"country_id": "CAN", "government_type": "democracy"},
+      {"country_id": "FRA", "government_type": "democracy"},
+      {"country_id": "ITA", "government_type": "democracy"},
+      {"country_id": "ESP", "government_type": "democracy"},
+      {"country_id": "SWE", "government_type": "democracy"},
+      {"country_id": "NOR", "government_type": "democracy"}
+    ],
+    "countries_treaties": [
+      {
+        "id": "treaty-ukr-pol-deu",
+        "name": "Ukraine–Poland Test Compact",
+        "source_country_id": "UKR",
+        "target_country_id": "POL",
+        "type": "mobility_agreement",
+        "status": "active",
+        "members": ["UKR", "POL", "DEU"],
+        "side_a": ["UKR"],
+        "side_b": ["POL", "DEU"],
+        "terms": "Participants must have democratic governments.",
+        "conditions_json": "{\"government_type\":\"democracy\"}",
+        "open_to_new_members": false
+      }
+    ]
+  }
+}

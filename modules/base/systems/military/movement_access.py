@@ -21,22 +21,24 @@ class MovementAccessContext:
     transit_rights: frozenset[str]
 
     def can_station(self, target_region: dict[str, Any]) -> bool:
-        territory_owner = _tag(target_region.get("owner"))
+        # Occupation changes entry rights. Political ownership alone allowed
+        # friendly entry into hostile occupations and blocked liberated territory.
+        controller = _tag(target_region.get("controller") or target_region.get("owner"))
         return (
-            not territory_owner
-            or territory_owner == self.owner
-            or territory_owner in self.countries_at_war
-            or territory_owner in self.stationing_rights
+            not controller
+            or controller == self.owner
+            or controller in self.countries_at_war
+            or controller in self.stationing_rights
         )
 
     def can_transit(self, target_region: dict[str, Any]) -> bool:
-        territory_owner = _tag(target_region.get("owner"))
+        controller = _tag(target_region.get("controller") or target_region.get("owner"))
         return (
-            not territory_owner
-            or territory_owner == self.owner
-            or territory_owner in self.countries_at_war
-            or territory_owner in self.stationing_rights
-            or territory_owner in self.transit_rights
+            not controller
+            or controller == self.owner
+            or controller in self.countries_at_war
+            or controller in self.stationing_rights
+            or controller in self.transit_rights
         )
 
 

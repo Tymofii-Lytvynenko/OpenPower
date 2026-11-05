@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "op": "key",
+      "key": "f5"
+    },
+    {
+      "op": "assert_region",
+      "target": "objectives.panel",
+      "visible": true
+    },
+    {
+      "op": "key",
+      "key": "f5"
+    },
+    {
+      "op": "assert_region",
+      "target": "objectives.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

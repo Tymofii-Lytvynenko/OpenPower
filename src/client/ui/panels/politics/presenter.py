@@ -41,15 +41,19 @@ class PoliticsPresenter:
         capital_id = safe_int(government_row.get("capital_region_id"))
         active_treaties = len(self.active_treaties_for_country(state, country_tag))
         pending_treaties = len(self.pending_treaties_for_country(state, country_tag))
+        martial_law = bool(government_row.get("martial_law", False))
         return PoliticsSummaryViewModel(
-            government_type=safe_text(government_row.get("government_type"), "Transitional republic"),
+            government_type=(
+                "Martial law" if martial_law
+                else safe_text(government_row.get("government_type"), "Transitional republic")
+            ),
             ideology_balance=as_ratio(government_row.get("ideology_balance"), 0.5),
             approval_pct=as_percent(country_row.get("gvt_approval"), 50.0),
             stability_pct=as_percent(country_row.get("gvt_stability"), 50.0),
             corruption_pct=as_percent(country_row.get("gvt_corruption"), 40.0),
             capital_name=resolve_region_name(state, capital_id),
             next_election=safe_text(government_row.get("next_election"), "Unscheduled"),
-            martial_law=bool(government_row.get("martial_law", False)),
+            martial_law=martial_law,
             election_risk_pct=as_percent(government_row.get("election_risk"), 0.0),
             active_treaties=active_treaties,
             pending_treaties=pending_treaties,

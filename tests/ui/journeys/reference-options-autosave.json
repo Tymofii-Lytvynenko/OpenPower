@@ -1,0 +1,26 @@
+{
+  "steps": [
+    { "op": "click", "target": "main_menu.options" },
+    { "op": "assert_absent", "target": "options.source.profile.interval" },
+    { "op": "click", "target": "options.source.profile.autosave" },
+    { "op": "assert_region", "target": "main_menu.options.tab.profile.content", "visible": true, "inside_viewport": true },
+    { "op": "assert", "target": "options.source.profile.interval", "value": 15, "enabled": true },
+    { "op": "input", "target": "options.source.profile.interval", "value": 0 },
+    { "op": "assert", "target": "options.source.profile.interval", "value": 1 },
+    { "op": "input", "target": "options.source.profile.interval", "value": 3 },
+    { "op": "input", "target": "options.source.profile.filename", "value": "Campaign" },
+    { "op": "click", "target": "options.source.profile.incremental" },
+    { "op": "click", "target": "main_menu.back" },
+    { "op": "click", "target": "main_menu.options" },
+    { "op": "assert_absent", "target": "options.source.profile.interval" },
+    { "op": "click", "target": "options.source.profile.autosave" },
+    { "op": "input", "target": "options.source.profile.interval", "value": 3 },
+    { "op": "input", "target": "options.source.profile.filename", "value": "Campaign" },
+    { "op": "click", "target": "options.source.profile.incremental" },
+    { "op": "click", "target": "main_menu.apply" },
+    { "op": "click", "target": "main_menu.options" },
+    { "op": "assert", "target": "options.source.profile.interval", "value": 3 },
+    { "op": "assert", "target": "options.source.profile.filename", "value": "Campaign" },
+    { "op": "assert", "target": "options.source.profile.incremental", "value": true }
+  ]
+}

@@ -30,7 +30,8 @@ class LiveUIBridge:
     ):
         self.directory = directory.resolve()
         self.directory.mkdir(parents=True, exist_ok=True)
-        self.telemetry = UIRunTelemetry((1, 1))
+        # Live inspection must not pin windows and prevent the player's normal drag behavior.
+        self.telemetry = UIRunTelemetry((1, 1), pin_windows=False)
         self.capture = capture
         self.inspection_provider = inspection_provider
         self.dispatch_window_event = dispatch_window_event

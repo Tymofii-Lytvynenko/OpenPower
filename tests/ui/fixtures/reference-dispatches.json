@@ -1,0 +1,98 @@
+{
+  "tables": {
+    "battles": [
+      {
+        "id": "battle-kyiv",
+        "region_id": 1,
+        "attacker_side": "UKR",
+        "defender_side": "POL",
+        "status": "concluded",
+        "mode": "positional",
+        "victor_side": "SIDE_A"
+      }
+    ],
+    "battle_units": [
+      {"battle_id": "battle-kyiv", "unit_id": "mail-ukr-infantry", "country_id": "UKR", "side": "SIDE_A"},
+      {"battle_id": "battle-kyiv", "unit_id": "mail-pol-armor", "country_id": "POL", "side": "SIDE_B"}
+    ],
+    "battle_casualty_records": [
+      {"id": "battle-kyiv:mail:ukr-infantry", "battle_id": "battle-kyiv", "unit_id": "mail-ukr-infantry", "country_id": "UKR", "side": "SIDE_A", "unit_type": "infantry", "losses": 42},
+      {"id": "battle-kyiv:mail:pol-armor", "battle_id": "battle-kyiv", "unit_id": "mail-pol-armor", "country_id": "POL", "side": "SIDE_B", "unit_type": "tanks", "losses": 125}
+    ],
+    "pending_treaties": [
+      {
+        "id": "proposal-mail",
+        "title": "Mail-selected compact",
+        "treaty_type": "alliance",
+        "status": "pending",
+        "side_a": [
+          "POL"
+        ],
+        "side_b": [
+          "UKR"
+        ],
+        "required_responses": [
+          "UKR"
+        ],
+        "accepted_members": [
+          "POL"
+        ],
+        "terms": "Mutual defense."
+      }
+    ],
+    "diplomatic_trade_deals": [
+      {
+        "id": "deal-mail",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "status": "pending",
+        "offered_assets_json": "[]",
+        "requested_assets_json": "[]",
+        "expires_at_minute": 43200,
+        "reason": "Awaiting response."
+      }
+    ]
+  },
+  "journal": {
+    "domain_events": [
+      {
+        "event_id": "battle-mail",
+        "event_type": "EventBattleEnded",
+        "payload": {
+          "battle_id": "battle-kyiv",
+          "region_id": 1,
+          "victor_tag": "UKR",
+          "victor_side": "SIDE_A",
+          "side_a_losses": 42,
+          "side_b_losses": 125,
+          "side_a_country_ids": ["UKR"],
+          "side_b_country_ids": ["POL"],
+          "participant_countries": [
+            "UKR",
+            "POL"
+          ]
+        }
+      },
+      {
+        "event_id": "trade-mail",
+        "event_type": "EventDiplomaticTradeChanged",
+        "payload": {
+          "deal_id": "deal-mail",
+          "source_country_id": "POL",
+          "target_country_id": "UKR",
+          "status": "pending",
+          "reason": "Awaiting response."
+        }
+      },
+      {
+        "event_id": "treaty-mail",
+        "event_type": "EventTreatyProposed",
+        "payload": {
+          "treaty_id": "proposal-mail",
+          "source_country_tag": "POL",
+          "target_country_tag": "UKR"
+        }
+      }
+    ]
+  }
+}

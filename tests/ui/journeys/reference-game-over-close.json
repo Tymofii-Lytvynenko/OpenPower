@@ -1,0 +1,9 @@
+{
+  "fixture": "tests/ui/fixtures/reference-game-over.json",
+  "steps": [
+    {"op": "assert_region", "target": "game_over.dialog", "visible": true},
+    {"op": "click", "target": "game_over.dialog.close"},
+    {"op": "assert_navigation_request", "type": "stop_game", "count": 1},
+    {"op": "assert_region", "target": "game_over.dialog", "visible": false}
+  ]
+}

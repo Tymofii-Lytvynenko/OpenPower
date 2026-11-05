@@ -1,0 +1,18 @@
+{
+  "tables": {
+    "country_governments": [
+      {"country_id": "UKR", "capital_region_id": 1}
+    ],
+    "news_items": [
+      {
+        "id": "main-bar-latest-bulletin",
+        "headline": "North Atlantic Treaty Organization remains active",
+        "body": "Member coordination and obligations are being reviewed by member governments in accordance with the treaty charter.",
+        "category": "political",
+        "severity": "info",
+        "related_country_id": "UKR",
+        "created_at": "2001-01-02"
+      }
+    ]
+  }
+}

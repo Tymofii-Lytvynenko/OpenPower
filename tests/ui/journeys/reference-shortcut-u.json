@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "op": "key",
+      "key": "u"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_production.panel",
+      "visible": true
+    },
+    {
+      "op": "key",
+      "key": "u"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_production.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

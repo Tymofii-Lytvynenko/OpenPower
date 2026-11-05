@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from queue import Empty, Queue
 from threading import Event
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 
+import src.client.tasks.session_startup as session_startup
 from src.client.tasks.session_startup import (
     TaskCancelledError,
     create_session_until_ready,
@@ -103,3 +105,20 @@ def test_initial_state_wait_is_cancellable_and_times_out() -> None:
     session.tick.reset_mock(side_effect=True)
     with pytest.raises(TimeoutError):
         wait_for_initial_state(session, cancel_event=Event(), timeout=0.01, poll_interval=0.001)
+
+
+def test_initial_state_wait_allows_slow_full_world_snapshot(monkeypatch) -> None:
+    session = FakeSession()
+    expected_state = object()
+    elapsed = [0.0]
+
+    def wait_for_snapshot(interval: float) -> bool:
+        elapsed[0] += interval
+        if elapsed[0] >= 6.0:
+            session.state = expected_state
+        return False
+
+    cancel_event = SimpleNamespace(is_set=lambda: False, wait=wait_for_snapshot)
+    monkeypatch.setattr(session_startup.time, "monotonic", lambda: elapsed[0])
+
+    assert wait_for_initial_state(session, cancel_event=cancel_event) is expected_state

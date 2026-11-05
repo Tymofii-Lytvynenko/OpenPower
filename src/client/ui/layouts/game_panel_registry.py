@@ -12,11 +12,13 @@ from src.client.ui.panels.economic_health_panel import EconomicHealthPanel
 from src.client.ui.panels.economy_panel import EconomyPanel
 from src.client.ui.panels.military.battle_overview_panel import BattleOverviewPanel
 from src.client.ui.panels.military.covert_ops_panel import CovertOpsPanel
+from src.client.ui.panels.military.design_selection import UnitDesignSelection
 from src.client.ui.panels.military.strategic_warfare_panel import StrategicWarfarePanel
 from src.client.ui.panels.military.unit_design_panel import UnitDesignPanel
 from src.client.ui.panels.military.unit_list_panel import UnitListPanel
 from src.client.ui.panels.military.unit_market_panel import UnitMarketPanel
 from src.client.ui.panels.military.unit_production_panel import UnitProductionPanel
+from src.client.ui.panels.military.unit_reserves_panel import UnitReservesPanel
 from src.client.ui.panels.military.unit_research_panel import UnitResearchPanel
 from src.client.ui.panels.military.war_list_panel import WarListPanel
 from src.client.ui.panels.military_panel import MilitaryPanel
@@ -24,6 +26,7 @@ from src.client.ui.panels.migration_panel import MigrationPanel
 from src.client.ui.panels.politics.constitutional_form_panel import ConstitutionalFormPanel
 from src.client.ui.panels.politics.internal_laws_panel import InternalLawsPanel
 from src.client.ui.panels.politics.political_overview_panel import PoliticalOverviewPanel
+from src.client.ui.panels.politics.relations_panel import RelationsPanel
 from src.client.ui.panels.politics.treaties_panel import TreatiesPanel
 from src.client.ui.panels.politics.treaty_editor_panel import TreatyEditorPanel
 from src.client.ui.panels.politics_panel import PoliticsPanel
@@ -31,8 +34,10 @@ from src.client.ui.panels.region_inspector import RegionInspectorPanel
 from src.client.ui.panels.region_infrastructure_panel import RegionInfrastructurePanel
 from src.client.ui.panels.resources_panel import ResourcesPanel
 from src.client.ui.panels.service.console_panel import ConsolePanel
+from src.client.ui.panels.service.advisor_settings_panel import AdvisorSettingsPanel
 from src.client.ui.panels.service.history_panel import HistoryPanel
 from src.client.ui.panels.service.mail_panel import MailPanel
+from src.client.ui.panels.service.mail_inbox_state import MailInboxState
 from src.client.ui.panels.service.news_panel import NewsPanel
 from src.client.ui.panels.service.objectives_panel import ObjectivesPanel
 from src.client.ui.panels.service.settings_panel import SettingsPanel
@@ -40,11 +45,31 @@ from src.client.ui.panels.service.tooltip_help_panel import TooltipHelpPanel
 from src.client.ui.panels.trade_panel import TradePanel
 
 
-def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, window=None) -> list[PanelSpec]:
+def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, window=None,
+                           open_dispatch_cb=None, open_unit_train_cb=None,
+                           open_battle_cb=None, mail_inbox_state=None,
+                           close_mail_cb=None, open_tutorial_cb=None) -> list[PanelSpec]:
     """Builds the declarative panel registry for the in-game HUD."""
+
+    unit_design_selection = UnitDesignSelection()
 
     def open_panel(panel_id: str) -> None:
         panel_manager.set_visible(panel_id, True)
+
+    def open_all_unit_designs() -> None:
+        unit_design_selection.clear()
+        open_panel("UNIT_DESIGN")
+
+    def open_selected_unit_design(design_id: str) -> None:
+        unit_design_selection.select(design_id)
+        open_panel("UNIT_DESIGN")
+
+    def open_treaty(treaty_id: str) -> None:
+        for entry in panel_manager.get_entries():
+            if entry.id == "TREATIES":
+                entry.instance.request_treaty(treaty_id)
+                open_panel("TREATIES")
+                return
 
     return [
         PanelSpec(
@@ -52,7 +77,7 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             title="Politics",
             category="politics",
             factory=lambda: PoliticsPanel(
-                open_constitution_cb=lambda: open_panel("POLITICAL_OVERVIEW"),
+                open_constitution_cb=lambda: open_panel("CONSTITUTIONAL_FORM"),
                 open_laws_cb=lambda: open_panel("INTERNAL_LAWS"),
                 open_treaties_cb=lambda: open_panel("TREATIES"),
             ),
@@ -65,9 +90,10 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             category="military",
             factory=lambda: MilitaryPanel(
                 open_unit_list_cb=lambda: open_panel("UNIT_LIST"),
+                open_reserves_cb=lambda: open_panel("UNIT_RESERVES"),
                 open_production_cb=lambda: open_panel("UNIT_PRODUCTION"),
                 open_research_cb=lambda: open_panel("UNIT_RESEARCH"),
-                open_design_cb=lambda: open_panel("UNIT_DESIGN"),
+                open_design_cb=open_all_unit_designs,
                 open_market_cb=lambda: open_panel("UNIT_MARKET"),
                 open_covert_cb=lambda: open_panel("COVERT_OPS"),
                 open_wars_cb=lambda: open_panel("WAR_LIST"),
@@ -152,6 +178,13 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             show_in_toggle_bar=False,
         ),
         PanelSpec(
+            id="RELATIONS",
+            title="Relations",
+            category="politics",
+            factory=RelationsPanel,
+            show_in_toggle_bar=False,
+        ),
+        PanelSpec(
             id="NEW_TREATY",
             title="New Treaty",
             category="politics",
@@ -162,14 +195,22 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             id="UNIT_LIST",
             title="Unit List",
             category="military",
-            factory=UnitListPanel,
+            factory=lambda: UnitListPanel(open_design_cb=open_selected_unit_design,
+                open_train_cb=open_unit_train_cb),
+            show_in_toggle_bar=False,
+        ),
+        PanelSpec(
+            id="UNIT_RESERVES",
+            title="Undeployed Troops",
+            category="military",
+            factory=lambda: UnitReservesPanel(open_train_cb=open_unit_train_cb),
             show_in_toggle_bar=False,
         ),
         PanelSpec(
             id="UNIT_PRODUCTION",
             title="Unit Production",
             category="military",
-            factory=UnitProductionPanel,
+            factory=lambda: UnitProductionPanel(open_design_cb=open_selected_unit_design),
             show_in_toggle_bar=False,
         ),
         PanelSpec(
@@ -183,7 +224,7 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             id="UNIT_DESIGN",
             title="Unit Design",
             category="military",
-            factory=UnitDesignPanel,
+            factory=lambda: UnitDesignPanel(unit_design_selection),
             show_in_toggle_bar=False,
         ),
         PanelSpec(
@@ -211,7 +252,7 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             id="BATTLE_OVERVIEW",
             title="Battle Overview",
             category="military",
-            factory=BattleOverviewPanel,
+            factory=lambda: BattleOverviewPanel(open_battle_cb),
             show_in_toggle_bar=False,
         ),
         PanelSpec(
@@ -255,7 +296,13 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             id="BUDGET",
             title="Budget",
             category="economy",
-            factory=BudgetPanel,
+            factory=lambda: BudgetPanel(
+                open_economic_health_cb=lambda: open_panel("ECONOMIC_HEALTH"),
+                open_resources_cb=lambda: open_panel("RESOURCES"),
+                open_treaties_cb=lambda: open_panel("TREATIES"),
+                open_covert_ops_cb=lambda: open_panel("COVERT_OPS"),
+                open_unit_list_cb=lambda: open_panel("UNIT_LIST"),
+            ),
             show_in_toggle_bar=False,
         ),
         PanelSpec(
@@ -276,7 +323,12 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             id="MAIL",
             title="Mail",
             category="service",
-            factory=MailPanel,
+            factory=lambda: MailPanel(
+                open_treaty_cb=open_treaty,
+                open_dispatch_cb=open_dispatch_cb,
+                mail_inbox_state=mail_inbox_state or MailInboxState(),
+                close_mail_cb=close_mail_cb,
+            ),
             show_in_toggle_bar=False,
         ),
         PanelSpec(
@@ -303,6 +355,13 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             show_in_toggle_bar=False,
         ),
         PanelSpec(
+            id="ADVISOR_SETTINGS",
+            title="Advisor Settings",
+            category="service",
+            factory=lambda: AdvisorSettingsPanel(settings_service),
+            show_in_toggle_bar=False,
+        ),
+        PanelSpec(
             id="CONSOLE",
             title="Console",
             category="service",
@@ -314,7 +373,7 @@ def build_game_panel_specs(panel_manager: PanelManager, settings_service=None, w
             title="Tooltip Help",
             category="service",
             hotkey="F1",
-            factory=TooltipHelpPanel,
+            factory=lambda: TooltipHelpPanel(open_tutorial_cb),
             show_in_toggle_bar=False,
         ),
         PanelSpec(

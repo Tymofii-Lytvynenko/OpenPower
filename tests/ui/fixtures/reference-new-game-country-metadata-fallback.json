@@ -1,0 +1,26 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine", "gdp": 100000000.0},
+      {"id": "POL", "name": "Poland", "gdp": 160000000.0}
+    ],
+    "campaign_scenarios": [
+      {
+        "id": "ui-test-campaign",
+        "title": "UI Test Campaign",
+        "description": "Campaign selection with a runtime-only country snapshot.",
+        "selectable_country_ids_json": "[\"UKR\",\"POL\"]",
+        "political_scope": "country",
+        "sphere_scope": "",
+        "starting_setup_json": "{}",
+        "objectives_json": "[]",
+        "enabled_rules_json": "{}",
+        "max_duration_minutes": 180,
+        "win_conditions_json": "[]",
+        "loss_conditions_json": "[]",
+        "sandbox_allowed": true,
+        "enabled": true
+      }
+    ]
+  }
+}

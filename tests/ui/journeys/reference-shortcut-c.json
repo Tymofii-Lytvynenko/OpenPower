@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "op": "key",
+      "key": "c"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": true
+    },
+    {
+      "op": "key",
+      "key": "c"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "unit.context.move_and_attack"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.order.targeting",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "unit.order.targeting.label",
+      "label": "ATTACK MOVE — click a destination. Hostile contact triggers combat; neutral entry needs confirmation."
+    },
+    {
+      "op": "click",
+      "target": "unit.order.cancel"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.order.targeting",
+      "visible": false
+    }
+  ]
+}

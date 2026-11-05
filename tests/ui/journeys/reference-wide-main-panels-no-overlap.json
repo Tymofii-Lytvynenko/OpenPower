@@ -1,0 +1,17 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.pol" },
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "hud.panel.dem" },
+    { "op": "click", "target": "politics.open_treaties" },
+    { "op": "assert", "target": { "label": "HDI Score: 0.70", "region": "demographics.panel" }, "visible": true },
+    { "op": "assert_region", "target": "politics.panel", "visible": true, "inside_viewport": true, "no_overlap": "treaties.panel" },
+    { "op": "assert_region", "target": "treaties.panel", "visible": true, "inside_viewport": true, "no_overlap": "military.panel" },
+    { "op": "assert_region", "target": "military.panel", "visible": true, "inside_viewport": true, "no_overlap": "demographics.panel" },
+    { "op": "assert_region", "target": "demographics.panel", "visible": true, "inside_viewport": true, "no_overlap": "economy.panel" },
+    { "op": "assert_region", "target": "economy.panel", "visible": true, "inside_viewport": true },
+    { "op": "assert_region", "target": "treaties.panel", "visible": true, "no_overlap": "hud.system_bar" },
+    { "op": "assert_region", "target": "treaties.panel", "visible": true, "no_overlap": "hud.central_bar" }
+  ]
+}

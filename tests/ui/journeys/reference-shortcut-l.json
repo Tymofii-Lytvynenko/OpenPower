@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "op": "key",
+      "key": "l"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_list.panel",
+      "visible": true
+    },
+    {
+      "op": "key",
+      "key": "l"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_list.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

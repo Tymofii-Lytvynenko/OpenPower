@@ -1,0 +1,60 @@
+{
+  "test_support": {
+    "country_info_regions_from_base_data": ["UKR", "POL"],
+    "use_base_region_map": true
+  },
+  "tables": {
+    "countries": [
+      {
+        "id": "UKR",
+        "human_dev": 0.76,
+        "infrastructure_index": 0.58,
+        "telecom_index": 0.72
+      },
+      {
+        "id": "POL",
+        "human_dev": 0.82,
+        "infrastructure_index": 0.64,
+        "telecom_index": 0.69
+      }
+    ],
+    "regions": [
+      {
+        "id": 1,
+        "name": "Kyiv",
+        "owner": "UKR",
+        "controller": "UKR",
+        "area_km2": 603.0,
+        "pop_14": 100000,
+        "pop_15_64": 500000,
+        "pop_65": 100000,
+        "lat": 50.45,
+        "lon": 30.52
+      },
+      {
+        "id": 4,
+        "name": "Lviv",
+        "owner": "UKR",
+        "controller": "UKR",
+        "area_km2": 218.0,
+        "pop_14": 40000,
+        "pop_15_64": 220000,
+        "pop_65": 60000,
+        "lat": 49.84,
+        "lon": 24.03
+      },
+      {
+        "id": 2,
+        "name": "Warsaw",
+        "owner": "POL",
+        "controller": "POL",
+        "area_km2": 517.0,
+        "pop_14": 120000,
+        "pop_15_64": 570000,
+        "pop_65": 110000,
+        "lat": 52.23,
+        "lon": 21.01
+      }
+    ]
+  }
+}

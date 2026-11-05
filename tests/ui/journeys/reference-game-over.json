@@ -1,0 +1,64 @@
+{
+  "fixture": "tests/ui/fixtures/reference-game-over.json",
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "game_over.dialog",
+      "label": "GAME OVER",
+      "visible": true,
+      "rect": {"width": 503, "height": 273},
+      "inside_viewport": true
+    },
+    {
+      "op": "assert",
+      "target": "game_over.summary",
+      "label": "A required campaign condition was not met.",
+      "inside": "game_over.dialog"
+    },
+    {
+      "op": "assert_region",
+      "target": "game_over.objectives/gml:Game_Over_Window/frmInner/frmObjectives/lstObjectives",
+      "visible": true,
+      "rect": {"width": 450, "height": 75}
+    },
+    {
+      "op": "assert",
+      "target": "game_over.objective.stability.name",
+      "label": "Maintain stability",
+      "inside": "game_over.dialog"
+    },
+    {
+      "op": "assert",
+      "target": "game_over.objective.stability.time",
+      "label": "2 day(s)",
+      "inside": "game_over.dialog"
+    },
+    {
+      "op": "assert",
+      "target": "game_over.objective.stability.status",
+      "label": "COMPLETED",
+      "inside": "game_over.dialog"
+    },
+    {
+      "op": "assert",
+      "target": "game_over.objective.territory.status",
+      "label": "FAILED",
+      "inside": "game_over.dialog"
+    },
+    {
+      "op": "assert_absent",
+      "target": "game_over.objective.optional.name"
+    },
+    {
+      "op": "assert",
+      "target": "game_over.main_menu",
+      "label": "MAIN MENU",
+      "relative_to": "game_over.dialog",
+      "relative_rect": {"x": 382, "y": 244, "width": 106, "height": 18},
+      "tolerance": 1
+    },
+    {"op": "click", "target": "game_over.main_menu"},
+    {"op": "assert_navigation_request", "type": "stop_game", "count": 1},
+    {"op": "assert_region", "target": "game_over.dialog", "visible": false}
+  ]
+}

@@ -10,6 +10,7 @@ from functools import wraps, lru_cache
 from imgui_bundle import imgui as native_imgui
 
 from src.client.ui.core.testability import Rect, active_telemetry
+from src.client.ui.core.ui_anchor_registry import UIAnchorRegistry
 
 _INTERACTIVE = {
     "button", "small_button", "invisible_button", "arrow_button", "color_button",
@@ -121,7 +122,22 @@ def _rect(minimum, maximum) -> Rect:
                 float(maximum.x - minimum.x), float(maximum.y - minimum.y))
 
 
-def _record_item(recorder, name, label, source, result, explicit_id=None, component_width=None, native=None, options=None):
+def _record_tutorial_anchor(native, name: str, test_id: str | None) -> None:
+    if not UIAnchorRegistry.is_target(test_id):
+        return
+    interactive = (
+        name in _INTERACTIVE
+        or name.startswith(("input_", "slider_", "drag_", "v_slider_"))
+    )
+    # Tutorial targets include read-only labels such as the date and ticker;
+    # restricting anchors to controls left those source steps without arrows.
+    if not (interactive or name in _DISPLAY) or not native.is_item_visible():
+        return
+    rect = _rect(native.get_item_rect_min(), native.get_item_rect_max())
+    UIAnchorRegistry.record(test_id, rect.x, rect.y, rect.width, rect.height)
+
+
+def _record_item(recorder, name, label, source, result, explicit_id=None, component_width=None, native=None, options=None, layout_enabled=None, layout_clip_rect=None):
     native = native or native_imgui
     native_id = int(native.get_item_id())
     if not native_id and name in {"input_int", "input_float", "input_double"}:
@@ -138,12 +154,20 @@ def _record_item(recorder, name, label, source, result, explicit_id=None, compon
     value = result[1] if isinstance(result, tuple) and len(result) > 1 else None
     if not isinstance(value, (str, int, float, bool, list, tuple, type(None))):
         value = str(value)
+    item_rect = _rect(native.get_item_rect_min(), native.get_item_rect_max())
+    if layout_clip_rect is not None:
+        x = max(item_rect.x, layout_clip_rect.x)
+        y = max(item_rect.y, layout_clip_rect.y)
+        right = min(item_rect.x + item_rect.width, layout_clip_rect.x + layout_clip_rect.width)
+        bottom = min(item_rect.y + item_rect.height, layout_clip_rect.y + layout_clip_rect.height)
+        item_rect = Rect(x, y, max(0.0, right - x), max(0.0, bottom - y))
     recorder.record_widget(
         test_id, label.split("##", 1)[0], name,
-        bool(native.is_item_visible()), recorder.enabled,
-        _rect(native.get_item_rect_min(), native.get_item_rect_max()),
+        bool(native.is_item_visible()), recorder.enabled and layout_enabled is not False,
+        item_rect,
         native_id, source=source, interactive=interactive, value=value,
     )
+    _record_tutorial_anchor(native, name, explicit_id)
     if options is not None:
         recorder.set_options(test_id, options)
     if name in _VECTORS and component_width is not None:
@@ -174,6 +198,139 @@ class ImGuiFacade:
     def __init__(self, native=native_imgui):
         self._native = native
         self._wrappers = {}
+        self._layout_suspensions = []
+        self._container_disabled_scopes = []
+
+    def set_tooltip(self, text: str, *args, **kwargs):
+        if args or kwargs:
+            return self._native.set_tooltip(text, *args, **kwargs)
+        if text is None or not str(text):
+            return None
+        from src.client.ui.core.gml_tooltip import render_gml_tooltip
+
+        return render_gml_tooltip(self._native, str(text))
+
+    def _suspend_layout_for_container(self, name: str, result, layout_component=None) -> None:
+        if name not in _CONTAINERS or name == "begin_group":
+            return
+        end, unconditional, _ = _CONTAINERS[name]
+        opened = bool(result[0] if isinstance(result, tuple) else result)
+        if not (unconditional or opened):
+            return
+        self._container_disabled_scopes.append((
+            end,
+            layout_component is not None and not layout_component.enabled,
+        ))
+        from src.client.ui.layouts.gml_layout import suspend_gml_layout
+
+        # Keep nested non-GML containers on the stack so their end calls cannot
+        # resume a parent's suspended layout session too early.
+        token = suspend_gml_layout()
+        self._layout_suspensions.append((end, token))
+
+    def _resume_layout_after_container(self, name: str) -> None:
+        if not self._layout_suspensions or self._layout_suspensions[-1][0] != name:
+            return
+        _, token = self._layout_suspensions.pop()
+        from src.client.ui.layouts.gml_layout import resume_gml_layout
+
+        resume_gml_layout(token)
+
+    def _end_disabled_container(self, name: str) -> None:
+        if not self._container_disabled_scopes or self._container_disabled_scopes[-1][0] != name:
+            return
+        _, disabled = self._container_disabled_scopes.pop()
+        if disabled:
+            self.end_disabled()
+
+    def _finish_recorded_container(self, name, recorder, source) -> None:
+        self._resume_layout_after_container(name)
+        self._end_disabled_container(name)
+        if recorder._containers and recorder._containers[-1][0] == name:
+            _, kind, region_id = recorder._containers.pop()
+            recorder.pop_region()
+            # EndTabBar leaves the active tab's item rectangle as the
+            # last item rectangle. Keep the parent window bounds
+            # captured at BeginTabBar instead of mistaking that tab
+            # label for the tab bar's clipping bounds.
+            if kind in {"group", "table", "tab"}:
+                region = recorder.region(region_id)
+                recorder.record_region(
+                    region_id, str(region["label"]), bool(region["visible"]),
+                    _rect(self._native.get_item_rect_min(), self._native.get_item_rect_max()),
+                    kind=kind, source=region["source"],
+                )
+        else:
+            recorder.record_error(source["path"], f"Unbalanced container: {name}")
+
+    def _record_container(self, name, recorder, label, source, result, explicit_id, layout_component) -> None:
+        end, unconditional, kind = _CONTAINERS[name]
+        opened = bool(result[0] if isinstance(result, tuple) else result)
+        if name in {"begin_combo", "begin_menu", "begin_tab_item"}:
+            _record_item(
+                recorder, name, label, source, result, explicit_id,
+                native=self._native,
+                layout_enabled=(layout_component.enabled if layout_component is not None else None),
+            )
+        if unconditional or opened:
+            parent = recorder.parent_id or "root"
+            region_id = explicit_id or f"region/{parent}/{_site_id(source, name)}"
+            if "##" in label:
+                region_id += "/" + label.split("##", 1)[1]
+            region_id = recorder.unique_id(region_id)
+            p, size = self._native.get_window_pos(), self._native.get_window_size()
+            recorder.record_region(region_id, label, opened if kind in {"window", "child"} else True,
+                                   Rect(p.x, p.y, size.x, size.y), kind=kind, source=source)
+            recorder.push_region(region_id)
+            recorder._containers.append((end, kind, region_id))
+
+    def _invoke_unclipped(self, name, target, args, kwargs, layout_component):
+        if layout_component is None or layout_component.enabled:
+            return target(*args, **kwargs)
+        if name in _CONTAINERS and name != "begin_group":
+            end, unconditional, _ = _CONTAINERS[name]
+            self.begin_disabled(True)
+            try:
+                result = target(*args, **kwargs)
+            except Exception:
+                self.end_disabled()
+                raise
+            opened = bool(result[0] if isinstance(result, tuple) else result)
+            if not unconditional and not opened:
+                self.end_disabled()
+            # ImGui child contents are emitted after begin_child returns.
+            return result
+        self.begin_disabled(True)
+        try:
+            return target(*args, **kwargs)
+        finally:
+            self.end_disabled()
+
+
+    def _invoke_layout_widget(self, name, target, args, kwargs, layout_session, layout_component):
+        layout_clip_rect = None
+        text_slot = layout_component is not None and name in {
+            "text", "text_unformatted", "text_colored", "text_disabled",
+            "text_wrapped", "bullet_text", "label_text",
+        }
+        if not text_slot:
+            return self._invoke_unclipped(name, target, args, kwargs, layout_component), layout_clip_rect
+        rect = layout_session.rect_for(layout_component)
+        origin = layout_session.window_position
+        x = origin[0] + rect.x - self._native.get_scroll_x()
+        y = origin[1] + rect.y - self._native.get_scroll_y()
+        layout_clip_rect = Rect(x, y, rect.width, rect.height)
+        # Long live values must not draw over adjacent source fields.
+        self._native.push_clip_rect((x, y), (x + rect.width, y + rect.height), True)
+        if name == "text_wrapped":
+            self._native.push_text_wrap_pos(self._native.get_cursor_pos_x() + max(1.0, rect.width - abs(layout_component.text_offset[0])))
+        try:
+            return self._invoke_unclipped(name, target, args, kwargs, layout_component), layout_clip_rect
+        finally:
+            if name == "text_wrapped":
+                self._native.pop_text_wrap_pos()
+            self._native.pop_clip_rect()
+
 
     def __getattr__(self, name):
         target = getattr(self._native, name)
@@ -190,31 +347,51 @@ class ImGuiFacade:
                 target = getattr(self._native, name)
                 recorder = active_telemetry()
                 explicit_id = kwargs.pop("test_id", None)
+                gml_id = kwargs.pop("gml_id", None)
+                gml_align = kwargs.pop("gml_align", None)
+                gml_enabled = kwargs.pop("gml_enabled", None)
                 if explicit_id is not None and (name in _INTERACTIVE or name.startswith(("input_", "slider_", "drag_", "v_slider_")) or name == "begin_combo"):
                     if args and isinstance(args[0], str):
                         args = (f"{args[0].split('###', 1)[0]}###{explicit_id}", *args[1:])
                     elif isinstance(kwargs.get("label"), str):
                         kwargs["label"] = f"{kwargs['label'].split('###', 1)[0]}###{explicit_id}"
+                layout_session = None
+                layout_component = None
+                if observed:
+                    from src.client.ui.layouts.gml_layout import active_gml_layout
+
+                    layout_session = active_gml_layout()
+                    if layout_session is not None:
+                        placed = layout_session.place_widget(
+                            name,
+                            args,
+                            explicit_id=gml_id or explicit_id,
+                            align=gml_align,
+                            enabled_override=gml_enabled,
+                        )
+                        if placed is not None:
+                            args, layout_component = placed
+
                 if recorder is None or not observed:
-                    return target(*args, **kwargs)
+                    result, layout_clip_rect = self._invoke_layout_widget(
+                        name, target, args, kwargs, layout_session, layout_component,
+                    )
+                    _record_tutorial_anchor(self._native, name, explicit_id)
+                    self._suspend_layout_for_container(name, result, layout_component)
+                    if name in _END:
+                        self._resume_layout_after_container(name)
+                        self._end_disabled_container(name)
+                    return result
                 source = _source(inspect.currentframe().f_back)
                 if name in _END:
                     result = target(*args, **kwargs)
-                    if recorder._containers and recorder._containers[-1][0] == name:
-                        _, kind, region_id = recorder._containers.pop()
-                        recorder.pop_region()
-                        if kind in {"group", "table", "tab_bar", "tab"}:
-                            region = recorder.region(region_id)
-                            recorder.record_region(
-                                region_id, str(region["label"]), bool(region["visible"]),
-                                _rect(self._native.get_item_rect_min(), self._native.get_item_rect_max()),
-                                kind=kind, source=region["source"],
-                            )
-                    else:
-                        recorder.record_error(source["path"], f"Unbalanced container: {name}")
+                    self._finish_recorded_container(name, recorder, source)
                     return result
                 component_width = float(native_imgui.calc_item_width()) if name in _VECTORS else None
-                result = target(*args, **kwargs)
+                result, layout_clip_rect = self._invoke_layout_widget(
+                    name, target, args, kwargs, layout_session, layout_component,
+                )
+                self._suspend_layout_for_container(name, result, layout_component)
                 if name == "push_id":
                     recorder._id_stack.append(str(args[0]))
                     return result
@@ -233,21 +410,9 @@ class ImGuiFacade:
                     return result
                 label = _label(name, args, kwargs)
                 if name in _CONTAINERS:
-                    end, unconditional, kind = _CONTAINERS[name]
-                    opened = bool(result[0] if isinstance(result, tuple) else result)
-                    if name in {"begin_combo", "begin_menu", "begin_tab_item"}:
-                        _record_item(recorder, name, label, source, result, explicit_id, native=self._native)
-                    if unconditional or opened:
-                        parent = recorder.parent_id or "root"
-                        region_id = explicit_id or f"region/{parent}/{_site_id(source, name)}"
-                        if "##" in label:
-                            region_id += "/" + label.split("##", 1)[1]
-                        region_id = recorder.unique_id(region_id)
-                        p, size = self._native.get_window_pos(), self._native.get_window_size()
-                        recorder.record_region(region_id, label, opened if kind in {"window", "child"} else True,
-                                               Rect(p.x, p.y, size.x, size.y), kind=kind, source=source)
-                        recorder.push_region(region_id)
-                        recorder._containers.append((end, kind, region_id))
+                    self._record_container(
+                        name, recorder, label, source, result, explicit_id, layout_component,
+                    )
                     return result
                 options = None
                 if name in {"combo", "list_box"}:
@@ -256,7 +421,13 @@ class ImGuiFacade:
                         options = [str(item) for item in raw]
                     elif isinstance(raw, str):
                         options = [item for item in raw.split("\0") if item]
-                _record_item(recorder, name, label, source, result, explicit_id, component_width, native=self._native, options=options)
+                _record_item(
+                    recorder, name, label, source, result, explicit_id, component_width,
+                    native=self._native,
+                    options=options,
+                    layout_enabled=(layout_component.enabled if layout_component is not None else None),
+                    layout_clip_rect=layout_clip_rect,
+                )
                 return result
             self._wrappers[name] = call
         return self._wrappers[name]

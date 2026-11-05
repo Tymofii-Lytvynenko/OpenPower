@@ -24,5 +24,25 @@ class WarListPanelFlagTests(unittest.TestCase):
         panel._flag_renderer.draw_flag.assert_called_once_with("", 20.0, 14.0)
 
 
+class WarListPanelCoalitionTests(unittest.TestCase):
+    def test_side_allies_excludes_the_separately_displayed_leader(self):
+        allies = WarListPanel._side_allies(
+            {"side_a": ["USA", "FRA", "GER"]},
+            "side_a",
+            "usa",
+        )
+
+        self.assertEqual(allies, ["FRA", "GER"])
+
+    def test_side_allies_ignores_empty_tags_and_normalizes_case(self):
+        allies = WarListPanel._side_allies(
+            {"side_b": [None, "gbr", "  ", "FRA"]},
+            "side_b",
+            "USA",
+        )
+
+        self.assertEqual(allies, ["GBR", "FRA"])
+
+
 if __name__ == "__main__":
     unittest.main()

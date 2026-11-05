@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.pol"
+    },
+    {
+      "op": "assert_region",
+      "target": "politics.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "politics.open_treaties"
+    },
+    {
+      "op": "assert_region",
+      "target": "treaties.panel",
+      "visible": true
+    }
+  ]
+}

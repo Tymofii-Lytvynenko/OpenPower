@@ -17,6 +17,21 @@ _DEFAULT_FORM_RULES = (
         "display_name": "Multi-party democracy",
         "election_eligible": True,
         "election_interval_minutes": DEFAULT_ELECTION_INTERVAL_MINUTES,
+        "party_policy_editable": True,
+        "party_count_transitions_json": '[{"target_form_id":"single-party democracy","minimum":1,"maximum":1}]',
+        "minimum_eligible_parties": 2,
+        "maximum_eligible_parties": 0,
+        "law_permissions_json": '["*"]',
+    },
+    {
+        "government_form_id": "single-party democracy",
+        "display_name": "Single-party democracy",
+        "election_eligible": True,
+        "election_interval_minutes": DEFAULT_ELECTION_INTERVAL_MINUTES,
+        "party_policy_editable": True,
+        "minimum_eligible_parties": 1,
+        "maximum_eligible_parties": 1,
+        "party_count_transitions_json": '[{"target_form_id":"multi-party democracy","minimum":2,"maximum":0}]',
         "law_permissions_json": '["*"]',
     },
     {
@@ -24,6 +39,9 @@ _DEFAULT_FORM_RULES = (
         "display_name": "Centralized republic",
         "election_eligible": True,
         "election_interval_minutes": DEFAULT_ELECTION_INTERVAL_MINUTES,
+        "party_policy_editable": True,
+        "minimum_eligible_parties": 1,
+        "maximum_eligible_parties": 0,
         "law_permissions_json": '["*"]',
     },
     {
@@ -31,6 +49,9 @@ _DEFAULT_FORM_RULES = (
         "display_name": "Transitional republic",
         "election_eligible": True,
         "election_interval_minutes": DEFAULT_ELECTION_INTERVAL_MINUTES,
+        "party_policy_editable": True,
+        "minimum_eligible_parties": 1,
+        "maximum_eligible_parties": 0,
         "law_permissions_json": '["*"]',
     },
     {
@@ -38,6 +59,9 @@ _DEFAULT_FORM_RULES = (
         "display_name": "Military-led state",
         "election_eligible": False,
         "election_interval_minutes": 0,
+        "party_policy_editable": True,
+        "minimum_eligible_parties": 1,
+        "maximum_eligible_parties": 0,
         "law_permissions_json": '["*"]',
     },
     {
@@ -45,6 +69,9 @@ _DEFAULT_FORM_RULES = (
         "display_name": "Emergency administration",
         "election_eligible": False,
         "election_interval_minutes": 0,
+        "party_policy_editable": True,
+        "minimum_eligible_parties": 1,
+        "maximum_eligible_parties": 0,
         "law_permissions_json": '["*"]',
     },
 )
@@ -53,6 +80,23 @@ _DEFAULT_FORM_RULES = (
 def default_government_form_rules(existing: pl.DataFrame | None) -> pl.DataFrame:
     """Add default form rules without overwriting scenario- or mod-owned rules."""
 
+    # Null marks saves from before party-policy metadata existed. Migrate only
+    # built-in forms; explicit scenario/mod denials must survive the upgrade.
+    defaults = {_form_id(row["government_form_id"]): row for row in _DEFAULT_FORM_RULES}
+    if existing is not None and not existing.is_empty():
+        migrated = existing.to_dicts()
+        changed = False
+        for row in migrated:
+            default = defaults.get(_form_id(row.get("government_form_id")))
+            if default and not row.get("party_count_transitions_json"):
+                row["party_count_transitions_json"] = default.get("party_count_transitions_json", "[]")
+                changed = True
+            if default and row.get("party_policy_editable") is None:
+                for key in ("party_policy_editable", "minimum_eligible_parties", "maximum_eligible_parties"):
+                    row[key] = default[key]
+                changed = True
+        if changed:
+            existing = pl.DataFrame(migrated, strict=False)
     current = _rows_by_key(existing, "government_form_id")
     additions = [
         _form_rule(row)
@@ -211,6 +255,10 @@ def _form_rule(values: dict[str, Any]) -> dict[str, Any]:
     return {
         "government_form_id": _form_id(values.get("government_form_id")),
         "display_name": _text(values.get("display_name"), _text(values.get("government_form_id"), "")),
+        "party_count_transitions_json": _text(values.get("party_count_transitions_json"), "[]"),
+        "party_policy_editable": bool(values.get("party_policy_editable", False)),
+        "minimum_eligible_parties": max(1, _non_negative_int(values.get("minimum_eligible_parties", 1))),
+        "maximum_eligible_parties": _non_negative_int(values.get("maximum_eligible_parties")),
         "election_eligible": bool(values.get("election_eligible", False)),
         "election_interval_minutes": _non_negative_int(values.get("election_interval_minutes")),
         "election_turnout_base": _finite(values.get("election_turnout_base"), 0.65),

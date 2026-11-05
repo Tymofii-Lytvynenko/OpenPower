@@ -62,6 +62,27 @@ def get_country_row(state, country_tag: str) -> dict[str, Any]:
     return rows.to_dicts()[0]
 
 
+def active_country_tags(state) -> list[str]:
+    """Return the current country catalog, excluding explicitly inactive rows."""
+    countries = getattr(state, "tables", {}).get("countries")
+    if countries is None or countries.is_empty() or "id" not in countries.columns:
+        return []
+
+    tags: set[str] = set()
+    for row in countries.to_dicts():
+        tag = safe_text(row.get("id")).upper()
+        if not tag:
+            continue
+        active = row.get("active", True)
+        if isinstance(active, bool):
+            if not active:
+                continue
+        elif safe_text(active, "true").casefold() in {"false", "0", "no", "inactive"}:
+            continue
+        tags.add(tag)
+    return sorted(tags)
+
+
 def resolve_country_name(state, owner_tag: str) -> str:
     owner_tag = safe_text(owner_tag, "Unknown")
     resolver = get_geo_name_resolver(_geo_language_code(state))

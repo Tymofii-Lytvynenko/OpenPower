@@ -1,0 +1,27 @@
+{
+  "fixture": "tests/ui/fixtures/reference-resource-production.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.eco"},
+    {"op": "click", "target": "economy.resources_btn"},
+    {"op": "click", "target": "resources.category.energy"},
+    {"op": "click", "target": "resources.resource.fossil_fuels"},
+    {"op": "click", "target": "resources.increase_production"},
+    {"op": "assert_region", "target": "resources.increase_production.dialog", "visible": true},
+    {"op": "assert", "target": "resources.increase_production.percent.25", "visible": true, "enabled": true},
+    {"op": "assert", "target": "resources.increase_production.cost.25", "label": "$300,000", "visible": true},
+    {"op": "assert", "target": "resources.increase_production.apply", "visible": true, "enabled": false},
+    {"op": "click", "target": "resources.increase_production.percent.2"},
+    {"op": "click", "target": "resources.increase_production.percent.25"},
+    {"op": "close_window", "target": "resources.increase_production.dialog"},
+    {"op": "assert_region", "target": "resources.increase_production.dialog", "visible": false, "present": false},
+    {"op": "click", "target": "resources.increase_production"},
+    {"op": "click", "target": "resources.increase_production.percent.2"},
+    {"op": "click", "target": "resources.increase_production.percent.25"},
+    {"op": "assert", "target": "resources.increase_production.apply", "visible": true, "enabled": true},
+    {"op": "click", "target": "resources.increase_production.apply"},
+    {"op": "assert_region", "target": "resources.increase_production.dialog", "visible": false, "present": false},
+    {"op": "assert_action", "type": "ActionIncreaseResourceProduction", "count": 1, "fields": {"increase_percent": 25, "country_tag": "UKR", "resource_id": "fossil_fuels"}},
+    {"op": "assert", "target": "resources.increase_production", "visible": true, "enabled": false},
+    {"op": "assert_action", "type": "ActionUpdateResourcePolicy", "count": 0}
+  ]
+}

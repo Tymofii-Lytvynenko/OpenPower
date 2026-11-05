@@ -1,0 +1,60 @@
+{
+  "fixture": "tests/ui/fixtures/reference-battle-inspection.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "battle.map.marker.battle-own"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "battle.inspection.map.UKR.infantry.0"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "battle.inspection.map.UKR.infantry.0",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "battle.inspection.force.POL.tanks"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetBattleStrategy",
+      "count": 0
+    },
+    {
+      "op": "scroll",
+      "target": "battle.inspection.close"
+    },
+    {
+      "op": "click",
+      "target": "battle.inspection.close"
+    },
+    {
+      "op": "wait",
+      "frames": 5
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.inspection.dialog",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

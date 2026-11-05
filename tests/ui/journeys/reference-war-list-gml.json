@@ -1,0 +1,83 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "click", "target": "military.open_war_list" },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/war-list-active.json"
+    },
+    {
+      "op": "assert_region",
+      "target": "war_list.panel",
+      "visible": true,
+      "min_width": 543,
+      "min_height": 296
+    },
+    {
+      "op": "assert",
+      "target": "war_list.select.war-fixture-1",
+      "visible": true,
+      "inside": "war_list.panel"
+    },
+    {
+      "op": "assert",
+      "target": "war_list.join.attacker",
+      "visible": true,
+      "enabled": true,
+      "inside": "war_list.panel",
+      "relative_to": "war_list.panel",
+      "relative_rect": { "x": 190, "y": 263, "width": 65, "height": 18 }
+    },
+    {
+      "op": "assert",
+      "target": "war_list.join.defender",
+      "visible": true,
+      "enabled": true,
+      "relative_to": "war_list.panel",
+      "relative_rect": { "x": 461, "y": 263, "width": 65, "height": 18 }
+    },
+    { "op": "click", "target": "war_list.join.attacker" },
+    {
+      "op": "assert_action",
+      "type": "ActionJoinWar",
+      "fields": {
+        "source_country_tag": "UKR",
+        "war_id": "war-fixture-1",
+        "side": "attacker"
+      }
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/war-list-controlled-war.json"
+    },
+    {
+      "op": "assert",
+      "target": "war_list.peace.attacker",
+      "visible": true,
+      "enabled": true,
+      "inside": "war_list.panel",
+      "relative_to": "war_list.panel",
+      "relative_rect": { "x": 141, "y": 263, "width": 55, "height": 18 }
+    },
+    { "op": "click", "target": "war_list.peace.attacker" },
+    {
+      "op": "assert_action",
+      "type": "ActionOfferPeace",
+      "fields": {
+        "source_country_tag": "UKR",
+        "war_id": "war-controlled-1",
+        "terms": "peace"
+      }
+    },
+    { "op": "click", "target": "war_list.page" },
+    { "op": "assert_region", "target": "war_list.panel", "visible": true },
+    { "op": "click", "target": "war_list.page" },
+    { "op": "close_window", "target": "war_list.panel" },
+    {
+      "op": "assert_region",
+      "target": "war_list.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

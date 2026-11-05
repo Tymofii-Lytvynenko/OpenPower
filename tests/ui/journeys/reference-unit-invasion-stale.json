@@ -1,0 +1,64 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-invasion.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "map.move.unit-1.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.POL",
+      "visible": true
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/reference-unit-invasion-stale.json"
+    },
+    {
+      "op": "click",
+      "target": "unit.attack.yes.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.POL",
+      "visible": false
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionInvadeTerritory",
+      "count": 0
+    },
+    {
+      "op": "assert_region",
+      "target": "generic_message.dialog",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "generic_message.ok"
+    },
+    {
+      "op": "click",
+      "target": "map.move.unit-1.POL"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.DEU",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "unit.attack.no.DEU"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.attack.confirm.DEU",
+      "visible": false
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionInvadeTerritory",
+      "count": 0
+    }
+  ]
+}

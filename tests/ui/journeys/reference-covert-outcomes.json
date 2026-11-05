@@ -1,0 +1,35 @@
+{
+  "fixture":"tests/ui/fixtures/reference-covert-outcomes.json",
+  "steps":[
+    {"op":"click","target":"hud.mail"},
+    {"op":"assert_absent","target":"mail.dispatch.covert:hidden-result"},
+    {"op":"click","target":"mail.dispatch.covert:own-result"},
+    {"op":"assert_region","target":"covert.outcome.own","visible":true},
+    {"op":"assert","target":"covert.outcome.cellname","label":"Alpha"},
+    {"op":"assert","target":"covert.outcome.missiontype","label":"Espionage"},
+    {"op":"assert","target":"covert.outcome.targetcountry","label":"POL"},
+    {
+      "op":"assert",
+      "target":"covert.outcome.result",
+      "label":"Success\nMilitary intelligence collected.",
+      "relative_to":"covert.outcome.own",
+      "relative_rect":{"x":154,"y":191},
+      "no_overlap":"covert.outcome.result.label"
+    },
+    {"op":"close_window","target":"covert.outcome.own"},
+    {"op":"click","target":"mail.dispatch.covert:incoming-result"},
+    {"op":"assert_region","target":"covert.outcome.attacked","visible":true},
+    {"op":"assert","target":"covert.outcome.attacked.country","label":"Unknown"},
+    {"op":"assert","target":"covert.outcome.attacked.outcome","label":"Partial Success"},
+    {
+      "op":"assert",
+      "target":"covert.outcome.attacked.effect",
+      "label":"A sabotage incident was detected.",
+      "relative_to":"covert.outcome.attacked",
+      "relative_rect":{"x":128,"y":73},
+      "no_overlap":"covert.outcome.attacked.effect.label"
+    },
+    {"op":"click","target":"covert.outcome.attacked.close"},
+    {"op":"assert_region","target":"covert.outcome.attacked","visible":false,"present":false}
+  ]
+}

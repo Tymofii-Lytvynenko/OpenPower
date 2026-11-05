@@ -20,6 +20,8 @@ from modules.base.systems.politics.politics_system import PoliticsSystem
 from modules.base.systems.politics.political_lifecycle_system import PoliticalLifecycleSystem
 from modules.base.systems.politics.identity_policy_system import IdentityPolicySystem
 from modules.base.systems.world.ai_system import AISystem
+from modules.base.systems.world.advisor_settings_system import AdvisorSettingsSystem
+from modules.base.systems.world.advisor_recommendation_system import AdvisorRecommendationSystem
 from modules.base.systems.world.bootstrap_system import BootstrapSystem
 from modules.base.systems.world.campaign_system import CampaignSetupSystem, CampaignSystem
 from modules.base.systems.world.history_system import HistorySystem
@@ -40,6 +42,8 @@ def contribute():
         BootstrapSystem,
         CampaignSetupSystem,
         CampaignSystem,
+        AdvisorRecommendationSystem,
+        AdvisorSettingsSystem,
         HistorySystem,
         AdvancedDiplomacySystem,
         DiplomacySystem,

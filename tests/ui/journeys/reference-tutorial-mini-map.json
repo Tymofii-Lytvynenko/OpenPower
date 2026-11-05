@@ -1,0 +1,19 @@
+{
+  "steps": [
+    { "op": "assert", "target": "game.tutorial.step.interface.1", "visible": true },
+    { "op": "click", "target": "mini_map.map" },
+    { "op": "assert", "target": "game.tutorial.step.interface.1", "visible": true },
+    { "op": "click", "target": "game.tutorial.next" },
+    { "op": "assert", "target": "game.tutorial.step.interface.2", "visible": true },
+    { "op": "assert_region", "target": "game.tutorial.arrow", "visible": true, "inside_viewport": true },
+    { "op": "click", "target": "mini_map.zoom" },
+    { "op": "assert", "target": "game.tutorial.step.interface.2", "visible": true },
+    { "op": "click", "target": "mini_map.map" },
+    { "op": "assert_viewport_request", "type": "focus_map", "fields": {"x_fraction": 0.5, "y_fraction": 0.5} },
+    { "op": "assert", "target": "game.tutorial.step.interface.3", "visible": true },
+    { "op": "assert_region", "target": "game.tutorial.arrow", "visible": true, "inside_viewport": true },
+    { "op": "drag", "target": "mini_map.zoom", "fraction": 0.25 },
+    { "op": "assert_viewport_request", "type": "zoom", "fields": {"fraction": 0.75}, "tolerance": 0.01 },
+    { "op": "assert", "target": "game.tutorial.step.interface.4", "visible": true }
+  ]
+}

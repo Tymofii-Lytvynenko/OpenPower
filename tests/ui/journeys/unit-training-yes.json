@@ -1,0 +1,40 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-reorganization.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "unit.context.view_list"
+    },
+    {
+      "op": "click",
+      "target": "unit.group.train"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.training.question",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "unit.training.question.yes"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "count": 1,
+      "fields": {
+        "unit_id": "unit-1",
+        "country_tag": "UKR",
+        "target_level": "Regular",
+        "expected_cost": 1000.0,
+        "expected_required_days": 30.0,
+        "expected_from_level": "Recruit"
+      }
+    }
+  ]
+}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import polars as pl
 import pytest
@@ -10,6 +11,7 @@ from modules.base.systems.politics.identity_policy_system import IdentityPolicyS
 from modules.base.systems.world.bilateral_trade_system import BilateralTradeSystem
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.panels.trade_panel import TradePanel
+from src.client.ui.panels.trade_options import country_options, technology_options
 from src.client.ui.testing.fixtures import RecordingClient, build_test_world
 from src.shared.actions import (
     ActionCounterTradeDeal, ActionCreateTradeDeal, ActionRespondTradeDeal,
@@ -19,6 +21,42 @@ from src.shared.events import EventNewDay
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_trade_options_use_snapshot_country_names_and_research_levels():
+    state = SimpleNamespace(tables={
+        "countries": pl.DataFrame([
+            {"id": "AAA", "name": "Alpha"}, {"id": "BBB", "name": "Beta"},
+        ]),
+        "research_tracks": pl.DataFrame([
+            {"country_id": "AAA", "branch": "Air", "research_level": 3},
+            {"country_id": "BBB", "branch": "Air", "research_level": 1},
+            {"country_id": "AAA", "branch": "Naval", "research_level": 1},
+            {"country_id": "BBB", "branch": "Naval", "research_level": 2},
+        ]),
+    })
+    assert country_options(state, "AAA") == [("BBB", "Beta (BBB)")]
+    assert technology_options(state, "AAA", "BBB") == [("air", 3, 1)]
+    assert technology_options(state, "BBB", "AAA") == [("naval", 2, 1)]
+
+
+def test_trade_region_options_exclude_a_countrys_only_capital():
+    state = SimpleNamespace(tables={
+        "regions": pl.DataFrame([
+            {"id": 1, "owner": "AAA", "name": "Capital"},
+            {"id": 2, "owner": "BBB", "name": "Other"},
+        ]),
+        "country_governments": pl.DataFrame([
+            {"country_id": "AAA", "capital_region_id": 1},
+        ]),
+    })
+    panel = TradePanel()
+    assert panel._regions_for_owner(state, "AAA") == []
+    state.tables["regions"] = pl.concat([
+        state.tables["regions"],
+        pl.DataFrame([{"id": 3, "owner": "AAA", "name": "Border"}]),
+    ])
+    assert panel._regions_for_owner(state, "AAA") == [(3, "Border (3)"), (1, "Capital (1)")]
 
 
 @pytest.fixture
@@ -154,3 +192,51 @@ def test_ui_counteroffer_preserves_terms_from_recipients_perspective(world):
     assert panel.offered_assets == []
     assert action.offered_assets != panel.offered_assets
     assert panel.active_page == "offers"
+
+
+@pytest.mark.parametrize("kind,identity_id", [("language", "ukrainian"), ("religion", "orthodox")])
+def test_last_recognized_identity_is_refused_before_dispatch_and_by_server(world, kind, identity_id):
+    from src.client.ui.panels.politics.identity_policy_view import IdentityPolicyView
+    frame = world.tables["country_identity_groups"]
+    frame = frame.with_columns(pl.when(pl.col("identity_id").is_in(["ukrainian", "orthodox"]))
+                               .then(pl.lit("legal")).otherwise(pl.lit("illegal")).alias("legal_status"))
+    world.tables["country_identity_groups"] = frame
+    rows = frame.filter(pl.col("identity_type") == kind).to_dicts()
+    target = next(row for row in rows if row["identity_id"] == identity_id)
+    client = RecordingClient(world)
+    view = IdentityPolicyView()
+    view.identity_type = kind
+    context = PanelRenderContext("UKR", True, net_client=client)
+    assert not view.request_policy(rows, target, "illegal", context)
+    assert client.actions == []
+    assert view._notice.is_open
+    assert world.tables["country_identity_groups"].equals(frame)
+    execute(IdentityPolicySystem(), world,
+            ActionSetCountryIdentityPolicy("UKR", "UKR", kind, identity_id, "illegal"))
+    assert world.journal.command_results[-1]["status"] == "rejected"
+    assert world.tables["country_identity_groups"].equals(frame)
+
+
+def test_staged_identity_swap_is_accepted_by_authoritative_system(world):
+    from src.client.ui.panels.politics.identity_policy_draft import IdentityPolicyDraft
+    frame = world.tables["country_identity_groups"].with_columns(
+        pl.when((pl.col("identity_type") == "language") & (pl.col("identity_id") != "ukrainian"))
+        .then(pl.lit("illegal")).otherwise(pl.col("legal_status")).alias("legal_status"))
+    world.tables["country_identity_groups"] = frame
+    rows = frame.filter(pl.col("identity_type") == "language").to_dicts()
+    draft = IdentityPolicyDraft()
+    draft.select_country("UKR")
+    russian = next(row for row in rows if row["identity_id"] == "russian")
+    ukrainian = next(row for row in rows if row["identity_id"] == "ukrainian")
+    assert draft.choose(rows, russian, "legal") == ""
+    assert draft.choose(rows, ukrainian, "illegal") == ""
+    client = RecordingClient(world)
+    client.player_id = "UKR"
+    actions, reason = draft.prepare(world, PanelRenderContext("UKR", True, net_client=client))
+    assert not reason
+    world.current_actions = actions
+    IdentityPolicySystem().update(world, 0.0)
+    assert [row["status"] for row in world.journal.command_results[-2:]] == ["applied", "applied"]
+    rows = world.tables["country_identity_groups"].filter(pl.col("identity_type") == "language")
+    assert rows.filter(pl.col("identity_id") == "russian").item(0, "legal_status") == "legal"
+    assert rows.filter(pl.col("identity_id") == "ukrainian").item(0, "legal_status") == "illegal"

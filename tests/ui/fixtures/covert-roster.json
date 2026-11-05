@@ -1,0 +1,33 @@
+{
+  "tables": {
+    "covert_cells": [
+      {
+        "id": "cell-first",
+        "country_id": "UKR",
+        "target_country_id": "POL",
+        "cell_name": "First cell",
+        "status": "active",
+        "origin_country_id": "UKR",
+        "location_country_id": "POL",
+        "assignment": "unassigned",
+        "skill_level": "Regular",
+        "communications_ready": true
+      },
+      {
+        "id": "cell-test",
+        "country_id": "UKR",
+        "target_country_id": "POL",
+        "cell_name": "Ready cell",
+        "status": "active",
+        "origin_country_id": "UKR",
+        "location_country_id": "POL",
+        "assignment": "unassigned",
+        "skill_level": "Regular",
+        "communications_ready": true,
+        "readiness": 1.0,
+        "upkeep": 2.5
+      }
+    ],
+    "covert_missions": []
+  }
+}

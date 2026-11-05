@@ -1,0 +1,15 @@
+{
+  "tables": {
+    "news_items": [
+      {
+        "id": "main-bar-global-bulletin",
+        "headline": "Global bulletin",
+        "body": "No map location is available.",
+        "category": "political",
+        "severity": "info",
+        "related_country_id": "",
+        "created_at": "2001-01-02"
+      }
+    ]
+  }
+}

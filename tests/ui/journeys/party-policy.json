@@ -1,0 +1,70 @@
+{
+  "fixture": "tests/ui/fixtures/party-policy.json",
+  "steps": [
+    {
+      "op": "assert",
+      "target": "laws.party.party-1.status",
+      "enabled": false
+    },
+    {
+      "op": "select",
+      "target": "laws.party.party-2.status",
+      "value": "Ineligible"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPartyEligibility",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "laws.apply"
+    },
+    {
+      "op": "assert_region",
+      "target": "generic_message.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPartyEligibility",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "generic_message.ok"
+    },
+    {
+      "op": "select",
+      "target": "laws.party.party-3.status",
+      "value": "Eligible"
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "laws.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPartyEligibility",
+      "count": 1,
+      "fields": {
+        "country_tag": "UKR",
+        "expected_government_form": "custom",
+        "changes": {
+          "party-2": false,
+          "party-3": true
+        }
+      }
+    },
+    {
+      "op": "assert",
+      "target": "laws.apply",
+      "enabled": false
+    }
+  ]
+}

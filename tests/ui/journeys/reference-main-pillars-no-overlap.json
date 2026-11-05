@@ -1,0 +1,57 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.pol" },
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "hud.panel.dem" },
+    {
+      "op": "assert",
+      "target": { "label": "CONSTITUTIONAL FORM", "region": "politics.panel" },
+      "visible": true,
+      "relative_to": "politics.panel",
+      "relative_rect": { "x": 33, "y": 38 },
+      "tolerance": 1
+    },
+    {
+      "op": "assert",
+      "target": { "label": "CONVENTIONAL FORCES", "region": "military.panel" },
+      "visible": true,
+      "relative_to": "military.panel",
+      "relative_rect": { "x": 33, "y": 36 },
+      "tolerance": 1
+    },
+    {
+      "op": "assert",
+      "target": { "label": "POPULATION SUMMARY", "region": "demographics.panel" },
+      "visible": true,
+      "relative_to": "demographics.panel",
+      "relative_rect": { "x": 22, "y": 43 },
+      "tolerance": 1
+    },
+    {
+      "op": "assert",
+      "target": { "label": "HDI Score: 0.70", "region": "demographics.panel" },
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": { "label": "ECONOMIC MODEL", "region": "economy.panel" },
+      "visible": true,
+      "relative_to": "economy.panel",
+      "relative_rect": { "x": 33, "y": 38 },
+      "tolerance": 1
+    },
+    { "op": "assert_region", "target": "politics.panel", "visible": true, "inside_viewport": true, "no_overlap": "military.panel", "no_overlap_min_viewport_width": 1280 },
+    { "op": "assert_region", "target": "military.panel", "visible": true, "inside_viewport": true, "no_overlap": "demographics.panel", "no_overlap_min_viewport_width": 1280 },
+    { "op": "assert_region", "target": "demographics.panel", "visible": true, "inside_viewport": true, "no_overlap": "economy.panel", "no_overlap_min_viewport_width": 1280 },
+    { "op": "assert_region", "target": "economy.panel", "visible": true, "inside_viewport": true },
+    { "op": "close_window", "target": "demographics.panel" },
+    { "op": "click", "target": "politics.open_treaties" },
+    { "op": "assert_region", "target": "politics.panel", "visible": true, "no_overlap": "treaties.panel", "no_overlap_min_viewport_width": 1280 },
+    { "op": "assert_region", "target": "military.panel", "visible": true, "no_overlap": "treaties.panel", "no_overlap_min_viewport_width": 1280 },
+    { "op": "assert_region", "target": "economy.panel", "visible": true, "no_overlap": "treaties.panel", "no_overlap_min_viewport_width": 1280 },
+    { "op": "assert_region", "target": "treaties.panel", "visible": true, "no_overlap": "hud.system_bar", "no_overlap_min_viewport_width": 1280 },
+    { "op": "assert_region", "target": "treaties.panel", "visible": true, "no_overlap": "hud.central_bar", "no_overlap_min_viewport_width": 1280 },
+    { "op": "close_window", "target": "treaties.panel" }
+  ]
+}

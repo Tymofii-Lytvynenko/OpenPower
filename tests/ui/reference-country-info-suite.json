@@ -1,0 +1,8 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-country-info.json",
+      "surface": "game-hud"
+    }
+  ]
+}

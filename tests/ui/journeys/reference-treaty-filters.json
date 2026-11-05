@@ -1,0 +1,23 @@
+{
+  "fixture": "tests/ui/fixtures/reference-treaty-filter-options.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.pol"},
+    {"op": "click", "target": "politics.open_treaties"},
+    {"op": "assert", "target": "treaties.active.filter-alliance", "visible": true},
+    {"op": "assert", "target": "treaties.active.filter-market", "visible": true},
+    {"op": "assert", "target": "treaties.pending.filter-proposal", "visible": true},
+    {"op": "select", "target": "treaties.filter_type", "value": "Economic partnership"},
+    {"op": "assert", "target": "treaties.active.filter-market", "visible": true},
+    {"op": "assert_absent", "target": "treaties.active.filter-alliance"},
+    {"op": "assert", "target": "treaties.pending.filter-proposal", "visible": true},
+    {"op": "select", "target": "treaties.filter_member", "value": "Germany (DEU)"},
+    {"op": "assert", "target": "treaties.active.filter-market", "visible": true},
+    {"op": "assert", "target": "treaties.pending.filter-proposal", "visible": true},
+    {"op": "select", "target": "treaties.filter_type", "value": "All types"},
+    {"op": "select", "target": "treaties.filter_member", "value": "Poland (POL)"},
+    {"op": "assert", "target": "treaties.active.filter-alliance", "visible": true},
+    {"op": "assert_absent", "target": "treaties.active.filter-market"},
+    {"op": "assert_absent", "target": "treaties.pending.filter-proposal"},
+    {"op": "assert_action", "type": "ActionRespondTreaty", "count": 0}
+  ]
+}

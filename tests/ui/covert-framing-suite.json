@@ -1,0 +1,8 @@
+{
+  "results": [
+    {
+      "surface": "game-hud",
+      "journey": "tests/ui/journeys/covert-framed-dispatch.json"
+    }
+  ]
+}

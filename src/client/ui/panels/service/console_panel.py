@@ -9,7 +9,7 @@ from src.client.ui.panels.shared.panel_widgets import draw_key_value_rows
 
 class ConsolePanel:
     def render(self, state, context: PanelRenderContext) -> bool:
-        with WindowManager.window("CONSOLE", x=80, y=520, w=720, h=320) as is_open:
+        with WindowManager.window("CONSOLE", x=80, y=520, w=720, h=320, test_id="console.panel") as is_open:
             if not is_open:
                 return False
             self._render_content(state, context)

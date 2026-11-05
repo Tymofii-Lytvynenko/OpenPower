@@ -1,0 +1,42 @@
+{
+  "steps": [
+    {"op": "click", "target": "unit_design.create.open"},
+    {"op": "assert_region", "target": "unit_design.create.dialog", "visible": true},
+    {"op": "input", "target": "unit_design.create.name", "value": "UI test infantry"},
+    {"op": "input", "target": "unit_design.create.cost", "value": 125.0},
+    {"op": "input", "target": "unit_design.create.capability.gun_range", "value": 3.0},
+    {"op": "input", "target": "unit_design.create.maintenance", "value": 2.5},
+    {
+      "op": "assert",
+      "target": "unit_design.create.submit",
+      "label": "CREATE",
+      "enabled": true,
+      "relative_to": "unit_design.create.dialog",
+      "relative_rect": {"x": 474, "y": 455, "width": 84, "height": 18}
+    },
+    {"op": "click", "target": "unit_design.create.submit"},
+    {
+      "op": "assert_action",
+      "type": "ActionCreateUnitDesign",
+      "fields": {
+        "country_tag": "UKR",
+        "branch": "land",
+        "class_name": "infantry",
+        "display_name": "UI test infantry",
+        "stats.cost": 125.0,
+        "stats.gun_range": 3.0,
+        "stats.maintenance_cost": 2.5
+      }
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/reference-design-create-success.json"
+    },
+    {"op": "assert_region", "target": "unit_design.create.dialog", "visible": false},
+    {"op": "click", "target": "unit_design.create.open"},
+    {"op": "assert_region", "target": "unit_design.create.dialog", "visible": true},
+    {"op": "input", "target": "unit_design.create.capability.gun_range", "value": 6.0},
+    {"op": "assert", "target": "unit_design.create.capability.gun_range", "value": 6.0},
+    {"op": "assert_region", "target": "unit_design.create.dialog", "visible": true}
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "tables": {
+    "research_tracks": [
+      {
+        "id": "research-UKR-ground",
+        "country_id": "UKR",
+        "branch": "ground",
+        "funding_ratio": 0.31,
+        "progress": 0.0,
+        "priority": 1,
+        "focus": "Ground research",
+        "research_level": 0,
+        "unlocks_json": "[]",
+        "blocking_reason": ""
+      },
+      {
+        "id": "research-UKR-air",
+        "country_id": "UKR",
+        "branch": "air",
+        "funding_ratio": 0.06333333333333332,
+        "progress": 0.0,
+        "priority": 1,
+        "focus": "Air research",
+        "research_level": 0,
+        "unlocks_json": "[]",
+        "blocking_reason": ""
+      },
+      {
+        "id": "research-UKR-naval",
+        "country_id": "UKR",
+        "branch": "naval",
+        "funding_ratio": 0.06333333333333332,
+        "progress": 0.0,
+        "priority": 1,
+        "focus": "Naval research",
+        "research_level": 0,
+        "unlocks_json": "[]",
+        "blocking_reason": ""
+      },
+      {
+        "id": "research-UKR-strategic",
+        "country_id": "UKR",
+        "branch": "strategic",
+        "funding_ratio": 0.06333333333333332,
+        "progress": 0.0,
+        "priority": 1,
+        "focus": "Strategic research",
+        "research_level": 0,
+        "unlocks_json": "[]",
+        "blocking_reason": ""
+      },
+      {
+        "id": "research-UKR-strategic-program",
+        "country_id": "UKR",
+        "branch": "strategic_program",
+        "funding_ratio": 0.73,
+        "progress": 0.0,
+        "priority": 1,
+        "focus": "Strategic program",
+        "research_level": 0,
+        "unlocks_json": "[]",
+        "blocking_reason": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "surface": "unit-context",
+      "journey": "tests/ui/journeys/unit-training-yes.json"
+    },
+    {
+      "surface": "unit-context",
+      "journey": "tests/ui/journeys/unit-training-no.json"
+    },
+    {
+      "surface": "unit-context",
+      "journey": "tests/ui/journeys/unit-training-stale.json"
+    },
+    {
+      "surface": "unit-context",
+      "journey": "tests/ui/journeys/unit-training-unavailable.json"
+    }
+  ]
+}

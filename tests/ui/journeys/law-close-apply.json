@@ -1,0 +1,42 @@
+{
+  "fixture": "tests/ui/fixtures/law-policy.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.pol"
+    },
+    {
+      "op": "click",
+      "target": "politics.open_laws"
+    },
+    {
+      "op": "select",
+      "target": "laws.value.speech",
+      "value": "Restricted"
+    },
+    {
+      "op": "close_window",
+      "target": "laws.panel"
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.close.confirmation",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "laws.close.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionChangePoliticalLaw",
+      "count": 1
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

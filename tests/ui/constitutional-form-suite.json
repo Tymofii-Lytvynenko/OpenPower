@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-government-form-change.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-government-form-apply.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-government-form-override.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-government-form-rejected.json",
+      "surface": "game-hud"
+    }
+  ]
+}

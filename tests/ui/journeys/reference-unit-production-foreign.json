@@ -1,0 +1,33 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-production-foreign.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_production"},
+    {"op": "select", "target": "unit_production.builder", "value": "Poland (POL)"},
+    {"op": "click", "target": "unit_production.category.air"},
+    {"op": "assert", "target": "unit_production.select_design.design-pol-fighter", "visible": true},
+    {"op": "assert", "target": "unit_production.page.queue", "visible": true, "relative_to": "unit_production.panel", "relative_rect": {"x": 409, "y": 38, "width": 46, "height": 15}, "tolerance": 2},
+    {"op": "assert", "target": "unit_production.page.foreign", "visible": true, "relative_to": "unit_production.panel", "relative_rect": {"x": 457, "y": 38, "width": 56, "height": 15}, "relative_rect_min_viewport_width": 1280},
+    {"op": "assert", "target": "unit_production.page.deployments", "visible": true, "no_overlap": "unit_production.accept_foreign.label", "relative_to": "unit_production.panel", "relative_rect": {"x": 515, "y": 38, "width": 54, "height": 15}, "relative_rect_min_viewport_width": 1280},
+    {"op": "assert_region", "target": "unit_production.panel", "visible": true, "min_width": 842, "min_height": 462},
+    {"op": "click", "target": "unit_production.category.naval"},
+    {"op": "assert", "target": "unit_production.designs.empty", "visible": true},
+    {"op": "click", "target": "unit_production.category.strategic"},
+    {"op": "assert", "target": "unit_production.designs.empty", "visible": true},
+    {"op": "click", "target": "unit_production.category.ground"},
+    {"op": "click", "target": "unit_production.select_design.design-pol-infantry"},
+    {"op": "assert", "target": "unit_production.manpower.value", "visible": true, "label": "20 000 000"},
+    {"op": "input", "target": "unit_production.quantity", "value": "3"},
+    {"op": "click", "target": "unit_production.build"},
+    {"op": "assert_action", "type": "ActionRequestForeignUnitOrder", "count": 1, "fields": {"buyer_country_tag": "UKR", "seller_country_tag": "POL", "design_id": "design-pol-infantry", "quantity": 3}},
+    {"op": "click", "target": "unit_production.page.foreign"},
+    {"op": "click", "target": "unit_production.foreign.request.design-pol-fighter"},
+    {"op": "assert_action", "type": "ActionRequestForeignUnitOrder", "count": 2, "index": 1, "fields": {"buyer_country_tag": "UKR", "seller_country_tag": "POL", "design_id": "design-pol-fighter", "quantity": 3}},
+    {"op": "click", "target": "unit_production.accept_foreign"},
+    {"op": "assert_action", "type": "ActionSetForeignOrderAcceptance", "fields": {"country_tag": "UKR", "is_accepting": true}},
+    {"op": "click", "target": "unit_production.foreign.accept.incoming-ukr"},
+    {"op": "assert_action", "type": "ActionRespondForeignUnitOrder", "fields": {"order_id": "incoming-ukr", "accept": true}},
+    {"op": "click", "target": "unit_production.foreign.cancel.outgoing-ukr"},
+    {"op": "assert_action", "type": "ActionCancelForeignUnitOrder", "fields": {"order_id": "outgoing-ukr"}}
+  ]
+}

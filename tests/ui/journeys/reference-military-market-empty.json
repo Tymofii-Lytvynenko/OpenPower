@@ -1,0 +1,11 @@
+{
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "assert_region", "target": "military.panel", "visible": true},
+    {"op": "click", "target": "military.open_market"},
+    {"op": "assert_region", "target": "unit_market.panel", "visible": true},
+    {"op": "assert_region", "target": "unit_market.list", "visible": true},
+    {"op": "assert", "target": "unit_market.type", "type": "combo", "enabled": false},
+    {"op": "assert", "target": "unit_market.buy", "type": "button", "enabled": false}
+  ]
+}

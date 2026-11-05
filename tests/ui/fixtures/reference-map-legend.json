@@ -1,0 +1,16 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine", "gdp": 180000000.0},
+      {"id": "POL", "name": "Poland", "gdp": 95000000.0}
+    ],
+    "regions": [
+      {"id": 1, "name": "Kyiv", "owner": "UKR", "controller": "UKR", "gdp": 180000000.0},
+      {"id": 2, "name": "Warsaw", "owner": "POL", "controller": "POL", "gdp": 95000000.0}
+    ],
+    "countries_relations": [
+      {"source": "UKR", "target": "POL", "value": 42.0}
+    ]
+  },
+  "globals": {"ui_map_mode": "gdp_total"}
+}

@@ -1,0 +1,8 @@
+{
+  "steps": [
+    {"op": "click", "target": "hud.news"},
+    {"op": "assert_region", "target": "news.panel", "visible": true},
+    {"op": "server_snapshot", "fixture": "tests/ui/fixtures/reference-news-arrival.json"},
+    {"op": "assert", "target": "news.item.news:arrival-1", "visible": true}
+  ]
+}

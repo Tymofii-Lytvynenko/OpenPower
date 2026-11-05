@@ -1,0 +1,21 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.history"
+    },
+    {
+      "op": "assert",
+      "target": "history.chart.empty_message",
+      "visible": true,
+      "min_height": 20,
+      "inside": "history.panel",
+      "label": "Historical data will appear after the first simulation update."
+    },
+    {
+      "op": "assert_region",
+      "target": "history.panel",
+      "visible": true
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "tables": {
+    "resource_ledger": [
+      {"country_id": "UKR", "game_resource_id": "oil", "category": "Energy", "production_usd": 220850000000.0, "consumption_usd": 130304000000.0, "trade_usd": 2630000000.0, "balance_usd": 87977000000.0},
+      {"country_id": "UKR", "game_resource_id": "financial_services", "category": "Services", "production_usd": 1315000000000.0, "consumption_usd": 2035000000000.0, "trade_usd": -87500000000.0, "balance_usd": -807500000000.0}
+    ],
+    "trade_network": [
+      {"exporter_id": "UKR", "importer_id": "POL", "game_resource_id": "oil", "trade_value_usd": 16191000000.0},
+      {"exporter_id": "POL", "importer_id": "UKR", "game_resource_id": "oil", "trade_value_usd": 13310000000.0}
+    ]
+  }
+}

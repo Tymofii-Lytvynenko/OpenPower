@@ -1,0 +1,35 @@
+{
+  "fixture": "tests/ui/fixtures/reference-government-form.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.pol"},
+    {"op": "assert_region", "target": "politics.panel", "visible": true},
+    {"op": "click", "target": "politics.open_constitution"},
+    {"op": "assert_region", "target": "constitutional_form.panel", "visible": true},
+    {
+      "op": "assert",
+      "target": "constitutional_form.government_form",
+      "visible": true,
+      "enabled": true,
+      "inside": "constitutional_form.panel"
+    },
+    {
+      "op": "select",
+      "target": "constitutional_form.government_form",
+      "value": "Single-party democracy"
+    },
+    {"op": "assert", "target": "constitutional_form.apply", "enabled": true},
+    {"op": "click", "target": "constitutional_form.panel.close"},
+    {"op": "assert_region", "target": "constitutional_form.close.confirmation", "visible": true},
+    {"op": "click", "target": "constitutional_form.close.apply"},
+    {
+      "op": "assert_action",
+      "type": "ActionSetGovernmentForm",
+      "fields": {
+        "country_tag": "UKR",
+        "expected_form_id": "transitional republic",
+        "target_form_id": "single-party democracy"
+      }
+    },
+    {"op": "assert_action", "type": "ActionSetCountryCapital", "count": 0}
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "tables": {
+    "pending_treaties": [],
+    "diplomatic_trade_deals": [
+      {
+        "id": "deal-mail",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "status": "pending",
+        "offered_assets_json": "[]",
+        "requested_assets_json": "[]",
+        "expires_at_minute": 43200,
+        "reason": "Awaiting response."
+      }
+    ]
+  },
+  "journal": {
+    "domain_events": [
+      {
+        "event_id": "battle-mail",
+        "event_type": "EventBattleEnded",
+        "payload": {
+          "battle_id": "battle-kyiv",
+          "region_id": 1,
+          "victor_tag": "UKR",
+          "victor_side": "SIDE_A",
+          "side_a_losses": 42,
+          "side_b_losses": 125,
+          "participant_countries": [
+            "UKR",
+            "POL"
+          ]
+        }
+      },
+      {
+        "event_id": "trade-mail",
+        "event_type": "EventDiplomaticTradeChanged",
+        "payload": {
+          "deal_id": "deal-mail",
+          "source_country_id": "POL",
+          "target_country_id": "UKR",
+          "status": "pending",
+          "reason": "Awaiting response."
+        }
+      },
+      {
+        "event_id": "treaty-mail",
+        "event_type": "EventTreatyProposed",
+        "payload": {
+          "treaty_id": "proposal-mail",
+          "source_country_tag": "POL",
+          "target_country_tag": "UKR"
+        }
+      }
+    ]
+  }
+}

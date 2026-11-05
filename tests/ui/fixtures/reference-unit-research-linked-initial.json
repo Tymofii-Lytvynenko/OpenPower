@@ -1,0 +1,16 @@
+{
+  "tables": {
+    "strategic_weapons": [
+      {"id":"research-link-test-weapon","country_id":"UKR","weapon_type":"nuclear","quantity":1,"ready":1,"defense_rating":0.0,"weapon_class":"icbm","origin_region_id":0,"range_km":12000.0,"payload_level":1,"max_payload_level":1,"required_research_level":1,"operational":true,"launch_cost":0.0,"readiness_minutes":60,"flight_minutes":0,"production_cost":0.0,"production_minutes":0,"program_level":0}
+    ],
+    "research_tracks": [
+      {"id":"research-UKR-ground","country_id":"UKR","branch":"ground","funding_ratio":0.4,"progress":0.0,"priority":1,"focus":"Ground research","research_level":0,"unlocks_json":"[]","blocking_reason":""},
+      {"id":"research-UKR-air","country_id":"UKR","branch":"air","funding_ratio":0.3,"progress":0.0,"priority":1,"focus":"Air research","research_level":0,"unlocks_json":"[]","blocking_reason":""},
+      {"id":"research-UKR-naval","country_id":"UKR","branch":"naval","funding_ratio":0.2,"progress":0.0,"priority":1,"focus":"Naval research","research_level":0,"unlocks_json":"[]","blocking_reason":""},
+      {"id":"research-UKR-strategic","country_id":"UKR","branch":"strategic","funding_ratio":0.1,"progress":0.0,"priority":1,"focus":"Strategic research","research_level":0,"unlocks_json":"[]","blocking_reason":""},
+      {"id":"research-UKR-strategic_program","country_id":"UKR","branch":"strategic_program","funding_ratio":0.2,"progress":0.0,"priority":1,"focus":"Strategic program","research_level":0,"unlocks_json":"[]","blocking_reason":""},
+      {"id":"research-UKR-strategic_weapons","country_id":"UKR","branch":"strategic_weapons","funding_ratio":0.3,"progress":0.0,"priority":1,"focus":"Strategic weapons","research_level":0,"unlocks_json":"[]","blocking_reason":""},
+      {"id":"research-UKR-strategic_defense","country_id":"UKR","branch":"strategic_defense","funding_ratio":0.5,"progress":0.0,"priority":1,"focus":"Strategic defense","research_level":0,"unlocks_json":"[]","blocking_reason":""}
+    ]
+  }
+}

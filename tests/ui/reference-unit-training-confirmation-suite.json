@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-unit-list-operations.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/unit-training-yes.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/unit-training-no.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/unit-training-stale.json",
+      "surface": "unit-context"
+    }
+  ]
+}

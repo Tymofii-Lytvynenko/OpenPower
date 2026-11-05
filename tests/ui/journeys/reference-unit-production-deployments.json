@@ -1,0 +1,12 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-production-deployments.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_production"},
+    {"op": "click", "target": "unit_production.page.deployments"},
+    {"op": "click", "target": "unit_production.deployments.dispatch.deployment-ready"},
+    {"op": "click", "target": "unit_production.deployments.split.deployment-ready"},
+    {"op": "assert_action", "type": "ActionDispatchUnitDeployment", "count": 2, "index": 0, "fields": {"unit_id": "completed-group", "destination_region_id": 1, "quantity": 0}},
+    {"op": "assert_action", "type": "ActionDispatchUnitDeployment", "count": 2, "index": 1, "fields": {"unit_id": "completed-group", "destination_region_id": 1, "quantity": 3}}
+  ]
+}

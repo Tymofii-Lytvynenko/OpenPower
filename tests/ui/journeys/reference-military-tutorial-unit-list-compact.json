@@ -1,0 +1,14 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.system.help" },
+    { "op": "click", "target": "help.tutorial.military" },
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "click", "target": "military.open_unit_list" },
+    { "op": "assert_region", "target": "unit_list.panel", "visible": true, "inside_viewport": true },
+    { "op": "assert_absent", "target": "game.tutorial.window" },
+    { "op": "close_window", "target": "unit_list.panel" },
+    { "op": "assert", "target": "game.tutorial.step.military.3", "visible": true },
+    { "op": "assert_region", "target": "game.tutorial.window", "visible": true, "inside_viewport": true, "no_overlap": "military.panel" },
+    { "op": "assert_region", "target": "game.tutorial.arrow", "visible": true, "inside_viewport": true }
+  ]
+}

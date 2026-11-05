@@ -58,6 +58,15 @@ class BattleEffectRendererTest(unittest.TestCase):
         self.assertEqual(placements[0].anchor_x, placements[1].anchor_x)
         self.assertEqual(placements[0].anchor_y, placements[1].anchor_y)
 
+    def test_hit_testing_selects_each_displaced_label_at_a_shared_anchor(self) -> None:
+        renderer, state = self._renderer_and_state(count=2)
+        rows = renderer._normalize_state(state)
+        point = renderer._projection.project_anchor(0.0, 180.0, 800, 600)
+        renderer._last_layout = tuple(renderer._layout([(row, point) for row in rows], 800, 600, 0, False))
+        for marker in renderer.last_layout:
+            self.assertEqual(renderer.battle_at(marker.label_x + 10, 600 - marker.label_y - 10, 600), marker.battle_id)
+        self.assertIsNone(renderer.battle_at(-500, -500, 600))
+
     def test_dense_same_anchor_stack_uses_spaced_slots_without_label_overlap(self) -> None:
         renderer, state = self._renderer_and_state(count=100)
         rows = renderer._normalize_state(state)

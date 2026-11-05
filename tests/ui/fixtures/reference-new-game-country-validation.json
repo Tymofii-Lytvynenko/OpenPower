@@ -1,0 +1,35 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine", "is_playable": true, "gdp": 100000000.0, "gvt_approval": 72.0, "military_count": 50000},
+      {"id": "POL", "name": "Poland", "is_playable": true, "gdp": 160000000.0, "gvt_approval": 64.0, "military_count": 60000}
+    ],
+    "country_governments": [
+      {"country_id": "UKR", "ruling_party_id": "ukr-ruling"},
+      {"country_id": "POL", "ruling_party_id": "pol-ruling"}
+    ],
+    "political_parties": [
+      {"country_id": "UKR", "party_id": "ukr-ruling", "display_name": "Civic Alliance", "support_share": 0.42, "is_ruling": true},
+      {"country_id": "UKR", "party_id": "ukr-opposition", "display_name": "People's Coalition", "support_share": 0.35, "is_ruling": false},
+      {"country_id": "POL", "party_id": "pol-ruling", "display_name": "National Union", "support_share": 0.51, "is_ruling": true}
+    ],
+    "campaign_scenarios": [
+      {
+        "id": "ui-test-campaign",
+        "title": "UI Test Campaign",
+        "description": "A deterministic campaign selection fixture.",
+        "selectable_country_ids_json": "[\"UKR\",\"POL\"]",
+        "political_scope": "country",
+        "sphere_scope": "",
+        "starting_setup_json": "{}",
+        "objectives_json": "[{\"id\":\"stability\",\"title\":\"Maintain stability\",\"deadline_minutes\":60}]",
+        "enabled_rules_json": "{\"democratic_elections\":true}",
+        "max_duration_minutes": 180,
+        "win_conditions_json": "[]",
+        "loss_conditions_json": "[]",
+        "sandbox_allowed": true,
+        "enabled": true
+      }
+    ]
+  }
+}

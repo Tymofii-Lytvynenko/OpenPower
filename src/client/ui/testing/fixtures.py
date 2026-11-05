@@ -17,6 +17,7 @@ class RecordingClient:
         self.player_country = "UKR"
         self.actions: list = []
         self.requests: list[dict] = []
+        self.system_errors = list(state.globals.get("ui_system_errors", []))
         self.session = self
 
     def get_state(self):
@@ -24,11 +25,23 @@ class RecordingClient:
 
     def send_action(self, action):
         self.actions.append(action)
+        for outcome in self.state.globals.get("ui_command_results", {}).get(type(action).__name__, []):
+            self.state.journal.append_command_result({
+                "actor_id": self.player_id, "action_type": type(action).__name__, **outcome,
+            })
+
+    def deliver_event(self,event_type,payload,event_id):
+        self.state.journal.domain_events.append(dict(event_id=event_id,event_type=event_type,
+            payload=dict(payload),tick=int(self.state.globals.get("tick",0)),source="ui-test-authoritative-delivery"))
+
+    def deliver_snapshot(self, snapshot):
+        apply_fixture_snapshot(self.state, snapshot)
 
     def get_system_errors(self):
-        return []
+        return self.system_errors
 
     def clear_system_errors(self):
+        self.system_errors.clear()
         self.requests.append({"type": "clear_errors"})
 
     def get_presentation_total_minutes(self):
@@ -92,6 +105,12 @@ class RecordingNavigation:
     def show_load_game_screen(self, *args, **kwargs):
         self.requests.append("load_game")
 
+    def load_saved_game(self, config, save_name):
+        self.requests.append({"type": "load_saved_game", "save_name": save_name})
+
+    def stop_game(self):
+        self.requests.append({"type": "stop_game"})
+
 
 class RecordingViewport:
     def __init__(self):
@@ -125,8 +144,10 @@ def build_test_world(project_root: Path, fixture: dict | None = None) -> GameSta
 
     state = _fixture_state()
     country = state.tables["countries"].to_dicts()[0]
+    # Match the political fields campaign loading adds so HUD metrics exercise real values.
     country.update(name="Ukraine", population=1_000_000, stability=0.72, human_dev=0.7,
-                   gdp=100_000_000.0, government_form="democracy")
+                   gdp=100_000_000.0, government_form="democracy",
+                   gvt_approval=72.0, gvt_stability=65.0)
     state.tables["countries"] = pl.DataFrame([country, {**country, "id": "POL", "name": "Poland"}])
     state.tables["regions"] = pl.DataFrame([
         {"id": 1, "name": "Kyiv", "owner": "UKR", "controller": "UKR", "population": 1_000_000,
@@ -136,7 +157,8 @@ def build_test_world(project_root: Path, fixture: dict | None = None) -> GameSta
     ])
     state.tables["units"] = pl.DataFrame([
         {"id": "unit-1", "owner": "UKR", "type": "infantry", "name": "1st Brigade",
-         "region_id": 1, "location": 1, "strength": 1000, "status": "ready"},
+         "region_id": 1, "location": 1, "strength": 1000, "status": "ready",
+         "readiness_status": "ready"},
     ])
     manager = ModManager(GameConfig(project_root))
     manager.resolve_load_order()
@@ -147,15 +169,27 @@ def build_test_world(project_root: Path, fixture: dict | None = None) -> GameSta
          "class_name": "infantry", "quality": 0.7, "cost": 1000.0, "speed": 10.0, "firepower": 5.0},
     ]))
     if fixture:
-        for name, rows in fixture.get("tables", {}).items():
-            if not isinstance(rows, list):
-                raise ValueError(f"Fixture table '{name}' must contain a list of row objects.")
-            empty = state.tables[name].clear() if name in state.tables else pl.DataFrame()
-            state.update_table(name, pl.DataFrame(rows) if rows else empty)
-        state.globals.update(fixture.get("globals", {}))
-        if "time" in fixture:
-            state.time = replace(state.time, **fixture["time"])
+        apply_fixture_snapshot(state, fixture)
+        support = fixture.get("test_support", {})
+        source_tags = support.get("country_info_regions_from_base_data")
+        if source_tags:
+            from src.client.ui.testing.country_info_assets import load_country_info_regions
+
+            state.update_table("regions", load_country_info_regions(project_root, source_tags))
     return state
+
+
+def apply_fixture_snapshot(state: GameState, fixture: dict) -> None:
+    for name, rows in fixture.get("tables", {}).items():
+        if not isinstance(rows, list):
+            raise ValueError(f"Fixture table '{name}' must contain a list of row objects.")
+        empty = state.tables[name].clear() if name in state.tables else pl.DataFrame()
+        state.update_table(name, pl.DataFrame(rows) if rows else empty)
+    state.globals.update(fixture.get("globals", {}))
+    state.journal.domain_events.extend(fixture.get("journal", {}).get("domain_events", []))
+    state.journal.command_results.extend(fixture.get("journal", {}).get("command_results", []))
+    if "time" in fixture:
+        state.time = replace(state.time, **fixture["time"])
 
 
 def test_settings():

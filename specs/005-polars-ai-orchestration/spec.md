@@ -52,6 +52,15 @@ single collect() pass (Rust backend)
    └──> utility_build_army > 0.0    ──> ActionBuildUnit (Army count + 1)
 ```
 
+## Functional Requirements
+
+- **FR-001**: The AI framework MUST accept independently registered policies that produce scored candidate actions from the current simulation state.
+- **FR-002**: Compatible scorer expressions MUST be evaluated from a shared lazy input and materialized once per decision pass.
+- **FR-003**: Financial-survival policy MUST raise a tax action when the configured deficit runway enters the critical interval and MUST avoid the action when finances do not meet that condition.
+- **FR-004**: Military procurement policy MUST consider five-year cost, protected-GDP benefit, reserves, current income, and diminishing returns before emitting a unit-build action.
+- **FR-005**: Policy results MUST be resolved deterministically, with duplicate or conflicting candidates filtered according to the registered policy and delegation rules.
+- **FR-006**: Adding a policy MUST NOT require editing the framework's central evaluation loop.
+
 ## Success Criteria
 
 - **SC-001**: Rust Execution Performance: Evaluating financial and military utility across 200+ nations completes in under 2ms per evaluation pass.

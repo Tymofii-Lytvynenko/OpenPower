@@ -1,0 +1,12 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-map-unit-composition.json",
+      "surface": "map-information"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-region-control.json",
+      "surface": "map-information"
+    }
+  ]
+}

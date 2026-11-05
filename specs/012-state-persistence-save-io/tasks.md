@@ -62,6 +62,17 @@
 - [X] T018 Run the benchmark and record samples, median/p95, workload, storage, and hardware in `specs/012-state-persistence-save-io/performance-log.md`; if a target fails, allow no more than three measured optimization iterations per algorithm, document each outcome, and then move on.
 - [X] T019 Run the commands in `specs/012-state-persistence-save-io/quickstart.md`, mark implementation tasks complete, and keep any inconclusive full-simulation throughput result explicitly separate.
 
+## Requirement Traceability
+
+| Requirement | Existing implementation and acceptance tasks |
+| --- | --- |
+| FR-001 | T003, T007, T009, T010 |
+| FR-002 | T007, T009 |
+| FR-003 | T003–T010 |
+| FR-004 | T005, T009, T010 |
+| FR-005 | T011–T016 |
+| FR-006 | T012, T014, T015 |
+
 ## Dependencies and execution order
 
 - T001–T002 establish measurements and fixtures before story tests.

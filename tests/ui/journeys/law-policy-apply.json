@@ -1,0 +1,54 @@
+{
+  "fixture": "tests/ui/fixtures/law-policy.json",
+  "steps": [
+    {
+      "op": "assert",
+      "target": "laws.apply",
+      "enabled": false
+    },
+    {
+      "op": "select",
+      "target": "laws.value.speech",
+      "value": "Restricted"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionChangePoliticalLaw",
+      "count": 0
+    },
+    {
+      "op": "assert",
+      "target": "laws.apply",
+      "enabled": true
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "laws.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionChangePoliticalLaw",
+      "count": 1,
+      "fields": {
+        "law_id": "speech",
+        "country_tag": "UKR",
+        "target_value": "Restricted"
+      }
+    },
+    {
+      "op": "assert",
+      "target": "laws.apply",
+      "enabled": false
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.panel",
+      "visible": true
+    }
+  ]
+}

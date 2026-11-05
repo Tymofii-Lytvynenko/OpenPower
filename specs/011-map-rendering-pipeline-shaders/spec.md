@@ -34,6 +34,14 @@ As a grand strategy gamer, I want a high-performance GPU map rendering pipeline 
 - Freeze Support: `mp.freeze_support()`
 - Profiler Export: `pyinstrument.Profiler` HTML output saved to `profile_results.html`
 
+## Functional Requirements
+
+- **FR-001**: Map source colors MUST be converted into stable region identifiers that support direct pixel-to-region picking without retaining redundant source-channel data.
+- **FR-002**: Spatial indexes MUST be reusable only when their recorded source identity and expected shape still match the current map asset; invalid or stale cache data MUST be regenerated.
+- **FR-003**: The rendering client MUST load the shader bundles required by the supported gameplay map path and report the missing bundle or file when shader loading fails.
+- **FR-004**: Region picking MUST return the region associated with an in-bounds map coordinate and MUST handle invalid or out-of-bounds coordinates without corrupting the cached map data.
+- **FR-005**: Application startup MUST configure process spawning before launching the graphical client and MUST retain the optional profiling output behavior.
+
 ## Success Criteria
 
 - **SC-001**: High Framerate GPU Rendering: Global map renders at 60+ FPS at 4K resolution.

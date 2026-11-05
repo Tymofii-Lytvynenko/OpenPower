@@ -1,0 +1,27 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "unit.context.move"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.order.targeting",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "unit.order.targeting.label",
+      "label": "MOVE — click a destination. Esc or right-click cancels."
+    },
+    {
+      "op": "click",
+      "target": "unit.order.cancel"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit.order.targeting",
+      "visible": false
+    }
+  ]
+}

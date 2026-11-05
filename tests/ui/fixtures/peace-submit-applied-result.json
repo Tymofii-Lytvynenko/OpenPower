@@ -1,0 +1,15 @@
+{
+  "globals": {
+    "ui_command_results": {
+      "ActionSubmitPeaceDeal": [
+        {
+          "status": "applied",
+          "reason": "Peace package submitted; awaiting responses from the opposing side.",
+          "war_id": "war-controlled-1",
+          "country_id": "UKR",
+          "deal_id": "peace-fixture-result-1"
+        }
+      ]
+    }
+  }
+}

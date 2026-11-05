@@ -1,0 +1,23 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-design-routes.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_production"},
+    {
+      "op": "assert_region",
+      "target": "unit_production.panel",
+      "visible": true,
+      "min_width": 842,
+      "min_height": 462
+    },
+    {"op": "click", "target": "unit_production.category.air"},
+    {"op": "click", "target": "unit_production.view_design.design-fighter-1"},
+    {"op": "assert_region", "target": "unit_design.panel", "visible": true},
+    {
+      "op": "assert",
+      "target": "unit_design.detail.selected",
+      "visible": true,
+      "label": "Viewing design: Multirole Fighter"
+    }
+  ]
+}

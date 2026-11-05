@@ -1,0 +1,49 @@
+{
+  "fixture": "tests/ui/fixtures/party-constitution.json",
+  "steps": [
+    {
+      "op": "select",
+      "target": "laws.party.party-2.status",
+      "value": "Ineligible"
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.constitution.question",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPartyEligibility",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "laws.constitution.question.yes"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPartyEligibility",
+      "count": 0
+    },
+    {
+      "op": "assert_region",
+      "target": "laws.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "laws.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPartyEligibility",
+      "count": 1,
+      "fields": {
+        "changes": {
+          "party-2": false
+        },
+        "confirmed_government_form": "single-party democracy"
+      }
+    }
+  ]
+}

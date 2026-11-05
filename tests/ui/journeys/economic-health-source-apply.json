@@ -1,0 +1,41 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.eco" },
+    { "op": "click", "target": "economy.health_btn" },
+    {
+      "op": "assert_region",
+      "target": "economic_health.panel",
+      "visible": true,
+      "rect": { "width": 264, "height": 333 },
+      "inside_viewport": true,
+      "no_overlap": "economy.panel"
+    },
+    {
+      "op": "assert",
+      "target": "economic_health.interest.value",
+      "inside": "economic_health.panel",
+      "min_width": 34
+    },
+    {
+      "op": "assert",
+      "target": "economic_health.tax.value",
+      "inside": "economic_health.panel",
+      "min_width": 34
+    },
+    { "op": "input", "target": "economic_health.interest.value", "value": 15.0 },
+    { "op": "input", "target": "economic_health.tax.value", "value": 30.0 },
+    { "op": "click", "target": "economic_health.apply" },
+    {
+      "op": "assert_action",
+      "type": "ActionChangeEconomicPolicy",
+      "count": 1,
+      "fields": { "country_tag": "UKR", "policy_name": "interest_rate", "target_value": 0.15 }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetTax",
+      "count": 1,
+      "fields": { "country_tag": "UKR", "new_tax_rate": 0.3 }
+    }
+  ]
+}

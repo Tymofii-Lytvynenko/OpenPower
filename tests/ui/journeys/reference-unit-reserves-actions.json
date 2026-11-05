@@ -1,0 +1,56 @@
+{
+  "fixture": "tests/ui/fixtures/reference-unit-reserves-actions.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.mil"},
+    {"op": "click", "target": "military.open_reserves"},
+    {"op": "assert_region", "target": "unit_reserves.panel", "visible": true},
+    {"op": "click", "target": "unit_reserves.row.reserve-tank-1"},
+    {"op": "assert", "target": "unit_reserves.help", "label": "1 group(s) selected; choose Train, Deploy or drag to map."},
+    {"op": "click", "target": "unit_reserves.category.air"},
+    {"op": "assert", "target": "unit_reserves.help", "label": "Select reserve groups to train or deploy to the capital or map."},
+    {"op": "assert", "target": "unit_reserves.deploy_capital", "enabled": false},
+    {"op": "click", "target": "unit_reserves.category.ground"},
+    {"op": "click", "target": "unit_reserves.row.reserve-tank-1"},
+    {"op": "assert", "target": "unit_reserves.help", "label": "1 group(s) selected; choose Train, Deploy or drag to map."},
+    {"op": "key_down", "key": "left_shift"},
+    {"op": "click", "target": "unit_reserves.row.reserve-tank-2"},
+    {"op": "key_up", "key": "left_shift"},
+    {"op": "assert", "target": "unit_reserves.help", "label": "2 group(s) selected; choose Train, Deploy or drag to map."},
+    {"op": "click", "target": "unit_reserves.deploy_capital"},
+    {
+      "op": "assert_action",
+      "type": "ActionDispatchUnitDeployment",
+      "count": 2,
+      "index": 0,
+      "fields": {"unit_id": "reserve-tank-1", "destination_region_id": 1, "quantity": 0}
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionDispatchUnitDeployment",
+      "count": 2,
+      "index": 1,
+      "fields": {"unit_id": "reserve-tank-2", "destination_region_id": 1, "quantity": 0}
+    },
+    {"op": "click", "target": "unit_reserves.row.reserve-tank-1"},
+    {"op": "key_down", "key": "left_ctrl"},
+    {"op": "click", "target": "unit_reserves.row.reserve-tank-2"},
+    {"op": "key_up", "key": "left_ctrl"},
+    {"op": "click", "target": "unit_reserves.train"},
+    {"op": "assert_region", "target": "unit.training.question", "visible": true},
+    {"op": "click", "target": "unit.training.question.yes"},
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "count": 2,
+      "index": 0,
+      "fields": {"country_tag": "UKR", "unit_id": "reserve-tank-1", "target_level": "Regular"}
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionTrainUnit",
+      "count": 2,
+      "index": 1,
+      "fields": {"country_tag": "UKR", "unit_id": "reserve-tank-2", "target_level": "Regular"}
+    }
+  ]
+}

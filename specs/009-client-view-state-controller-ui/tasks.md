@@ -51,6 +51,16 @@ description: "Task list for Client View State Architecture, Navigation & Audio S
 
 - [ ] T016 [US1] Measure one-frame view transitions and verify continuous audio, visible boot progress, rapid loading-view replacement, and resize behavior in the running desktop client; record actual results in `specs/009-client-view-state-controller-ui/quickstart.md`.
 
+## Requirement Traceability
+
+| Requirement | Existing implementation and acceptance tasks |
+| --- | --- |
+| FR-001 | T004, T008, T014, T016 |
+| FR-002 | T005, T007, T011, T013, T015, T016 |
+| FR-003 | T006, T012, T014, T016 |
+| FR-004 | T003, T010, T015, T016 |
+| FR-005 | T008, T014, T016 |
+
 ## Dependencies & Execution Order
 
 - T001 captures the baseline before changes. T002 establishes the shared client contracts before feature tests.

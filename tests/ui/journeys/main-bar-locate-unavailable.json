@@ -1,0 +1,37 @@
+{
+  "fixture": "tests/ui/fixtures/main-bar-locate-unavailable.json",
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "hud.central_bar",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "hud.locate",
+      "visible": true,
+      "enabled": false,
+      "relative_to": "hud.central_bar",
+      "relative_rect": {"x": 188, "y": 68, "width": 461, "height": 19},
+      "tolerance": 0.01
+    },
+    {
+      "op": "hover",
+      "target": "hud.locate"
+    },
+    {
+      "op": "wait",
+      "frames": 120
+    },
+    {
+      "op": "assert_region",
+      "target": "hud.central_bar",
+      "visible": true
+    },
+    {
+      "op": "assert_viewport_request",
+      "type": "region",
+      "count": 0
+    }
+  ]
+}

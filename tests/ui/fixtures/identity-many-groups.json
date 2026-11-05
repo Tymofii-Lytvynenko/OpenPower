@@ -1,0 +1,299 @@
+{
+  "tables": {
+    "country_identity_groups": [
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-00",
+        "display_name": "Language group 00 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-01",
+        "display_name": "Language group 01 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-02",
+        "display_name": "Language group 02 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-03",
+        "display_name": "Language group 03 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-04",
+        "display_name": "Language group 04 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-05",
+        "display_name": "Language group 05 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-06",
+        "display_name": "Language group 06 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-07",
+        "display_name": "Language group 07 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-08",
+        "display_name": "Language group 08 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-09",
+        "display_name": "Language group 09 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-10",
+        "display_name": "Language group 10 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-11",
+        "display_name": "Language group 11 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-12",
+        "display_name": "Language group 12 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-13",
+        "display_name": "Language group 13 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-14",
+        "display_name": "Language group 14 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-15",
+        "display_name": "Language group 15 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-16",
+        "display_name": "Language group 16 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-17",
+        "display_name": "Language group 17 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-18",
+        "display_name": "Language group 18 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      },
+      {
+        "country_id": "UKR",
+        "identity_type": "language",
+        "identity_id": "group-19",
+        "display_name": "Language group 19 with a long name",
+        "population_share": 5,
+        "legal_status": "legal"
+      }
+    ],
+    "regions": [
+      {
+        "id": 1,
+        "name": "Kyiv",
+        "owner": "UKR",
+        "controller": "UKR"
+      },
+      {
+        "id": 3,
+        "name": "Lviv",
+        "owner": "UKR",
+        "controller": "UKR"
+      },
+      {
+        "id": 2,
+        "name": "Warsaw",
+        "owner": "POL",
+        "controller": "POL"
+      },
+      {
+        "id": 4,
+        "name": "Gdansk",
+        "owner": "POL",
+        "controller": "POL"
+      }
+    ],
+    "country_governments": [
+      {
+        "country_id": "UKR",
+        "capital_region_id": 1,
+        "ruling_party_id": "party-1"
+      },
+      {
+        "country_id": "POL",
+        "capital_region_id": 2
+      }
+    ],
+    "political_parties": [
+      {
+        "country_id": "UKR",
+        "party_id": "party-1",
+        "display_name": "Demonstration party",
+        "support_share": 0.65,
+        "eligible": true
+      }
+    ],
+    "country_laws": [
+      {
+        "country_id": "UKR",
+        "law_id": "speech",
+        "title": "Freedom of speech",
+        "value": "Permitted",
+        "status": "active"
+      }
+    ],
+    "migration_policies": [
+      {
+        "country_id": "UKR",
+        "migration_policy": "managed",
+        "border_policy": "open",
+        "entry_rate": 0.75,
+        "exit_rate": 1
+      }
+    ],
+    "research_tracks": [
+      {
+        "id": "UKR-land",
+        "country_id": "UKR",
+        "branch": "land",
+        "research_level": 3,
+        "unlocks_json": "[\"tank\"]"
+      },
+      {
+        "id": "POL-land",
+        "country_id": "POL",
+        "branch": "land",
+        "research_level": 1
+      },
+      {
+        "id": "UKR-naval",
+        "country_id": "UKR",
+        "branch": "naval",
+        "research_level": 1
+      },
+      {
+        "id": "POL-naval",
+        "country_id": "POL",
+        "branch": "naval",
+        "research_level": 3,
+        "unlocks_json": "[\"frigate\"]"
+      }
+    ],
+    "diplomatic_trade_deals": [
+      {
+        "id": "incoming-accept",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "status": "pending",
+        "expires_at_minute": 43200,
+        "offered_assets_json": "[{\"type\":\"cash\",\"amount\":500}]",
+        "requested_assets_json": "[{\"type\":\"cash\",\"amount\":1000}]",
+        "reason": "Demonstration incoming offer."
+      },
+      {
+        "id": "incoming-reject",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "status": "pending",
+        "expires_at_minute": 43200,
+        "offered_assets_json": "[{\"type\":\"cash\",\"amount\":500}]",
+        "requested_assets_json": "[{\"type\":\"cash\",\"amount\":1000}]",
+        "reason": "Demonstration incoming offer."
+      },
+      {
+        "id": "incoming-counter",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "status": "pending",
+        "expires_at_minute": 43200,
+        "offered_assets_json": "[{\"type\":\"cash\",\"amount\":500}]",
+        "requested_assets_json": "[{\"type\":\"cash\",\"amount\":1000}]",
+        "reason": "Demonstration incoming offer."
+      },
+      {
+        "id": "outgoing",
+        "source_country_id": "UKR",
+        "target_country_id": "POL",
+        "status": "pending",
+        "expires_at_minute": 43200,
+        "offered_assets_json": "[{\"type\":\"cash\",\"amount\":100}]",
+        "requested_assets_json": "[]"
+      }
+    ]
+  }
+}

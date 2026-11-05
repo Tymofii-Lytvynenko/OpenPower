@@ -1,0 +1,9 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "click", "target": "military.open_war_list" },
+    { "op": "assert_region", "target": "war_list.panel", "visible": true },
+    { "op": "close_window", "target": "war_list.panel" },
+    { "op": "assert_region", "target": "war_list.panel", "visible": false, "present": false }
+  ]
+}

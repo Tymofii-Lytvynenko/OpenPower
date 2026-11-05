@@ -38,6 +38,15 @@ As a mod developer or core engine contributor, I want the engine to dynamically 
 | `base.ai` | `AISystem` | `["base.time"]` | 8 |
 | `base.politics` | `PoliticsSystem` | `["base.population"]` | 9 |
 
+## Functional Requirements
+
+- **FR-001**: The runtime MUST discover module manifests, validate requested dependencies, and produce a deterministic dependency load order.
+- **FR-002**: The runtime MUST load module contributions through the supported entry point and retain compatibility with the documented legacy registration entry point.
+- **FR-003**: The system scheduler MUST order systems according to declared dependencies and phase ordering while producing stable order among otherwise-ready systems.
+- **FR-004**: Duplicate system declarations, missing dependencies, and dependency cycles MUST produce actionable startup diagnostics before normal simulation proceeds.
+- **FR-005**: The simulation driver MUST remain content-agnostic; gameplay behavior MUST be supplied by registered module systems.
+- **FR-006**: Action handling and table access MUST follow each system's declared access contract so unsupported actions are rejected before being reported as applied.
+
 ## Success Criteria
 
 - **SC-001**: 100% Content-Agnostic Driver: Engine core (`src/engine/simulator.py`) contains zero hardcoded system imports or gameplay rules.

@@ -1,0 +1,36 @@
+{
+  "tables": {
+    "unit_designs": [
+      {
+        "id": "design-1",
+        "country_id": "UKR",
+        "branch": "land",
+        "display_name": "Infantry",
+        "class_name": "infantry",
+        "quality": 0.7,
+        "cost": 1000.0,
+        "maintenance_cost": 25.0,
+        "speed": 10.0,
+        "firepower": 5.0
+      },
+      {
+        "id": "design-UKR-infantry-001",
+        "country_id": "UKR",
+        "branch": "land",
+        "display_name": "UI test infantry",
+        "class_name": "infantry",
+        "quality": 0.0,
+        "cost": 125.0,
+        "maintenance_cost": 2.5,
+        "speed": 8.0,
+        "firepower": 1.0,
+        "domain": "land",
+        "capabilities_json": "{\"gun_range\":3.0}",
+        "valid_targets_json": "[\"infantry\",\"artillery\",\"air_defense\"]",
+        "vulnerabilities_json": "[\"armor\",\"air\"]",
+        "research_level": 0,
+        "research_requirements_json": "{}"
+      }
+    ]
+  }
+}

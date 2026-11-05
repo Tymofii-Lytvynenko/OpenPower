@@ -1,0 +1,35 @@
+{
+  "tables": {
+    "battles": [
+      {
+        "id": "battle-observer",
+        "region_id": 2,
+        "anchor_latitude": 0.0,
+        "anchor_longitude": 15.0,
+        "attacker_side": "POL",
+        "defender_side": "DEU",
+        "status": "active",
+        "mode": "positional"
+      },
+      {
+        "id": "battle-own",
+        "region_id": 1,
+        "anchor_latitude": 50.5,
+        "anchor_longitude": 30.6,
+        "attacker_side": "UKR",
+        "defender_side": "POL",
+        "status": "concluded",
+        "mode": "positional",
+        "victor_side": "SIDE_A"
+      }
+    ],
+    "battle_units": [
+      {"battle_id": "battle-own", "unit_id": "ukr-infantry", "country_id": "UKR", "side": "SIDE_A"},
+      {"battle_id": "battle-own", "unit_id": "pol-armor", "country_id": "POL", "side": "SIDE_B"}
+    ],
+    "battle_casualty_records": [
+      {"id": "battle-own:result:ukr-infantry", "battle_id": "battle-own", "unit_id": "ukr-infantry", "country_id": "UKR", "side": "SIDE_A", "unit_type": "infantry", "losses": 21},
+      {"id": "battle-own:result:pol-armor", "battle_id": "battle-own", "unit_id": "pol-armor", "country_id": "POL", "side": "SIDE_B", "unit_type": "tanks", "losses": 87}
+    ]
+  }
+}

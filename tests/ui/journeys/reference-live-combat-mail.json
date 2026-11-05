@@ -1,0 +1,133 @@
+{
+  "fixture": "tests/ui/fixtures/reference-dispatches.json",
+  "steps": [
+    {
+      "op": "assert_absent",
+      "target": "battle.summary.category.B.I"
+    },
+    {
+      "op": "click",
+      "target": "hud.mail"
+    },
+    {
+      "op": "server_event",
+      "target": "EventBattleEnded",
+      "event_id": "foreign-fight",
+      "payload": {
+        "battle_id": "foreign",
+        "participant_countries": [
+          "POL",
+          "DEU"
+        ],
+        "region_id": 2,
+        "victor_side": "SIDE_A",
+        "victor_tag": "POL"
+      }
+    },
+    {
+      "op": "assert_absent",
+      "target": "mail.dispatch.foreign-fight"
+    },
+    {
+      "op": "assert_absent",
+      "target": "battle.summary.category.B.I"
+    },
+    {
+      "op": "server_event",
+      "target": "EventBattleEnded",
+      "event_id": "battle-live",
+      "payload": {
+        "battle_id": "battle-live",
+        "participant_countries": [
+          "UKR",
+          "POL"
+        ],
+        "region_id": 1,
+        "victor_side": "SIDE_A",
+        "victor_tag": "UKR",
+        "side_a_country_ids": ["UKR"],
+        "side_b_country_ids": ["POL"],
+        "side_a_losses": 21,
+        "side_b_losses": 87
+      }
+    },
+    {
+      "op": "assert_absent",
+      "target": "battle.summary.category.B.I"
+    },
+    {
+      "op": "assert",
+      "target": "mail.item.dispatch:battle-live.subject",
+      "label": "Battle concluded: battle-live"
+    },
+    {
+      "op": "click",
+      "target": "mail.dispatch.battle-live"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.summary.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "battle.summary.region",
+      "label": "Kyiv"
+    },
+    {
+      "op": "assert",
+      "target": "battle.summary.category.B.I",
+      "label": "—"
+    },
+    {
+      "op": "assert",
+      "target": "battle.summary.countries.A.0",
+      "label": "POL"
+    },
+    {
+      "op": "assert",
+      "target": "battle.summary.outcome.B",
+      "label": "Victory"
+    },
+    {
+      "op": "assert_absent",
+      "target": "mail.dispatch.battle-live"
+    },
+    {
+      "op": "close_window",
+      "target": "battle.summary.dialog"
+    },
+    {
+      "op": "wait",
+      "frames": 5
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.summary.dialog",
+      "visible": false,
+      "present": false
+    },
+    {
+      "op": "server_event",
+      "target": "EventDiplomaticTradeChanged",
+      "event_id": "trade-live",
+      "payload": {
+        "deal_id": "deal-mail",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "status": "pending",
+        "reason": "Awaiting response."
+      }
+    },
+    {
+      "op": "assert",
+      "target": "mail.item.dispatch:trade-live.subject",
+      "label": "Trade pending: deal-mail"
+    },
+    {
+      "op": "assert_region",
+      "target": "mail.panel",
+      "visible": true
+    }
+  ]
+}

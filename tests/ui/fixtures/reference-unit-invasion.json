@@ -1,0 +1,81 @@
+{
+  "globals": {
+    "ui_context_region_id": 2,
+    "ui_context_selected_units": ["unit-1"]
+  },
+  "tables": {
+    "units": [
+      {
+        "id": "unit-1",
+        "owner": "UKR",
+        "unit_type": "infantry",
+        "strength": 1000,
+        "equipment_quantity": 17,
+        "current_region_id": 1,
+        "latitude": 50.0,
+        "longitude": 30.0,
+        "readiness_status": "ready"
+      },
+      {
+        "id": "unit-2",
+        "owner": "UKR",
+        "unit_type": "tanks",
+        "strength": 500,
+        "equipment_quantity": 9,
+        "current_region_id": 1,
+        "latitude": 50.0,
+        "longitude": 30.0,
+        "readiness_status": "ready"
+      }
+    ],
+    "regions": [
+      {
+        "id": 1,
+        "owner": "UKR",
+        "controller": "UKR",
+        "name": "Kyiv",
+        "latitude": 50.0,
+        "longitude": 30.0
+      },
+      {
+        "id": 2,
+        "owner": "POL",
+        "controller": "POL",
+        "name": "Warsaw",
+        "latitude": 52.0,
+        "longitude": 21.0
+      },
+      {
+        "id": 3,
+        "owner": "DEU",
+        "controller": "DEU",
+        "name": "Berlin",
+        "latitude": 51.0,
+        "longitude": 13.0
+      }
+    ],
+    "countries": [
+      {
+        "id": "UKR",
+        "name": "Ukraine",
+        "gdp": 1000000.0,
+        "money_reserves": 10000.0,
+        "population": 1000000
+      },
+      {
+        "id": "POL",
+        "name": "Poland",
+        "gdp": 1000000.0,
+        "money_reserves": 10000.0,
+        "population": 1000000
+      },
+      {
+        "id": "DEU",
+        "name": "Germany",
+        "gdp": 1000000.0,
+        "money_reserves": 10000.0,
+        "population": 1000000
+      }
+    ]
+  }
+}

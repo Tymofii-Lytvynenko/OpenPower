@@ -1,0 +1,23 @@
+{
+  "fixture": "tests/ui/fixtures/reference-foreign-constitutional-qualified.json",
+  "steps": [
+    {"op": "click", "target": "hud.panel.pol"},
+    {"op": "click", "target": "politics.open_constitution"},
+    {"op": "assert", "target": "constitutional_form.government_form", "enabled": true},
+    {"op": "assert", "target": "constitutional_form.capital", "enabled": false},
+    {"op": "assert", "target": "constitutional_form.override", "enabled": false},
+    {"op": "assert", "target": "constitutional_form.martial_law", "enabled": false},
+    {"op": "select", "target": "constitutional_form.government_form", "value": "Single-party democracy"},
+    {"op": "assert", "target": "constitutional_form.apply", "enabled": true},
+    {"op": "click", "target": "constitutional_form.apply"},
+    {"op": "assert_region", "target": "constitutional_form.foreign.confirmation", "visible": true},
+    {"op": "click", "target": "constitutional_form.foreign.confirmation.no"},
+    {"op": "assert_action", "type": "ActionSetGovernmentForm", "count": 0},
+    {"op": "assert", "target": "constitutional_form.apply", "enabled": true},
+    {"op": "click", "target": "constitutional_form.apply"},
+    {"op": "assert_region", "target": "constitutional_form.foreign.confirmation", "visible": true},
+    {"op": "assert_action", "type": "ActionSetGovernmentForm", "count": 0},
+    {"op": "click", "target": "constitutional_form.foreign.confirmation.yes"},
+    {"op": "assert_action", "type": "ActionSetGovernmentForm", "fields": {"country_tag": "POL", "target_form_id": "single-party democracy", "confirmed_foreign_change": true}}
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "fixture":"tests/ui/fixtures/reference-unit-reorganization.json",
+  "steps":[
+    {"op":"click","target":"unit.context.merge_with"},
+    {"op":"assert_region","target":"unit.merge.dialog","visible":true},
+    {"op":"check","target":"unit.merge.select.unit-2","value":true},
+    {"op":"click","target":"unit.merge.apply"},
+    {"op":"assert_action","type":"ActionMergeUnits","fields":{"target_unit_id":"unit-1","source_unit_ids":["unit-2"]}},
+    {"op":"assert_region","target":"unit.merge.dialog","visible":false,"present":false}
+  ]
+}

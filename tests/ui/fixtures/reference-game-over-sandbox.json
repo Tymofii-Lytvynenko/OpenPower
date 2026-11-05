@@ -1,0 +1,31 @@
+{
+  "tables": {
+    "campaign_scenarios": [
+      {
+        "id": "ui-sandbox-result",
+        "title": "UI Sandbox Result Fixture",
+        "sandbox_allowed": true
+      }
+    ],
+    "campaigns": [
+      {
+        "id": "campaign-ui-sandbox-result",
+        "scenario_id": "ui-sandbox-result",
+        "actor_country_id": "UKR",
+        "started_at_minute": 0,
+        "outcome": "victory",
+        "outcome_reason": "The configured campaign win conditions are satisfied.",
+        "sandbox_continuation": true
+      }
+    ],
+    "objectives": [
+      {
+        "id": "sandbox-victory",
+        "campaign_id": "campaign-ui-sandbox-result",
+        "title": "Complete the sandbox objective",
+        "status": "completed",
+        "deadline_at_minute": -1
+      }
+    ]
+  }
+}

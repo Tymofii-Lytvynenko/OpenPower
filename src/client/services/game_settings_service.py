@@ -39,6 +39,20 @@ class GameSettings:
     fullscreen_mode_height: int = 720
     fullscreen_mode_rate: int = 60
     reduce_motion: bool = False
+    autosave_enabled: bool = False
+    autosave_incremental: bool = False
+    autosave_interval_minutes: int = 15
+    autosave_name: str = "Autosave"
+    autosave_counter: int = 0
+    advisor_economy_manual: bool = True
+    advisor_economy_automatic: bool = False
+    advisor_economy_confirmations: bool = True
+    advisor_politics_manual: bool = True
+    advisor_politics_automatic: bool = False
+    advisor_politics_confirmations: bool = True
+    advisor_military_manual: bool = True
+    advisor_military_automatic: bool = False
+    advisor_military_confirmations: bool = True
 
 
 class GameSettingsRepository:
@@ -60,6 +74,20 @@ class GameSettingsRepository:
         return GameSettings(
             fullscreen=self._read_bool(payload, "fullscreen", False),
             reduce_motion=self._read_bool(payload, "reduce_motion", False),
+            autosave_enabled=self._read_bool(payload, "autosave_enabled", False),
+            autosave_incremental=self._read_bool(payload, "autosave_incremental", False),
+            autosave_interval_minutes=self._read_int(payload, "autosave_interval_minutes", 15, minimum=1),
+            autosave_name=self._read_str(payload, "autosave_name", "Autosave"),
+            autosave_counter=self._read_int(payload, "autosave_counter", 0, minimum=0) % 10000,
+            advisor_economy_manual=self._read_bool(payload, "advisor_economy_manual", True),
+            advisor_economy_automatic=self._read_bool(payload, "advisor_economy_automatic", False),
+            advisor_economy_confirmations=self._read_bool(payload, "advisor_economy_confirmations", True),
+            advisor_politics_manual=self._read_bool(payload, "advisor_politics_manual", True),
+            advisor_politics_automatic=self._read_bool(payload, "advisor_politics_automatic", False),
+            advisor_politics_confirmations=self._read_bool(payload, "advisor_politics_confirmations", True),
+            advisor_military_manual=self._read_bool(payload, "advisor_military_manual", True),
+            advisor_military_automatic=self._read_bool(payload, "advisor_military_automatic", False),
+            advisor_military_confirmations=self._read_bool(payload, "advisor_military_confirmations", True),
             language_code=self._read_str(payload, "language_code", "en"),
             geo_language_code=self._read_str(payload, "geo_language_code", DEFAULT_GEO_LANGUAGE_CODE),
             windowed_width=self._read_int(payload, "windowed_width", 1280, minimum=800),
@@ -270,6 +298,70 @@ class GameSettingsService:
         self._settings = updated
         self._save()
 
+    def apply_options(self, settings: GameSettings, window=None) -> None:
+        """Commit a settings-page draft and apply display changes as one action."""
+
+        updated = self._normalize(settings)
+        previous = self._settings
+        # A settings dialog may stay open while an autosave increments its counter.
+        updated = replace(updated, autosave_counter=(
+            0 if updated.autosave_name != previous.autosave_name else previous.autosave_counter
+        ))
+        if updated == previous:
+            return
+
+        display_fields = (
+            "fullscreen",
+            "windowed_width",
+            "windowed_height",
+            "fullscreen_screen_index",
+            "fullscreen_mode_width",
+            "fullscreen_mode_height",
+            "fullscreen_mode_rate",
+        )
+        display_changed = any(
+            getattr(updated, field) != getattr(previous, field)
+            for field in display_fields
+        )
+        self._settings = updated
+        self._save()
+        if display_changed and window is not None:
+            self.apply_display(window)
+
+    def set_autosave_counter(self, counter: int) -> None:
+        updated = replace(self._settings, autosave_counter=max(0, int(counter)) % 10000)
+        if updated != self._settings:
+            self._settings = updated
+            self._save()
+
+    def set_advisor_preferences(self, preferences: dict[str, bool]) -> None:
+        """Persist advisor UI preferences as one local settings update."""
+
+        allowed = {
+            "advisor_economy_manual",
+            "advisor_economy_automatic",
+            "advisor_economy_confirmations",
+            "advisor_politics_manual",
+            "advisor_politics_automatic",
+            "advisor_politics_confirmations",
+            "advisor_military_manual",
+            "advisor_military_automatic",
+            "advisor_military_confirmations",
+        }
+        updates = {
+            key: bool(value)
+            for key, value in preferences.items()
+            if key in allowed
+        }
+        if not updates:
+            return
+
+        updated = replace(self._settings, **updates)
+        if updated == self._settings:
+            return
+        self._settings = updated
+        self._save()
+
     def toggle_fullscreen(self, window) -> None:
         self.set_fullscreen(not self._settings.fullscreen, window)
 
@@ -345,6 +437,7 @@ class GameSettingsService:
         self._save()
 
     def _normalize(self, settings: GameSettings) -> GameSettings:
+        settings = replace(settings, autosave_interval_minutes=max(1, int(settings.autosave_interval_minutes)))
         settings = self._normalize_language(settings)
         settings = self._normalize_geo_language(settings)
         settings = self._with_windowed_resolution(settings, settings.windowed_width, settings.windowed_height)

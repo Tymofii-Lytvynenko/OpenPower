@@ -1,0 +1,44 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-unit-split.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-merge.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-split.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-merge.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-group-list.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-reorganization-cancel.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-unavailable.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-targeting.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-context-attack-targeting.json",
+      "surface": "unit-context"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-unit-list-design-details.json",
+      "surface": "game-hud"
+    }
+  ]
+}

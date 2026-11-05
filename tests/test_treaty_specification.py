@@ -6,7 +6,12 @@ import polars as pl
 
 from modules.base.systems.world.treaty_diplomacy import DiplomacySystem
 from modules.base.schema import ensure_base_tables
-from src.shared.actions import ActionCreateTreaty, ActionJoinTreaty, ActionRespondTreaty
+from src.shared.actions import (
+    ActionCreateTreaty,
+    ActionJoinTreaty,
+    ActionRespondTreaty,
+    ActionUpdateTreatyParticipants,
+)
 from src.shared.state import GameState
 from src.shared.treaties import TREATY_DEFINITIONS
 
@@ -110,6 +115,81 @@ class TreatySpecificationTest(unittest.TestCase):
         self.assertEqual(set(effects["country_id"].to_list()), {"USA", "CAN"})
         self.assertTrue(all(effect["value"] == 1.0 for effect in effects.to_dicts()))
 
+    def test_treaty_sponsor_can_update_participant_sides(self) -> None:
+        state = self._state()
+        self._propose(state, treaty_type="mobility_agreement", members=["USA", "CAN"])
+        proposal_id = state.get_table("pending_treaties")["id"][0]
+        self._respond(state, proposal_id, "CAN")
+        treaty_id = state.get_table("countries_treaties")["id"][0]
+
+        state.current_actions = [
+            ActionUpdateTreatyParticipants(
+                player_id="USA",
+                treaty_id=treaty_id,
+                side_a_country_tags=["USA", "GBR"],
+                side_b_country_tags=["CAN"],
+            )
+        ]
+        self.system.update(state, 0.1)
+
+        treaty = state.get_table("countries_treaties").to_dicts()[0]
+        self.assertEqual(set(treaty["members"]), {"USA", "CAN", "GBR"})
+        self.assertEqual(set(treaty["side_a"]), {"USA", "GBR"})
+        self.assertEqual(set(treaty["side_b"]), {"CAN"})
+        self.assertTrue(
+            any(row["country_id"] == "GBR" for row in state.get_table("messages").to_dicts())
+        )
+
+        state.current_actions = [
+            ActionUpdateTreatyParticipants(
+                player_id="CAN",
+                treaty_id=treaty_id,
+                side_a_country_tags=["USA"],
+                side_b_country_tags=["CAN", "FRA"],
+            )
+        ]
+        self.system.update(state, 0.1)
+        self.assertEqual(
+            set(state.get_table("countries_treaties").to_dicts()[0]["members"]),
+            {"USA", "CAN", "GBR"},
+        )
+
+    def test_treaty_participant_update_rejects_members_who_fail_saved_conditions(self) -> None:
+        state = self._state()
+        state.update_table(
+            "country_governments",
+            pl.DataFrame(
+                {
+                    "country_id": ["USA", "CAN", "GBR", "FRA"],
+                    "government_type": ["democracy", "democracy", "democracy", "autocracy"],
+                }
+            ),
+        )
+        self._propose(
+            state,
+            treaty_type="mobility_agreement",
+            members=["USA", "CAN"],
+            conditions={"government_type": "democracy"},
+        )
+        proposal_id = state.get_table("pending_treaties")["id"][0]
+        self._respond(state, proposal_id, "CAN")
+        treaty_id = state.get_table("countries_treaties")["id"][0]
+
+        state.current_actions = [
+            ActionUpdateTreatyParticipants(
+                player_id="USA",
+                treaty_id=treaty_id,
+                side_a_country_tags=["USA"],
+                side_b_country_tags=["CAN", "FRA"],
+            )
+        ]
+        self.system.update(state, 0.1)
+
+        treaty = state.get_table("countries_treaties").to_dicts()[0]
+        self.assertEqual(set(treaty["members"]), {"USA", "CAN"})
+        self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+        self.assertIn("FRA", state.journal.command_results[-1]["reason"])
+
     def _propose(
         self,
         state: GameState,
@@ -171,6 +251,17 @@ class TreatySpecificationTest(unittest.TestCase):
         )
         ensure_base_tables(state)
         return state
+
+
+def test_inverted_quick_treaty_draft_matches_its_dispatched_sides():
+    from src.client.ui.panels.politics.treaty_editor_live import LiveTreatyEditorPanel
+    from src.shared.treaties import TREATY_DEFINITIONS
+
+    panel = LiveTreatyEditorPanel()
+    for treaty_type in ("assume_foreign_debt", "free_region"):
+        panel.prepare("UKR", "POL", treaty_type, invert_sides=True)
+        panel._sync_participant_sides("UKR", "POL", treaty_type, TREATY_DEFINITIONS[treaty_type])
+        assert panel._participant_sides == ({"POL"}, {"UKR"})
 
 
 if __name__ == "__main__":

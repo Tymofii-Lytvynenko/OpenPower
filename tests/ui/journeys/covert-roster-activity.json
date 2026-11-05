@@ -1,0 +1,55 @@
+{
+  "fixture": "tests/ui/fixtures/covert-roster.json",
+  "steps": [
+    {
+      "op": "select",
+      "target": "covert_ops.cell.cell-test.status",
+      "value": "Dormant"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCovertCellActivity",
+      "count": 1,
+      "fields": {
+        "cell_id": "cell-test",
+        "is_active": false,
+        "expected_target_country_tag": "POL",
+        "expected_status": "active"
+      }
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.cell.cell-test.status",
+      "enabled": false
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.selected_cell",
+      "label": "MISSION \u00b7 Ready cell"
+    },
+    {
+      "op": "server_snapshot",
+      "fixture": "tests/ui/fixtures/covert-roster-dormant.json"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": true
+    },
+    {
+      "op": "select",
+      "target": "covert_ops.cell.cell-test.status",
+      "value": "Active"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCovertCellActivity",
+      "count": 2,
+      "fields": {
+        "cell_id": "cell-test",
+        "is_active": true,
+        "expected_status": "dormant"
+      }
+    }
+  ]
+}

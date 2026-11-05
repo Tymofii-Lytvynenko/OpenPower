@@ -1,0 +1,8 @@
+{
+  "results": [
+    {
+      "surface": "main-menu",
+      "journey": "tests/ui/journeys/load-game-success.json"
+    }
+  ]
+}

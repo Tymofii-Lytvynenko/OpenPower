@@ -1,0 +1,12 @@
+{
+  "fixture": "tests/ui/fixtures/reference-main-bar-military-access.json",
+  "steps": [
+    {"op": "assert_region", "target": "hud.central_bar", "visible": true},
+    {"op": "click", "target": "hud.country"},
+    {"op": "assert", "target": "hud.country.option.POL", "visible": true},
+    {"op": "click", "target": "hud.country.option.POL"},
+    {"op": "assert", "target": "hud.country_status", "label": "ACCESS"},
+    {"op": "assert_viewport_request", "type": "country", "fields": {"country": "POL"}},
+    {"op": "assert_region", "target": "hud.central_bar", "visible": true}
+  ]
+}

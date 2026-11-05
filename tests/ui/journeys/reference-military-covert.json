@@ -1,0 +1,43 @@
+{
+  "fixture": "tests/ui/fixtures/reference-covert-protection.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.mil"
+    },
+    {
+      "op": "assert_region",
+      "target": "military.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "military.open_covert"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.protection",
+      "label": "10.8%"
+    },
+    {
+      "op": "assert",
+      "target": "covert_ops.mission.txtFramedCountry",
+      "label": "Poland"
+    },
+    {
+      "op": "close_window",
+      "target": "covert_ops.panel"
+    },
+    {
+      "op": "assert_region",
+      "target": "covert_ops.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

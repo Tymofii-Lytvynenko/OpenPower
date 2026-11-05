@@ -1,12 +1,11 @@
 {
+  "fixture": "tests/ui/fixtures/identity-trade.json",
   "steps": [
     {
       "op": "assert",
-      "target": {
-        "label": "72.0%",
-        "type": "text"
-      },
-      "visible": true
+      "target": "identity.UKR.language.ukrainian.share",
+      "visible": true,
+      "label": "72.0%"
     },
     {
       "op": "assert",
@@ -17,6 +16,15 @@
       "op": "select",
       "target": "identity.UKR.language.russian.status",
       "value": "Restricted"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCountryIdentityPolicy",
+      "count": 0
+    },
+    {
+      "op": "click",
+      "target": "laws.apply"
     },
     {
       "op": "assert_action",
@@ -46,16 +54,23 @@
     },
     {
       "op": "assert",
-      "target": {
-        "label": "68.0%",
-        "type": "text"
-      },
-      "visible": true
+      "target": "identity.UKR.religion.orthodox.share",
+      "visible": true,
+      "label": "68.0%"
     },
     {
       "op": "select",
       "target": "identity.UKR.religion.catholic.status",
       "value": "Illegal"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetCountryIdentityPolicy",
+      "count": 1
+    },
+    {
+      "op": "click",
+      "target": "laws.apply"
     },
     {
       "op": "assert_action",

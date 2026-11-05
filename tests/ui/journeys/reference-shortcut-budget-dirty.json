@@ -1,0 +1,38 @@
+{
+  "steps": [
+    {
+      "op": "key",
+      "key": "b"
+    },
+    {
+      "op": "input",
+      "target": "budget.income_tax_rate",
+      "value": 35.0
+    },
+    {
+      "op": "key",
+      "key": "escape"
+    },
+    {
+      "op": "key",
+      "key": "b"
+    },
+    {
+      "op": "assert_region",
+      "target": "budget.close.confirmation",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "budget.close.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateBudget",
+      "fields": {
+        "country_tag": "UKR",
+        "allocations.personal_income_tax_rate": 0.35
+      }
+    }
+  ]
+}

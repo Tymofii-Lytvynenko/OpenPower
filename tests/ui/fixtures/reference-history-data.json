@@ -1,0 +1,118 @@
+{
+  "time": {"total_minutes": 43200},
+  "tables": {
+    "history_indicator_definitions": [
+      {
+        "id": "country.gdp",
+        "subject_type": "country",
+        "unit": "USD",
+        "source_table": "countries",
+        "source_field": "gdp",
+        "subject_id_field": "id",
+        "aggregation": "last",
+        "enabled": true
+      },
+      {
+        "id": "country.population",
+        "subject_type": "country",
+        "unit": "people",
+        "source_table": "regions",
+        "source_field": "id",
+        "subject_id_field": "owner",
+        "aggregation": "sum",
+        "derivation": "country_population",
+        "enabled": true
+      },
+      {
+        "id": "military.conventional_strength",
+        "subject_type": "country",
+        "unit": "OpenPower unit strength",
+        "source_table": "units",
+        "source_field": "strength",
+        "subject_id_field": "country_id",
+        "aggregation": "sum",
+        "derivation": "conventional_forces",
+        "enabled": true
+      },
+      {
+        "id": "strategic.weapon_quantity",
+        "subject_type": "country",
+        "unit": "weapons",
+        "source_table": "strategic_weapons",
+        "source_field": "quantity",
+        "subject_id_field": "country_id",
+        "aggregation": "sum",
+        "enabled": true
+      },
+      {
+        "id": "country.expense_military_upkeep",
+        "subject_type": "country",
+        "unit": "USD/year",
+        "source_table": "countries",
+        "source_field": "expense_military_upkeep",
+        "subject_id_field": "id",
+        "aggregation": "last",
+        "enabled": true
+      },
+      {
+        "id": "research.total_level",
+        "subject_type": "country",
+        "unit": "levels",
+        "source_table": "research_tracks",
+        "source_field": "research_level",
+        "subject_id_field": "country_id",
+        "aggregation": "sum",
+        "enabled": true
+      },
+      {
+        "id": "country.resource_balance",
+        "subject_type": "country",
+        "unit": "USD/year",
+        "source_table": "resource_ledger",
+        "source_field": "balance_usd",
+        "subject_id_field": "country_id",
+        "aggregation": "sum",
+        "derivation": "resource_balance",
+        "enabled": true
+      }
+    ],
+    "history_snapshots": [
+      {"id": "ukr-0", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.gdp", "value": 80.0, "unit": "USD", "game_minute": 0, "tick": 0},
+      {"id": "ukr-1", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.gdp", "value": 95.0, "unit": "USD", "game_minute": 7200, "tick": 1},
+      {"id": "ukr-2", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.gdp", "value": 92.0, "unit": "USD", "game_minute": 14400, "tick": 2},
+      {"id": "ukr-3", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.gdp", "value": null, "unit": "USD", "game_minute": 21600, "tick": 3},
+      {"id": "ukr-4", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.gdp", "value": 130.0, "unit": "USD", "game_minute": 28800, "tick": 4},
+      {"id": "ukr-5", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.gdp", "value": 144.0, "unit": "USD", "game_minute": 36000, "tick": 5},
+      {"id": "ukr-6", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.gdp", "value": 151.0, "unit": "USD", "game_minute": 43200, "tick": 6},
+      {"id": "ukr-pop-0", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.population", "value": 40000000.0, "unit": "people", "game_minute": 0, "tick": 0},
+      {"id": "ukr-pop-1", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.population", "value": 40500000.0, "unit": "people", "game_minute": 7200, "tick": 1},
+      {"id": "ukr-pop-2", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.population", "value": 41000000.0, "unit": "people", "game_minute": 14400, "tick": 2},
+      {"id": "ukr-pop-3", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.population", "value": 41500000.0, "unit": "people", "game_minute": 21600, "tick": 3},
+      {"id": "ukr-pop-4", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.population", "value": 42000000.0, "unit": "people", "game_minute": 28800, "tick": 4},
+      {"id": "ukr-pop-5", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.population", "value": 42500000.0, "unit": "people", "game_minute": 36000, "tick": 5},
+      {"id": "ukr-pop-6", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.population", "value": 43000000.0, "unit": "people", "game_minute": 43200, "tick": 6},
+      {"id": "ukr-conventional-0", "subject_type": "country", "subject_id": "UKR", "indicator_id": "military.conventional_strength", "value": 100.0, "unit": "OpenPower unit strength", "game_minute": 0, "tick": 0},
+      {"id": "ukr-conventional-1", "subject_type": "country", "subject_id": "UKR", "indicator_id": "military.conventional_strength", "value": 150.0, "unit": "OpenPower unit strength", "game_minute": 43200, "tick": 6},
+      {"id": "ukr-strategic-0", "subject_type": "country", "subject_id": "UKR", "indicator_id": "strategic.weapon_quantity", "value": 2.0, "unit": "weapons", "game_minute": 0, "tick": 0},
+      {"id": "ukr-strategic-1", "subject_type": "country", "subject_id": "UKR", "indicator_id": "strategic.weapon_quantity", "value": 4.0, "unit": "weapons", "game_minute": 43200, "tick": 6},
+      {"id": "ukr-upkeep-0", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.expense_military_upkeep", "value": 100.0, "unit": "USD/year", "game_minute": 0, "tick": 0},
+      {"id": "ukr-upkeep-1", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.expense_military_upkeep", "value": 200.0, "unit": "USD/year", "game_minute": 43200, "tick": 6},
+      {"id": "ukr-research-0", "subject_type": "country", "subject_id": "UKR", "indicator_id": "research.total_level", "value": 20.0, "unit": "levels", "game_minute": 0, "tick": 0},
+      {"id": "ukr-research-1", "subject_type": "country", "subject_id": "UKR", "indicator_id": "research.total_level", "value": 23.0, "unit": "levels", "game_minute": 43200, "tick": 6},
+      {"id": "ukr-resource-balance-0", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.resource_balance", "value": -100.0, "unit": "USD/year", "game_minute": 0, "tick": 0},
+      {"id": "ukr-resource-balance-1", "subject_type": "country", "subject_id": "UKR", "indicator_id": "country.resource_balance", "value": 250.0, "unit": "USD/year", "game_minute": 43200, "tick": 6},
+      {"id": "pol-0", "subject_type": "country", "subject_id": "POL", "indicator_id": "country.gdp", "value": 70.0, "unit": "USD", "game_minute": 0, "tick": 0},
+      {"id": "pol-1", "subject_type": "country", "subject_id": "POL", "indicator_id": "country.gdp", "value": 74.0, "unit": "USD", "game_minute": 7200, "tick": 1},
+      {"id": "pol-2", "subject_type": "country", "subject_id": "POL", "indicator_id": "country.gdp", "value": 81.0, "unit": "USD", "game_minute": 14400, "tick": 2},
+      {"id": "pol-3", "subject_type": "country", "subject_id": "POL", "indicator_id": "country.gdp", "value": 85.0, "unit": "USD", "game_minute": 21600, "tick": 3},
+      {"id": "pol-4", "subject_type": "country", "subject_id": "POL", "indicator_id": "country.gdp", "value": 91.0, "unit": "USD", "game_minute": 28800, "tick": 4},
+      {"id": "pol-5", "subject_type": "country", "subject_id": "POL", "indicator_id": "country.gdp", "value": 96.0, "unit": "USD", "game_minute": 36000, "tick": 5},
+      {"id": "pol-6", "subject_type": "country", "subject_id": "POL", "indicator_id": "country.gdp", "value": 102.0, "unit": "USD", "game_minute": 43200, "tick": 6}
+    ],
+    "history_events": [
+      {"id": "ukr-budget-adoption", "event_type": "budget_policy_changed", "subject_type": "country", "subject_id": "UKR", "related_country_ids_json": "[]", "region_id": 0, "title": "Budget adjustment adopted", "details_json": "{}", "source_type": "simulation_tick", "source_id": "tick-5", "cause_source_type": "budget_policy", "cause_source_id": "ukr-budget-review", "game_minute": 36000, "tick": 5, "confidence": 1.0, "completeness": "authoritative", "schema_version": 1},
+      {"id": "ukr-tax-measure", "event_type": "tax_policy_changed", "subject_type": "country", "subject_id": "UKR", "related_country_ids_json": "[]", "region_id": 0, "title": "Tax measure revised", "details_json": "{}", "source_type": "simulation_tick", "source_id": "tick-5", "cause_source_type": "tax_policy", "cause_source_id": "ukr-tax-review", "game_minute": 36050, "tick": 5, "confidence": 1.0, "completeness": "authoritative", "schema_version": 1},
+      {"id": "ukr-reserve-target", "event_type": "reserve_target_changed", "subject_type": "country", "subject_id": "UKR", "related_country_ids_json": "[]", "region_id": 0, "title": "Reserve target approved", "details_json": "{}", "source_type": "simulation_tick", "source_id": "tick-5", "cause_source_type": "budget_policy", "cause_source_id": "ukr-reserve-review", "game_minute": 36100, "tick": 5, "confidence": 1.0, "completeness": "authoritative", "schema_version": 1}
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "steps": [
+    { "op": "click", "target": "hud.panel.mil" },
+    { "op": "click", "target": "military.open_research" },
+    { "op": "drag", "target": "unit_research.funding.ground", "fraction": 0.73 },
+    { "op": "assert_action", "type": "ActionUpdateResearchFunding", "count": 0 },
+    { "op": "close_window", "target": "unit_research.panel" },
+    { "op": "assert_region", "target": "unit_research.close.confirmation", "visible": true },
+    { "op": "click", "target": "unit_research.close.discard" },
+    { "op": "assert_action", "type": "ActionUpdateResearchFunding", "count": 0 },
+    { "op": "assert_region", "target": "unit_research.panel", "visible": false, "present": false }
+  ]
+}

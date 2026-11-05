@@ -82,6 +82,10 @@ class TestEventFeedPresenter(unittest.TestCase):
         self.assertEqual(len(presenter.items(state, EventCategory.POLITICAL)), 1)
         self.assertEqual(len(presenter.items(state, EventCategory.GENERAL)), 1)
         self.assertEqual(presenter.category_for("economic_boom"), EventCategory.ECONOMIC)
+        self.assertEqual(
+            presenter.category_for("population_displacement"),
+            EventCategory.DEMOGRAPHIC,
+        )
 
     def test_projects_typed_event_history_with_effects_response_expiry_and_recovery(self):
         state = SimpleNamespace(

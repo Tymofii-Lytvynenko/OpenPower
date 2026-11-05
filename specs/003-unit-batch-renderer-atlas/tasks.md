@@ -25,6 +25,15 @@
 - [X] T011 [US1] Preserve the ImGui draw path when batch GPU rendering is unavailable in `src/client/renderers/unit_renderer.py` and renderer tests.
 - [X] T012 Run atlas, batch, stack, route, and controller tests after T009; focused matrix result is 27 passed, 2 opt-in GPU checks skipped by default, 3 subtests passed. The separate live GPU run passed both checks on NVIDIA GeForce RTX 5060 Ti / OpenGL 4.6.0.
 
+## Requirement Traceability
+
+| Requirement | Existing implementation and acceptance tasks |
+| --- | --- |
+| FR-001 | T001, T003, T004, T005 |
+| FR-002 | T001, T002, T003, T011 |
+| FR-003 | T006, T007 |
+| FR-004 | T008, T009, T010 |
+
 ## Dependencies & Execution Order
 
 - T001 precedes UV/batch integration and test tasks T002–T003.

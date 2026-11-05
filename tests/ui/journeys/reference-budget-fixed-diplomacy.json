@@ -1,0 +1,26 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.eco"
+    },
+    {
+      "op": "click",
+      "target": "economy.budget_btn"
+    },
+    {
+      "op": "assert_region",
+      "target": "budget.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "budget.navigate.fixed-diplomacy"
+    },
+    {
+      "op": "assert_region",
+      "target": "treaties.panel",
+      "visible": true
+    }
+  ]
+}

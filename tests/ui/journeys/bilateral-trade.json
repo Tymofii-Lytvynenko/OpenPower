@@ -1,4 +1,5 @@
 {
+  "fixture": "tests/ui/fixtures/identity-trade.json",
   "steps": [
     {
       "op": "input",
@@ -11,6 +12,11 @@
     },
     {
       "op": "select",
+      "target": "trade.asset_category",
+      "value": "Regions"
+    },
+    {
+      "op": "select",
       "target": "trade.offer.region",
       "value": "Lviv (3)"
     },
@@ -19,8 +25,18 @@
       "target": "trade.offer.add_region"
     },
     {
+      "op": "select",
+      "target": "trade.asset_category",
+      "value": "Technology"
+    },
+    {
       "op": "click",
       "target": "trade.offer.add_technology"
+    },
+    {
+      "op": "select",
+      "target": "trade.asset_category",
+      "value": "Cash"
     },
     {
       "op": "input",
@@ -33,12 +49,17 @@
     },
     {
       "op": "select",
-      "target": "trade.request.region",
-      "value": "Gdansk (4)"
+      "target": "trade.asset_category",
+      "value": "Regions"
     },
     {
       "op": "click",
       "target": "trade.request.add_region"
+    },
+    {
+      "op": "select",
+      "target": "trade.asset_category",
+      "value": "Technology"
     },
     {
       "op": "click",
@@ -91,12 +112,58 @@
       }
     },
     {
+      "op": "assert_region",
+      "target": "trade.panel",
+      "visible": true,
+      "min_width": 630,
+      "min_height": 245
+    },
+    {
+      "op": "click",
+      "target": "trade.deal.incoming-accept.row"
+    },
+    {
+      "op": "click",
+      "target": "trade.deal.view"
+    },
+    {
+      "op": "assert_region",
+      "target": "trade.panel",
+      "visible": true,
+      "min_width": 648,
+      "min_height": 423
+    },
+    {
+      "op": "assert",
+      "target": "trade.detail.proposer",
+      "label": "PROPOSER · POL"
+    },
+    {
+      "op": "click",
+      "target": "trade.page.offers"
+    },
+    {
+      "op": "assert_region",
+      "target": "trade.panel",
+      "visible": true,
+      "min_width": 630,
+      "min_height": 245
+    },
+    {
+      "op": "click",
+      "target": "trade.deal.view"
+    },
+    {
       "op": "click",
       "target": "trade.deal.incoming-accept.accept"
     },
     {
-      "op": "scroll",
-      "target": "trade.deal.incoming-reject.reject"
+      "op": "click",
+      "target": "trade.deal.incoming-reject.row"
+    },
+    {
+      "op": "click",
+      "target": "trade.deal.view"
     },
     {
       "op": "click",
@@ -112,8 +179,12 @@
       }
     },
     {
-      "op": "scroll",
-      "target": "trade.deal.incoming-counter.counter"
+      "op": "click",
+      "target": "trade.deal.incoming-counter.row"
+    },
+    {
+      "op": "click",
+      "target": "trade.deal.view"
     },
     {
       "op": "click",
@@ -148,8 +219,12 @@
       }
     },
     {
-      "op": "scroll",
-      "target": "trade.deal.outgoing.withdraw"
+      "op": "click",
+      "target": "trade.deal.outgoing.row"
+    },
+    {
+      "op": "click",
+      "target": "trade.deal.view"
     },
     {
       "op": "click",

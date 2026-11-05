@@ -1,9 +1,18 @@
-import arcade
 import ctypes  # Required for raw pointer handling in ImGui
-from typing import Optional
-from src.client.ui.core.instrumented_imgui import imgui
-from src.client.ui.core.theme import UITheme
+
+import arcade
+
 from src.client.services.imgui_service import ImGuiService
+from src.client.ui.core.instrumented_imgui import imgui
+from src.client.ui.core.primitives import UIPrimitives
+from src.client.ui.core.theme import UITheme
+from src.client.ui.layouts.gml_layout import (
+    create_gml_layout_session,
+    render_gml_title,
+    resolve_gml_layout,
+    use_gml_layout,
+)
+
 
 class UIComposer:
     """
@@ -13,6 +22,7 @@ class UIComposer:
     """
     def __init__(self, theme: UITheme):
         self.theme = theme
+        self._gml_layout_scopes = []
 
     def setup_frame(self):
         """Applies global theme styles for the current frame."""
@@ -48,34 +58,67 @@ class UIComposer:
         
         return expanded, opened
 
-    def end_panel(self): 
+    def end_panel(self):
         """Ends the current window context."""
+        if self._gml_layout_scopes:
+            self._gml_layout_scopes.pop().__exit__(None, None, None)
         imgui.end()
 
-    def begin_centered_panel(self, name: str, sw: float, sh: float, w: float = 300, h: float = 400):
+    def begin_centered_panel(self, name: str, sw: float, sh: float, w: float = 300, h: float = 400,
+                             test_id: str | None = None,
+                             gml_template: str | None = None,
+                             force_size: bool = False,
+                             size_override: tuple[float, float] | None = None):
         """
         Starts a modal-like window centered on screen.
         Used for Menus, Loading Screens, etc.
         """
+        layout = resolve_gml_layout(gml_template, title=name)
+        if layout is not None:
+            w, h = float(layout.width), float(layout.height)
+        if size_override is not None:
+            w, h = map(float, size_override)
+
         # Center calculation
         pos_x = (sw - w) / 2
         pos_y = (sh - h) / 2
         
         imgui.set_next_window_pos((pos_x, pos_y))
-        imgui.set_next_window_size((w, h))
+        size_condition = (
+            imgui.Cond_.always
+            if layout is not None or force_size
+            else imgui.Cond_.first_use_ever
+        )
+        imgui.set_next_window_size((w, h), size_condition)
         
         # Thicker border for modal look
         imgui.push_style_var(imgui.StyleVar_.window_border_size, 1.0)
         imgui.push_style_var(imgui.StyleVar_.window_rounding, 8.0)
+        if layout is not None:
+            imgui.push_style_var(imgui.StyleVar_.window_padding, (0.0, 0.0))
         
         flags = (imgui.WindowFlags_.no_title_bar | 
                  imgui.WindowFlags_.no_resize | 
                  imgui.WindowFlags_.no_move)
         
         # Pass None for p_open to hide close button
-        is_visible, _ = imgui.begin(name, None, flags)
-        
-        imgui.pop_style_var(2)
+        is_visible, _ = imgui.begin(name, None, flags, test_id=test_id)
+
+        imgui.pop_style_var(3 if layout is not None else 2)
+        if layout is not None and is_visible:
+            window_position = imgui.get_window_pos()
+            window_size = imgui.get_window_size()
+            layout_session = create_gml_layout_session(
+                gml_template or layout.template,
+                (float(window_position.x), float(window_position.y)),
+                (float(window_size.x), float(window_size.y)),
+            )
+            render_gml_title(layout, name, layout_session)
+            scope = use_gml_layout(layout_session)
+            scope.__enter__()
+            self._gml_layout_scopes.append(scope)
+        elif not is_visible:
+            imgui.end()
         return is_visible
 
     # =========================================================
@@ -121,12 +164,29 @@ class UIComposer:
         imgui.separator()
         self.dummy((0, 10))
 
-    def draw_menu_button(self, label: str, w: float = -1, h: float = 40) -> bool:
+    def draw_menu_button(self, label: str, w: float = -1, h: float = 40,
+                         test_id: str | None = None,
+                         gml_id: str | None = None,
+                         enabled: bool = True,
+                         tooltip: str | None = None) -> bool:
         """
         Draws a large menu button (standard height 40px).
         Returns True if clicked.
         """
-        clicked = imgui.button(label, (w, h))
+        imgui.begin_disabled(not enabled)
+        try:
+            clicked = UIPrimitives.button(
+                label,
+                test_id=test_id,
+                size=(w, h),
+                enabled=enabled,
+                gml_id=gml_id,
+                gml_enabled=enabled,
+            )
+        finally:
+            imgui.end_disabled()
+        if tooltip and imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled):
+            imgui.set_tooltip(tooltip)
         self.dummy((0, 5)) # Spacing below
         return clicked
 
@@ -134,161 +194,47 @@ class UIComposer:
         """
         Draws a styled header bar with a background color.
         """
-        draw_list = imgui.get_window_draw_list()
-        p = imgui.get_cursor_screen_pos()
-        width = imgui.get_content_region_avail().x
-        height = 24.0
-        
-        # Draw Background Rect
-        draw_list.add_rect_filled(
-            p, 
-            (p.x + width, p.y + height), 
-            imgui.get_color_u32(self.theme.colors.bg_input),
-            4.0 # Rounding
-        )
-        
-        # Draw Text (Vertically Centered)
-        text_size = imgui.calc_text_size(label)
-        text_y = p.y + (height - text_size.y) / 2
-        
-        # Padding Left
-        imgui.set_cursor_screen_pos((p.x + 8, text_y))
-        imgui.text_colored(self.theme.colors.text_main, label)
-        
-        # Reset Cursor for next item
-        imgui.set_cursor_screen_pos((p.x, p.y + height + 5))
+        UIPrimitives.header(label, theme=self.theme)
 
     def draw_meter(self, label: str, value: float, color: tuple, show_percentage: bool = True):
         """
         Draws a label and a horizontal progress bar (0-100 range).
         """
-        if label:
-            imgui.text(label)
-            
-        w = imgui.get_content_region_avail().x
-        h = 12.0
-        p = imgui.get_cursor_screen_pos()
-        draw_list = imgui.get_window_draw_list()
-        
-        # Clamp value 0-100
-        clamped_val = max(0.0, min(value, 100.0))
-        fraction = clamped_val / 100.0
+        UIPrimitives.meter(label, value, color, theme=self.theme)
 
-        # Background (Track)
-        draw_list.add_rect_filled(
-            p, (p.x + w, p.y + h), 
-            imgui.get_color_u32(self.theme.colors.bg_input),
-            h / 2
-        )
-        
-        # Foreground (Fill)
-        if fraction > 0.01:
-            # Convert color tuple (r,g,b,a) to U32
-            col_u32 = imgui.get_color_u32(color if len(color) == 4 else (*color, 1.0))
-            draw_list.add_rect_filled(
-                p, (p.x + w * fraction, p.y + h), 
-                col_u32,
-                h / 2
-            )
-
-        self.dummy((0, h + 5))
-
-    def draw_currency_row(self, label: str, value: float, color_val: Optional[tuple] = None):
+    def draw_currency_row(self, label: str, value: float, color_val: tuple | None = None):
         """
         Draws a row with 'Label ......... $ Value'.
         Value is formatted with spaces as thousand separators.
         """
-        imgui.text(label)
-        imgui.same_line()
-        
-        # Format: 1 000 000
-        val_str = f"$ {value:,.0f}".replace(",", " ")
-        
-        # Right align the value
-        self.right_align(imgui.calc_text_size(val_str).x)
-        
-        col = color_val if color_val else self.theme.colors.text_main
-        imgui.text_colored(col, val_str)
+        UIPrimitives.currency_row(label, value, color_val, theme=self.theme)
 
     def draw_progress_bar(self, fraction: float, text: str = "", width: float = -1, height: float = 20):
         """
         Standard ImGui ProgressBar wrapper with theme colors.
         """
-        p = imgui.get_cursor_screen_pos()
-        w = width if width > 0 else imgui.get_content_region_avail().x
-        
-        draw_list = imgui.get_window_draw_list()
-        
-        # Background
-        draw_list.add_rect_filled(
-            p, (p.x + w, p.y + height), 
-            imgui.get_color_u32(self.theme.colors.bg_window)
+        UIPrimitives.progress_bar(
+            fraction,
+            text,
+            width,
+            height,
+            theme=self.theme,
         )
-        
-        # Fill
-        fill_w = w * max(0.0, min(fraction, 1.0))
-        draw_list.add_rect_filled(
-            p, (p.x + fill_w, p.y + height), 
-            imgui.get_color_u32(self.theme.colors.accent)
-        )
-        
-        # Border
-        draw_list.add_rect(
-            p, (p.x + w, p.y + height), 
-            imgui.get_color_u32(self.theme.colors.accent)
-        )
-        
-        # Centered Text
-        if text:
-            text_size = imgui.calc_text_size(text)
-            text_x = p.x + (w - text_size.x) / 2
-            text_y = p.y + (height - text_size.y) / 2
-            
-            # Shadow for readability
-            draw_list.add_text((text_x + 1, text_y + 1), 0xFF000000, text) 
-            # Text
-            draw_list.add_text((text_x, text_y), 0xFFFFFFFF, text)
-            
-        self.dummy((w, height + 5))
 
     def draw_icon_toggle(self, icon: str, color: tuple, is_active: bool, width: float = 50, height: float = 50) -> bool:
         """
         Draws a large toggle button for the main HUD toolbar.
         Includes a colored underline indicator when active.
         """
-        # 1. Custom Button Style
-        # Use Active color for background if selected, else Normal
-        bg_col = self.theme.colors.interaction_active if is_active else self.theme.colors.bg_input
-        imgui.push_style_color(imgui.Col_.button, bg_col)
-        imgui.push_style_var(imgui.StyleVar_.frame_rounding, 8.0) # Softer corners for icons
-        
-        clicked = imgui.button(icon, (width, height))
-        
-        imgui.pop_style_var()
-        imgui.pop_style_color()
-        
-        # 2. Draw Indicator Line (Manually via DrawList)
-        p_min = imgui.get_item_rect_min()
-        p_max = imgui.get_item_rect_max()
-        
-        draw_list = imgui.get_window_draw_list()
-        
-        # Indicator color: The specific category color (e.g. Red for Mil, Green for Eco)
-        ind_col_tuple = (*color[:3], 1.0) if is_active else self.theme.colors.text_dim
-        ind_col = imgui.get_color_u32(ind_col_tuple)
-        
-        # Draw a small bar at the bottom
-        bar_height = 4.0
-        padding = 5.0
-        
-        draw_list.add_rect_filled(
-            (p_min.x + padding, p_max.y - bar_height - 2), 
-            (p_max.x - padding, p_max.y - 2), 
-            ind_col,
-            2.0 # Rounding
+        return UIPrimitives.icon_toggle(
+            icon,
+            color,
+            is_active,
+            width,
+            height,
+            show_inactive_indicator=True,
+            theme=self.theme,
         )
-        
-        return clicked
 
     # =========================================================
     # 4. IMAGES & TEXTURES
@@ -314,7 +260,7 @@ class UIComposer:
             # 2. Draw with Correct Binding
             imgui.image(ctypes.c_void_p(tex_id), imgui.ImVec2(width, height)) # type: ignore
 
-        except Exception as e:
+        except Exception:
             # Fallback to prevent crashes
             # print(f"[UIComposer] draw_image error: {e}")
             self.dummy((width, height))
@@ -347,9 +293,15 @@ class UIComposer:
         """Ends a menu dropdown."""
         imgui.end_menu()
 
-    def draw_menu_item(self, label: str, shortcut: str = "") -> bool:
+    def draw_menu_item(
+        self,
+        label: str,
+        shortcut: str = "",
+        *,
+        test_id: str | None = None,
+    ) -> bool:
         """Draws a clickable menu item. Returns True if clicked."""
-        clicked, _ = imgui.menu_item(label, shortcut, False, True)
+        clicked, _ = imgui.menu_item(label, shortcut, False, True, test_id=test_id)
         return clicked
 
     def is_background_clicked(self) -> bool:

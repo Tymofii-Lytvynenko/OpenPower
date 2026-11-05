@@ -89,6 +89,37 @@ class ActionMoveUnit(GameAction):
     via_region_ids: list[int] = field(default_factory=list)
     is_naval_invasion: bool = False
 
+
+@dataclass
+class ActionInvadeTerritory(GameAction):
+    """Authorize hostilities against the expected controller and move owned groups."""
+    order_id: str
+    unit_ids: list[str]
+    target_region_id: int
+    expected_controller: str
+    target_latitude: float
+    target_longitude: float
+
+
+@dataclass
+class ActionSplitUnit(GameAction):
+    """Detach personnel and their proportional equipment into a new owned unit."""
+    unit_id: str
+    detached_strength: int
+
+
+@dataclass
+class ActionMergeUnits(GameAction):
+    """Consolidate compatible colocated units into the specified surviving unit."""
+    target_unit_id: str
+    source_unit_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ActionDisbandUnits(GameAction):
+    """Disband selected owned units and release their personnel from service."""
+    unit_ids: list[str] = field(default_factory=list)
+
 @dataclass
 class ActionAttackUnit(GameAction):
     """
@@ -113,6 +144,9 @@ class ActionTrainUnit(GameAction):
     country_tag: str
     unit_id: str
     target_level: str
+    expected_cost: float | None = None
+    expected_required_days: float | None = None
+    expected_from_level: str = ""
 
 
 @dataclass
@@ -211,6 +245,31 @@ class ActionUpdateResourcePolicy(GameAction):
 
 
 @dataclass
+class ActionIncreaseResourceProduction(GameAction):
+    """Funds a bounded increase to a country's controlled resource output."""
+
+    country_tag: str
+    resource_id: str
+    increase_percent: int
+
+
+@dataclass
+class ActionUpdateAdvisorSettings(GameAction):
+    """Sets the authoritative advisor mode for each domain of a country."""
+    country_tag: str
+    economy_status: str
+    politics_status: str
+    military_status: str
+
+
+@dataclass
+class ActionResolveAdvisorRecommendation(GameAction):
+    """Accepts or dismisses one server-generated advisor recommendation."""
+    recommendation_id: str
+    accept: bool
+
+
+@dataclass
 class ActionUpdateGovernment(GameAction):
     """
     Updates the current government profile displayed by the client.
@@ -221,11 +280,33 @@ class ActionUpdateGovernment(GameAction):
 
 
 @dataclass
+class ActionSetCountryCapital(GameAction):
+    """Changes a country's capital to a region currently under its control."""
+
+    country_tag: str
+    expected_capital_region_id: int
+    target_region_id: int
+
+
+@dataclass
+class ActionSetGovernmentForm(GameAction):
+    """Changes a country's constitutional settings under its political rules."""
+
+    country_tag: str
+    expected_form_id: str
+    target_form_id: str
+    expected_martial_law: Optional[bool] = None
+    target_martial_law: Optional[bool] = None
+    confirmed_foreign_change: bool = False
+
+
+@dataclass
 class ActionStartCampaign(GameAction):
     """Starts a scenario for one selected country through the authoritative server."""
 
     scenario_id: str
     country_tag: str
+    player_party_id: str = ""
 
 
 @dataclass
@@ -415,6 +496,15 @@ class ActionExpelTreatyMember(GameAction):
 
 
 @dataclass
+class ActionUpdateTreatyParticipants(GameAction):
+    """Replaces the participant sides of an active multi-member treaty."""
+
+    treaty_id: str
+    side_a_country_tags: list[str] = field(default_factory=list)
+    side_b_country_tags: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ActionQueueUnitProduction(GameAction):
     """
     Adds a new production order for a country's armed forces.
@@ -500,6 +590,7 @@ class ActionCreateCovertCell(GameAction):
     country_tag: str
     target_country_tag: str
     cell_name: str
+    training_level: str = "Recruit"
 
 
 @dataclass
@@ -520,6 +611,21 @@ class ActionStartCovertMission(GameAction):
     mission_type: str
     target_country_tag: str
     cover_country_tag: Optional[str] = None
+    requires_execution_confirmation: bool = False
+    target_sector: Optional[str] = None
+    complexity: Optional[str] = None
+    target_resource_id: Optional[str] = None
+    target_unit_category: Optional[str] = None
+
+
+@dataclass
+class ActionExecuteCovertMission(GameAction):
+    mission_id: str
+
+
+@dataclass
+class ActionCancelCovertMission(GameAction):
+    mission_id: str
 
 
 @dataclass
@@ -531,6 +637,22 @@ class ActionRetireCovertCell(GameAction):
 class ActionSetCovertCellAssignment(GameAction):
     cell_id: str
     assignment: str
+
+
+@dataclass
+class ActionRetargetCovertCell(GameAction):
+    cell_id: str
+    target_country_tag: str
+    expected_target_country_tag: str
+    expected_status: str
+
+
+@dataclass
+class ActionSetCovertCellActivity(GameAction):
+    cell_id: str
+    is_active: bool
+    expected_target_country_tag: str
+    expected_status: str
 
 
 @dataclass
@@ -551,6 +673,15 @@ class ActionOfferPeace(GameAction):
     war_id: str
     source_country_tag: str
     terms: str = ""
+
+
+@dataclass
+class ActionJoinWar(GameAction):
+    """Joins one coalition in an existing war after server-side country authority checks."""
+
+    war_id: str
+    source_country_tag: str
+    side: str
 
 
 @dataclass
@@ -692,3 +823,13 @@ class ActionMarkMessageRead(GameAction):
     Marks a message as read in the player's inbox.
     """
     message_id: str
+
+
+@dataclass
+class ActionSetPartyEligibility(GameAction):
+    """Request one atomic party-status batch under the inspected government form."""
+
+    country_tag: str
+    expected_government_form: str
+    changes: dict[str, bool]
+    confirmed_government_form: str = ""

@@ -1,0 +1,502 @@
+{
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "main_menu.window",
+      "visible": true,
+      "inside_viewport": true,
+      "min_width": 273,
+      "min_height": 196
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.singleplayer",
+      "visible": true,
+      "enabled": true,
+      "inside": "main_menu.window",
+      "relative_to": "main_menu.window",
+      "relative_rect": {
+        "x": 35,
+        "y": 41,
+        "width": 225,
+        "height": 18
+      }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.multiplayer",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.options",
+      "visible": true,
+      "enabled": true,
+      "relative_to": "main_menu.window",
+      "relative_rect": {
+        "x": 35,
+        "y": 108,
+        "width": 225,
+        "height": 18
+      }
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.exit",
+      "visible": true,
+      "enabled": true,
+      "relative_to": "main_menu.window",
+      "relative_rect": {
+        "x": 35,
+        "y": 162,
+        "width": 225,
+        "height": 18
+      }
+    },
+    {
+      "op": "click",
+      "target": "main_menu.singleplayer"
+    },
+    {
+      "op": "assert_region",
+      "target": "main_menu.singleplayer.window",
+      "visible": true,
+      "inside_viewport": true,
+      "min_width": 273,
+      "min_height": 235
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.interface_tutorial",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.interface_tutorial"
+    },
+    {
+      "op": "assert_region",
+      "target": "main_menu.tutorial.window",
+      "visible": true,
+      "inside_viewport": true,
+      "min_width": 400,
+      "min_height": 160
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.1",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.previous",
+      "visible": true,
+      "enabled": false
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.2",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.3",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.4",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.previous"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.3",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.4",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.5",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.6",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.7",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.8",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.9",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.10",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.11",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.12",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.13",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.14",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.15",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.16",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.17",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.18",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.19",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.20",
+      "visible": true
+    },
+    {
+      "op": "assert_region",
+      "target": "main_menu.tutorial.window",
+      "visible": true,
+      "inside_viewport": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.21",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.interface.22",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.next",
+      "visible": true,
+      "enabled": true,
+      "label": "FINISH"
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert_region",
+      "target": "main_menu.singleplayer.window",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.military_tutorial",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.military_tutorial"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.military.1",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.next"
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.tutorial.step.military.2",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.tutorial.close"
+    },
+    {
+      "op": "assert_region",
+      "target": "main_menu.singleplayer.window",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.scenario",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.custom_game",
+      "visible": true,
+      "enabled": false
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.load_game",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "click",
+      "target": "main_menu.singleplayer.back"
+    },
+    {
+      "op": "click",
+      "target": "main_menu.multiplayer"
+    },
+    {
+      "op": "assert_region",
+      "target": "main_menu.multiplayer.window",
+      "visible": true,
+      "inside_viewport": true,
+      "min_width": 273,
+      "min_height": 139
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.multiplayer.internet",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.multiplayer.lan",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "assert",
+      "target": "main_menu.multiplayer.back",
+      "visible": true,
+      "enabled": true,
+      "inside": "main_menu.multiplayer.window",
+      "relative_to": "main_menu.multiplayer.window",
+      "relative_rect": {
+        "x": 35,
+        "y": 105,
+        "width": 225,
+        "height": 18
+      }
+    },
+    {
+      "op": "click",
+      "target": "main_menu.multiplayer.internet"
+    },
+    {
+      "op": "assert_region",
+      "target": "multiplayer.join.window",
+      "visible": true,
+      "inside_viewport": true,
+      "min_width": 566,
+      "min_height": 454
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.join.empty_state",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.join.host",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.join.connect",
+      "visible": true,
+      "enabled": false
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.join.server_info",
+      "visible": true,
+      "enabled": false
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.join.load_game",
+      "visible": true,
+      "enabled": true
+    },
+    {
+      "op": "click",
+      "target": "multiplayer.join.cancel"
+    },
+    {
+      "op": "click",
+      "target": "main_menu.multiplayer.lan"
+    },
+    {
+      "op": "assert_region",
+      "target": "multiplayer.join.window",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "multiplayer.join.update",
+      "visible": true,
+      "enabled": false,
+      "relative_to": "multiplayer.join.window",
+      "relative_rect": {
+        "x": 29,
+        "y": 409,
+        "width": 116,
+        "height": 18
+      }
+    },
+    {
+      "op": "click",
+      "target": "multiplayer.join.cancel"
+    },
+    {
+      "op": "click",
+      "target": "main_menu.multiplayer.back"
+    },
+    {
+      "op": "assert_region",
+      "target": "main_menu.window",
+      "visible": true
+    }
+  ]
+}

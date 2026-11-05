@@ -1,0 +1,29 @@
+{
+  "fixture": "tests/ui/fixtures/reference-covert-cell.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "covert_ops.open_cell_creation"
+    },
+    {
+      "op": "input",
+      "target": "covert.cell_creation.name",
+      "value": "   "
+    },
+    {
+      "op": "assert",
+      "target": "covert.cell_creation.submit",
+      "enabled": false
+    },
+    {
+      "op": "assert_region",
+      "target": "covert.cell_creation.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionCreateCovertCell",
+      "count": 0
+    }
+  ]
+}

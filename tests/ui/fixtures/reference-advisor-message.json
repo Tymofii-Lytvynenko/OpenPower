@@ -1,0 +1,15 @@
+{
+  "tables": {
+    "messages": [
+      {
+        "id": "advisor-budget",
+        "country_id": "UKR",
+        "category": "advisor",
+        "subject": "Budget outlook",
+        "body": "Debt servicing is consuming a rising share of revenue.",
+        "is_read": false,
+        "created_at": "2001-01-02 00:00"
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "tables": {
+    "countries": [
+      {"id": "UKR", "name": "Ukraine", "gdp": 180000000.0},
+      {"id": "POL", "name": "Poland", "gdp": 95000000.0}
+    ],
+    "countries_treaties": [
+      {"id": "test-alliance", "name": "Test Alliance", "type": "military_alliance", "members": ["UKR", "POL"], "status": "active"}
+    ],
+    "countries_relations": [
+      {"source": "UKR", "target": "POL", "value": 42.0}
+    ]
+  },
+  "globals": {"ui_map_mode": "empire"}
+}

@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "op": "key",
+      "key": "d"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_reserves.panel",
+      "visible": true
+    },
+    {
+      "op": "key",
+      "key": "d"
+    },
+    {
+      "op": "assert_region",
+      "target": "unit_reserves.panel",
+      "visible": false,
+      "present": false
+    }
+  ]
+}

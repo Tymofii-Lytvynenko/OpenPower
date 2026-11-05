@@ -1,0 +1,85 @@
+{
+  "fixture": "tests/ui/fixtures/reference-advisor-recommendations.json",
+  "steps": [
+    {"op": "key", "key": "f5"},
+    {
+      "op": "assert_region",
+      "target": "objectives.panel",
+      "visible": true,
+      "rect": {"width": 354, "height": 336},
+      "tolerance": 0.5,
+      "inside_viewport": true,
+      "no_overlap": "hud.central_bar"
+    },
+    {"op": "assert", "target": "objectives.tab.description", "visible": true, "enabled": true},
+    {"op": "assert_region", "target": "objectives.description.page/objectives.description.page", "visible": true},
+    {"op": "click", "target": "objectives.tab.goals"},
+    {"op": "assert", "target": "objectives.goals.label", "visible": true},
+    {"op": "assert_region", "target": "objectives.goals.list/objectives.goals.list", "visible": true},
+    {"op": "assert", "target": "objectives.goals.time_remaining", "visible": true},
+    {"op": "assert", "target": "objectives.goal.title.advisor-review-objective-active", "visible": true},
+    {"op": "assert", "target": "objectives.goal.completed.advisor-review-objective-complete", "visible": true, "enabled": false},
+    {"op": "click", "target": "objectives.tab.tips"},
+    {"op": "assert_region", "target": "objectives.tips.page/objectives.tips.page", "visible": true},
+    {"op": "assert", "target": "objectives.tips.unavailable", "visible": true},
+    {"op": "assert", "target": "objectives.recommendation.review.advisor:ai:UKR:budget-review", "visible": true, "enabled": true},
+    {"op": "click", "target": "objectives.recommendation.review.advisor:ai:UKR:budget-review"},
+    {
+      "op": "assert_region",
+      "target": "advisor.recommendation.window",
+      "visible": true,
+      "rect": {"width": 319, "height": 294},
+      "tolerance": 0.5,
+      "inside_viewport": true,
+      "no_overlap": "objectives.panel"
+    },
+    {"op": "assert", "target": "advisor.recommendation.problem.advisor:ai:UKR:budget-review", "visible": true},
+    {"op": "assert", "target": "advisor.recommendation.action.advisor:ai:UKR:budget-review", "visible": true},
+    {"op": "assert", "target": "advisor.recommendation.target.advisor:ai:UKR:budget-review", "visible": true},
+    {"op": "assert", "target": "advisor.recommendation.result.advisor:ai:UKR:budget-review", "visible": true},
+    {"op": "hover", "target": "advisor.recommendation.execute.advisor:ai:UKR:budget-review"},
+    {"op": "click", "target": "advisor.recommendation.execute.advisor:ai:UKR:budget-review"},
+    {
+      "op": "assert_action",
+      "type": "ActionResolveAdvisorRecommendation",
+      "count": 1,
+      "index": 0,
+      "fields": {
+        "player_id": "ui-test-player",
+        "recommendation_id": "advisor:ai:UKR:budget-review",
+        "accept": true
+      }
+    },
+    {"op": "assert", "target": "advisor.recommendation.problem.advisor:ai:UKR:budget-review-decline", "visible": true},
+    {"op": "close_window", "target": "advisor.recommendation.window"},
+    {"op": "assert_region", "target": "advisor.recommendation.window", "visible": false},
+    {
+      "op": "assert_action",
+      "type": "ActionResolveAdvisorRecommendation",
+      "count": 2,
+      "index": 1,
+      "fields": {
+        "player_id": "ui-test-player",
+        "recommendation_id": "advisor:ai:UKR:budget-review-decline",
+        "accept": false
+      }
+    },
+    {"op": "assert", "target": "objectives.recommendation.review.advisor:ai:UKR:budget-review-decline", "visible": true},
+    {"op": "click", "target": "objectives.recommendation.read.advisor:campaign:data-review"},
+    {"op": "assert_region", "target": "generic_message.dialog", "visible": true},
+    {"op": "assert", "target": "generic_message.content", "visible": true, "no_overlap": "generic_message.ok"},
+    {"op": "click", "target": "generic_message.ok"},
+    {"op": "assert_region", "target": "generic_message.dialog", "visible": false},
+    {
+      "op": "assert_action",
+      "type": "ActionResolveAdvisorRecommendation",
+      "count": 3,
+      "index": 2,
+      "fields": {
+        "player_id": "ui-test-player",
+        "recommendation_id": "advisor:campaign:data-review",
+        "accept": false
+      }
+    }
+  ]
+}

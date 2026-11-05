@@ -1,0 +1,28 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-map-unit-composition.json",
+      "surface": "map-information"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-map-region-control.json",
+      "surface": "map-information"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-military-battle.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-generic-message.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-mail-context.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-live-combat-mail.json",
+      "surface": "game-hud"
+    }
+  ]
+}

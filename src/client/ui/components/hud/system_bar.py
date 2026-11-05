@@ -1,70 +1,160 @@
+"""REFERENCE system shortcuts rendered in their source GML coordinate slots."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable
-
-from imgui_bundle import icons_fontawesome_6
 from src.client.ui.core.instrumented_imgui import imgui
-from src.client.ui.core.testability import record_last_item
-
-
-@dataclass(frozen=True, slots=True)
-class SystemBarAction:
-    id: str
-    icon: str
-    tooltip: str
-    callback: Callable[[], None]
-    shortcut: str = ""
-    badge: int | None = None
+from src.client.ui.core.theme import GAMETHEME
+from src.client.ui.core.gml_widgets import GMLWidgets
+from src.client.ui.components.shared.gml_slide_transition import GMLSlideTransition
+from src.client.ui.layouts.gml_layout import (
+    create_gml_layout_session,
+    get_gml_layout,
+    gml_style,
+    use_gml_layout,
+)
 
 
 class SystemBar:
+    """Right-anchored 577x38 REFERENCE shortcut bar with its source collapse control."""
+
+    _TEMPLATE = "System_Bar_Window"
+    _COLLAPSED_WIDTH = 36.0
+
     def __init__(
         self,
         open_help_cb=None,
         open_objectives_cb=None,
         open_console_cb=None,
-        open_mail_cb=None,
-        open_news_cb=None,
-        open_settings_cb=None,
         open_history_cb=None,
-    ):
+        open_menu_cb=None,
+        open_save_cb=None,
+        open_load_cb=None,
+    ) -> None:
         self._open_help_cb = open_help_cb
         self._open_objectives_cb = open_objectives_cb
         self._open_console_cb = open_console_cb
-        self._open_mail_cb = open_mail_cb
-        self._open_news_cb = open_news_cb
-        self._open_settings_cb = open_settings_cb
         self._open_history_cb = open_history_cb
+        self._open_menu_cb = open_menu_cb
+        self._open_save_cb = open_save_cb
+        self._open_load_cb = open_load_cb
+        self._expanded = True
+        self._slide = GMLSlideTransition()
+        self._slide_initialized = False
+        self._expanded_width = 0.0
+        self._collapsed_width = self._COLLAPSED_WIDTH
 
-    def render(self, net_client, nav_service, hud_summary):
+    def render(self, net_client, nav_service, hud_summary=None):
         self._consume_shortcuts(net_client, nav_service)
 
         viewport = imgui.get_main_viewport()
-        pad_x, pad_y = 10.0, 10.0
+        source_layout = get_gml_layout(self._TEMPLATE)
+        self._expanded_width = min(float(source_layout.width), float(viewport.size.x))
+        self._collapsed_width = min(self._COLLAPSED_WIDTH, self._expanded_width)
+        now = float(imgui.get_time())
+        if not self._slide_initialized:
+            self._slide.snap(self._expanded_width)
+            self._slide_initialized = True
+        else:
+            self._slide.advance(now)
+            if not self._slide.active:
+                target = self._expanded_width if self._expanded else self._collapsed_width
+                self._slide.snap(target)
 
-        imgui.set_next_window_pos(
-            imgui.ImVec2(viewport.size.x - pad_x, pad_y),
-            imgui.Cond_.always,
-            imgui.ImVec2(1.0, 0.0),
-        )
+        visible_width = self._slide.value
+        x = float(viewport.pos.x + viewport.size.x - visible_width)
+        y = float(viewport.pos.y)
+        imgui.set_next_window_pos((x, y), imgui.Cond_.always)
+        imgui.set_next_window_size((visible_width, float(source_layout.height)), imgui.Cond_.always)
 
         flags = (
             imgui.WindowFlags_.no_decoration
             | imgui.WindowFlags_.no_move
-            | imgui.WindowFlags_.always_auto_resize
+            | imgui.WindowFlags_.no_saved_settings
+            | imgui.WindowFlags_.no_scroll_with_mouse
             | imgui.WindowFlags_.no_background
         )
 
-        if imgui.begin("##System_Bar", True, flags):
-            self._render_actions(self._build_actions(net_client, nav_service, hud_summary))
-            imgui.end()
+        with gml_style():
+            imgui.push_style_var(imgui.StyleVar_.window_padding, (0.0, 0.0))
+            opened, _ = imgui.begin("System_Bar", None, flags, test_id="hud.system_bar")
+            imgui.pop_style_var()
+            try:
+                if not opened:
+                    return
+                position = imgui.get_window_pos()
+                session = create_gml_layout_session(
+                    self._TEMPLATE,
+                    (float(position.x), float(position.y)),
+                    (float(source_layout.width), float(source_layout.height)),
+                )
+                with use_gml_layout(session):
+                    ui = GMLWidgets(self._TEMPLATE)
+                    ui.frame("")
+                    if self._render_toggle(ui):
+                        return
+                    if self._expanded or self._slide.active:
+                        self._render_shortcuts(ui, net_client, nav_service)
+            finally:
+                imgui.end()
+
+    def _render_toggle(self, ui: GMLWidgets) -> bool:
+        changed, self._expanded = ui.toggle(
+            "togMain",
+            self._expanded,
+            "hud.system.toggle",
+            icon="‹" if self._expanded else "›",
+            color=GAMETHEME.colors.accent,
+            tooltip="Collapse system shortcuts" if self._expanded else "Expand system shortcuts",
+        )
+        if changed:
+            target = self._expanded_width if self._expanded else self._collapsed_width
+            self._slide.begin(target, float(imgui.get_time()))
+        return changed
+
+    def _render_shortcuts(self, ui: GMLWidgets, net_client, nav_service) -> None:
+        shortcuts = (
+            ("btnF1", "txtF1", "F1", "Help", "help", self._open_help_cb, True,
+             "Open help"),
+            # OpenPower has no multiplayer lobby route, so this source slot is explicitly unavailable.
+            ("btnF2", "txtF2", "F2", "Chat", "chat", None, False,
+             "Multiplayer lobby chat is unavailable in OpenPower"),
+            ("btnF3", "txtF3", "F3", "Save", "save", lambda: self._show_save(net_client), True,
+             "Save game"),
+            ("btnF4", "txtF4", "F4", "Load", "load", lambda: self._show_load(nav_service, net_client), True,
+             "Load saved game"),
+            ("btnF5", "txtF5", "F5", "Objectives", "objectives", self._open_objectives_cb, True,
+             "Scenario objectives"),
+            ("btnF10", "txtF10", "F10", "Menu", "menu", lambda: self._toggle_menu(nav_service, net_client), True,
+             "Main menu"),
+        )
+        style = imgui.get_style()
+        font_scale = max(0.1, float(style.font_scale_main) * float(style.font_scale_dpi))
+        for button_slot, label_slot, key, label, action_id, callback, enabled, tooltip in shortcuts:
+            if ui.button(
+                button_slot,
+                key,
+                f"hud.system.{action_id}",
+                enabled=enabled,
+                dynamic_enabled=True,
+                tooltip=tooltip,
+            ):
+                self._safe_call(callback)
+            # The source's 57 px captions use a 9 pt font; OpenPower's wider UI font needs a smaller logical size.
+            imgui.push_font(None, 10.0 / font_scale)
+            try:
+                ui.text(
+                    label_slot,
+                    label,
+                    color=GAMETHEME.colors.text_main if enabled else GAMETHEME.colors.text_dim,
+                    test_id=f"hud.system.{action_id}.label",
+                )
+            finally:
+                imgui.pop_font()
 
     def _consume_shortcuts(self, net_client, nav_service) -> None:
         if imgui.is_key_pressed(imgui.Key.f1, False):
             self._safe_call(self._open_help_cb)
         if imgui.is_key_pressed(imgui.Key.f3, False):
-            net_client.request_save()
+            self._show_save(net_client)
         if imgui.is_key_pressed(imgui.Key.f4, False):
             self._show_load(nav_service, net_client)
         if imgui.is_key_pressed(imgui.Key.f5, False):
@@ -74,114 +164,29 @@ class SystemBar:
         if imgui.is_key_pressed(imgui.Key.f9, False):
             self._safe_call(self._open_console_cb)
         if imgui.is_key_pressed(imgui.Key.f10, False):
+            self._toggle_menu(nav_service, net_client)
+
+    def _toggle_menu(self, nav_service, net_client) -> None:
+        if self._open_menu_cb is not None:
+            self._open_menu_cb()
+        else:
             self._show_menu(nav_service, net_client)
 
-    def _build_actions(self, net_client, nav_service, hud_summary) -> list[SystemBarAction]:
-        return [
-            SystemBarAction(
-                id="help",
-                icon=icons_fontawesome_6.ICON_FA_CIRCLE_QUESTION,
-                tooltip="Help",
-                shortcut="F1",
-                callback=lambda: self._safe_call(self._open_help_cb),
-            ),
-            SystemBarAction(
-                id="save",
-                icon=icons_fontawesome_6.ICON_FA_FLOPPY_DISK,
-                tooltip="Save",
-                shortcut="F3",
-                callback=lambda: net_client.request_save(),
-            ),
-            SystemBarAction(
-                id="load",
-                icon=icons_fontawesome_6.ICON_FA_FOLDER_OPEN,
-                tooltip="Load",
-                shortcut="F4",
-                callback=lambda: self._show_load(nav_service, net_client),
-            ),
-            SystemBarAction(
-                id="objectives",
-                icon=icons_fontawesome_6.ICON_FA_BULLSEYE,
-                tooltip="Objectives",
-                shortcut="F5",
-                callback=lambda: self._safe_call(self._open_objectives_cb),
-                badge=hud_summary.active_objectives,
-            ),
-            SystemBarAction(
-                id="mail",
-                icon=icons_fontawesome_6.ICON_FA_ENVELOPE,
-                tooltip="Mail",
-                callback=lambda: self._safe_call(self._open_mail_cb),
-                badge=hud_summary.unread_messages,
-            ),
-            SystemBarAction(
-                id="news",
-                icon=icons_fontawesome_6.ICON_FA_NEWSPAPER,
-                tooltip="Event feed",
-                callback=lambda: self._safe_call(self._open_news_cb),
-                badge=hud_summary.unread_news,
-            ),
-            SystemBarAction(
-                id="history",
-                icon=icons_fontawesome_6.ICON_FA_CHART_LINE,
-                tooltip="History & analytics",
-                shortcut="F6",
-                callback=lambda: self._safe_call(self._open_history_cb),
-            ),
-            SystemBarAction(
-                id="console",
-                icon=icons_fontawesome_6.ICON_FA_TERMINAL,
-                tooltip="Console",
-                shortcut="F9",
-                callback=lambda: self._safe_call(self._open_console_cb),
-            ),
-            SystemBarAction(
-                id="settings",
-                icon=icons_fontawesome_6.ICON_FA_GEAR,
-                tooltip="Settings",
-                callback=lambda: self._safe_call(self._open_settings_cb),
-            ),
-            SystemBarAction(
-                id="menu",
-                icon=icons_fontawesome_6.ICON_FA_HOUSE,
-                tooltip="Main menu",
-                shortcut="F10",
-                callback=lambda: self._show_menu(nav_service, net_client),
-            ),
-        ]
-
-    def _render_actions(self, actions: list[SystemBarAction]) -> None:
-        for index, action in enumerate(actions):
-            if index > 0:
-                imgui.same_line()
-
-            label = self._button_label(action)
-            clicked = imgui.button(label, (self._button_width(action), 30))
-            record_last_item(f"hud.system.{action.id}", action.tooltip, "button")
-            if clicked:
-                action.callback()
-
-            if imgui.is_item_hovered():
-                tooltip = action.tooltip
-                if action.shortcut:
-                    tooltip = f"{tooltip} ({action.shortcut})"
-                imgui.set_tooltip(tooltip)
-
-    def _button_label(self, action: SystemBarAction) -> str:
-        badge = "" if not action.badge else f" {action.badge}"
-        return f"{action.icon}{badge}##{action.id}"
-
-    def _button_width(self, action: SystemBarAction) -> float:
-        if not action.badge:
-            return 34.0
-        return 42.0 + (8.0 * max(0, len(str(action.badge)) - 1))
-
     def _show_load(self, nav_service, net_client) -> None:
+        if self._open_load_cb is not None:
+            self._open_load_cb()
+            return
         session, config = self._resolve_session_and_config(nav_service, net_client)
         if session is None or config is None:
             return
 
         nav_service.show_load_game_screen(config)
+
+    def _show_save(self, net_client) -> None:
+        if self._open_save_cb is not None:
+            self._open_save_cb()
+        else:
+            net_client.request_save()
 
     def _show_menu(self, nav_service, net_client) -> None:
         session, config = self._resolve_session_and_config(nav_service, net_client)

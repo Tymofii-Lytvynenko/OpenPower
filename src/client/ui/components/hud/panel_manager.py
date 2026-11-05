@@ -81,12 +81,18 @@ class PanelManager:
     def toggle(self, pid: str) -> None:
         entry = self._panels.get(pid)
         if entry is not None:
-            entry.visible = not entry.visible
+            self.set_visible(pid, not entry.visible)
 
     def set_visible(self, pid: str, is_visible: bool) -> None:
         entry = self._panels.get(pid)
         if entry is not None:
-            entry.visible = is_visible
+            close_request = getattr(entry.instance, "request_close", None)
+            if entry.visible and not is_visible and callable(close_request):
+                # Hiding used to bypass dirty-close handling entirely. Keep the
+                # panel rendering until it resolves the request through its own UI.
+                close_request()
+            else:
+                entry.visible = is_visible
 
     def is_visible(self, pid: str) -> bool:
         entry = self._panels.get(pid)

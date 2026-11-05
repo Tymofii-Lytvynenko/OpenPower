@@ -1,0 +1,8 @@
+{
+  "steps": [
+    { "op": "assert_region", "target": "main_menu.window", "visible": true },
+    { "op": "click", "target": "main_menu.options" },
+    { "op": "assert_region", "target": "main_menu.options_screen", "visible": true },
+    { "op": "assert", "target": "main_menu.back", "visible": true }
+  ]
+}

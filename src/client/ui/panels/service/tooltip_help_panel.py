@@ -8,8 +8,12 @@ from src.client.ui.panels.shared.panel_widgets import draw_key_value_rows
 
 
 class TooltipHelpPanel:
+    def __init__(self, open_tutorial_cb=None) -> None:
+        self._open_tutorial_cb = open_tutorial_cb
+
     def render(self, state, context: PanelRenderContext) -> bool:
-        with WindowManager.window("TOOLTIP HELP", x=840, y=120, w=420, h=360) as is_open:
+        with WindowManager.window("TOOLTIP HELP", x=840, y=120, w=420, h=360,
+                                  test_id="help.panel") as is_open:
             if not is_open:
                 return False
             self._render_content()
@@ -33,3 +37,22 @@ class TooltipHelpPanel:
             ),
             dim_labels=False,
         )
+        imgui.separator()
+        imgui.text("Guided tours")
+        imgui.begin_disabled(self._open_tutorial_cb is None)
+        try:
+            if imgui.button(
+                "INTERFACE",
+                (176.0, 26.0),
+                test_id="help.tutorial.interface",
+            ):
+                self._open_tutorial_cb("interface")
+            imgui.same_line()
+            if imgui.button(
+                "MILITARY",
+                (176.0, 26.0),
+                test_id="help.tutorial.military",
+            ):
+                self._open_tutorial_cb("military")
+        finally:
+            imgui.end_disabled()

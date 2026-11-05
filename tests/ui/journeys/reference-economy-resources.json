@@ -1,0 +1,27 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.panel.eco"
+    },
+    {
+      "op": "assert_region",
+      "target": "economy.panel",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "economy.resources_btn"
+    },
+    {
+      "op": "assert_region",
+      "target": "resources.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "resources.market.unavailable",
+      "label": "Resource market data is unavailable."
+    }
+  ]
+}

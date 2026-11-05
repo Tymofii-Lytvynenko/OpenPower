@@ -1,0 +1,10 @@
+{
+  "tables": {
+    "country_governments": [
+      {
+        "country_id": "UKR",
+        "government_type": "Anarchy"
+      }
+    ]
+  }
+}

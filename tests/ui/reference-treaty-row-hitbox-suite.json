@@ -1,0 +1,28 @@
+{
+  "results": [
+    {
+      "journey": "tests/ui/journeys/reference-politics-treaties.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-politics-treaty-details.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-politics-create-treaty.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-eligible-grid.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-ineligible-rejection.json",
+      "surface": "game-hud"
+    },
+    {
+      "journey": "tests/ui/journeys/reference-treaty-remove-ineligible.json",
+      "surface": "game-hud"
+    }
+  ]
+}

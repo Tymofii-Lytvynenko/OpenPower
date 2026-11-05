@@ -1,0 +1,69 @@
+{
+  "fixture": "tests/ui/fixtures/reference-battle-inspection-many-countries.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "battle.map.marker.battle-observer"
+    },
+    {
+      "op": "assert_region",
+      "target": "battle.info.dialog",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.countries.A.0",
+      "label": "DEU",
+      "visible": true,
+      "inside": "battle.info.country_list.A/gml:Battle_Info_Window/frmInner/frmInner/frmBattleInfo/lstCountriesA",
+      "relative_rect": {
+        "x": 25,
+        "y": 2
+      },
+      "relative_to": "battle.info.country_list.A/gml:Battle_Info_Window/frmInner/frmInner/frmBattleInfo/lstCountriesA"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.countries.A.1",
+      "label": "CZE",
+      "visible": true,
+      "inside": "battle.info.country_list.A/gml:Battle_Info_Window/frmInner/frmInner/frmBattleInfo/lstCountriesA",
+      "relative_rect": {
+        "y": 18
+      },
+      "relative_to": "battle.info.country_list.A/gml:Battle_Info_Window/frmInner/frmInner/frmBattleInfo/lstCountriesA"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.countries.A.2",
+      "label": "ESP",
+      "visible": true,
+      "inside": "battle.info.country_list.A/gml:Battle_Info_Window/frmInner/frmInner/frmBattleInfo/lstCountriesA",
+      "relative_rect": {
+        "y": 34
+      },
+      "relative_to": "battle.info.country_list.A/gml:Battle_Info_Window/frmInner/frmInner/frmBattleInfo/lstCountriesA"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.countries.B.0",
+      "label": "POL",
+      "visible": true,
+      "inside": "battle.info.country_list.B/gml:Battle_Info_Window/frmInner/frmInner/frmBattleInfo/lstCountriesB"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.countries.B.1",
+      "label": "FRA",
+      "visible": true,
+      "inside": "battle.info.country_list.B/gml:Battle_Info_Window/frmInner/frmInner/frmBattleInfo/lstCountriesB"
+    },
+    {
+      "op": "assert",
+      "target": "battle.info.countries.B.2",
+      "label": "ITA",
+      "visible": true,
+      "inside": "battle.info.country_list.B/gml:Battle_Info_Window/frmInner/frmInner/frmBattleInfo/lstCountriesB"
+    }
+  ]
+}

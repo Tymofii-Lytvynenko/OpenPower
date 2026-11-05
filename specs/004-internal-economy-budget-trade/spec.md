@@ -46,6 +46,15 @@ As a national economic manager, I want an economic simulation featuring dynamic 
 - **Debt Interest Expense**:
   \[ \text{Expense}_{\text{interest}} = 0.05 \cdot |\text{MoneyReserves}| \quad (\text{if } \text{MoneyReserves} < 0) \]
 
+## Functional Requirements
+
+- **FR-001**: Resource demand MUST reflect the relative wealth of each country and the population eligible to consume each resource.
+- **FR-002**: The economic model MUST constrain raw demand to each country's consumption capacity while preserving the defined baseline demand for essential resources.
+- **FR-003**: The global market MUST resolve available supply and demand into bounded import and export quantities for each resource.
+- **FR-004**: Stockpiles MUST apply resource-specific storage and decay behavior; non-storable services MUST expire within the production period and apply the specified unsold-capacity penalty.
+- **FR-005**: Budget updates MUST account for tax and tourism revenue, military upkeep, debt interest, and the resulting change in national reserves.
+- **FR-006**: Repeated economic updates over the same ordered inputs MUST produce stable monetary totals without cumulative floating-point drift.
+
 ## Success Criteria
 
 - **SC-001**: Economic Realism: Dynamic consumption pooling restricts low-GDP countries from buying luxury goods while maintaining realistic basic food demand.

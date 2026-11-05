@@ -1,0 +1,22 @@
+{
+  "steps": [
+    {"op": "click", "target": "hud.advisor"},
+    {"op": "assert_region", "target": "advisor.settings.panel", "visible": true},
+    {"op": "click", "target": "advisor.settings.economy.manual"},
+    {"op": "assert", "target": "advisor.settings.apply", "enabled": true},
+    {"op": "click", "target": "advisor.settings.apply"},
+    {
+      "op": "assert_action",
+      "type": "ActionUpdateAdvisorSettings",
+      "count": 1,
+      "index": 0,
+      "fields": {
+        "country_tag": "UKR",
+        "economy_status": "confirmations",
+        "politics_status": "manual",
+        "military_status": "manual"
+      }
+    },
+    {"op": "assert", "target": "advisor.settings.apply", "enabled": false}
+  ]
+}

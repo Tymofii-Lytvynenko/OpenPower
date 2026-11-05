@@ -1,0 +1,31 @@
+{
+  "globals": {
+    "foreign_order_permissions": [["UKR", "POL"]]
+  },
+  "tables": {
+    "unit_designs": [
+      {
+        "id": "design-pol-tanks",
+        "country_id": "POL",
+        "branch": "land",
+        "display_name": "Polish Tanks",
+        "class_name": "tanks",
+        "cost": 5000.0,
+        "capabilities_json": "{}"
+      }
+    ],
+    "unit_market_listings": [
+      {
+        "id": "listing-pol-tanks",
+        "seller_country_id": "POL",
+        "design_id": "design-pol-tanks",
+        "unit_id": "pol-unit-tanks",
+        "quantity": 21,
+        "price": 5000.0,
+        "eligibility": "open",
+        "status": "listed",
+        "created_at_minute": 20
+      }
+    ]
+  }
+}

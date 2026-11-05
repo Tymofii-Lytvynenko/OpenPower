@@ -8,7 +8,7 @@ from typing import Any
 import polars as pl
 
 from modules.base.systems.world.ai.common import country_frame
-from modules.base.systems.military.covert_operations_system import MISSION_PROFILES
+from modules.base.systems.military.covert_mission_profiles import MISSION_PROFILES
 from modules.base.systems.military.covert_policy import skill_profile
 from src.core.ai_framework import AITableContext, empty_candidates
 from src.shared.actions import (

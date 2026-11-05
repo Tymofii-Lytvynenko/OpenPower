@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.relations"
+    },
+    {
+      "op": "assert_region",
+      "target": "relations.panel",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "relations.no_history",
+      "visible": true,
+      "label": "No relation history recorded."
+    }
+  ]
+}

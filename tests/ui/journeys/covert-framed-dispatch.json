@@ -1,0 +1,10 @@
+{
+  "fixture": "tests/ui/fixtures/covert-framed-result.json",
+  "steps": [
+    {"op": "click", "target": "hud.mail"},
+    {"op": "click", "target": "mail.dispatch.covert:mission-framed"},
+    {"op": "assert_region", "target": "covert.outcome.attacked", "visible": true},
+    {"op": "assert_absent", "target": "covert.outcome.attacked.outcome"},
+    {"op": "assert", "target": "covert.outcome.attacked.country", "label": "DEU"}
+  ]
+}
