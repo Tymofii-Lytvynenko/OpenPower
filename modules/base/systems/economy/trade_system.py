@@ -11,7 +11,7 @@ from src.shared.frames import ensure_sorted
 from src.shared.events import EventRealSecond
 from modules.base.systems.economy.treaty_trade_policy import TreatyTradePolicy
 from modules.base.systems.economy.market_clearing_kernel import calculate_unconstrained_market
-from modules.base.systems.economy.input_validation import validate_numeric_columns
+from modules.base.systems.economy.market_input_validator import MarketInputValidator
 from modules.base.systems.world.recognition_policy import regional_trade_access_allowed
 
 
@@ -69,6 +69,7 @@ class TradeSystem(ISystem):
         "_missing_columns": SYSTEM_STATE_CACHE,
         "_market_index_cache": SYSTEM_STATE_CACHE,
         "_treaty_trade_policy": SYSTEM_STATE_HELPER,
+        "_market_input_validator": SYSTEM_STATE_HELPER,
     }
 
     TRADE_PRIORITY_MATRIX = {
@@ -132,10 +133,13 @@ class TradeSystem(ISystem):
         "construction_materials": {"is_storable": True, "decay_rate": 0.05},
     }
 
-    def __init__(self):
+    def __init__(self, market_input_validator: MarketInputValidator | None = None):
         self._missing_columns = set()
         self._market_index_cache: _MarketIndexCache | None = None
         self._treaty_trade_policy = TreatyTradePolicy()
+        self._market_input_validator = (
+            market_input_validator if market_input_validator is not None else MarketInputValidator()
+        )
 
     @property
     def id(self) -> str:
@@ -160,33 +164,7 @@ class TradeSystem(ISystem):
             return
 
         # Invalid quantities otherwise contaminate global ratios and every country's closing stock.
-        validate_numeric_columns(
-            state.get_table("domestic_production"),
-            "domestic_production",
-            ("domestic_production", "tax_rate"),
-            nonnegative=("domestic_production", "tax_rate"),
-        )
-        resource_ledger = state.tables.get("resource_ledger")
-        if resource_ledger is not None:
-            validate_numeric_columns(
-                resource_ledger,
-                "resource_ledger",
-                ("consumption_usd",),
-                nonnegative=("consumption_usd",),
-            )
-        stockpiles = state.tables.get("stockpiles")
-        if stockpiles is not None:
-            validate_numeric_columns(
-                stockpiles,
-                "stockpiles",
-                ("stock_amount",),
-                nonnegative=("stock_amount",),
-            )
-        validate_numeric_columns(
-            state.get_table("countries"),
-            "countries",
-            ("economic_trade_modifier",),
-        )
+        self._market_input_validator.validate(state)
 
         countries = state.get_table("countries")
         countries_lf = countries.lazy()
