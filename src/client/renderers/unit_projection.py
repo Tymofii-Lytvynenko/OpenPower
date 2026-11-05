@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 
 from src.client.controllers.camera_controller import CameraController
-from src.core.map.geo import EquirectangularProjection, GeoCoordinate
+from src.core.map.geo import EquirectangularProjection
 from src.client.renderers.unit_projection_data import (
     PreparedUnitProjectionData,
     RegionAnchor,
@@ -373,144 +372,10 @@ class UnitProjectionService:
         result[safe] = result[safe] / lengths[safe, None]
         return result
 
-    def _project_unit(
-        self,
-        row: dict,
-        region_lookup: dict[int, RegionAnchor],
-        vp_matrix: np.ndarray,
-        model_matrix: np.ndarray,
-        camera_pos: np.ndarray,
-        window_width: int,
-        window_height: int,
-    ) -> Optional[ProjectedUnit]:
-        local_pos = self._unit_local_position(row, region_lookup)
-        if local_pos is None:
-            return None
-
-        world_pos4 = model_matrix @ np.array([local_pos[0], local_pos[1], local_pos[2], 1.0], dtype=np.float32)
-        world_pos = world_pos4[:3]
-        normal = self._safe_normalize(world_pos)
-
-        if float(np.dot(normal, camera_pos - world_pos)) <= -0.02:
-            return None
-
-        clip = vp_matrix @ world_pos4
-        if abs(float(clip[3])) < 1e-6:
-            return None
-
-        ndc = clip[:3] / clip[3]
-        if ndc[0] < -1.2 or ndc[0] > 1.2 or ndc[1] < -1.2 or ndc[1] > 1.2:
-            return None
-
-        screen_x = (float(ndc[0]) * 0.5 + 0.5) * window_width
-        screen_y = (float(ndc[1]) * 0.5 + 0.5) * window_height
-        width, height = self._billboard_size()
-
-        return ProjectedUnit(
-            unit_id=str(row.get("id", "")),
-            owner=str(row.get("owner", "")),
-            unit_type=str(row.get("unit_type", "")),
-            strength=int(row.get("strength", 1) or 1),
-            current_region_id=int(row.get("current_region_id", 0) or 0),
-            target_region_id=int(row.get("target_region_id", -1) or -1),
-            screen_x=screen_x,
-            screen_y=screen_y,
-            distance_to_camera=float(np.linalg.norm(camera_pos - world_pos)),
-            width=width,
-            height=height,
-            movement_progress=float(row.get("movement_progress", 0.0) or 0.0),
-            is_moving=bool(row.get("is_moving", False)),
-            readiness_status=str(row.get("readiness_status", "ready") or "ready").strip().lower(),
-            readiness_target=str(row.get("readiness_target", row.get("readiness_status", "ready")) or "ready").strip().lower(),
-            readiness_progress=float(row.get("readiness_progress", 0.0) or 0.0),
-            readiness_transition_id=str(row.get("readiness_transition_id", "") or ""),
-            readiness_eta_minute=int(row.get("readiness_eta_minute", 0) or 0),
-            readiness_remaining_minutes=max(
-                0,
-                int(row.get("readiness_eta_minute", 0) or 0)
-                - int(row.get("current_game_minute", 0) or 0),
-            ) if str(row.get("readiness_transition_id", "") or "") else 0,
-            readiness_remaining_label=self._format_remaining(
-                max(
-                    0,
-                    int(row.get("readiness_eta_minute", 0) or 0)
-                    - int(row.get("current_game_minute", 0) or 0),
-                )
-            ) if str(row.get("readiness_transition_id", "") or "") else "",
-            local_position=tuple(float(value) for value in local_pos),
-        )
-
-    def _unit_local_position(
-        self,
-        row: dict,
-        region_lookup: dict[int, RegionAnchor],
-    ) -> Optional[np.ndarray]:
-        current_region_id = int(row.get("current_region_id", 0) or 0)
-        source_region_id = int(row.get("source_region_id", current_region_id) or current_region_id)
-        target_region_id = int(row.get("target_region_id", -1) or -1)
-        progress = float(row.get("movement_progress", 0.0) or 0.0)
-
-        current_geo = self._row_geo(row, "latitude", "longitude")
-        source_geo = self._row_geo(row, "source_latitude", "source_longitude")
-        target_geo = self._row_geo(row, "target_latitude", "target_longitude")
-
-        source = source_geo or current_geo or self._anchor_geo(region_lookup, source_region_id, current_region_id)
-        if source is None:
-            return None
-
-        source_vec = self._geo_to_unit_vector(source)
-        if target_region_id <= 0 or progress <= 0.0:
-            return source_vec * self.surface_radius
-
-        target = target_geo or self._anchor_geo(region_lookup, target_region_id)
-        if target is None:
-            return source_vec * self.surface_radius
-
-        target_vec = self._geo_to_unit_vector(target)
-        return self._slerp(source_vec, target_vec, progress) * self.surface_radius
-
-    def _geo_to_unit_vector(self, geo: GeoCoordinate) -> np.ndarray:
-        return self._data_preparer.geography.to_unit_vector(geo)
-
     def _format_remaining(self, minutes: int) -> str:
         days, remainder = divmod(max(0, int(minutes)), 24 * 60)
         hours = remainder // 60
         return f"{days}d {hours}h" if days else f"{hours}h"
-
-    def _row_geo(self, row: dict, latitude_key: str, longitude_key: str) -> Optional[GeoCoordinate]:
-        return self._data_preparer.geography.row_geo(
-            row,
-            latitude_key,
-            longitude_key,
-        )
-
-    def _anchor_geo(
-        self,
-        region_lookup: dict[int, RegionAnchor],
-        primary_region_id: int,
-        fallback_region_id: Optional[int] = None,
-    ) -> Optional[GeoCoordinate]:
-        return self._data_preparer.geography.anchor_geo(
-            region_lookup,
-            primary_region_id,
-            fallback_region_id,
-        )
-
-    def _slerp(self, start: np.ndarray, end: np.ndarray, progress: float) -> np.ndarray:
-        t = max(0.0, min(1.0, progress))
-        dot = float(np.clip(np.dot(start, end), -1.0, 1.0))
-
-        if dot > 0.9995:
-            return self._safe_normalize(start + (end - start) * t)
-
-        theta = float(np.arccos(dot))
-        sin_theta = float(np.sin(theta))
-        if sin_theta <= 1e-6:
-            return start
-
-        a = float(np.sin((1.0 - t) * theta) / sin_theta)
-        b = float(np.sin(t * theta) / sin_theta)
-        return self._safe_normalize((start * a) + (end * b))
 
     def _safe_normalize(self, value: np.ndarray) -> np.ndarray:
         length = float(np.linalg.norm(value))

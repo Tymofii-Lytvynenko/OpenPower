@@ -243,10 +243,6 @@ class UnitProjectionDataPreparer:
             UnitReadinessResolver(),
         )
 
-    @property
-    def geography(self) -> UnitGeographyResolver:
-        return self._geography
-
     def prepare(
         self,
         unit_rows: list[dict],
