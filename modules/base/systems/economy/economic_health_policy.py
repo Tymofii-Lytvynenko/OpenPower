@@ -491,6 +491,120 @@ class DeterministicDebtContractRequestPlanner:
 
 
 @dataclass(frozen=True)
+class DebtRestructuringInputs:
+    contract: Mapping[str, Any]
+    payment_frequency_months: Any
+    maturity_months: Any
+    annual_interest_rate: Any
+    principal_installment: Any
+    maximum_rate: float
+
+
+@dataclass(frozen=True)
+class _NormalizedDebtRestructuringTerms:
+    frequency: int
+    maturity: int
+    rate: float
+    installment: float
+    maximum_rate: float
+
+
+@dataclass(frozen=True)
+class DebtRestructuringPlan:
+    contract: dict[str, Any] | None
+    old_service: float
+    new_service: float
+    rejection_reason: str | None
+
+
+class DebtRestructuringPlanner(Protocol):
+    def plan(self, inputs: DebtRestructuringInputs) -> DebtRestructuringPlan: ...
+
+
+class DeterministicDebtRestructuringPlanner:
+    """Plan revised debt terms without accessing or mutating simulation state."""
+
+    _ELIGIBLE_STATUSES = frozenset({"current", "arrears", "restructured"})
+    _RESTRUCTURED_REASON = (
+        "Terms were revised by an authorized restructuring request; "
+        "outstanding principal and arrears remain due."
+    )
+
+    def plan(self, inputs: DebtRestructuringInputs) -> DebtRestructuringPlan:
+        contract = inputs.contract
+        terms = self._normalize(inputs)
+        if contract["status"] not in self._ELIGIBLE_STATUSES:
+            return self._rejected("Contract is not eligible for restructuring.")
+        if self._terms_already_active(contract, terms):
+            return self._rejected("The requested restructuring terms are already active.")
+        if self._outside_scenario_bounds(terms):
+            return self._rejected("Restructured terms are outside scenario bounds.")
+
+        previous_service = calculate_annualized_debt_service(contract)
+        restructured_contract = dict(contract)
+        restructured_contract["annual_interest_rate"] = terms.rate
+        restructured_contract["payment_frequency_months"] = terms.frequency
+        restructured_contract["principal_payment"] = min(
+            _finite(contract.get("principal_remaining")),
+            terms.installment,
+        )
+        restructured_contract["maturity_months"] = terms.maturity
+        restructured_contract["status"] = "restructured"
+        restructured_contract["reason"] = self._RESTRUCTURED_REASON
+        return DebtRestructuringPlan(
+            contract=restructured_contract,
+            old_service=previous_service,
+            new_service=calculate_annualized_debt_service(restructured_contract),
+            rejection_reason=None,
+        )
+
+    @staticmethod
+    def _normalize(inputs: DebtRestructuringInputs) -> _NormalizedDebtRestructuringTerms:
+        return _NormalizedDebtRestructuringTerms(
+            frequency=int(_finite(inputs.payment_frequency_months, 0.0)),
+            maturity=int(_finite(inputs.maturity_months, 0.0)),
+            rate=_finite(inputs.annual_interest_rate, math.nan),
+            installment=_finite(inputs.principal_installment, math.nan),
+            maximum_rate=inputs.maximum_rate,
+        )
+
+    @staticmethod
+    def _terms_already_active(
+        contract: Mapping[str, Any],
+        terms: _NormalizedDebtRestructuringTerms,
+    ) -> bool:
+        if contract["status"] != "restructured":
+            return False
+        if int(contract.get("payment_frequency_months") or 0) != terms.frequency:
+            return False
+        if int(contract.get("maturity_months") or 0) != terms.maturity:
+            return False
+        if not abs(_finite(contract.get("annual_interest_rate")) - terms.rate) < 1e-9:
+            return False
+        return abs(_finite(contract.get("principal_payment")) - terms.installment) < 1e-9
+
+    @staticmethod
+    def _outside_scenario_bounds(terms: _NormalizedDebtRestructuringTerms) -> bool:
+        return any((
+            terms.frequency < 1 or terms.frequency > 120,
+            terms.maturity < terms.frequency or terms.maturity > 1_200,
+            not math.isfinite(terms.rate),
+            terms.rate < 0.0 or terms.rate > terms.maximum_rate,
+            not math.isfinite(terms.installment),
+            terms.installment < 0.0,
+        ))
+
+    @staticmethod
+    def _rejected(reason: str) -> DebtRestructuringPlan:
+        return DebtRestructuringPlan(
+            contract=None,
+            old_service=0.0,
+            new_service=0.0,
+            rejection_reason=reason,
+        )
+
+
+@dataclass(frozen=True)
 class DebtServiceSettlementInputs:
     contract: Mapping[str, Any]
     due_at_minute: int

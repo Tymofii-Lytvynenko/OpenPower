@@ -13,10 +13,14 @@ import polars as pl
 from modules.base.systems.economy.economic_health_policy import (
     DebtContractRequestInputs,
     DebtContractRequestPlanner,
+    DebtRestructuringInputs,
+    DebtRestructuringPlan,
+    DebtRestructuringPlanner,
     DebtServiceSettlement,
     DebtServiceSettlementCalculator,
     DebtServiceSettlementInputs,
     DeterministicDebtContractRequestPlanner,
+    DeterministicDebtRestructuringPlanner,
     DeterministicDebtServiceSettlementCalculator,
     DeterministicEconomicPolicyChangeValidator,
     DeterministicEconomicProfileCalculator,
@@ -92,6 +96,7 @@ class EconomicHealthSystem(ISystem):
         debt_service_calculator: DebtServiceSettlementCalculator | None = None,
         policy_change_validator: EconomicPolicyChangeValidator | None = None,
         debt_contract_request_planner: DebtContractRequestPlanner | None = None,
+        debt_restructuring_planner: DebtRestructuringPlanner | None = None,
     ) -> None:
         self._profile_calculator = (
             profile_calculator
@@ -112,6 +117,11 @@ class EconomicHealthSystem(ISystem):
             debt_contract_request_planner
             if debt_contract_request_planner is not None
             else DeterministicDebtContractRequestPlanner()
+        )
+        self._debt_restructuring_planner = (
+            debt_restructuring_planner
+            if debt_restructuring_planner is not None
+            else DeterministicDebtRestructuringPlanner()
         )
 
     @property
@@ -513,40 +523,75 @@ class EconomicHealthSystem(ISystem):
         if str(action.country_tag) != debtor_id or not player_controls_country(state, action.player_id, debtor_id):
             self._reject(state, debtor_id, str(contract["id"]), "debt_restructuring", self._number(contract.get("arrears_amount")), "Actor is not authorized for this debtor.", now)
             return
-        frequency = int(self._number(action.payment_frequency_months, 0))
-        maturity = int(self._number(action.maturity_months, 0))
-        rate = self._number(action.annual_interest_rate, math.nan)
-        installment = self._number(action.principal_installment, math.nan)
         maximum_rate = self._bounded(self._terms(state).get("max_interest_rate"), 0.0, 0.5, 0.5)
-        if contract["status"] not in {"current", "arrears", "restructured"}:
-            self._reject(state, debtor_id, str(contract["id"]), "debt_restructuring", 0.0, "Contract is not eligible for restructuring.", now)
-            return
-        if (
-            contract["status"] == "restructured"
-            and int(contract.get("payment_frequency_months") or 0) == frequency
-            and int(contract.get("maturity_months") or 0) == maturity
-            and abs(self._number(contract.get("annual_interest_rate")) - rate) < 1e-9
-            and abs(self._number(contract.get("principal_payment")) - installment) < 1e-9
-        ):
-            self._reject(state, debtor_id, str(contract["id"]), "debt_restructuring", 0.0, "The requested restructuring terms are already active.", now)
-            return
-        if frequency < 1 or frequency > 120 or maturity < frequency or maturity > 1_200 or not math.isfinite(rate) or not 0.0 <= rate <= maximum_rate or not math.isfinite(installment) or installment < 0:
-            self._reject(state, debtor_id, str(contract["id"]), "debt_restructuring", 0.0, "Restructured terms are outside scenario bounds.", now)
+        plan = self._debt_restructuring_planner.plan(
+            DebtRestructuringInputs(
+                contract=contract,
+                payment_frequency_months=action.payment_frequency_months,
+                maturity_months=action.maturity_months,
+                annual_interest_rate=action.annual_interest_rate,
+                principal_installment=action.principal_installment,
+                maximum_rate=maximum_rate,
+            )
+        )
+        if plan.rejection_reason is not None:
+            self._reject(
+                state,
+                debtor_id,
+                str(contract["id"]),
+                "debt_restructuring",
+                0.0,
+                plan.rejection_reason,
+                now,
+            )
             return
 
-        old_service = self._annualized_service(contract)
-        contract["annual_interest_rate"] = rate
-        contract["payment_frequency_months"] = frequency
-        contract["principal_payment"] = min(self._number(contract.get("principal_remaining")), installment)
-        contract["maturity_at_minute"] = self._add_months(now, maturity)
-        contract["maturity_months"] = maturity
-        contract["next_payment_at_minute"] = self._add_months(now, frequency)
-        contract["status"] = "restructured"
-        contract["reason"] = "Terms were revised by an authorized restructuring request; outstanding principal and arrears remain due."
-        self._replace_rows(state, "debt_contracts", [contract])
-        self._adjust_annual_service(state, debtor_id, old_service, self._annualized_service(contract))
-        self._set_distress(state, debtor_id, "restructuring", "authorized_restructuring", self._number(contract.get("arrears_amount")), now, contract["reason"])
-        self._transition_event(state, "restructured", debtor_id, str(contract["id"]), "foreign_debt", old_service, self._annualized_service(contract), contract["reason"], now)
+        self._apply_debt_restructuring_plan(state, debtor_id, plan, now)
+
+    def _apply_debt_restructuring_plan(
+        self,
+        state: GameState,
+        debtor_id: str,
+        plan: DebtRestructuringPlan,
+        now: int,
+    ) -> None:
+        assert plan.contract is not None
+        restructured_contract = plan.contract
+        restructured_contract["maturity_at_minute"] = self._add_months(
+            now,
+            int(restructured_contract["maturity_months"]),
+        )
+        restructured_contract["next_payment_at_minute"] = self._add_months(
+            now,
+            int(restructured_contract["payment_frequency_months"]),
+        )
+        self._replace_rows(state, "debt_contracts", [restructured_contract])
+        self._adjust_annual_service(
+            state,
+            debtor_id,
+            plan.old_service,
+            plan.new_service,
+        )
+        self._set_distress(
+            state,
+            debtor_id,
+            "restructuring",
+            "authorized_restructuring",
+            self._number(restructured_contract.get("arrears_amount")),
+            now,
+            restructured_contract["reason"],
+        )
+        self._transition_event(
+            state,
+            "restructured",
+            debtor_id,
+            str(restructured_contract["id"]),
+            "foreign_debt",
+            plan.old_service,
+            plan.new_service,
+            restructured_contract["reason"],
+            now,
+        )
 
     def _add_months(self, minute: int, months: int) -> int:
         current = GAME_EPOCH + timedelta(minutes=max(0, int(minute)))
