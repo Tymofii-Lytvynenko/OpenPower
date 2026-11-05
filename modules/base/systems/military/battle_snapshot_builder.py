@@ -8,6 +8,7 @@ from typing import Any
 import polars as pl
 
 from modules.base.systems.military.battle_anchor_policy import BattleAnchor
+from modules.base.systems.military.battle_change_detection import battle_snapshot_changed
 from modules.base.systems.military.combat_round_resolver import normalize_country_tag
 from modules.base.systems.military.readiness_policy import ReadinessPolicy
 from modules.base.systems.military.war_index import ConflictContext
@@ -40,6 +41,32 @@ class BattleRowRequest:
     round_number: int | None = None
     prior_row: dict[str, Any] | None = None
     anchor: BattleAnchor | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ActiveBattleSnapshotRequest:
+    battle_units_table: pl.DataFrame | None
+    region_id: int
+    local_units: list[dict[str, Any]]
+    conflict: ConflictContext
+    battle_id: str
+    battle_mode: str
+    now: int
+    prior_row: dict[str, Any]
+    anchor: BattleAnchor | None
+    previous_a: int
+    previous_b: int
+    side_a_strength: int
+    side_b_strength: int
+    resolve_this_tick: bool
+
+
+@dataclass(slots=True)
+class ActiveBattleSnapshot:
+    battle_row: dict[str, Any]
+    battle_unit_rows: list[dict[str, Any]]
+    participant_rows: list[dict[str, Any]]
+    updated_event: EventBattleUpdated | None
 
 
 class BattleSnapshotBuilder:
@@ -222,6 +249,124 @@ class BattleSnapshotBuilder:
                 unit.get("readiness_status")
             )
         return [grouped[key] for key in sorted(grouped)]
+
+    def build_active_battle_snapshot(
+        self,
+        request: ActiveBattleSnapshotRequest,
+    ) -> ActiveBattleSnapshot:
+        conflict = request.conflict
+        prior_row = request.prior_row
+        status = self.lifecycle_status(
+            prior_row,
+            BattleStrengthDelta(
+                round_resolved=request.resolve_this_tick,
+                previous_a=request.previous_a,
+                previous_b=request.previous_b,
+                current_a=request.side_a_strength,
+                current_b=request.side_b_strength,
+            ),
+        )
+        round_number = int(prior_row.get("round") or 0) + (1 if request.resolve_this_tick else 0)
+        current_balance = float(
+            request.side_a_strength
+            / max(1, request.side_a_strength + request.side_b_strength)
+        )
+        battle_changed = self._active_battle_changed(
+            request,
+            status,
+            current_balance,
+        )
+        battle_row = (
+            self._build_active_battle_row(request, status, round_number)
+            if battle_changed
+            else prior_row
+        )
+        event = None
+        if battle_changed or float(prior_row.get("balance") or -1.0) != current_balance:
+            event = self.build_updated_event(
+                battle_row,
+                conflict,
+                request.now,
+            )
+        return ActiveBattleSnapshot(
+            battle_row=battle_row,
+            battle_unit_rows=self.build_battle_units(
+                request.battle_id,
+                request.local_units,
+                conflict,
+                request.side_a_strength + request.side_b_strength,
+            ),
+            participant_rows=self.build_participants(
+                request.battle_id,
+                request.local_units,
+                conflict,
+            ),
+            updated_event=event,
+        )
+
+    def _active_battle_changed(
+        self,
+        request: ActiveBattleSnapshotRequest,
+        status: str,
+        balance: float,
+    ) -> bool:
+        if not request.prior_row or request.resolve_this_tick:
+            return True
+        if battle_snapshot_changed(
+            request.prior_row,
+            status=status,
+            mode=request.battle_mode,
+            side_a_tags=request.conflict.side_a_tags,
+            side_b_tags=request.conflict.side_b_tags,
+            side_a_strength=request.side_a_strength,
+            side_b_strength=request.side_b_strength,
+            balance=balance,
+        ):
+            return True
+        return self.battle_units_changed(
+            request.battle_units_table,
+            request.battle_id,
+            request.local_units,
+            request.conflict,
+        )
+
+    def _build_active_battle_row(
+        self,
+        request: ActiveBattleSnapshotRequest,
+        status: str,
+        round_number: int,
+    ) -> dict[str, Any]:
+        conflict = request.conflict
+        prior_row = request.prior_row
+        return self.build_battle_row(
+            BattleRowRequest(
+                battle_id=request.battle_id,
+                war_id=conflict.war_id,
+                mode=request.battle_mode,
+                region_id=request.region_id,
+                side_a_tags=conflict.side_a_tags,
+                side_b_tags=conflict.side_b_tags,
+                side_a_strength=request.side_a_strength,
+                side_b_strength=request.side_b_strength,
+                now=request.now,
+                side_a_losses=int(prior_row.get("side_a_losses") or 0)
+                + (
+                    max(0, request.previous_a - request.side_a_strength)
+                    if request.resolve_this_tick
+                    else 0
+                ),
+                side_b_losses=int(prior_row.get("side_b_losses") or 0)
+                + (
+                    max(0, request.previous_b - request.side_b_strength)
+                    if request.resolve_this_tick
+                    else 0
+                ),
+                status=status,
+                round_number=round_number,
+                prior_row=prior_row,
+                anchor=request.anchor,
+            )
+        )
 
     @staticmethod
     def build_updated_event(
