@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 import polars as pl
 
@@ -39,6 +40,11 @@ from modules.base.systems.economy.debt_distress_policy import (
     DebtDistressRequest,
     DeterministicDebtDistressPlanner,
 )
+from modules.base.systems.economy.economic_policy_transition import (
+    DeterministicEconomicPolicyTransitionPlanner,
+    EconomicPolicyTransitionInputs,
+    EconomicPolicyTransitionPlanner,
+)
 from modules.base.systems.world.authority_policy import player_controls_country
 from modules.base.systems.world.random_event_effects import aggregate_active_effects
 from src.shared.actions import (
@@ -51,6 +57,18 @@ from src.shared.actions import (
 from src.shared.events import EventEconomicTransition, EventRealSecond
 from src.shared.state import GameState
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
+
+TComponent = TypeVar("TComponent")
+
+
+def _resolve_component(
+    component: TComponent | None,
+    default_factory: Callable[[], TComponent],
+) -> TComponent:
+    if component is not None:
+        return component
+    return default_factory()
+
 
 class EconomicHealthSystem(ISystem):
     """Resolves effective-dated national economic policy and contractual debt."""
@@ -83,41 +101,39 @@ class EconomicHealthSystem(ISystem):
         debt_restructuring_planner: DebtRestructuringPlanner | None = None,
         due_debt_processor: DueDebtSettlementProcessor | None = None,
         debt_distress_planner: DebtDistressPlanner | None = None,
+        policy_transition_planner: EconomicPolicyTransitionPlanner | None = None,
     ) -> None:
-        self._profile_calculator = (
-            profile_calculator
-            if profile_calculator is not None
-            else DeterministicEconomicProfileCalculator()
+        self._profile_calculator = _resolve_component(
+            profile_calculator,
+            DeterministicEconomicProfileCalculator,
         )
-        self._debt_service_calculator = (
-            debt_service_calculator
-            if debt_service_calculator is not None
-            else DeterministicDebtServiceSettlementCalculator()
+        self._debt_service_calculator = _resolve_component(
+            debt_service_calculator,
+            DeterministicDebtServiceSettlementCalculator,
         )
-        self._policy_change_validator = (
-            policy_change_validator
-            if policy_change_validator is not None
-            else DeterministicEconomicPolicyChangeValidator()
+        self._policy_change_validator = _resolve_component(
+            policy_change_validator,
+            DeterministicEconomicPolicyChangeValidator,
         )
-        self._debt_contract_request_planner = (
-            debt_contract_request_planner
-            if debt_contract_request_planner is not None
-            else DeterministicDebtContractRequestPlanner()
+        self._debt_contract_request_planner = _resolve_component(
+            debt_contract_request_planner,
+            DeterministicDebtContractRequestPlanner,
         )
-        self._debt_restructuring_planner = (
-            debt_restructuring_planner
-            if debt_restructuring_planner is not None
-            else DeterministicDebtRestructuringPlanner()
+        self._debt_restructuring_planner = _resolve_component(
+            debt_restructuring_planner,
+            DeterministicDebtRestructuringPlanner,
         )
-        self._due_debt_processor = (
-            due_debt_processor
-            if due_debt_processor is not None
-            else DeterministicDueDebtSettlementProcessor(self._debt_service_calculator)
+        self._due_debt_processor = _resolve_component(
+            due_debt_processor,
+            lambda: DeterministicDueDebtSettlementProcessor(self._debt_service_calculator),
         )
-        self._debt_distress_planner = (
-            debt_distress_planner
-            if debt_distress_planner is not None
-            else DeterministicDebtDistressPlanner()
+        self._debt_distress_planner = _resolve_component(
+            debt_distress_planner,
+            DeterministicDebtDistressPlanner,
+        )
+        self._policy_transition_planner = _resolve_component(
+            policy_transition_planner,
+            DeterministicEconomicPolicyTransitionPlanner,
         )
 
     @property
@@ -312,49 +328,50 @@ class EconomicHealthSystem(ISystem):
         previous = validation.previous_value
 
         transitions = state.tables["economic_policy_transitions"]
-        cooldowns = transitions.filter(
+        cooldown_active = not transitions.filter(
             (pl.col("country_id") == country_id)
             & (pl.col("policy_name") == column)
             & (pl.col("status").is_in(["scheduled", "applied"]))
             & (pl.col("cooldown_until_minute") > now)
-        )
-        if not cooldowns.is_empty():
-            self._reject(state, country_id, source_id, column, previous, "Policy cooldown has not elapsed.", now)
-            return
-
+        ).is_empty()
         configured_cost = terms.get(f"{column}_transition_cost", terms.get("policy_transition_cost", 0.0))
-        transition_cost = self._bounded(configured_cost, 0.0, 1_000_000_000_000.0)
-        if self._number(country.get("money_reserves")) < transition_cost:
-            self._reject(state, country_id, source_id, column, previous, "Treasury cannot cover the configured policy transition cost.", now)
+        draft = self._policy_transition_planner.prepare(
+            EconomicPolicyTransitionInputs(
+                transition_id=source_id,
+                country_id=country_id,
+                player_id=str(action.player_id),
+                policy_name=column,
+                previous_value=previous,
+                target_value=value,
+                current_reserves=self._number(country.get("money_reserves")),
+                transition_cost_setting=configured_cost,
+                delay_minutes_setting=terms.get("policy_delay_minutes"),
+                cooldown_minutes_setting=terms.get("policy_cooldown_minutes"),
+                cooldown_active=cooldown_active,
+                now=now,
+            )
+        )
+        if draft.rejection_reason is not None:
+            self._reject(state, country_id, source_id, column, previous, draft.rejection_reason, now)
             return
-        delay = int(self._bounded(terms.get("policy_delay_minutes"), 0.0, 525_600.0, 1_440.0))
-        cooldown = int(self._bounded(terms.get("policy_cooldown_minutes"), 0.0, 5_256_000.0, 43_200.0))
-        transition_id = source_id
-        if not transitions.filter(pl.col("id") == transition_id).is_empty():
-            self._reject(state, country_id, source_id, column, previous, "A request with this deterministic identity already exists.", now)
+        plan = self._policy_transition_planner.finalize(
+            draft,
+            transition_id_exists=not transitions.filter(pl.col("id") == source_id).is_empty(),
+        )
+        if plan.rejection_reason is not None:
+            self._reject(state, country_id, source_id, column, previous, plan.rejection_reason, now)
             return
-        row = {
-            "id": transition_id,
-            "country_id": country_id,
-            "player_id": str(action.player_id),
-            "policy_name": column,
-            "previous_value": previous,
-            "target_value": value,
-            "transition_cost": transition_cost,
-            "created_at_minute": now,
-            "effective_at_minute": now + delay,
-            "cooldown_until_minute": now + delay + cooldown,
-            "status": "scheduled",
-            "reason": f"Accepted at a one-time cost of {transition_cost:.2f}; the policy takes effect at its persisted effective minute.",
-        }
+        assert plan.row is not None
+        row = plan.row
+        transition_cost = plan.transition_cost
         if transition_cost > 0.0:
             self._country_values(state, country_id, {"money_reserves": ("add", -transition_cost)})
-            self._record_cause(state, country_id=country_id, source_type="policy_transition", source_id=transition_id,
+            self._record_cause(state, country_id=country_id, source_type="policy_transition", source_id=source_id,
                 indicator="money_reserves", previous=self._number(country.get("money_reserves")),
                 current=self._number(country.get("money_reserves")) - transition_cost,
                 unit="currency", now=now, reason=row["reason"])
         self._append_rows(state, "economic_policy_transitions", [row])
-        self._transition_event(state, "scheduled", country_id, transition_id, column, previous, value, row["reason"], now)
+        self._transition_event(state, "scheduled", country_id, source_id, column, previous, value, row["reason"], now)
 
     def _apply_due_policy_changes(self, state: GameState, now: int) -> None:
         transitions = state.tables.get("economic_policy_transitions")
