@@ -4,6 +4,7 @@ import calendar
 import heapq
 import json
 import math
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
@@ -12,6 +13,7 @@ import polars as pl
 from modules.base.systems.economy.economic_health_policy import (
     DebtContractRequestInputs,
     DebtContractRequestPlanner,
+    DebtServiceSettlement,
     DebtServiceSettlementCalculator,
     DebtServiceSettlementInputs,
     DeterministicDebtContractRequestPlanner,
@@ -37,6 +39,29 @@ from src.shared.actions import (
 from src.shared.events import EventEconomicTransition, EventRealSecond
 from src.shared.state import GAME_EPOCH, GameState
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
+
+
+@dataclass
+class _DueDebtBatch:
+    current_minute: int
+    contracts: dict[str, dict[str, Any]]
+    country_rows: dict[str, dict[str, Any]]
+    balance_columns: tuple[str, ...]
+    payment_queue: list[tuple[int, str]]
+    affected_countries: set[str]
+    country_balances: dict[str, float]
+    changed_countries: set[str]
+    cause_records: list[dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class _DueDebtInstallment:
+    contract_id: str
+    due_at_minute: int
+    debtor_country_id: str
+    creditor_country_id: str
+    contract: dict[str, Any]
+    settlement: DebtServiceSettlement
 
 
 class EconomicHealthSystem(ISystem):
@@ -553,6 +578,16 @@ class EconomicHealthSystem(ISystem):
             state.globals["economic_health_last_debt_scan_minute"] = now
             return
 
+        batch = self._prepare_due_debt_batch(state, due, now)
+        self._settle_due_debt_queue(state, batch)
+        self._finalize_due_debt_batch(state, batch)
+
+    def _prepare_due_debt_batch(
+        self,
+        state: GameState,
+        due: pl.DataFrame,
+        now: int,
+    ) -> _DueDebtBatch:
         due_contracts = {
             str(row["id"]): dict(row)
             for row in due.iter_rows(named=True)
@@ -578,75 +613,183 @@ class EconomicHealthSystem(ISystem):
             for contract_id, contract in due_contracts.items()
         ]
         heapq.heapify(payment_queue)
-        affected_countries: set[str] = set()
-        country_balances: dict[str, float] = {}
-        changed_countries: set[str] = set()
-        cause_records: list[dict[str, Any]] = []
+        return _DueDebtBatch(
+            current_minute=now,
+            contracts=due_contracts,
+            country_rows=country_rows,
+            balance_columns=country_balance_columns,
+            payment_queue=payment_queue,
+            affected_countries=set(),
+            country_balances={},
+            changed_countries=set(),
+            cause_records=[],
+        )
 
+    def _settle_due_debt_queue(self, state: GameState, batch: _DueDebtBatch) -> None:
         # A save/load or coarse time step may cross multiple due dates; settle them chronologically instead of delaying each missed installment by a simulation tick.
-        while payment_queue:
-            due_at, contract_id = heapq.heappop(payment_queue)
-            contract = due_contracts[contract_id]
-            if due_at > now or contract["status"] not in {"current", "arrears", "restructured"}:
+        while batch.payment_queue:
+            due_at, contract_id = heapq.heappop(batch.payment_queue)
+            contract = batch.contracts[contract_id]
+            if (
+                due_at > batch.current_minute
+                or contract["status"] not in {"current", "arrears", "restructured"}
+            ):
                 continue
-            debtor_id = str(contract["debtor_country_id"])
-            creditor_id = str(contract["creditor_country_id"])
-            affected_countries.add(debtor_id)
-            debtor = country_rows.get(debtor_id)
-            available = max(0.0, self._number((debtor or {}).get("money_reserves")))
-            settlement = self._debt_service_calculator.calculate(
-                DebtServiceSettlementInputs(
-                    contract=contract,
-                    due_at_minute=due_at,
-                    available_reserves=available,
-                )
-            )
-            if debtor is not None:
-                for column, delta in (
-                    ("money_reserves", -settlement.paid),
-                    ("foreign_debt", -settlement.principal_paid),
-                    ("arrears", settlement.new_arrears - settlement.old_arrears),
-                    ("annual_debt_service", settlement.new_service - settlement.old_service),
-                ):
-                    if column in country_balance_columns:
-                        debtor[column] = self._number(debtor.get(column)) + delta
-                changed_countries.add(debtor_id)
-            creditor = country_rows.get(creditor_id)
-            if creditor is not None and "money_reserves" in country_balance_columns:
-                creditor["money_reserves"] = self._number(creditor.get("money_reserves")) + settlement.paid
-                changed_countries.add(creditor_id)
-            contract["principal_remaining"] = settlement.new_principal
-            contract["arrears_amount"] = settlement.new_arrears
-            contract["last_payment_at_minute"] = due_at
-            contract["next_payment_at_minute"] = self._add_months(
+            self._settle_due_debt_installment(
+                state,
+                batch,
+                contract_id,
                 due_at,
-                settlement.frequency_months,
             )
-            contract["status"] = settlement.status
-            contract["reason"] = settlement.reason
-            due_contracts[contract_id] = contract
-            next_due = int(contract["next_payment_at_minute"])
-            if contract["status"] in {"current", "arrears", "restructured"} and next_due <= now:
-                heapq.heappush(payment_queue, (next_due, contract_id))
-            country_balances[debtor_id] = self._number((debtor or {}).get("arrears"))
-            self._record_cause(state, country_id=debtor_id, source_type="debt_service", source_id=f"{contract['id']}:{due_at}",
-                indicator="foreign_debt", previous=settlement.principal, current=settlement.new_principal, unit="currency", now=due_at,
-                reason=contract["reason"], records=cause_records)
-            self._transition_event(state, "serviced", debtor_id, str(contract["id"]), "debt_service", settlement.total_due, settlement.paid, contract["reason"], due_at)
-            if settlement.new_arrears > 1e-9:
-                self._flush_debt_country_updates(state, country_rows, changed_countries, country_balance_columns)
-                self._set_distress(state, debtor_id, "arrears", "scheduled_service_shortfall", settlement.new_arrears, due_at, contract["reason"])
 
-        self._replace_rows(state, "debt_contracts", list(due_contracts.values()))
-        self._flush_debt_country_updates(state, country_rows, changed_countries, country_balance_columns)
-        self._append_rows(state, "economic_cause_records", cause_records)
+    def _settle_due_debt_installment(
+        self,
+        state: GameState,
+        batch: _DueDebtBatch,
+        contract_id: str,
+        due_at: int,
+    ) -> None:
+        contract = batch.contracts[contract_id]
+        debtor_id = str(contract["debtor_country_id"])
+        creditor_id = str(contract["creditor_country_id"])
+        batch.affected_countries.add(debtor_id)
+        debtor = batch.country_rows.get(debtor_id)
+        available = max(0.0, self._number((debtor or {}).get("money_reserves")))
+        settlement = self._debt_service_calculator.calculate(
+            DebtServiceSettlementInputs(
+                contract=contract,
+                due_at_minute=due_at,
+                available_reserves=available,
+            )
+        )
+        installment = _DueDebtInstallment(
+            contract_id=contract_id,
+            due_at_minute=due_at,
+            debtor_country_id=debtor_id,
+            creditor_country_id=creditor_id,
+            contract=contract,
+            settlement=settlement,
+        )
+        self._apply_due_debt_balance_updates(batch, installment)
+        self._advance_due_debt_contract(batch, installment)
+        batch.country_balances[debtor_id] = self._number((debtor or {}).get("arrears"))
+        self._record_due_debt_settlement(state, batch, installment)
+        if settlement.new_arrears > 1e-9:
+            self._record_due_debt_shortfall(state, batch, installment)
+
+    def _apply_due_debt_balance_updates(
+        self,
+        batch: _DueDebtBatch,
+        installment: _DueDebtInstallment,
+    ) -> None:
+        settlement = installment.settlement
+        debtor = batch.country_rows.get(installment.debtor_country_id)
+        if debtor is not None:
+            for column, delta in (
+                ("money_reserves", -settlement.paid),
+                ("foreign_debt", -settlement.principal_paid),
+                ("arrears", settlement.new_arrears - settlement.old_arrears),
+                ("annual_debt_service", settlement.new_service - settlement.old_service),
+            ):
+                if column in batch.balance_columns:
+                    debtor[column] = self._number(debtor.get(column)) + delta
+            batch.changed_countries.add(installment.debtor_country_id)
+        creditor = batch.country_rows.get(installment.creditor_country_id)
+        if creditor is not None and "money_reserves" in batch.balance_columns:
+            creditor["money_reserves"] = self._number(creditor.get("money_reserves")) + settlement.paid
+            batch.changed_countries.add(installment.creditor_country_id)
+
+    def _advance_due_debt_contract(
+        self,
+        batch: _DueDebtBatch,
+        installment: _DueDebtInstallment,
+    ) -> None:
+        contract = installment.contract
+        settlement = installment.settlement
+        due_at = installment.due_at_minute
+        contract["principal_remaining"] = settlement.new_principal
+        contract["arrears_amount"] = settlement.new_arrears
+        contract["last_payment_at_minute"] = due_at
+        contract["next_payment_at_minute"] = self._add_months(due_at, settlement.frequency_months)
+        contract["status"] = settlement.status
+        contract["reason"] = settlement.reason
+        next_due = int(contract["next_payment_at_minute"])
+        if contract["status"] in {"current", "arrears", "restructured"} and next_due <= batch.current_minute:
+            heapq.heappush(batch.payment_queue, (next_due, installment.contract_id))
+
+    def _record_due_debt_settlement(
+        self,
+        state: GameState,
+        batch: _DueDebtBatch,
+        installment: _DueDebtInstallment,
+    ) -> None:
+        settlement = installment.settlement
+        contract = installment.contract
+        debtor_id = installment.debtor_country_id
+        due_at = installment.due_at_minute
+        self._record_cause(
+            state,
+            country_id=debtor_id,
+            source_type="debt_service",
+            source_id=f"{contract['id']}:{due_at}",
+            indicator="foreign_debt",
+            previous=settlement.principal,
+            current=settlement.new_principal,
+            unit="currency",
+            now=due_at,
+            reason=contract["reason"],
+            records=batch.cause_records,
+        )
+        self._transition_event(
+            state,
+            "serviced",
+            debtor_id,
+            str(contract["id"]),
+            "debt_service",
+            settlement.total_due,
+            settlement.paid,
+            contract["reason"],
+            due_at,
+        )
+
+    def _record_due_debt_shortfall(
+        self,
+        state: GameState,
+        batch: _DueDebtBatch,
+        installment: _DueDebtInstallment,
+    ) -> None:
+        self._flush_debt_country_updates(
+            state,
+            batch.country_rows,
+            batch.changed_countries,
+            batch.balance_columns,
+        )
+        self._set_distress(
+            state,
+            installment.debtor_country_id,
+            "arrears",
+            "scheduled_service_shortfall",
+            installment.settlement.new_arrears,
+            installment.due_at_minute,
+            installment.contract["reason"],
+        )
+
+    def _finalize_due_debt_batch(self, state: GameState, batch: _DueDebtBatch) -> None:
+        self._replace_rows(state, "debt_contracts", list(batch.contracts.values()))
+        self._flush_debt_country_updates(
+            state,
+            batch.country_rows,
+            batch.changed_countries,
+            batch.balance_columns,
+        )
+        self._append_rows(state, "economic_cause_records", batch.cause_records)
         distress_cases = state.tables.get("debt_distress_cases")
         if distress_cases is not None and not distress_cases.is_empty():
-            for country_id in sorted(affected_countries):
-                if country_balances.get(country_id, 0.0) <= 1e-9:
-                    self._recover_distress_if_eligible(state, country_id, now)
+            for country_id in sorted(batch.affected_countries):
+                if batch.country_balances.get(country_id, 0.0) <= 1e-9:
+                    self._recover_distress_if_eligible(state, country_id, batch.current_minute)
 
-        state.globals["economic_health_last_debt_scan_minute"] = now
+        state.globals["economic_health_last_debt_scan_minute"] = batch.current_minute
 
     def _flush_debt_country_updates(
         self,
