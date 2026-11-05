@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 import polars as pl
@@ -35,6 +36,16 @@ UNIT_ORDER_FEEDBACK_SCHEMA: dict[str, pl.DataType] = {
 }
 
 
+@dataclass(frozen=True)
+class UnitOrderFeedbackEntry:
+    unit_id: str
+    owner: str
+    order_type: str
+    status: str
+    reason: str
+    current_minute: int
+
+
 class _ReadinessPreparer(Protocol):
     def prepare_order(self, state: GameState, unit_id: str) -> bool: ...
 
@@ -66,6 +77,21 @@ class UnitOrderWorkflowService:
         })
         if len(rows) > 500:
             del rows[:-500]
+
+    def record_feedback_entry(
+        self,
+        rows: list[dict[str, Any]],
+        entry: UnitOrderFeedbackEntry,
+    ) -> None:
+        self.record_feedback(
+            rows,
+            entry.unit_id,
+            entry.owner,
+            entry.order_type,
+            entry.status,
+            entry.reason,
+            entry.current_minute,
+        )
 
     def write_feedback(self, state: GameState, rows: list[dict[str, Any]]) -> None:
         frame = (

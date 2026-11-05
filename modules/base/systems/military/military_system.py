@@ -50,6 +50,10 @@ from modules.base.systems.military.war_policy import hostile_country_pairs
 from modules.base.systems.military.contact_transition_preflight import (
     MilitaryContactTransitionPreflight,
 )
+from modules.base.systems.military.deployment_service import (
+    DeploymentOrderSpec,
+    MilitaryDeploymentService,
+)
 
 
 UNIT_TABLE = "units"
@@ -241,6 +245,7 @@ class MilitarySystem(ISystem):
         "_attack_order_service": SYSTEM_STATE_HELPER,
         "_unit_order_workflow": SYSTEM_STATE_HELPER,
         "_contact_transition_preflight": SYSTEM_STATE_HELPER,
+        "_deployment_service": SYSTEM_STATE_HELPER,
         "_manpower_cache_key": SYSTEM_STATE_CACHE,
         "_manpower_by_owner": SYSTEM_STATE_CACHE,
     }
@@ -264,6 +269,12 @@ class MilitarySystem(ISystem):
         self._weapons_trade_policy = WeaponsTradePolicy()
         self._readiness_system = ReadinessSystem()
         self._unit_order_workflow = UnitOrderWorkflowService(self._readiness_system)
+        self._deployment_service = MilitaryDeploymentService(
+            unit_factory=self._unit_factory,
+            unit_order_workflow=self._unit_order_workflow,
+            authorization_policy=player_controls_country,
+            units_from_rows=self._units_from_rows,
+        )
         self._contact_transition_preflight = MilitaryContactTransitionPreflight(
             readiness_transitions=self._readiness_system,
             unit_order_workflow=self._unit_order_workflow,
@@ -611,21 +622,19 @@ class MilitarySystem(ISystem):
                 unit_lifecycle="deployment_queued",
             )
             unit_rows.append(unit)
-            deployment_rows.append({
-                "id": self._next_deployment_id(str(order.get("id") or ""), deployment_rows),
-                "unit_id": unit_id,
-                "country_id": owner,
-                "production_order_id": str(order.get("id") or ""),
-                "quantity": quantity,
-                "source_region_id": home_region_id,
-                "destination_region_id": 0,
-                "route_region_ids": [],
-                "route_index": 0,
-                "status": "queued",
-                "created_at_minute": int(state.time.total_minutes),
-                "estimated_arrival_at_minute": 0,
-                "blocking_reason": "Select a valid deployment region and dispatch this group.",
-            })
+            deployment_rows.append(
+                self._deployment_service.create_order_record(
+                    DeploymentOrderSpec(
+                        production_order_id=str(order.get("id") or ""),
+                        unit_id=unit_id,
+                        country_id=owner,
+                        quantity=quantity,
+                        source_region_id=home_region_id,
+                        created_at_minute=int(state.time.total_minutes),
+                    ),
+                    existing_deployments=deployment_rows,
+                )
+            )
             country["military_count"] = int(country.get("military_count") or 0) + quantity
             order["status"] = "awaiting_deployment"
             order["blocking_reason"] = "Completed; waiting for deployment and route arrival."
@@ -644,164 +653,16 @@ class MilitarySystem(ISystem):
         return self._units_from_rows(unit_rows)
 
     def _process_deployment_actions(self, state: GameState, units: pl.DataFrame):
-        actions = [action for action in state.current_actions if isinstance(action, ActionDispatchUnitDeployment)]
-        deployment_table = state.tables.get("unit_deployment_orders")
-        if not actions or units.is_empty() or deployment_table is None:
-            return units, []
-
-        rows = units.to_dicts()
-        deployments = deployment_table.to_dicts()
-        units_by_id = {str(row.get("id") or ""): row for row in rows}
-        deployments_by_unit = {str(row.get("unit_id") or ""): row for row in deployments}
-        moves: list[ActionMoveUnit] = []
-        seen: set[str] = set()
-        feedback_table = state.tables.get("unit_order_feedback")
-        feedback = [] if feedback_table is None else feedback_table.to_dicts()
-        now = int(state.time.total_minutes)
-
-        for action in actions:
-            unit_id = str(action.unit_id or "")
-            unit = units_by_id.get(unit_id)
-            deployment = deployments_by_unit.get(unit_id)
-            if unit is None or deployment is None:
-                self._record_unit_order_feedback(feedback, unit_id, "", "deployment", "rejected", "No deployment-queued group matches this unit.", now)
-                continue
-            owner = str(unit.get("owner") or "").strip().upper()
-            if unit_id in seen:
-                self._record_unit_order_feedback(feedback, unit_id, owner, "deployment", "rejected", "A unit group can receive only one deployment order per update.", now)
-                continue
-            seen.add(unit_id)
-            if not self._deployment_actor_authorized(state, str(action.player_id or ""), owner):
-                self._record_unit_order_feedback(feedback, unit_id, owner, "deployment", "rejected", "The issuer does not control this deployment group.", now)
-                continue
-            if str(unit.get("unit_lifecycle") or "") not in {"deployment_queued", "deployment_blocked"}:
-                self._record_unit_order_feedback(feedback, unit_id, owner, "deployment", "rejected", "The unit is not waiting for deployment or route recovery.", now)
-                continue
-            target_id = int(action.destination_region_id or 0)
-            regions = state.tables.get("regions")
-            if target_id <= 0 or regions is None or regions.filter(pl.col("id") == target_id).is_empty():
-                self._record_unit_order_feedback(feedback, unit_id, owner, "deployment", "rejected", "The deployment destination is invalid.", now)
-                continue
-            available = max(0, int(unit.get("strength") or 0))
-            requested = available if int(action.quantity or 0) <= 0 else int(action.quantity)
-            if requested <= 0 or requested > available:
-                self._record_unit_order_feedback(feedback, unit_id, owner, "deployment", "rejected", "The deployment quantity must be between one and the available group strength.", now)
-                continue
-
-            dispatched_id = unit_id
-            if requested < available:
-                available_equipment = max(0, int(unit.get("equipment_quantity") or 0))
-                dispatched_equipment = min(
-                    available_equipment,
-                    int(round(available_equipment * requested / available)),
-                )
-                unit["strength"] = available - requested
-                unit["equipment_quantity"] = available_equipment - dispatched_equipment
-                deployment["quantity"] = available - requested
-                clone = dict(unit)
-                dispatched_id = self._next_unit_id(rows, owner, str(unit.get("unit_type") or DEFAULT_UNIT_TYPE))
-                clone.update(
-                    id=dispatched_id,
-                    strength=requested,
-                    equipment_quantity=dispatched_equipment,
-                    unit_lifecycle="deployment_queued",
-                )
-                rows.append(clone)
-                units_by_id[dispatched_id] = clone
-                deployment = dict(deployment)
-                deployment.update(
-                    id=self._next_deployment_id(str(deployment.get("production_order_id") or ""), deployments),
-                    unit_id=dispatched_id,
-                    quantity=requested,
-                    destination_region_id=0,
-                    route_region_ids=[],
-                    route_index=0,
-                    status="queued",
-                    estimated_arrival_at_minute=0,
-                    blocking_reason="Select a valid deployment region and dispatch this group.",
-                )
-                deployments.append(deployment)
-                deployments_by_unit[dispatched_id] = deployment
-            deployment["destination_region_id"] = target_id
-            deployment["status"] = "dispatching"
-            deployment["blocking_reason"] = ""
-            moves.append(ActionMoveUnit(str(action.player_id or owner), dispatched_id, target_id))
-
-        if deployments != deployment_table.to_dicts():
-            state.update_table("unit_deployment_orders", pl.DataFrame(deployments, schema=deployment_table.schema))
-        self._write_unit_order_feedback(state, feedback)
-        return self._units_from_rows(rows), moves
+        return self._deployment_service.process_actions(state, units)
 
     def _refresh_deployment_state(self, state: GameState, units: pl.DataFrame) -> None:
-        deployments_table = state.tables.get("unit_deployment_orders")
-        if deployments_table is None or deployments_table.is_empty():
-            return
-        units_by_id = {str(row.get("id") or ""): row for row in units.to_dicts()}
-        routes_table = state.tables.get("unit_movement_routes")
-        routes = {} if routes_table is None else {
-            str(row.get("unit_id") or ""): row for row in routes_table.to_dicts()
-        }
-        deployments = deployments_table.to_dicts()
-        for deployment in deployments:
-            unit_id = str(deployment.get("unit_id") or "")
-            unit = units_by_id.get(unit_id)
-            route = routes.get(unit_id)
-            if unit is None:
-                if str(deployment.get("status") or "") in {"delivered", "cancelled", "failed", "disbanded"}:
-                    continue
-                deployment.update(status="blocked", blocking_reason="The deployed group no longer exists.")
-                continue
-            lifecycle = str(unit.get("unit_lifecycle") or "")
-            if route is not None:
-                deployment["route_region_ids"] = list(route.get("route_region_ids") or [])
-                deployment["route_index"] = max(0, int(route.get("route_index") or 0))
-                deployment["destination_region_id"] = max(0, int(route.get("destination_region_id") or 0))
-                deployment["estimated_arrival_at_minute"] = max(0, int(unit.get("arrival_at_minute") or 0))
-            if lifecycle == "available":
-                deployment.update(status="delivered", blocking_reason="")
-            elif lifecycle in {"deployment_transit", "in_transit"}:
-                deployment.update(status="in_transit", blocking_reason="")
-            elif lifecycle in {"deployment_blocked", "route_blocked"}:
-                deployment.update(
-                    status="blocked",
-                    blocking_reason=str((route or {}).get("rejection_reason") or "The deployment route needs a new order."),
-                )
-            elif lifecycle == "deployment_queued":
-                deployment.update(status="queued", blocking_reason="Select a valid deployment region and dispatch this group.")
-        frame = pl.DataFrame(deployments, schema=deployments_table.schema)
-        if not frame.equals(deployments_table):
-            state.update_table("unit_deployment_orders", frame)
-
-        production_table = state.tables.get("production_orders")
-        if production_table is None or production_table.is_empty():
-            return
-        production_rows = production_table.to_dicts()
-        by_order: dict[str, list[dict[str, Any]]] = {}
-        for deployment in deployments:
-            by_order.setdefault(str(deployment.get("production_order_id") or ""), []).append(deployment)
-        changed = False
-        for order in production_rows:
-            if str(order.get("status") or "") != "awaiting_deployment":
-                continue
-            related = by_order.get(str(order.get("id") or ""), [])
-            if related and all(str(item.get("status") or "") == "delivered" for item in related):
-                order["status"] = "delivered"
-                order["blocking_reason"] = "All produced groups arrived at their assigned deployment regions."
-                changed = True
-        if changed:
-            state.update_table("production_orders", pl.DataFrame(production_rows, schema=production_table.schema))
+        self._deployment_service.refresh_state(state, units)
 
     def _deployment_actor_authorized(self, state, actor: str, owner: str) -> bool:
         return player_controls_country(state, actor, owner)
 
     def _next_deployment_id(self, production_order_id: str, deployments: list[dict[str, Any]]) -> str:
-        existing = {str(row.get("id") or "") for row in deployments}
-        index = 1
-        identifier = f"deployment-{production_order_id}-{index:03d}"
-        while identifier in existing:
-            index += 1
-            identifier = f"deployment-{production_order_id}-{index:03d}"
-        return identifier
+        return self._deployment_service.next_deployment_id(production_order_id, deployments)
 
     def _process_build_actions(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
         actions_to_process = [a for a in state.current_actions if isinstance(a, ActionBuildUnit)]
