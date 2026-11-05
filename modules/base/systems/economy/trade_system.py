@@ -12,6 +12,7 @@ from src.shared.events import EventRealSecond
 from modules.base.systems.economy.treaty_trade_policy import TreatyTradePolicy
 from modules.base.systems.economy.market_clearing_kernel import calculate_unconstrained_market
 from modules.base.systems.economy.market_input_validator import MarketInputValidator
+from modules.base.systems.economy.market_frame_builder import MarketFrameBuilder
 from modules.base.systems.world.recognition_policy import regional_trade_access_allowed
 
 
@@ -70,6 +71,7 @@ class TradeSystem(ISystem):
         "_market_index_cache": SYSTEM_STATE_CACHE,
         "_treaty_trade_policy": SYSTEM_STATE_HELPER,
         "_market_input_validator": SYSTEM_STATE_HELPER,
+        "_market_frame_builder": SYSTEM_STATE_HELPER,
     }
 
     TRADE_PRIORITY_MATRIX = {
@@ -133,12 +135,19 @@ class TradeSystem(ISystem):
         "construction_materials": {"is_storable": True, "decay_rate": 0.05},
     }
 
-    def __init__(self, market_input_validator: MarketInputValidator | None = None):
+    def __init__(
+        self,
+        market_input_validator: MarketInputValidator | None = None,
+        market_frame_builder: MarketFrameBuilder | None = None,
+    ):
         self._missing_columns = set()
         self._market_index_cache: _MarketIndexCache | None = None
         self._treaty_trade_policy = TreatyTradePolicy()
         self._market_input_validator = (
             market_input_validator if market_input_validator is not None else MarketInputValidator()
+        )
+        self._market_frame_builder = (
+            market_frame_builder if market_frame_builder is not None else MarketFrameBuilder()
         )
 
     @property
@@ -166,67 +175,15 @@ class TradeSystem(ISystem):
         # Invalid quantities otherwise contaminate global ratios and every country's closing stock.
         self._market_input_validator.validate(state)
 
-        countries = state.get_table("countries")
-        countries_lf = countries.lazy()
-        country_columns = set(countries.columns)
-        trade_modifier = (
-            pl.col("economic_trade_modifier").cast(pl.Float64, strict=False).fill_null(1.0).clip(0.5, 1.0)
-            if "economic_trade_modifier" in country_columns
-            else pl.lit(1.0)
-        )
-        trade_modifiers = countries_lf.select(
-            pl.col("id").alias("country_id"),
-            trade_modifier.alias("_economic_trade_modifier"),
-        )
         production = state.get_table("domestic_production")
-        prod_lf = production.lazy()
-        prod_lf = self._apply_treaty_production_bonus(state, prod_lf)
-        
-        if "resource_ledger" in state.tables:
-            demand_lf = state.get_table("resource_ledger").lazy().select(
-                pl.col("country_id"), pl.col("game_resource_id"), pl.col("consumption_usd").alias("demand")
-            )
-        else:
-            demand_lf = prod_lf.select(["country_id", "game_resource_id"]).with_columns(pl.lit(0.0).alias("demand"))
-
-        if "stockpiles" in state.tables:
-            stock_lf = state.get_table("stockpiles").lazy()
-        else:
-            stock_lf = prod_lf.select(["country_id", "game_resource_id"]).with_columns(pl.lit(0.0).alias("stock_amount"))
-
-        market_lf = prod_lf.join(demand_lf, on=["country_id", "game_resource_id"], how="left").with_columns(
-            pl.col("demand").fill_null(0.0)
+        production_lf = self._apply_treaty_production_bonus(state, production.lazy())
+        market_lf = self._market_frame_builder.build(
+            state,
+            production_lf,
+            _resource_physics_table(),
+            self._missing_columns,
+            self.id,
         )
-        market_lf = market_lf.join(trade_modifiers, on="country_id", how="left").with_columns(
-            pl.col("_economic_trade_modifier").fill_null(1.0)
-        )
-        market_lf = market_lf.join(stock_lf, on=["country_id", "game_resource_id"], how="left").with_columns(
-            pl.col("stock_amount").fill_null(0.0)
-        )
-
-        # Ensure Meta columns exist
-        market_cols = production.columns
-        if "is_gov_controlled" not in market_cols:
-            if "is_gov_controlled" not in self._missing_columns:
-                print(f"[{self.id}] Column 'is_gov_controlled' not found in 'domestic_production'. Defaulting to False.")
-                self._missing_columns.add("is_gov_controlled")
-            market_lf = market_lf.with_columns(pl.lit(False).alias("is_gov_controlled"))
-        if "is_legal" not in market_cols:
-            if "is_legal" not in self._missing_columns:
-                print(f"[{self.id}] Column 'is_legal' not found in 'domestic_production'. Defaulting to True.")
-                self._missing_columns.add("is_legal")
-            market_lf = market_lf.with_columns(pl.lit(True).alias("is_legal"))
-        if "tax_rate" not in market_cols:
-            if "tax_rate" not in self._missing_columns:
-                print(f"[{self.id}] Column 'tax_rate' not found in 'domestic_production'. Defaulting to 0.05.")
-                self._missing_columns.add("tax_rate")
-            market_lf = market_lf.with_columns(pl.lit(0.05).alias("tax_rate"))
-
-        # Add Physical Properties
-        market_lf = market_lf.join(_resource_physics_table().lazy(), on="game_resource_id", how="left").with_columns([
-            pl.col("is_storable").fill_null(True),
-            pl.col("decay_rate").fill_null(0.10)
-        ])
 
         # ---------------------------------------------------------
         # Local Supply & Trade Desires
