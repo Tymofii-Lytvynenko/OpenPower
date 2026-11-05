@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import math
 from typing import Any, Mapping, Protocol
 
@@ -286,6 +287,207 @@ class DeterministicEconomicPolicyChangeValidator:
             rejection_indicator=indicator,
             rejection_value=0.0,
         )
+
+
+@dataclass(frozen=True)
+class DebtContractRequestInputs:
+    player_id: str
+    debtor_country_id: str
+    creditor_country_id: str
+    now: int
+    principal: Any
+    annual_interest_rate: Any
+    payment_frequency_months: Any
+    principal_installment: Any
+    maturity_months: Any
+    currency_code: Any
+    conditions: Any
+    debtor_exists: bool
+    creditor_exists: bool
+    actor_authorized: bool
+    debtor_gdp: Any
+    terms: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class _NormalizedDebtContractRequest:
+    principal: float
+    rate: float
+    frequency: int
+    maturity: int
+    installment: float
+    maximum_rate: float
+    max_debt_ratio: float
+
+
+@dataclass(frozen=True)
+class DebtContractRequestPlan:
+    contract_id: str
+    principal: float
+    contract_row: dict[str, Any] | None
+    rejection_reason: str | None
+    rejection_amount: float
+
+
+class DebtContractRequestPlanner(Protocol):
+    def plan(self, inputs: DebtContractRequestInputs) -> DebtContractRequestPlan: ...
+
+
+class DeterministicDebtContractRequestPlanner:
+    """Build a validated debt-contract request without reading or mutating world state."""
+
+    def plan(self, inputs: DebtContractRequestInputs) -> DebtContractRequestPlan:
+        contract_id = self._contract_id(inputs)
+        terms = self._normalize(inputs)
+        rejection_reason = self._rejection_reason(inputs, terms)
+        if rejection_reason is not None:
+            rejection_amount = max(
+                0.0,
+                terms.principal if math.isfinite(terms.principal) else 0.0,
+            )
+            return DebtContractRequestPlan(
+                contract_id=contract_id,
+                principal=terms.principal,
+                contract_row=None,
+                rejection_reason=rejection_reason,
+                rejection_amount=rejection_amount,
+            )
+
+        contract_row = self._contract_row(inputs, contract_id, terms)
+        return DebtContractRequestPlan(
+            contract_id=contract_id,
+            principal=terms.principal,
+            contract_row=contract_row,
+            rejection_reason=None,
+            rejection_amount=0.0,
+        )
+
+    @staticmethod
+    def _normalize(inputs: DebtContractRequestInputs) -> _NormalizedDebtContractRequest:
+        return _NormalizedDebtContractRequest(
+            principal=_finite(inputs.principal, math.nan),
+            rate=_finite(inputs.annual_interest_rate, math.nan),
+            frequency=int(_finite(inputs.payment_frequency_months, 0.0)),
+            maturity=int(_finite(inputs.maturity_months, 0.0)),
+            installment=_finite(inputs.principal_installment, math.nan),
+            maximum_rate=_clamp(inputs.terms.get("max_interest_rate"), 0.0, 0.5, 0.5),
+            max_debt_ratio=_clamp(
+                inputs.terms.get("max_principal_multiple_of_gdp"),
+                0.0,
+                100.0,
+                3.0,
+            ),
+        )
+
+    def _rejection_reason(
+        self,
+        inputs: DebtContractRequestInputs,
+        terms: _NormalizedDebtContractRequest,
+    ) -> str | None:
+        participant_reason = self._participant_rejection(inputs)
+        if participant_reason is not None:
+            return participant_reason
+        if not inputs.actor_authorized:
+            return "Actor is not authorized for the debtor country."
+        terms_reason = self._financial_terms_rejection(terms)
+        if terms_reason is not None:
+            return terms_reason
+        if terms.principal > max(0.0, _finite(inputs.debtor_gdp)) * terms.max_debt_ratio:
+            return "Requested principal exceeds the configured debt-to-GDP limit."
+        return None
+
+    @staticmethod
+    def _participant_rejection(inputs: DebtContractRequestInputs) -> str | None:
+        if (
+            not inputs.debtor_exists
+            or not inputs.creditor_exists
+            or inputs.debtor_country_id == inputs.creditor_country_id
+        ):
+            return "Debtor and a distinct existing creditor are required."
+        return None
+
+    @classmethod
+    def _financial_terms_rejection(
+        cls,
+        terms: _NormalizedDebtContractRequest,
+    ) -> str | None:
+        amount_reason = cls._amount_rejection(terms)
+        if amount_reason is not None:
+            return amount_reason
+        rate_reason = cls._rate_rejection(terms)
+        if rate_reason is not None:
+            return rate_reason
+        return cls._schedule_rejection(terms)
+
+    @staticmethod
+    def _amount_rejection(terms: _NormalizedDebtContractRequest) -> str | None:
+        if not math.isfinite(terms.principal) or terms.principal <= 0.0:
+            return "Principal and installment must be finite non-negative amounts, with positive principal."
+        if not math.isfinite(terms.installment) or terms.installment < 0.0:
+            return "Principal and installment must be finite non-negative amounts, with positive principal."
+        return None
+
+    @staticmethod
+    def _rate_rejection(terms: _NormalizedDebtContractRequest) -> str | None:
+        if not math.isfinite(terms.rate):
+            return "Interest rate is outside scenario bounds."
+        if terms.rate < 0.0 or terms.rate > terms.maximum_rate:
+            return "Interest rate is outside scenario bounds."
+        return None
+
+    @staticmethod
+    def _schedule_rejection(terms: _NormalizedDebtContractRequest) -> str | None:
+        if terms.frequency < 1 or terms.frequency > 120:
+            return "Payment frequency or maturity is outside supported bounds."
+        if terms.maturity < terms.frequency or terms.maturity > 1_200:
+            return "Payment frequency or maturity is outside supported bounds."
+        return None
+
+    @staticmethod
+    def _contract_id(inputs: DebtContractRequestInputs) -> str:
+        request_signature = "|".join((
+            str(inputs.player_id),
+            inputs.debtor_country_id,
+            inputs.creditor_country_id,
+            str(inputs.now),
+            repr(_finite(inputs.principal)),
+            repr(_finite(inputs.annual_interest_rate)),
+            str(inputs.payment_frequency_months),
+            repr(_finite(inputs.principal_installment)),
+            str(inputs.maturity_months),
+            str(inputs.currency_code or "USD"),
+            str(inputs.conditions or ""),
+        ))
+        request_hash = hashlib.sha256(request_signature.encode("utf-8")).hexdigest()[:20]
+        return f"foreign-debt:{request_hash}"
+
+    @staticmethod
+    def _contract_row(
+        inputs: DebtContractRequestInputs,
+        contract_id: str,
+        terms: _NormalizedDebtContractRequest,
+    ) -> dict[str, Any]:
+        return {
+            "id": contract_id,
+            "debtor_country_id": inputs.debtor_country_id,
+            "creditor_country_id": inputs.creditor_country_id,
+            "debt_type": "foreign",
+            "principal_original": terms.principal,
+            "principal_remaining": terms.principal,
+            "annual_interest_rate": terms.rate,
+            "payment_frequency_months": terms.frequency,
+            "principal_payment": min(terms.principal, terms.installment),
+            "maturity_months": terms.maturity,
+            "currency_code": str(inputs.currency_code or "USD")[:16],
+            "conditions": str(inputs.conditions or "")[:2_000],
+            "created_at_minute": inputs.now,
+            "next_payment_at_minute": 0,
+            "maturity_at_minute": 0,
+            "arrears_amount": 0.0,
+            "status": "pending",
+            "reason": "Awaiting creditor approval; no funds have moved.",
+            "last_payment_at_minute": 0,
+        }
 
 
 @dataclass(frozen=True)

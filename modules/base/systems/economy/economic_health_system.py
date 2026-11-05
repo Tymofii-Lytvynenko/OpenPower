@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import calendar
-import hashlib
 import heapq
 import json
 import math
@@ -11,8 +10,11 @@ from typing import Any
 import polars as pl
 
 from modules.base.systems.economy.economic_health_policy import (
+    DebtContractRequestInputs,
+    DebtContractRequestPlanner,
     DebtServiceSettlementCalculator,
     DebtServiceSettlementInputs,
+    DeterministicDebtContractRequestPlanner,
     DeterministicDebtServiceSettlementCalculator,
     DeterministicEconomicPolicyChangeValidator,
     DeterministicEconomicProfileCalculator,
@@ -64,6 +66,7 @@ class EconomicHealthSystem(ISystem):
         profile_calculator: EconomicProfileCalculator | None = None,
         debt_service_calculator: DebtServiceSettlementCalculator | None = None,
         policy_change_validator: EconomicPolicyChangeValidator | None = None,
+        debt_contract_request_planner: DebtContractRequestPlanner | None = None,
     ) -> None:
         self._profile_calculator = (
             profile_calculator
@@ -79,6 +82,11 @@ class EconomicHealthSystem(ISystem):
             policy_change_validator
             if policy_change_validator is not None
             else DeterministicEconomicPolicyChangeValidator()
+        )
+        self._debt_contract_request_planner = (
+            debt_contract_request_planner
+            if debt_contract_request_planner is not None
+            else DeterministicDebtContractRequestPlanner()
         )
 
     @property
@@ -367,67 +375,63 @@ class EconomicHealthSystem(ISystem):
     def _request_debt_contract(self, state: GameState, action: ActionRequestDebtContract, now: int) -> None:
         debtor_id = str(action.debtor_country_id)
         creditor_id = str(action.creditor_country_id)
-        request_signature = "|".join((
-            str(action.player_id), debtor_id, creditor_id, str(now),
-            repr(self._number(action.principal)), repr(self._number(action.annual_interest_rate)),
-            str(action.payment_frequency_months), repr(self._number(action.principal_installment)),
-            str(action.maturity_months), str(action.currency_code or "USD"), str(action.conditions or ""),
-        ))
-        request_hash = hashlib.sha256(request_signature.encode("utf-8")).hexdigest()[:20]
-        contract_id = f"foreign-debt:{request_hash}"
         debtor = self._country(state, debtor_id)
         creditor = self._country(state, creditor_id)
-        principal = self._number(action.principal, math.nan)
-        rate = self._number(action.annual_interest_rate, math.nan)
-        frequency = int(self._number(action.payment_frequency_months, 0.0))
-        maturity = int(self._number(action.maturity_months, 0.0))
-        installment = self._number(action.principal_installment, math.nan)
-        terms = self._terms(state)
-        maximum_rate = self._bounded(terms.get("max_interest_rate"), 0.0, 0.5, 0.5)
-        max_debt_ratio = self._bounded(terms.get("max_principal_multiple_of_gdp"), 0.0, 100.0, 3.0)
-        reason = ""
-        if debtor is None or creditor is None or debtor_id == creditor_id:
-            reason = "Debtor and a distinct existing creditor are required."
-        elif not player_controls_country(state, action.player_id, debtor_id):
-            reason = "Actor is not authorized for the debtor country."
-        elif not math.isfinite(principal) or principal <= 0.0 or not math.isfinite(installment) or installment < 0.0:
-            reason = "Principal and installment must be finite non-negative amounts, with positive principal."
-        elif not math.isfinite(rate) or rate < 0.0 or rate > maximum_rate:
-            reason = "Interest rate is outside scenario bounds."
-        elif frequency < 1 or frequency > 120 or maturity < frequency or maturity > 1_200:
-            reason = "Payment frequency or maturity is outside supported bounds."
-        elif principal > max(0.0, self._number(debtor.get("gdp"))) * max_debt_ratio:
-            reason = "Requested principal exceeds the configured debt-to-GDP limit."
-        if reason:
-            self._reject(state, debtor_id, contract_id, "foreign_debt", max(0.0, principal if math.isfinite(principal) else 0.0), reason, now)
+        actor_authorized = (
+            debtor is not None
+            and creditor is not None
+            and debtor_id != creditor_id
+            and player_controls_country(state, action.player_id, debtor_id)
+        )
+        plan = self._debt_contract_request_planner.plan(
+            DebtContractRequestInputs(
+                player_id=str(action.player_id),
+                debtor_country_id=debtor_id,
+                creditor_country_id=creditor_id,
+                now=now,
+                principal=action.principal,
+                annual_interest_rate=action.annual_interest_rate,
+                payment_frequency_months=action.payment_frequency_months,
+                principal_installment=action.principal_installment,
+                maturity_months=action.maturity_months,
+                currency_code=action.currency_code,
+                conditions=action.conditions,
+                debtor_exists=debtor is not None,
+                creditor_exists=creditor is not None,
+                actor_authorized=actor_authorized,
+                debtor_gdp=(debtor or {}).get("gdp"),
+                terms=self._terms(state),
+            )
+        )
+        if plan.rejection_reason is not None:
+            self._reject(
+                state,
+                debtor_id,
+                plan.contract_id,
+                "foreign_debt",
+                plan.rejection_amount,
+                plan.rejection_reason,
+                now,
+            )
             return
 
         contracts = state.tables["debt_contracts"]
-        if not contracts.filter(pl.col("id") == contract_id).is_empty():
-            self._reject(state, debtor_id, contract_id, "foreign_debt", principal, "Duplicate deterministic financing request.", now)
+        if not contracts.filter(pl.col("id") == plan.contract_id).is_empty():
+            self._reject(state, debtor_id, plan.contract_id, "foreign_debt", plan.principal, "Duplicate deterministic financing request.", now)
             return
-        self._append_rows(state, "debt_contracts", [{
-            "id": contract_id,
-            "debtor_country_id": debtor_id,
-            "creditor_country_id": creditor_id,
-            "debt_type": "foreign",
-            "principal_original": principal,
-            "principal_remaining": principal,
-            "annual_interest_rate": rate,
-            "payment_frequency_months": frequency,
-            "principal_payment": min(principal, installment),
-            "maturity_months": maturity,
-            "currency_code": str(action.currency_code or "USD")[:16],
-            "conditions": str(action.conditions or "")[:2_000],
-            "created_at_minute": now,
-            "next_payment_at_minute": 0,
-            "maturity_at_minute": 0,
-            "arrears_amount": 0.0,
-            "status": "pending",
-            "reason": "Awaiting creditor approval; no funds have moved.",
-            "last_payment_at_minute": 0,
-        }])
-        self._transition_event(state, "requested", debtor_id, contract_id, "foreign_debt", 0.0, principal, "Financing request awaits creditor approval.", now)
+        assert plan.contract_row is not None
+        self._append_rows(state, "debt_contracts", [plan.contract_row])
+        self._transition_event(
+            state,
+            "requested",
+            debtor_id,
+            plan.contract_id,
+            "foreign_debt",
+            0.0,
+            plan.principal,
+            "Financing request awaits creditor approval.",
+            now,
+        )
 
     def _resolve_debt_contract(self, state: GameState, action: ActionResolveDebtContract, now: int) -> None:
         contracts = state.tables["debt_contracts"]
