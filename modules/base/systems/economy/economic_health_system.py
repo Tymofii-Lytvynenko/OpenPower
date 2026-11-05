@@ -724,52 +724,71 @@ class EconomicHealthSystem(ISystem):
         if resolution is None:
             return
 
-        contract = resolution.contract
-        debtor_id = resolution.debtor_id
-        creditor_id = resolution.creditor_id
         creditor = resolution.creditor
         debtor = resolution.debtor
         principal = resolution.principal
         if not action.accept:
-            contract["status"] = "rejected"
-            contract["reason"] = "Creditor rejected the financing request; no funds moved."
-            self._replace_rows(state, "debt_contracts", [contract])
-            self._transition_event(
+            self._reject_resolved_debt_contract(
                 state,
-                EconomicTransitionEventRequest(
-                    event_type="rejected",
-                    country_id=debtor_id,
-                    source_id=str(contract["id"]),
-                    indicator="foreign_debt",
-                    previous_value=principal,
-                    new_value=0.0,
-                    reason=contract["reason"],
-                    at_minute=now,
-                ),
+                resolution,
+                "Creditor rejected the financing request; no funds moved.",
+                now,
             )
             return
-        if creditor is None or debtor is None or self._number(creditor.get("money_reserves")) < principal:
-            contract["status"] = "rejected"
-            contract["reason"] = "Creditor no longer has sufficient reserves; the pending request was closed without a transfer."
-            self._replace_rows(state, "debt_contracts", [contract])
-            self._transition_event(
+        if (
+            creditor is None
+            or debtor is None
+            or self._number(creditor.get("money_reserves")) < principal
+        ):
+            self._reject_resolved_debt_contract(
                 state,
-                EconomicTransitionEventRequest(
-                    event_type="rejected",
-                    country_id=debtor_id,
-                    source_id=str(contract["id"]),
-                    indicator="foreign_debt",
-                    previous_value=principal,
-                    new_value=0.0,
-                    reason=contract["reason"],
-                    at_minute=now,
-                ),
+                resolution,
+                "Creditor no longer has sufficient reserves; the pending request was closed without a transfer.",
+                now,
             )
             return
 
+        self._approve_resolved_debt_contract(state, resolution, now)
+
+    def _reject_resolved_debt_contract(
+        self,
+        state: GameState,
+        resolution: _DebtContractResolutionContext,
+        reason: str,
+        now: int,
+    ) -> None:
+        contract = resolution.contract
+        contract["status"] = "rejected"
+        contract["reason"] = reason
+        self._replace_rows(state, "debt_contracts", [contract])
+        self._transition_event(
+            state,
+            EconomicTransitionEventRequest(
+                event_type="rejected",
+                country_id=resolution.debtor_id,
+                source_id=str(contract["id"]),
+                indicator="foreign_debt",
+                previous_value=resolution.principal,
+                new_value=0.0,
+                reason=reason,
+                at_minute=now,
+            ),
+        )
+
+    def _approve_resolved_debt_contract(
+        self,
+        state: GameState,
+        resolution: _DebtContractResolutionContext,
+        now: int,
+    ) -> None:
+        contract = resolution.contract
+        debtor_id = resolution.debtor_id
+        debtor = resolution.debtor
+        assert debtor is not None
+        principal = resolution.principal
         frequency = int(contract["payment_frequency_months"])
         maturity_months = max(frequency, int(contract.get("maturity_months") or frequency))
-        self._transfer_debt_principal(state, debtor_id, creditor_id, principal)
+        self._transfer_debt_principal(state, debtor_id, resolution.creditor_id, principal)
         contract["status"] = "current"
         contract["created_at_minute"] = now
         contract["next_payment_at_minute"] = self._add_months(now, frequency)
