@@ -7,18 +7,19 @@ import numpy as np
 
 from src.client.controllers.camera_controller import CameraController
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate
+from src.client.renderers.unit_projection_data import (
+    PreparedUnitProjectionData,
+    RegionAnchor,
+)
+from src.client.renderers.unit_projection_preparer import (
+    UnitGeographyResolver,
+    UnitProjectionDataPreparer,
+)
 
 
 UNIT_BILLBOARD_BASE_WIDTH = 17.0
 UNIT_BILLBOARD_ZOOM_BONUS = 9.0
 UNIT_BILLBOARD_ASPECT_RATIO = 0.68
-
-
-@dataclass(frozen=True)
-class RegionAnchor:
-    region_id: int
-    geo: GeoCoordinate
-    owner: str
 
 
 @dataclass
@@ -57,58 +58,6 @@ class ProjectedUnit:
         )
 
 
-@dataclass(frozen=True)
-class PreparedUnitProjectionData:
-    unit_ids: list[str]
-    owners: list[str]
-    unit_types: list[str]
-    strengths: np.ndarray
-    current_region_ids: np.ndarray
-    target_region_ids: np.ndarray
-    source_vectors: np.ndarray
-    target_vectors: np.ndarray
-    movement_progress: np.ndarray
-    departed_at_minutes: np.ndarray
-    arrival_at_minutes: np.ndarray
-    is_moving: np.ndarray
-    readiness_statuses: list[str]
-    readiness_targets: list[str]
-    readiness_progress: np.ndarray
-    readiness_transition_ids: list[str]
-    readiness_eta_minutes: np.ndarray
-    readiness_remaining_minutes: np.ndarray
-
-    @property
-    def count(self) -> int:
-        return len(self.unit_ids)
-
-    @classmethod
-    def empty(cls) -> "PreparedUnitProjectionData":
-        empty_int = np.empty(0, dtype=np.int32)
-        empty_float = np.empty(0, dtype=np.float32)
-        empty_vectors = np.empty((0, 3), dtype=np.float32)
-        return cls(
-            unit_ids=[],
-            owners=[],
-            unit_types=[],
-            strengths=empty_int,
-            current_region_ids=empty_int,
-            target_region_ids=empty_int,
-            source_vectors=empty_vectors,
-            target_vectors=empty_vectors,
-            movement_progress=empty_float,
-            departed_at_minutes=empty_float,
-            arrival_at_minutes=empty_float,
-            is_moving=np.empty(0, dtype=np.bool_),
-            readiness_statuses=[],
-            readiness_targets=[],
-            readiness_progress=empty_float,
-            readiness_transition_ids=[],
-            readiness_eta_minutes=empty_int,
-            readiness_remaining_minutes=empty_int,
-        )
-
-
 class UnitProjectionService:
     """
     Projects spherical world-space unit anchors into screen-space billboards.
@@ -122,6 +71,7 @@ class UnitProjectionService:
         map_height: int,
         globe_radius: float,
         surface_offset: float = 0.0,
+        data_preparer: UnitProjectionDataPreparer | None = None,
     ):
         self.camera = camera
         self.map_width = max(1, int(map_width))
@@ -131,7 +81,12 @@ class UnitProjectionService:
         # globe creates visible parallax drift at close zoom instead of preventing
         # z-fighting.
         self.surface_radius = float(globe_radius + surface_offset)
-        self._geo_projection = EquirectangularProjection(self.map_width, self.map_height)
+        projection = EquirectangularProjection(self.map_width, self.map_height)
+        self._data_preparer = (
+            data_preparer
+            if data_preparer is not None
+            else UnitProjectionDataPreparer(UnitGeographyResolver(projection))
+        )
 
     def project_units(
         self,
@@ -155,96 +110,10 @@ class UnitProjectionService:
         region_lookup: dict[int, RegionAnchor],
         current_game_minute: float | None = None,
     ) -> PreparedUnitProjectionData:
-        if not unit_rows:
-            return PreparedUnitProjectionData.empty()
-
-        unit_ids: list[str] = []
-        owners: list[str] = []
-        unit_types: list[str] = []
-        strengths: list[int] = []
-        current_region_ids: list[int] = []
-        target_region_ids: list[int] = []
-        source_vectors: list[np.ndarray] = []
-        target_vectors: list[np.ndarray] = []
-        movement_progress: list[float] = []
-        departed_at_minutes: list[float] = []
-        arrival_at_minutes: list[float] = []
-        is_moving: list[bool] = []
-        readiness_statuses: list[str] = []
-        readiness_targets: list[str] = []
-        readiness_progress: list[float] = []
-        readiness_transition_ids: list[str] = []
-        readiness_eta_minutes: list[int] = []
-        readiness_remaining_minutes: list[int] = []
-
-        for row in unit_rows:
-            current_region_id = int(row.get("current_region_id", 0) or 0)
-            source_region_id = int(row.get("source_region_id", current_region_id) or current_region_id)
-            target_region_id = int(row.get("target_region_id", -1) or -1)
-
-            current_geo = self._row_geo(row, "latitude", "longitude")
-            source_geo = self._row_geo(row, "source_latitude", "source_longitude")
-            target_geo = self._row_geo(row, "target_latitude", "target_longitude")
-
-            source = source_geo or current_geo or self._anchor_geo(region_lookup, source_region_id, current_region_id)
-            if source is None:
-                continue
-
-            target = target_geo if target_region_id > 0 else None
-            if target is None and target_region_id > 0:
-                target = self._anchor_geo(region_lookup, target_region_id)
-
-            source_vec = self._geo_to_unit_vector(source)
-            target_vec = self._geo_to_unit_vector(target) if target is not None else source_vec
-
-            unit_ids.append(str(row.get("id", "")))
-            owners.append(str(row.get("owner", "")))
-            unit_types.append(str(row.get("unit_type", "")))
-            strengths.append(int(row.get("strength", 1) or 1))
-            current_region_ids.append(current_region_id)
-            target_region_ids.append(target_region_id)
-            source_vectors.append(source_vec)
-            target_vectors.append(target_vec)
-            movement_progress.append(float(row.get("movement_progress", 0.0) or 0.0))
-            departed_at_minutes.append(float(row.get("departed_at_minute", 0) or 0))
-            arrival_at_minutes.append(float(row.get("arrival_at_minute", 0) or 0))
-            is_moving.append(bool(row.get("is_moving", False)))
-            readiness_status = str(row.get("readiness_status", "ready") or "ready").strip().lower()
-            transition_id = str(row.get("readiness_transition_id", "") or "")
-            eta_minute = int(row.get("readiness_eta_minute", 0) or 0)
-            remaining_minutes = max(
-                0,
-                eta_minute - int(current_game_minute or 0),
-            ) if transition_id else 0
-            readiness_statuses.append(readiness_status)
-            readiness_targets.append(str(row.get("readiness_target", readiness_status) or readiness_status).strip().lower())
-            readiness_progress.append(float(row.get("readiness_progress", 0.0) or 0.0))
-            readiness_transition_ids.append(transition_id)
-            readiness_eta_minutes.append(eta_minute)
-            readiness_remaining_minutes.append(remaining_minutes)
-
-        if not unit_ids:
-            return PreparedUnitProjectionData.empty()
-
-        return PreparedUnitProjectionData(
-            unit_ids=unit_ids,
-            owners=owners,
-            unit_types=unit_types,
-            strengths=np.asarray(strengths, dtype=np.int32),
-            current_region_ids=np.asarray(current_region_ids, dtype=np.int32),
-            target_region_ids=np.asarray(target_region_ids, dtype=np.int32),
-            source_vectors=np.asarray(source_vectors, dtype=np.float32),
-            target_vectors=np.asarray(target_vectors, dtype=np.float32),
-            movement_progress=np.asarray(movement_progress, dtype=np.float32),
-            departed_at_minutes=np.asarray(departed_at_minutes, dtype=np.float32),
-            arrival_at_minutes=np.asarray(arrival_at_minutes, dtype=np.float32),
-            is_moving=np.asarray(is_moving, dtype=np.bool_),
-            readiness_statuses=readiness_statuses,
-            readiness_targets=readiness_targets,
-            readiness_progress=np.asarray(readiness_progress, dtype=np.float32),
-            readiness_transition_ids=readiness_transition_ids,
-            readiness_eta_minutes=np.asarray(readiness_eta_minutes, dtype=np.int64),
-            readiness_remaining_minutes=np.asarray(readiness_remaining_minutes, dtype=np.int64),
+        return self._data_preparer.prepare(
+            unit_rows,
+            region_lookup,
+            current_game_minute,
         )
 
     def project_prepared_units(
@@ -601,8 +470,7 @@ class UnitProjectionService:
         return self._slerp(source_vec, target_vec, progress) * self.surface_radius
 
     def _geo_to_unit_vector(self, geo: GeoCoordinate) -> np.ndarray:
-        x, y, z = self._geo_projection.geo_to_unit_vector(geo)
-        return np.array([x, y, z], dtype=np.float32)
+        return self._data_preparer.geography.to_unit_vector(geo)
 
     def _format_remaining(self, minutes: int) -> str:
         days, remainder = divmod(max(0, int(minutes)), 24 * 60)
@@ -610,12 +478,11 @@ class UnitProjectionService:
         return f"{days}d {hours}h" if days else f"{hours}h"
 
     def _row_geo(self, row: dict, latitude_key: str, longitude_key: str) -> Optional[GeoCoordinate]:
-        latitude = row.get(latitude_key)
-        longitude = row.get(longitude_key)
-        if latitude is None or longitude is None:
-            return None
-
-        return GeoCoordinate(latitude=float(latitude), longitude=float(longitude))
+        return self._data_preparer.geography.row_geo(
+            row,
+            latitude_key,
+            longitude_key,
+        )
 
     def _anchor_geo(
         self,
@@ -623,10 +490,11 @@ class UnitProjectionService:
         primary_region_id: int,
         fallback_region_id: Optional[int] = None,
     ) -> Optional[GeoCoordinate]:
-        anchor = region_lookup.get(primary_region_id)
-        if anchor is None and fallback_region_id is not None:
-            anchor = region_lookup.get(fallback_region_id)
-        return anchor.geo if anchor is not None else None
+        return self._data_preparer.geography.anchor_geo(
+            region_lookup,
+            primary_region_id,
+            fallback_region_id,
+        )
 
     def _slerp(self, start: np.ndarray, end: np.ndarray, progress: float) -> np.ndarray:
         t = max(0.0, min(1.0, progress))
