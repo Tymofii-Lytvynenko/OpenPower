@@ -11,11 +11,10 @@ from typing import Any
 import polars as pl
 
 from modules.base.systems.economy.economic_health_policy import (
-    calculate_economic_health,
-    calculate_employment_rate,
-    calculate_inflation_rate,
-    calculate_labor_outcomes,
-    calculate_real_income_index,
+    DeterministicEconomicProfileCalculator,
+    EconomicProfileCalculator,
+    EconomicProfileEnvironment,
+    EconomicProfileInputs,
     calculate_scheduled_debt_service,
 )
 from modules.base.systems.world.authority_policy import player_controls_country
@@ -53,6 +52,13 @@ class EconomicHealthSystem(ISystem):
         }),
         phase=SystemPhase.ECONOMIC_HEALTH,
     )
+
+    def __init__(self, profile_calculator: EconomicProfileCalculator | None = None) -> None:
+        self._profile_calculator = (
+            profile_calculator
+            if profile_calculator is not None
+            else DeterministicEconomicProfileCalculator()
+        )
 
     @property
     def id(self) -> str:
@@ -802,24 +808,121 @@ class EconomicHealthSystem(ISystem):
         if due.is_empty():
             return
 
+        unconsumed_migration_signals = self._unconsumed_migration_signals(state)
+        regions = state.tables.get("regions")
+        environment = self._economic_profile_environment(state, now, regions)
+        updated_rows: list[dict[str, Any]] = []
+        updated_migration_signals: list[dict[str, Any]] = []
+        cause_records: list[dict[str, Any]] = []
+        source_id = f"daily-economic-profile:{boundary}"
+
+        for row in due.iter_rows(named=True):
+            country = row
+            country_id = str(country["id"])
+            inputs = EconomicProfileInputs(
+                country=country,
+                boundary=boundary,
+                labor_supply=max(
+                    0.0,
+                    environment.labor_by_country.get(
+                        country_id,
+                        self._number(country.get("labor_supply")),
+                    ),
+                ),
+                labor_effect=environment.country_effects.get(
+                    ("country", country_id.upper(), "labour"),
+                    0.0,
+                ),
+                employment_effect=environment.country_effects.get(
+                    ("country", country_id.upper(), "employment"),
+                    0.0,
+                ),
+                resource_shortage=environment.shortage_by_country.get(country_id, 0.0),
+                regional_health_effect=environment.health_effect_by_country.get(
+                    country_id.upper(),
+                    0.0,
+                ),
+                migration_signal=unconsumed_migration_signals.get(country_id),
+                migration_health_penalty=self._bounded(
+                    self._terms(state).get("migration_service_health_penalty", 0.08),
+                    0.0,
+                    0.25,
+                ),
+            )
+            projection = self._profile_calculator.calculate(inputs)
+            updated_rows.append(projection.country)
+            if projection.consumed_migration_signal is not None:
+                updated_migration_signals.append(projection.consumed_migration_signal)
+            for cause in projection.cause_changes:
+                self._record_cause(
+                    state,
+                    country_id=country_id,
+                    source_type="economic_update",
+                    source_id=source_id,
+                    indicator=cause.indicator,
+                    previous=cause.previous,
+                    current=cause.current,
+                    unit=cause.unit,
+                    now=boundary,
+                    reason=cause.reason,
+                    records=cause_records,
+                )
+
+        self._append_rows(state, "economic_cause_records", cause_records)
+        update = pl.DataFrame(updated_rows, schema=countries.schema, strict=False)
+        unaffected = countries.join(due.select("id"), on="id", how="anti")
+        state.update_table(
+            "countries",
+            pl.concat([unaffected, update], how="vertical_relaxed").sort("id"),
+        )
+        self._replace_rows(
+            state,
+            "migration_signals",
+            updated_migration_signals,
+            key="country_id",
+        )
+
+    def _unconsumed_migration_signals(
+        self,
+        state: GameState,
+    ) -> dict[str, dict[str, Any]]:
         migration_signals = state.tables.get("migration_signals")
-        unconsumed_migration_signals: dict[str, dict[str, Any]] = {}
+        unconsumed: dict[str, dict[str, Any]] = {}
         if migration_signals is not None:
             for signal in migration_signals.to_dicts():
                 updated_at = max(0, int(self._number(signal.get("updated_at_minute"))))
-                consumed_at = max(0, int(self._number(signal.get("economy_consumed_at_minute"))))
+                consumed_at = max(
+                    0,
+                    int(self._number(signal.get("economy_consumed_at_minute"))),
+                )
                 if updated_at > consumed_at:
-                    unconsumed_migration_signals[str(signal.get("country_id", ""))] = signal
+                    unconsumed[str(signal.get("country_id", ""))] = signal
+        return unconsumed
 
-        updated_migration_signals: list[dict[str, Any]] = []
-        regions = state.tables.get("regions")
-
-        country_effects = aggregate_active_effects(
-            state.tables.get("random_event_effects"),
-            now,
-            categories={"labour", "employment"},
-            subject_type="country",
+    def _economic_profile_environment(
+        self,
+        state: GameState,
+        now: int,
+        regions: pl.DataFrame | None,
+    ) -> EconomicProfileEnvironment:
+        return EconomicProfileEnvironment(
+            country_effects=aggregate_active_effects(
+                state.tables.get("random_event_effects"),
+                now,
+                categories={"labour", "employment"},
+                subject_type="country",
+            ),
+            health_effect_by_country=self._health_effect_by_country(state, now, regions),
+            labor_by_country=self._labor_supply_by_country(regions),
+            shortage_by_country=self._resource_shortage_by_country(state),
         )
+
+    def _health_effect_by_country(
+        self,
+        state: GameState,
+        now: int,
+        regions: pl.DataFrame | None,
+    ) -> dict[str, float]:
         regional_health_effects = aggregate_active_effects(
             state.tables.get("random_event_effects"),
             now,
@@ -836,223 +939,44 @@ class EconomicHealthSystem(ISystem):
         for (_, region_id, _), magnitude in regional_health_effects.items():
             owner = region_owners.get(region_id, "")
             if owner:
-                health_effect_by_country[owner] = health_effect_by_country.get(owner, 0.0) + magnitude
+                health_effect_by_country[owner] = (
+                    health_effect_by_country.get(owner, 0.0) + magnitude
+                )
+        return health_effect_by_country
 
-        labor_by_country: dict[str, float] = {}
-        if regions is not None and {"owner", "pop_15_64"}.issubset(regions.columns):
-            labor_by_country = {
-                str(row["owner"]): max(0.0, self._number(row["labor_supply"]))
-                for row in regions.group_by("owner").agg(pl.col("pop_15_64").fill_null(0).sum().alias("labor_supply")).iter_rows(named=True)
-            }
-        shortage_by_country: dict[str, float] = {}
+    def _labor_supply_by_country(
+        self,
+        regions: pl.DataFrame | None,
+    ) -> dict[str, float]:
+        if regions is None or not {"owner", "pop_15_64"}.issubset(regions.columns):
+            return {}
+        return {
+            str(row["owner"]): max(0.0, self._number(row["labor_supply"]))
+            for row in regions.group_by("owner").agg(
+                pl.col("pop_15_64").fill_null(0).sum().alias("labor_supply")
+            ).iter_rows(named=True)
+        }
+
+    def _resource_shortage_by_country(
+        self,
+        state: GameState,
+    ) -> dict[str, float]:
         ledger = state.tables.get("resource_ledger")
-        if ledger is not None and {"country_id", "balance_usd", "consumption_usd"}.issubset(ledger.columns):
-            shortage = ledger.group_by("country_id").agg(
-                pl.col("balance_usd").filter(pl.col("balance_usd") < 0).abs().sum().alias("shortage"),
-                pl.col("consumption_usd").sum().alias("demand"),
-            )
-            shortage_by_country = {
-                str(row["country_id"]): self._bounded(
-                    self._number(row["shortage"]) / max(1.0, self._number(row["demand"])), 0.0, 1.0
-                )
-                for row in shortage.iter_rows(named=True)
-            }
-
-        updated_rows: list[dict[str, Any]] = []
-        cause_records: list[dict[str, Any]] = []
-        for row in due.iter_rows(named=True):
-            country = dict(row)
-            country_id = str(country["id"])
-            previous_gdp = max(0.0, self._number(country.get("economic_previous_gdp")))
-            gdp = max(0.0, self._number(country.get("gdp")))
-            production_growth = self._bounded((gdp / previous_gdp) - 1.0, -0.5, 0.5) if previous_gdp > 0.0 else 0.0
-            employment_before = self._bounded(country.get("employment_rate"), 0.0, 1.0, 0.95)
-            raw_labor_supply = max(0.0, labor_by_country.get(country_id, self._number(country.get("labor_supply"))))
-            labor_effect = country_effects.get(("country", country_id.upper(), "labour"), 0.0)
-            labor_supply = raw_labor_supply * (1.0 + self._bounded(labor_effect, -0.5, 0.5))
-            old_wage = max(0.0, self._number(country.get("economic_previous_minimum_wage")))
-            minimum_wage = max(0.0, self._number(country.get("minimum_wage")))
-            # Wage policy cannot create household income when no working-age labor pool exists to receive it.
-            has_employed_population = labor_supply > 0.0 and employment_before > 0.0
-            wage_growth = self._bounded((minimum_wage / old_wage) - 1.0, -1.0, 1.0) if old_wage > 0.0 and has_employed_population else 0.0
-            inflation_before = self._number(country.get("inflation_rate"))
-            revenue = max(0.0, self._number(country.get("total_annual_revenue")))
-            expenses = max(0.0, self._number(country.get("total_annual_expense")))
-            deficit_ratio = self._bounded(max(0.0, expenses - revenue) / max(1.0, gdp), 0.0, 1.0)
-            inflation_after = calculate_inflation_rate(
-                previous_rate=inflation_before,
-                demand_growth=production_growth,
-                fiscal_deficit_ratio=deficit_ratio,
-                resource_cost_growth=shortage_by_country.get(country_id, 0.0),
-                policy_interest_rate=self._number(country.get("interest_rate")),
-            )
-            real_income_before = self._bounded(country.get("real_income_index"), 0.0, 2.0, 1.0)
-            nominal_index = self._bounded(
-                self._number(country.get("nominal_income_index"), 1.0) * (1.0 + wage_growth), 0.0, 2.0, 1.0
-            )
-            real_income_after = calculate_real_income_index(real_income_before, wage_growth, inflation_after)
-            employment_after = calculate_employment_rate(
-                current_rate=employment_before,
-                production_growth=production_growth,
-                real_wage_growth=wage_growth - inflation_after,
-            )
-            employment_effect = country_effects.get(("country", country_id.upper(), "employment"), 0.0)
-            employment_after = self._bounded(
-                employment_after * (1.0 + self._bounded(employment_effect, -0.5, 0.5)),
-                0.0,
-                1.0,
-            )
-            unemployment_before = self._bounded(country.get("unemployment_rate"), 0.0, 1.0, 1.0 - employment_before)
-            unemployment_after = 1.0 - employment_after
-            poverty_before = self._bounded(country.get("poverty_rate"), 0.0, 1.0)
-            poverty_after = self._bounded(
-                poverty_before + ((unemployment_after - unemployment_before) * 0.12)
-                + (max(0.0, inflation_after) * 0.02) - (max(0.0, wage_growth) * 0.04),
-                0.0,
-                1.0,
-            )
-            labor = calculate_labor_outcomes(
-                labor_supply=labor_supply,
-                employment_rate=employment_after,
-                underemployment_rate=self._number(country.get("underemployment_rate")),
-            )
-            reserve_coverage = self._bounded(self._number(country.get("money_reserves")) / max(1.0, expenses), 0.0, 1.0)
-            health_before = self._bounded(country.get("economic_health"), 0.0, 1.0, 1.0)
-            health_after = calculate_economic_health(
-                human_development=self._number(country.get("human_dev"), 0.5),
-                reserve_coverage=reserve_coverage,
-                inflation_rate=inflation_after,
-                unemployment_rate=unemployment_after,
-                poverty_rate=poverty_after,
-                real_income_index=real_income_after,
-            )
-            migration_signal = unconsumed_migration_signals.get(country_id)
-            migration_service_pressure = self._bounded(
-                migration_signal.get("service_pressure") if migration_signal else 0.0,
-                0.0,
-                1.0,
-            )
-            migration_political_pressure = self._bounded(
-                migration_signal.get("political_pressure") if migration_signal else 0.0,
-                0.0,
-                1.0,
-            )
-            migration_health_cost = self._bounded(
-                self._terms(state).get("migration_service_health_penalty", 0.08),
-                0.0,
-                0.25,
-            ) * migration_service_pressure
-            distress_health_modifier = self._bounded(
-                country.get("economic_health_modifier"), 0.5, 1.0, 1.0
-            )
-            health_after = self._bounded(
-                (health_after * distress_health_modifier)
-                - migration_health_cost
-                + self._bounded(health_effect_by_country.get(country_id.upper(), 0.0), -0.5, 0.25),
-                0.0,
-                1.0,
-            )
-            migration_pressure = self._bounded(
-                (0.35 * poverty_after)
-                + (0.30 * unemployment_after)
-                + (0.35 * max(0.0, 1.0 - real_income_after)),
-                0.0,
-                1.0,
-            )
-            migration_pressure = self._bounded(
-                migration_pressure
-                + (0.20 * migration_service_pressure)
-                + (0.10 * migration_political_pressure),
-                0.0,
-                1.0,
-            )
-            if migration_signal is not None:
-                consumed_signal = dict(migration_signal)
-                consumed_signal["economy_consumed_at_minute"] = max(
-                    0,
-                    int(self._number(migration_signal.get("updated_at_minute"))),
-                )
-                updated_migration_signals.append(consumed_signal)
-            domestic_debt = max(0.0, -self._number(country.get("money_reserves")))
-            values = {
-                "inflation_rate": inflation_after,
-                "real_income_index": real_income_after,
-                "nominal_income_index": nominal_index,
-                "employment_rate": employment_after,
-                "unemployment_rate": unemployment_after,
-                "poverty_rate": poverty_after,
-                "labor_supply": labor.labor_supply,
-                "employed_population": labor.employed_population,
-                "underemployed_population": labor.underemployed_population,
-                "economic_health": health_after,
-                "migration_pressure": migration_pressure,
-                "domestic_debt": domestic_debt,
-                "economic_previous_gdp": gdp,
-                "economic_previous_minimum_wage": minimum_wage,
-                "economic_health_last_update_minute": boundary,
-            }
-            country.update(values)
-            if "gvt_approval" in country:
-                approval_before = self._bounded(country.get("gvt_approval"), 0.0, 100.0, 50.0)
-                approval_delta = ((health_after - health_before) * 20.0) + ((unemployment_before - unemployment_after) * 8.0)
-                values["gvt_approval"] = self._bounded(approval_before + approval_delta, 0.0, 100.0)
-                country["gvt_approval"] = values["gvt_approval"]
-            updated_rows.append(country)
-            source_id = f"daily-economic-profile:{boundary}"
-            reasons = {
-                "inflation_rate": "Demand growth, fiscal deficit, resource shortage, and policy interest rate changed price pressure.",
-                "real_income_index": "Nominal income growth was adjusted for the observed inflation rate.",
-                "nominal_income_index": "Minimum-wage policy changed the nominal income index only where working-age labor is available.",
-                "employment_rate": "Production growth and real wage pressure changed labor demand.",
-                "unemployment_rate": "Unemployment is the unfilled share of the available labor supply.",
-                "labor_supply": "Regional working-age population cohorts changed the country's available labor supply.",
-                "employed_population": "Employment rate was applied to the available working-age labor supply.",
-                "underemployed_population": "Configured underemployment was applied to the employed working-age population.",
-                "poverty_rate": "Labor outcomes, purchasing-power loss, and wage growth changed poverty pressure.",
-                "economic_health": "Economic health aggregates development, reserve coverage, prices, labor, poverty, real income, migration service pressure, and bounded debt-distress effects.",
-                "migration_pressure": "Poverty, unemployment, lost purchasing power, and newly observed migration service or political pressure influence mobility.",
-                "domestic_debt": "Negative treasury reserves are reported as domestic overdraft exposure without inventing a creditor.",
-            }
-            old_values = {
-                "inflation_rate": inflation_before,
-                "nominal_income_index": self._number(row.get("nominal_income_index"), 1.0),
-                "real_income_index": real_income_before,
-                "employment_rate": employment_before,
-                "unemployment_rate": unemployment_before,
-                "labor_supply": self._number(row.get("labor_supply")),
-                "employed_population": self._number(row.get("employed_population")),
-                "underemployed_population": self._number(row.get("underemployed_population")),
-                "poverty_rate": poverty_before,
-                "economic_health": health_before,
-                "migration_pressure": self._number(row.get("migration_pressure")),
-                "domestic_debt": self._number(row.get("domestic_debt")),
-            }
-            if "gvt_approval" in row:
-                old_values["gvt_approval"] = self._number(row.get("gvt_approval"), 50.0)
-                reasons["gvt_approval"] = "Employment and economic-health changes influenced public approval."
-                units = {"gvt_approval": "percent"}
-            else:
-                units = {}
-            units.update({
-                "inflation_rate": "rate", "nominal_income_index": "index", "real_income_index": "index",
-                "employment_rate": "rate", "unemployment_rate": "rate",
-                "labor_supply": "people", "employed_population": "people", "underemployed_population": "people",
-                "poverty_rate": "rate", "economic_health": "index",
-                "migration_pressure": "index", "domestic_debt": "currency",
-            })
-            for indicator, previous in old_values.items():
-                current = self._number(values[indicator])
-                self._record_cause(state, country_id=country_id, source_type="economic_update", source_id=source_id,
-                    indicator=indicator, previous=previous, current=current, unit=units[indicator], now=boundary,
-                    reason=reasons[indicator], records=cause_records)
-
-        self._append_rows(state, "economic_cause_records", cause_records)
-        update = pl.DataFrame(updated_rows, schema=countries.schema, strict=False)
-        unaffected = countries.join(due.select("id"), on="id", how="anti")
-        state.update_table("countries", pl.concat([unaffected, update], how="vertical_relaxed").sort("id"))
-        self._replace_rows(
-            state,
-            "migration_signals",
-            updated_migration_signals,
-            key="country_id",
+        if ledger is None or not {
+            "country_id",
+            "balance_usd",
+            "consumption_usd",
+        }.issubset(ledger.columns):
+            return {}
+        shortage = ledger.group_by("country_id").agg(
+            pl.col("balance_usd").filter(pl.col("balance_usd") < 0).abs().sum().alias("shortage"),
+            pl.col("consumption_usd").sum().alias("demand"),
         )
+        return {
+            str(row["country_id"]): self._bounded(
+                self._number(row["shortage"]) / max(1.0, self._number(row["demand"])),
+                0.0,
+                1.0,
+            )
+            for row in shortage.iter_rows(named=True)
+        }
