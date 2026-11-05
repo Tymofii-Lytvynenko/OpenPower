@@ -46,8 +46,10 @@ from modules.base.systems.military.unit_reorganization import UnitReorganization
 from modules.base.systems.military.market_purchase_service import MilitaryMarketPurchaseService
 from modules.base.systems.military.territory_entry import authorized_entry_moves
 from modules.base.systems.world.demilitarization_policy import DemilitarizationPolicy
-from src.core.map.engagement_geometry import interpolate_geo
 from modules.base.systems.military.war_policy import hostile_country_pairs
+from modules.base.systems.military.contact_transition_preflight import (
+    MilitaryContactTransitionPreflight,
+)
 
 
 UNIT_TABLE = "units"
@@ -238,6 +240,7 @@ class MilitarySystem(ISystem):
         "_market_purchase_service": SYSTEM_STATE_HELPER,
         "_attack_order_service": SYSTEM_STATE_HELPER,
         "_unit_order_workflow": SYSTEM_STATE_HELPER,
+        "_contact_transition_preflight": SYSTEM_STATE_HELPER,
         "_manpower_cache_key": SYSTEM_STATE_CACHE,
         "_manpower_by_owner": SYSTEM_STATE_CACHE,
     }
@@ -261,6 +264,12 @@ class MilitarySystem(ISystem):
         self._weapons_trade_policy = WeaponsTradePolicy()
         self._readiness_system = ReadinessSystem()
         self._unit_order_workflow = UnitOrderWorkflowService(self._readiness_system)
+        self._contact_transition_preflight = MilitaryContactTransitionPreflight(
+            readiness_transitions=self._readiness_system,
+            unit_order_workflow=self._unit_order_workflow,
+            unit_movement=self._movement_progression,
+            hostility_policy=hostile_country_pairs,
+        )
         self._movement_order_service = MilitaryMoveOrderService(
             route_planner=self._route_planner,
             access_policy=self._access_policy,
@@ -327,95 +336,7 @@ class MilitarySystem(ISystem):
             self._update_manpower(state)
 
     def _preflight_contact_transition_interruptions(self, state: GameState, units: pl.DataFrame) -> None:
-        """Cancel transitions before due processing when contact is already knowable.
-
-        Readiness and movement share one military phase. Looking one movement
-        segment ahead preserves contact-before-completion precedence without
-        making the readiness system depend on the movement implementation.
-        """
-        war_table = state.tables.get("countries_wars")
-        war_rows = [] if war_table is None else war_table.to_dicts()
-        hostile_pairs = hostile_country_pairs(war_rows)
-        if not hostile_pairs or units.is_empty() or "owner" not in units.columns:
-            return
-        hostile_countries = sorted({country for pair in hostile_pairs for country in pair})
-        unit_rows = units.filter(
-            pl.col("owner").cast(pl.Utf8, strict=False).fill_null("").str.strip_chars().str.to_uppercase().is_in(hostile_countries)
-        ).to_dicts()
-        if not unit_rows:
-            return
-        by_id = {str(row.get("id") or ""): row for row in unit_rows}
-        contact_ids: set[str] = set()
-
-        for action in state.current_actions:
-            if not isinstance(action, ActionAttackUnit):
-                continue
-            attacker = by_id.get(str(action.attacker_unit_id or ""))
-            defender = by_id.get(str(action.defender_unit_id or ""))
-            if not self._valid_hostile_attack(attacker, defender, hostile_pairs, state):
-                continue
-            if self._unit_is_transitioning(state, str(attacker.get("id") or "")):
-                continue
-            if str(attacker.get("readiness_status") or "").strip().lower() == "parked":
-                continue
-            contact_ids.update({str(attacker.get("id") or ""), str(defender.get("id") or "")})
-
-        ordered_rows = sorted(unit_rows, key=lambda row: str(row.get("id") or ""))
-        owners_by_country: dict[str, list[dict[str, Any]]] = {}
-        for row in ordered_rows:
-            owner = str(row.get("owner") or "").strip().upper()
-            if owner:
-                owners_by_country.setdefault(owner, []).append(row)
-        for row in ordered_rows:
-            if str(row.get("engagement_mode") or "").lower() not in {"assault", "positional"}:
-                continue
-            owner = str(row.get("owner") or "").strip().upper()
-            hostile_units = [
-                candidate
-                for enemy in sorted(owners_by_country)
-                if frozenset((owner, enemy)) in hostile_pairs
-                for candidate in owners_by_country[enemy]
-                if int(candidate.get("strength") or 0) > 0
-            ]
-            if hostile_units:
-                contact_ids.add(str(row.get("id") or ""))
-                contact_ids.update(str(candidate.get("id") or "") for candidate in hostile_units)
-        for row in ordered_rows:
-            if not bool(row.get("is_moving")):
-                continue
-            owner = str(row.get("owner") or "").strip().upper()
-            hostile_candidates = [
-                candidate
-                for enemy in sorted(owners_by_country)
-                if frozenset((owner, enemy)) in hostile_pairs
-                for candidate in owners_by_country[enemy]
-            ]
-            if not hostile_candidates:
-                continue
-            departed_value = row.get("departed_at_minute")
-            arrival_value = row.get("arrival_at_minute")
-            departed = int(departed_value if departed_value is not None else state.time.total_minutes)
-            arrival = int(arrival_value if arrival_value is not None else state.time.total_minutes)
-            duration = max(1, arrival - departed)
-            previous_progress = max(0.0, min(1.0, float(row.get("movement_progress") or 0.0)))
-            next_progress = max(
-                0.0,
-                min(1.0, (int(state.time.total_minutes) - departed) / duration),
-            )
-            start = self._interpolate_row_geo(row, previous_progress)
-            end = self._interpolate_row_geo(row, next_progress)
-            contact = self._first_hostile_contact(
-                row,
-                hostile_candidates,
-                start,
-                end,
-                int(state.time.total_minutes),
-            )
-            if contact is not None:
-                contact_ids.update({str(row.get("id") or ""), str(contact[0].get("id") or "")})
-
-        for unit_id in sorted(contact_ids):
-            self._readiness_system.cancel_transition_for_unit(state, unit_id, "combat_contact")
+        self._contact_transition_preflight.process(state, units)
 
     def _valid_hostile_attack(
         self,
@@ -424,24 +345,14 @@ class MilitarySystem(ISystem):
         hostile_pairs: set[frozenset[str]],
         state: GameState,
     ) -> bool:
-        if attacker is None or defender is None or attacker is defender:
-            return False
-        if int(attacker.get("strength") or 0) <= 0 or int(defender.get("strength") or 0) <= 0:
-            return False
-        attacker_owner = str(attacker.get("owner") or "").strip().upper()
-        defender_owner = str(defender.get("owner") or "").strip().upper()
-        return frozenset((attacker_owner, defender_owner)) in hostile_pairs
+        return self._contact_transition_preflight.valid_hostile_attack(
+            attacker,
+            defender,
+            hostile_pairs,
+        )
 
     def _interpolate_row_geo(self, row: dict[str, Any], progress: float) -> GeoCoordinate:
-        source = GeoCoordinate(
-            latitude=self._row_float(row, "source_latitude", row.get("latitude")),
-            longitude=self._row_float(row, "source_longitude", row.get("longitude")),
-        )
-        target = GeoCoordinate(
-            latitude=self._row_float(row, "target_latitude", row.get("latitude")),
-            longitude=self._row_float(row, "target_longitude", row.get("longitude")),
-        )
-        return interpolate_geo(source, target, progress)
+        return self._contact_transition_preflight.interpolate_row_geo(row, progress)
 
     def _row_float(self, row: dict[str, Any], key: str, fallback: Any = 0.0) -> float:
         value = row.get(key)
