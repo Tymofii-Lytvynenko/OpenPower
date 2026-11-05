@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 import polars as pl
@@ -50,6 +51,7 @@ from modules.base.systems.economy.economic_policy_transition import (
     DeterministicEconomicPolicyTransitionPlanner,
     EconomicPolicyApplicationInputs,
     EconomicPolicyApplicationPlanner,
+    EconomicPolicyTransitionPlan,
     EconomicPolicyTransitionInputs,
     EconomicPolicyTransitionPlanner,
 )
@@ -79,6 +81,18 @@ def _resolve_component(
     if component is not None:
         return component
     return default_factory()
+
+
+@dataclass(frozen=True)
+class _ValidatedEconomicPolicyChange:
+    country_id: str
+    source_id: str
+    player_id: str
+    country: Mapping[str, Any]
+    terms: Mapping[str, Any]
+    policy_name: str
+    previous_value: float
+    target_value: float
 
 
 class EconomicHealthSystem(ISystem):
@@ -284,12 +298,28 @@ class EconomicHealthSystem(ISystem):
         )
 
     def _request_policy_change(self, state: GameState, action: ActionChangeEconomicPolicy, now: int) -> None:
+        request = self._validate_policy_change_request(state, action, now)
+        if request is None:
+            return
+
+        plan = self._plan_policy_transition_request(state, request, now)
+        if plan is None:
+            return
+
+        self._persist_policy_transition_request(state, request, plan, now)
+
+    def _validate_policy_change_request(
+        self,
+        state: GameState,
+        action: ActionChangeEconomicPolicy,
+        now: int,
+    ) -> _ValidatedEconomicPolicyChange | None:
         country_id = str(action.country_tag)
         country = self._country(state, country_id)
         source_id = f"policy-request:{country_id}:{action.policy_name}:{now}"
         if country is None or not player_controls_country(state, action.player_id, country_id):
             self._reject(state, country_id, source_id, action.policy_name, 0.0, "Actor is not authorized for this country.", now)
-            return
+            return None
 
         terms = self._terms(state)
         validation = self._policy_change_validator.validate(
@@ -311,59 +341,109 @@ class EconomicHealthSystem(ISystem):
                 validation.rejection_reason,
                 now,
             )
-            return
-        column = validation.policy_name
-        value = validation.target_value
-        previous = validation.previous_value
+            return None
 
+        return _ValidatedEconomicPolicyChange(
+            country_id=country_id,
+            source_id=source_id,
+            player_id=str(action.player_id),
+            country=country,
+            terms=terms,
+            policy_name=validation.policy_name,
+            previous_value=validation.previous_value,
+            target_value=validation.target_value,
+        )
+
+    def _plan_policy_transition_request(
+        self,
+        state: GameState,
+        request: _ValidatedEconomicPolicyChange,
+        now: int,
+    ) -> EconomicPolicyTransitionPlan | None:
         transitions = state.tables["economic_policy_transitions"]
         cooldown_active = not transitions.filter(
-            (pl.col("country_id") == country_id)
-            & (pl.col("policy_name") == column)
+            (pl.col("country_id") == request.country_id)
+            & (pl.col("policy_name") == request.policy_name)
             & (pl.col("status").is_in(["scheduled", "applied"]))
             & (pl.col("cooldown_until_minute") > now)
         ).is_empty()
-        configured_cost = terms.get(f"{column}_transition_cost", terms.get("policy_transition_cost", 0.0))
+        configured_cost = request.terms.get(
+            f"{request.policy_name}_transition_cost",
+            request.terms.get("policy_transition_cost", 0.0),
+        )
         draft = self._policy_transition_planner.prepare(
             EconomicPolicyTransitionInputs(
-                transition_id=source_id,
-                country_id=country_id,
-                player_id=str(action.player_id),
-                policy_name=column,
-                previous_value=previous,
-                target_value=value,
-                current_reserves=self._number(country.get("money_reserves")),
+                transition_id=request.source_id,
+                country_id=request.country_id,
+                player_id=request.player_id,
+                policy_name=request.policy_name,
+                previous_value=request.previous_value,
+                target_value=request.target_value,
+                current_reserves=self._number(request.country.get("money_reserves")),
                 transition_cost_setting=configured_cost,
-                delay_minutes_setting=terms.get("policy_delay_minutes"),
-                cooldown_minutes_setting=terms.get("policy_cooldown_minutes"),
+                delay_minutes_setting=request.terms.get("policy_delay_minutes"),
+                cooldown_minutes_setting=request.terms.get("policy_cooldown_minutes"),
                 cooldown_active=cooldown_active,
                 now=now,
             )
         )
         if draft.rejection_reason is not None:
-            self._reject(state, country_id, source_id, column, previous, draft.rejection_reason, now)
-            return
+            self._reject(
+                state,
+                request.country_id,
+                request.source_id,
+                request.policy_name,
+                request.previous_value,
+                draft.rejection_reason,
+                now,
+            )
+            return None
+
         plan = self._policy_transition_planner.finalize(
             draft,
-            transition_id_exists=not transitions.filter(pl.col("id") == source_id).is_empty(),
+            transition_id_exists=not transitions.filter(
+                pl.col("id") == request.source_id
+            ).is_empty(),
         )
         if plan.rejection_reason is not None:
-            self._reject(state, country_id, source_id, column, previous, plan.rejection_reason, now)
-            return
+            self._reject(
+                state,
+                request.country_id,
+                request.source_id,
+                request.policy_name,
+                request.previous_value,
+                plan.rejection_reason,
+                now,
+            )
+            return None
+
+        return plan
+
+    def _persist_policy_transition_request(
+        self,
+        state: GameState,
+        request: _ValidatedEconomicPolicyChange,
+        plan: EconomicPolicyTransitionPlan,
+        now: int,
+    ) -> None:
         assert plan.row is not None
         row = plan.row
         transition_cost = plan.transition_cost
         if transition_cost > 0.0:
-            self._country_values(state, country_id, {"money_reserves": ("add", -transition_cost)})
+            self._country_values(
+                state,
+                request.country_id,
+                {"money_reserves": ("add", -transition_cost)},
+            )
             self._record_cause(
                 state,
                 EconomicCauseRecordRequest(
-                    country_id=country_id,
+                    country_id=request.country_id,
                     source_type="policy_transition",
-                    source_id=source_id,
+                    source_id=request.source_id,
                     indicator="money_reserves",
-                    previous_value=self._number(country.get("money_reserves")),
-                    new_value=self._number(country.get("money_reserves")) - transition_cost,
+                    previous_value=self._number(request.country.get("money_reserves")),
+                    new_value=self._number(request.country.get("money_reserves")) - transition_cost,
                     unit="currency",
                     game_minute=now,
                     reason=row["reason"],
@@ -374,11 +454,11 @@ class EconomicHealthSystem(ISystem):
             state,
             EconomicTransitionEventRequest(
                 event_type="scheduled",
-                country_id=country_id,
-                source_id=source_id,
-                indicator=column,
-                previous_value=previous,
-                new_value=value,
+                country_id=request.country_id,
+                source_id=request.source_id,
+                indicator=request.policy_name,
+                previous_value=request.previous_value,
+                new_value=request.target_value,
                 reason=row["reason"],
                 at_minute=now,
             ),
