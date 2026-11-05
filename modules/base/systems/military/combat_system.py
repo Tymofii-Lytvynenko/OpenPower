@@ -21,6 +21,14 @@ from modules.base.systems.military.war_index import (
     WarRecord as WarRecord,
 )
 from modules.base.systems.military.battle_change_detection import battle_snapshot_changed
+from modules.base.systems.military.battle_victory_finalizer import (
+    BattleEndedEventRequest,
+    BattleVictoryFinalizer,
+    ConcludedBattleRowRequest,
+    ConcludedOccupationUpdateRequest,
+    VictoryFinalizationOperations,
+    VictoryResolutionBatch as _VictoryResolutionBatch,
+)
 from modules.base.systems.military.readiness_policy import ReadinessPolicy
 from modules.base.systems.military.readiness_system import cancel_readiness_for_contact
 
@@ -114,19 +122,6 @@ class CombatOutcome:
     defender_losses: int
 
 
-@dataclass(slots=True)
-class _VictoryResolutionBatch:
-    victors: dict[str, str]
-    victor_sides: dict[str, str]
-    active_battle_ids: set[str]
-    battle_regions: dict[str, int]
-    battle_metadata: dict[str, dict[str, Any]]
-    battle_rows: list[dict[str, Any]]
-    unit_rows: list[dict[str, Any]]
-    region_rows: list[dict[str, Any]]
-    occupation_rows: list[dict[str, Any]]
-
-
 class CombatResolutionPolicy:
     """Keeps combat deterministic and easy to tune independently from system flow."""
 
@@ -168,6 +163,7 @@ class CombatSystem(ISystem):
         "_policy": SYSTEM_STATE_HELPER,
         "_readiness": SYSTEM_STATE_HELPER,
         "_alliances": SYSTEM_STATE_HELPER,
+        "_victory_finalizer": SYSTEM_STATE_HELPER,
         "_capability_index": SYSTEM_STATE_HELPER,
     }
 
@@ -175,6 +171,14 @@ class CombatSystem(ISystem):
         self._policy = CombatResolutionPolicy()
         self._readiness = ReadinessPolicy()
         self._alliances = AlliancePolicy()
+        self._victory_finalizer = BattleVictoryFinalizer(
+            VictoryFinalizationOperations(
+                battle_row_lookup=self._battle_row,
+                concluded_battle_row_builder=self._concluded_battle_row,
+                battle_ended_event_factory=self._battle_ended_event,
+                concluded_occupation_updater=self._update_concluded_occupation,
+            )
+        )
         self._capability_index: dict[str, dict[str, Any]] = {}
 
     @property
@@ -490,27 +494,11 @@ class CombatSystem(ISystem):
             )
 
     def _finalize_victories(
-        self, state: GameState, batch: _VictoryResolutionBatch,
+        self,
+        state: GameState,
+        batch: _VictoryResolutionBatch,
     ) -> list[dict[str, Any]]:
-        occupation_rows = batch.occupation_rows
-        for battle_id, victor in batch.victors.items():
-            if battle_id in batch.active_battle_ids:
-                batch.active_battle_ids.remove(battle_id)
-            region_id = batch.battle_regions.get(battle_id, int(battle_id.split("-")[2]))
-            prior_row = self._battle_row(state.tables.get(BATTLE_TABLE), battle_id)
-            concluded_row = self._concluded_battle_row(
-                prior_row, battle_id, region_id, batch.battle_metadata.get(battle_id, {}),
-                now=int(state.time.total_minutes), victor_side=batch.victor_sides.get(battle_id, ''),
-            )
-            batch.battle_rows.append(concluded_row)
-            state.events.append(self._battle_ended_event(
-                battle_id, victor, region_id, int(state.time.total_minutes), concluded_row,
-            ))
-            occupation_rows = self._update_concluded_occupation(
-                region_id, victor, batch.unit_rows, batch.region_rows, occupation_rows,
-                int(state.time.total_minutes),
-            )
-        return occupation_rows
+        return self._victory_finalizer.finalize(state, batch)
 
     def _replace_occupation(self, occupation_rows, region_id, controller, local_units, now):
         previous = next(
@@ -541,8 +529,15 @@ class CombatSystem(ISystem):
         return occupation_rows
 
     def _concluded_battle_row(
-        self, prior_row, battle_id, region_id, metadata, *, now: int, victor_side: str,
+        self,
+        request: ConcludedBattleRowRequest,
     ) -> dict[str, Any]:
+        prior_row = request.prior_row
+        battle_id = request.battle_id
+        region_id = request.region_id
+        metadata = request.metadata
+        now = request.now
+        victor_side = request.victor_side
         concluded_row = dict(prior_row)
         if not concluded_row:
             side_a_strength = int(metadata.get("side_a_strength", 0))
@@ -585,8 +580,15 @@ class CombatSystem(ISystem):
         return concluded_row
 
     def _update_concluded_occupation(
-        self, region_id, victor, unit_rows, region_rows, occupation_rows, now,
-    ):
+        self,
+        request: ConcludedOccupationUpdateRequest,
+    ) -> list[dict[str, Any]]:
+        region_id = request.region_id
+        victor = request.victor
+        unit_rows = request.unit_rows
+        region_rows = request.region_rows
+        occupation_rows = request.occupation_rows
+        now = request.now
         if victor:
             self._set_region_controller(region_rows, region_id, victor)
             victor_tag = self._clean_tag(victor)
@@ -628,18 +630,21 @@ class CombatSystem(ISystem):
         )
 
     @staticmethod
-    def _battle_ended_event(battle_id, victor, region_id, now, concluded_row) -> EventBattleEnded:
+    def _battle_ended_event(
+        request: BattleEndedEventRequest,
+    ) -> EventBattleEnded:
         # Outcomes are emitted after scanning every region. The loop's last
         # local_units/conflict belongs to another battle when several end
         # together; recipient and side metadata must come from this result.
+        concluded_row = request.concluded_row
         side_a_countries = WarIndex._normalize_side(concluded_row.get("attacker_side"))
         side_b_countries = WarIndex._normalize_side(concluded_row.get("defender_side"))
         return EventBattleEnded(
-            battle_id=battle_id,
-            victor_tag=victor,
+            battle_id=request.battle_id,
+            victor_tag=request.victor,
             victor_side=str(concluded_row.get("victor_side") or ""),
-            region_id=region_id,
-            concluded_at_minute=now,
+            region_id=request.region_id,
+            concluded_at_minute=request.now,
             side_a_losses=int(concluded_row.get("side_a_losses") or 0),
             side_b_losses=int(concluded_row.get("side_b_losses") or 0),
             participant_countries=tuple(sorted(side_a_countries | side_b_countries)),
