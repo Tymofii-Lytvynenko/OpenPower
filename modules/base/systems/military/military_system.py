@@ -26,6 +26,7 @@ from modules.base.systems.military.movement_access import MovementAccessPolicy
 from modules.base.systems.military.movement_batch_updater import MovementBatchUpdater
 from modules.base.systems.military.movement_constants import NO_TARGET_REGION
 from modules.base.systems.military.movement_duration import MovementDurationPolicy, DEFAULT_MOVE_MINUTES
+from modules.base.systems.military.movement_progression import MovementProgression
 from modules.base.systems.military.movement_domains import (unit_domain, has_domain_metadata, domain_route_compatible, region_is_water)
 from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
 from modules.base.systems.military.authority_policy import player_controls_country
@@ -37,7 +38,7 @@ from modules.base.systems.military.readiness_system import ReadinessSystem
 from modules.base.systems.military.unit_reorganization import UnitReorganization
 from modules.base.systems.military.territory_entry import authorized_entry_moves
 from modules.base.systems.world.demilitarization_policy import DemilitarizationPolicy
-from src.core.map.engagement_geometry import engagement_radius_km, first_zone_contact_fraction, interpolate_geo
+from src.core.map.engagement_geometry import interpolate_geo
 from modules.base.systems.military.war_policy import hostile_country_pairs
 
 
@@ -213,6 +214,7 @@ class MilitarySystem(ISystem):
         "_unit_factory": SYSTEM_STATE_HELPER,
         "_access_policy": SYSTEM_STATE_HELPER,
         "_movement_batch_updater": SYSTEM_STATE_HELPER,
+        "_movement_progression": SYSTEM_STATE_HELPER,
         "_route_planner": SYSTEM_STATE_HELPER,
         "_naval_invasion_policy": SYSTEM_STATE_HELPER,
         "_weapons_trade_policy": SYSTEM_STATE_HELPER,
@@ -230,6 +232,13 @@ class MilitarySystem(ISystem):
         self._movement_batch_updater = MovementBatchUpdater(self._access_policy)
         self._route_planner = MilitaryRoutePlanner()
         self._naval_invasion_policy = NavalInvasionPolicy()
+        self._movement_progression = MovementProgression(
+            access_policy=self._access_policy,
+            duration_policy=self._duration_policy,
+            naval_invasion_policy=self._naval_invasion_policy,
+            duration_calculator=self._route_segment_minutes_for_unit,
+            route_schema=MOVEMENT_ROUTE_SCHEMA,
+        )
         self._weapons_trade_policy = WeaponsTradePolicy()
         self._readiness_system = ReadinessSystem()
         self._demilitarization_policy = DemilitarizationPolicy()
@@ -1771,266 +1780,29 @@ class MilitarySystem(ISystem):
         current_minute: int,
         capability_speed_by_unit: dict[str, float] | None = None,
     ) -> pl.DataFrame:
-        if units.is_empty():
+        if self._unit_movement_is_idle(units):
             return units
-
-        if {"is_moving", "movement_progress"}.issubset(units.columns):
-            is_moving = units.get_column("is_moving").fill_null(False)
-            has_stale_progress = (
-                units.get_column("movement_progress").fill_null(0.0) != 0.0
-            ).any()
-            if not is_moving.any() and not has_stale_progress:
-                return units
 
         batched = self._try_update_uncontested_movement_batch(state, units, current_minute)
         if batched is not None:
             return batched
 
-        war_table = state.tables.get("countries_wars")
-        war_rows = [] if war_table is None else war_table.to_dicts()
-        hostile_owners_by_country: dict[str, set[str]] = {}
-        for pair in hostile_country_pairs(war_rows):
-            tags = tuple(pair)
-            if len(tags) != 2:
-                continue
-            left, right = tags
-            hostile_owners_by_country.setdefault(left, set()).add(right)
-            hostile_owners_by_country.setdefault(right, set()).add(left)
+        updated_rows = self._movement_progression.update_rows(
+            state,
+            units,
+            current_minute,
+            capability_speed_by_unit,
+        )
+        return self._units_from_rows(updated_rows)
 
-        rows = units.to_dicts()
-        route_table = state.tables.get("unit_movement_routes")
-        route_rows = [] if route_table is None else route_table.to_dicts()
-        route_by_unit = {str(route.get("unit_id") or ""): route for route in route_rows}
-        regions = state.tables.get("regions")
-        region_locations = {} if regions is None else self._duration_policy.region_locations(regions)
-        region_rows = [] if regions is None else regions.to_dicts()
-        has_domain_metadata = self._has_domain_route_metadata(region_rows)
-        regions_by_id = {int(region.get("id") or 0): region for region in region_rows}
-        ordered_rows = sorted(rows, key=lambda candidate: str(candidate.get("id") or ""))
-        moving_owners = {
-            str(row.get("owner") or "").strip().upper()
-            for row in rows
-            if bool(row.get("is_moving"))
-        }
-        contact_candidates = {
-            owner: [
-                candidate
-                for candidate in ordered_rows
-                if str(candidate.get("owner") or "").strip().upper()
-                in hostile_owners_by_country.get(owner, set())
-            ]
-            for owner in moving_owners
-        }
-        access_context_by_country = {}
-        for row in rows:
-            unit_id = str(row.get("id") or "")
-            owner = str(row.get("owner") or "").strip().upper()
-            route = route_by_unit.get(unit_id)
-            target_region_id = int(row.get("target_region_id") or NO_TARGET_REGION)
-            if target_region_id <= 0 or not bool(row.get("is_moving")):
-                row["movement_progress"] = 0.0
-                row["is_moving"] = False
-                continue
-
-            departed_value = row.get("departed_at_minute")
-            arrival_value = row.get("arrival_at_minute")
-            departed_at = int(departed_value if departed_value is not None else current_minute)
-            arrival_at = int(arrival_value if arrival_value is not None else current_minute)
-            duration = max(1, arrival_at - departed_at)
-            previous_progress = max(0.0, min(1.0, float(row.get("movement_progress") or 0.0)))
-            progress = max(0.0, min(1.0, (current_minute - departed_at) / duration))
-            source_geo = GeoCoordinate(
-                latitude=self._row_float(row, "source_latitude", row.get("latitude")),
-                longitude=self._row_float(row, "source_longitude", row.get("longitude")),
-            )
-            target_geo = GeoCoordinate(
-                latitude=self._row_float(row, "target_latitude", row.get("latitude")),
-                longitude=self._row_float(row, "target_longitude", row.get("longitude")),
-            )
-            current_target = regions_by_id.get(target_region_id)
-            route_ids = [] if route is None else [int(value) for value in route.get("route_region_ids") or []]
-            route_index = 0 if route is None else int(route.get("route_index") or 0)
-            is_final_leg = route is None or int(route.get("destination_region_id") or target_region_id) == target_region_id
-            domain_allowed = current_target is not None and self._domain_route_compatible(
-                self._domain_for_unit(row),
-                current_target,
-                is_final_leg,
-                bool(route and route.get("is_naval_invasion")),
-                region_rows,
-                metadata_available=has_domain_metadata,
-            )[0]
-            access_context = access_context_by_country.get(owner)
-            if access_context is None:
-                access_context = self._access_policy.for_country(state, owner)
-                access_context_by_country[owner] = access_context
-            access_allowed = current_target is not None and (
-                access_context.can_station(current_target)
-                if is_final_leg
-                else access_context.can_transit(current_target)
-            )
-            if not domain_allowed or not access_allowed:
-                # Revoked rights stop movement at the last legal waypoint instead of allowing a stale route to cross a border.
-                self._stop_unit_at(row, source_geo, current_minute)
-                lifecycle = str(row.get("unit_lifecycle") or "")
-                if lifecycle in {"deployment_transit", "in_transit"}:
-                    row["unit_lifecycle"] = "deployment_blocked"
-                else:
-                    row["unit_lifecycle"] = "route_blocked"
-                if route is not None:
-                    route["status"] = "blocked"
-                    route["rejection_reason"] = (
-                        "The current route segment is incompatible with the unit domain."
-                        if not domain_allowed
-                        else "The current route segment no longer has valid access rights."
-                    )
-                    route["updated_at_minute"] = current_minute
-                continue
-            previous_geo = interpolate_geo(source_geo, target_geo, previous_progress)
-            next_geo = interpolate_geo(source_geo, target_geo, progress)
-            contact = self._first_hostile_contact(
-                row,
-                contact_candidates.get(owner, ()),
-                previous_geo,
-                next_geo,
-                current_minute,
-            )
-
-            if contact is not None:
-                defender, fraction = contact
-                contact_geo = interpolate_geo(previous_geo, next_geo, fraction)
-                row["current_region_id"] = int(defender.get("current_region_id") or 0)
-                self._stop_unit_at(row, contact_geo, current_minute)
-                row["engagement_mode"] = "positional"
-                if route is not None:
-                    route["status"] = "interrupted"
-                    route["rejection_reason"] = "Hostile contact interrupted the route."
-                    route["updated_at_minute"] = current_minute
-                defender_geo = self._unit_geo_at(defender, current_minute)
-                self._stop_unit_at(defender, defender_geo, current_minute)
-                defender["engagement_mode"] = "positional"
-                continue
-
-            if progress >= 1.0:
-                if route is not None and bool(route.get("is_naval_invasion")) and is_final_leg:
-                    destination = regions_by_id.get(target_region_id)
-                    valid_landing, landing_reason = (False, "The landing region is no longer available.") if destination is None else self._naval_invasion_policy.validate(
-                        state, row, destination, rows, (next_geo.latitude, next_geo.longitude),
-                    )
-                    if not valid_landing:
-                        self._stop_unit_at(row, previous_geo, current_minute)
-                        row["unit_lifecycle"] = "landing_blocked"
-                        route["status"] = "blocked"
-                        route["rejection_reason"] = landing_reason
-                        route["updated_at_minute"] = current_minute
-                        continue
-                row["current_region_id"] = target_region_id
-                next_index = route_index + 1
-                if route is not None and next_index < len(route_ids):
-                    next_region_id = route_ids[next_index]
-                    next_geo = region_locations.get(next_region_id)
-                    if (
-                        next_geo is not None
-                        and regions is not None
-                        and next_region_id > 0
-                    ):
-                        next_region_row = regions_by_id.get(next_region_id)
-                        final_leg = next_index == len(route_ids) - 1
-                        domain_allowed = next_region_row is not None and self._domain_route_compatible(
-                            self._domain_for_unit(row),
-                            next_region_row,
-                            final_leg,
-                            bool(route.get("is_naval_invasion")),
-                            region_rows,
-                            metadata_available=has_domain_metadata,
-                        )[0]
-                        access_context = access_context_by_country.get(owner)
-                        if access_context is None:
-                            access_context = self._access_policy.for_country(state, owner)
-                            access_context_by_country[owner] = access_context
-                        allowed = domain_allowed and (
-                            access_context.can_station(next_region_row)
-                            if final_leg
-                            else access_context.can_transit(next_region_row)
-                        )
-                        if not allowed:
-                            self._stop_unit_at(row, target_geo, current_minute)
-                            lifecycle = str(row.get("unit_lifecycle") or "")
-                            if lifecycle in {"deployment_transit", "in_transit"}:
-                                row["current_region_id"] = 0
-                            row["unit_lifecycle"] = "deployment_blocked" if lifecycle == "deployment_transit" else "route_blocked"
-                            route["status"] = "blocked"
-                            route["rejection_reason"] = (
-                                "The next route segment is incompatible with the unit domain."
-                                if not domain_allowed
-                                else "The next route segment no longer has valid access rights."
-                            )
-                            route["updated_at_minute"] = current_minute
-                            continue
-                        has_custom = bool(route.get("has_custom_destination")) and final_leg
-                        if has_custom:
-                            next_geo = GeoCoordinate(
-                                float(route.get("destination_latitude") or 0.0),
-                                float(route.get("destination_longitude") or 0.0),
-                            )
-                        row["latitude"] = target_geo.latitude
-                        row["longitude"] = target_geo.longitude
-                        row["source_region_id"] = target_region_id
-                        row["source_latitude"] = target_geo.latitude
-                        row["source_longitude"] = target_geo.longitude
-                        if str(row.get("unit_lifecycle") or "") in {"deployment_transit", "in_transit"}:
-                            row["current_region_id"] = 0
-                        row["target_region_id"] = next_region_id
-                        row["target_latitude"] = next_geo.latitude
-                        row["target_longitude"] = next_geo.longitude
-                        row["departed_at_minute"] = arrival_at
-                        duration_locations = dict(region_locations)
-                        duration_locations[target_region_id] = target_geo
-                        row["arrival_at_minute"] = arrival_at + self._route_segment_minutes_for_unit(
-                            regions_by_id[target_region_id],
-                            next_region_row,
-                            duration_locations,
-                            row,
-                            state,
-                            (capability_speed_by_unit or {}).get(str(row.get("id") or ""), 1.0),
-                        )
-                        row["movement_progress"] = 0.0
-                        row["is_moving"] = True
-                        row["engagement_mode"] = ""
-                        route["route_index"] = next_index
-                        route["updated_at_minute"] = current_minute
-                    else:
-                        self._stop_unit_at(row, target_geo, current_minute)
-                        row["engagement_mode"] = ""
-                        if str(row.get("unit_lifecycle") or "") in {"deployment_transit", "in_transit"}:
-                            row["current_region_id"] = 0
-                            row["unit_lifecycle"] = "deployment_blocked" if str(row.get("production_order_id") or "") else "route_blocked"
-                        route["status"] = "blocked"
-                        route["rejection_reason"] = "The next route region no longer has a valid location."
-                        route["updated_at_minute"] = current_minute
-                else:
-                    self._stop_unit_at(row, target_geo, current_minute)
-                    row["engagement_mode"] = ""
-                    if route is not None:
-                        route["status"] = "arrived"
-                        route["rejection_reason"] = ""
-                        route["updated_at_minute"] = current_minute
-                    if "unit_lifecycle" in row:
-                        row["unit_lifecycle"] = (
-                            "battle_regrouping"
-                            if str(row.get("unit_lifecycle") or "") == "battle_retreating"
-                            else "available"
-                        )
-            else:
-                row["movement_progress"] = progress
-                row["is_moving"] = True
-                if route is not None:
-                    route["updated_at_minute"] = current_minute
-
-        if route_table is not None:
-            route_frame = pl.DataFrame(list(route_by_unit.values()), schema=MOVEMENT_ROUTE_SCHEMA) if route_by_unit else pl.DataFrame(schema=MOVEMENT_ROUTE_SCHEMA)
-            if not route_table.equals(route_frame):
-                state.update_table("unit_movement_routes", route_frame)
-        return self._units_from_rows(rows)
+    def _unit_movement_is_idle(self, units: pl.DataFrame) -> bool:
+        if units.is_empty():
+            return True
+        if not {"is_moving", "movement_progress"}.issubset(units.columns):
+            return False
+        is_moving = units.get_column("is_moving").fill_null(False)
+        has_stale_progress = (units.get_column("movement_progress").fill_null(0.0) != 0.0).any()
+        return not is_moving.any() and not has_stale_progress
 
     def _first_hostile_contact(
         self,
@@ -2040,74 +1812,19 @@ class MilitarySystem(ISystem):
         end: GeoCoordinate,
         current_minute: int,
     ) -> tuple[dict[str, Any], float] | None:
-        best_contact: tuple[dict[str, Any], float] | None = None
-        moving_id = str(moving_unit.get("id") or "")
-        for defender in unit_rows:
-            if str(defender.get("id") or "") == moving_id or int(defender.get("strength") or 0) <= 0:
-                continue
-            fraction = first_zone_contact_fraction(
-                start,
-                end,
-                self._unit_geo_at(defender, current_minute),
-                engagement_radius_km(defender),
-            )
-            if fraction is None:
-                continue
-            # Stop at the first route contact; region and unit IDs make exact
-            # fraction ties deterministic across equivalent snapshots.
-            candidate_key = (
-                round(float(fraction), 12),
-                int(defender.get("current_region_id") or 0) if int(defender.get("current_region_id") or 0) > 0 else 2**31,
-                str(defender.get("id") or ""),
-            )
-            best_key = None
-            if best_contact is not None:
-                best_defender, best_fraction = best_contact
-                best_key = (
-                    round(float(best_fraction), 12),
-                    int(best_defender.get("current_region_id") or 0) if int(best_defender.get("current_region_id") or 0) > 0 else 2**31,
-                    str(best_defender.get("id") or ""),
-                )
-            if best_contact is None or candidate_key < best_key:
-                best_contact = (defender, fraction)
-        return best_contact
+        return self._movement_progression.first_hostile_contact(
+            moving_unit,
+            unit_rows,
+            start,
+            end,
+            current_minute,
+        )
 
     def _unit_geo_at(self, row: dict[str, Any], current_minute: int) -> GeoCoordinate:
-        current_geo = GeoCoordinate(
-            latitude=self._row_float(row, "latitude"),
-            longitude=self._row_float(row, "longitude"),
-        )
-        if not bool(row.get("is_moving")) or int(row.get("target_region_id") or NO_TARGET_REGION) <= 0:
-            return current_geo
-        source_geo = GeoCoordinate(
-            latitude=self._row_float(row, "source_latitude", current_geo.latitude),
-            longitude=self._row_float(row, "source_longitude", current_geo.longitude),
-        )
-        target_geo = GeoCoordinate(
-            latitude=self._row_float(row, "target_latitude", current_geo.latitude),
-            longitude=self._row_float(row, "target_longitude", current_geo.longitude),
-        )
-        departed_value = row.get("departed_at_minute")
-        arrival_value = row.get("arrival_at_minute")
-        departed_at = int(departed_value if departed_value is not None else current_minute)
-        arrival_at = int(arrival_value if arrival_value is not None else current_minute)
-        progress = max(0.0, min(1.0, (current_minute - departed_at) / max(1, arrival_at - departed_at)))
-        return interpolate_geo(source_geo, target_geo, progress)
+        return self._movement_progression.unit_geo_at(row, current_minute)
 
     def _stop_unit_at(self, row: dict[str, Any], geo: GeoCoordinate, current_minute: int) -> None:
-        region_id = int(row.get("current_region_id") or 0)
-        row["latitude"] = float(geo.latitude)
-        row["longitude"] = float(geo.longitude)
-        row["source_region_id"] = region_id
-        row["source_latitude"] = float(geo.latitude)
-        row["source_longitude"] = float(geo.longitude)
-        row["target_region_id"] = NO_TARGET_REGION
-        row["target_latitude"] = float(geo.latitude)
-        row["target_longitude"] = float(geo.longitude)
-        row["departed_at_minute"] = current_minute
-        row["arrival_at_minute"] = current_minute
-        row["movement_progress"] = 0.0
-        row["is_moving"] = False
+        self._movement_progression.stop_unit_at(row, geo, current_minute)
 
     def _ensure_country_columns(self, countries: pl.DataFrame) -> pl.DataFrame:
         if "military_count" not in countries.columns:
