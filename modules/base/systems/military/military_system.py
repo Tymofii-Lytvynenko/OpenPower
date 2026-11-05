@@ -27,6 +27,7 @@ from modules.base.systems.military.movement_batch_updater import MovementBatchUp
 from modules.base.systems.military.movement_constants import NO_TARGET_REGION
 from modules.base.systems.military.movement_duration import MovementDurationPolicy, DEFAULT_MOVE_MINUTES
 from modules.base.systems.military.movement_progression import MovementProgression
+from modules.base.systems.military.attack_order_service import MilitaryAttackOrderService
 from modules.base.systems.military.movement_domains import (unit_domain, has_domain_metadata, domain_route_compatible, region_is_water)
 from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
 from modules.base.systems.military.authority_policy import player_controls_country
@@ -238,6 +239,7 @@ class MilitarySystem(ISystem):
         "_readiness_system": SYSTEM_STATE_HELPER,
         "_demilitarization_policy": SYSTEM_STATE_HELPER,
         "_market_purchase_service": SYSTEM_STATE_HELPER,
+        "_attack_order_service": SYSTEM_STATE_HELPER,
         "_manpower_cache_key": SYSTEM_STATE_CACHE,
         "_manpower_by_owner": SYSTEM_STATE_CACHE,
     }
@@ -260,6 +262,14 @@ class MilitarySystem(ISystem):
         self._weapons_trade_policy = WeaponsTradePolicy()
         self._readiness_system = ReadinessSystem()
         self._demilitarization_policy = DemilitarizationPolicy()
+        self._attack_order_service = MilitaryAttackOrderService(
+            readiness_preparer=self._readiness_system,
+            unit_movement=self._movement_progression,
+            hostility_policy=hostile_country_pairs,
+            fortification_release=self._release_fortified_for_order,
+            pending_order_queue=self._queue_pending_attack,
+            units_from_rows=self._units_from_rows,
+        )
         self._market_purchase_service = MilitaryMarketPurchaseService(
             unit_factory=self._unit_factory,
             duration_policy=self._duration_policy,
@@ -993,52 +1003,7 @@ class MilitarySystem(ISystem):
         return self._units_from_rows(purchase_rows)
 
     def _process_attack_actions(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
-        actions = [action for action in state.current_actions if isinstance(action, ActionAttackUnit)]
-        if not actions or units.is_empty():
-            return units
-
-        war_rows = state.tables.get("countries_wars")
-        wars = [] if war_rows is None else war_rows.to_dicts()
-        hostile_pairs = hostile_country_pairs(wars)
-        rows = units.to_dicts()
-        units_by_id = {str(row.get("id") or ""): row for row in rows}
-        now = int(state.time.total_minutes)
-        changed = False
-
-        for action in actions:
-            attacker = units_by_id.get(str(action.attacker_unit_id or ""))
-            defender = units_by_id.get(str(action.defender_unit_id or ""))
-            if attacker is None:
-                continue
-            if defender is None or attacker is defender:
-                continue
-            if int(attacker.get("strength") or 0) <= 0 or int(defender.get("strength") or 0) <= 0:
-                continue
-            attacker_owner = str(attacker.get("owner") or "").strip().upper()
-            defender_owner = str(defender.get("owner") or "").strip().upper()
-            if frozenset((attacker_owner, defender_owner)) not in hostile_pairs:
-                continue
-
-            attacker_id = str(attacker.get("id") or "")
-            released_fortification = self._release_fortified_for_order(state, attacker)
-            can_execute = released_fortification or self._readiness_system.prepare_order(state, attacker_id)
-            if not can_execute:
-                self._queue_pending_attack(state, action)
-                continue
-            attacker["readiness_status"] = "ready"
-            attacker["readiness_progress"] = 0.0
-            attacker["readiness_transition_id"] = ""
-            attacker["readiness_eta_minute"] = 0
-
-            defender_geo = self._unit_geo_at(defender, now)
-            self._stop_unit_at(attacker, defender_geo, now)
-            self._stop_unit_at(defender, defender_geo, now)
-            attacker["current_region_id"] = int(defender.get("current_region_id") or 0)
-            attacker["engagement_mode"] = "assault"
-            defender["engagement_mode"] = "assault"
-            changed = True
-
-        return self._units_from_rows(rows) if changed else units
+        return self._attack_order_service.process(state, units)
 
     def _process_move_actions(
         self,
