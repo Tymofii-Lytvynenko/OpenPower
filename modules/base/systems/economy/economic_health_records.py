@@ -31,6 +31,28 @@ class EconomicTransitionEventRequest:
 
 
 @dataclass(frozen=True)
+class EconomicRejectionRequest:
+    country_id: str
+    source_id: str
+    indicator: str
+    value: float
+    reason: str
+    at_minute: int
+
+    def to_event_request(self) -> EconomicTransitionEventRequest:
+        return EconomicTransitionEventRequest(
+            event_type="rejected",
+            country_id=self.country_id,
+            source_id=self.source_id,
+            indicator=self.indicator,
+            previous_value=self.value,
+            new_value=self.value,
+            reason=self.reason,
+            at_minute=self.at_minute,
+        )
+
+
+@dataclass(frozen=True)
 class EconomicCauseRecordRequest:
     country_id: str
     source_type: str

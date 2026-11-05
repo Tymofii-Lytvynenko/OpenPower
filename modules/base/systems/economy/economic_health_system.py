@@ -68,6 +68,7 @@ from modules.base.systems.economy.economic_policy_transition import (
 )
 from modules.base.systems.economy.economic_health_records import (
     EconomicCauseRecordRequest,
+    EconomicRejectionRequest,
     EconomicTransitionEventRequest,
 )
 from modules.base.systems.world.authority_policy import player_controls_country
@@ -104,6 +105,26 @@ class _ValidatedEconomicPolicyChange:
     policy_name: str
     previous_value: float
     target_value: float
+
+    def rejection_request(self, reason: str, at_minute: int) -> EconomicRejectionRequest:
+        return EconomicRejectionRequest(
+            country_id=self.country_id,
+            source_id=self.source_id,
+            indicator=self.policy_name,
+            value=self.previous_value,
+            reason=reason,
+            at_minute=at_minute,
+        )
+
+
+@dataclass(frozen=True)
+class _DebtContractResolutionContext:
+    contract: dict[str, Any]
+    debtor_id: str
+    creditor_id: str
+    creditor: dict[str, Any] | None
+    debtor: dict[str, Any] | None
+    principal: float
 
 
 class EconomicHealthSystem(ISystem):
@@ -276,29 +297,8 @@ class EconomicHealthSystem(ISystem):
         else:
             records.append(record)
 
-    def _reject(
-        self,
-        state: GameState,
-        country_id: str,
-        source_id: str,
-        indicator: str,
-        value: float,
-        reason: str,
-        now: int,
-    ) -> None:
-        self._transition_event(
-            state,
-            EconomicTransitionEventRequest(
-                event_type="rejected",
-                country_id=country_id,
-                source_id=source_id,
-                indicator=indicator,
-                previous_value=value,
-                new_value=value,
-                reason=reason,
-                at_minute=now,
-            ),
-        )
+    def _reject(self, state: GameState, request: EconomicRejectionRequest) -> None:
+        self._transition_event(state, request.to_event_request())
 
     def _request_policy_change(self, state: GameState, action: ActionChangeEconomicPolicy, now: int) -> None:
         request = self._validate_policy_change_request(state, action, now)
@@ -321,7 +321,17 @@ class EconomicHealthSystem(ISystem):
         country = self._country(state, country_id)
         source_id = f"policy-request:{country_id}:{action.policy_name}:{now}"
         if country is None or not player_controls_country(state, action.player_id, country_id):
-            self._reject(state, country_id, source_id, action.policy_name, 0.0, "Actor is not authorized for this country.", now)
+            self._reject(
+                state,
+                EconomicRejectionRequest(
+                    country_id=country_id,
+                    source_id=source_id,
+                    indicator=action.policy_name,
+                    value=0.0,
+                    reason="Actor is not authorized for this country.",
+                    at_minute=now,
+                ),
+            )
             return None
 
         terms = self._terms(state)
@@ -337,12 +347,14 @@ class EconomicHealthSystem(ISystem):
         if validation.rejection_reason is not None:
             self._reject(
                 state,
-                country_id,
-                source_id,
-                validation.rejection_indicator,
-                validation.rejection_value,
-                validation.rejection_reason,
-                now,
+                EconomicRejectionRequest(
+                    country_id=country_id,
+                    source_id=source_id,
+                    indicator=validation.rejection_indicator,
+                    value=validation.rejection_value,
+                    reason=validation.rejection_reason,
+                    at_minute=now,
+                ),
             )
             return None
 
@@ -391,15 +403,7 @@ class EconomicHealthSystem(ISystem):
             )
         )
         if draft.rejection_reason is not None:
-            self._reject(
-                state,
-                request.country_id,
-                request.source_id,
-                request.policy_name,
-                request.previous_value,
-                draft.rejection_reason,
-                now,
-            )
+            self._reject(state, request.rejection_request(draft.rejection_reason, now))
             return None
 
         plan = self._policy_transition_planner.finalize(
@@ -409,15 +413,7 @@ class EconomicHealthSystem(ISystem):
             ).is_empty(),
         )
         if plan.rejection_reason is not None:
-            self._reject(
-                state,
-                request.country_id,
-                request.source_id,
-                request.policy_name,
-                request.previous_value,
-                plan.rejection_reason,
-                now,
-            )
+            self._reject(state, request.rejection_request(plan.rejection_reason, now))
             return None
 
         return plan
@@ -578,18 +574,30 @@ class EconomicHealthSystem(ISystem):
         if plan.rejection_reason is not None:
             self._reject(
                 state,
-                debtor_id,
-                plan.contract_id,
-                "foreign_debt",
-                plan.rejection_amount,
-                plan.rejection_reason,
-                now,
+                EconomicRejectionRequest(
+                    country_id=debtor_id,
+                    source_id=plan.contract_id,
+                    indicator="foreign_debt",
+                    value=plan.rejection_amount,
+                    reason=plan.rejection_reason,
+                    at_minute=now,
+                ),
             )
             return
 
         contracts = state.tables["debt_contracts"]
         if not contracts.filter(pl.col("id") == plan.contract_id).is_empty():
-            self._reject(state, debtor_id, plan.contract_id, "foreign_debt", plan.principal, "Duplicate deterministic financing request.", now)
+            self._reject(
+                state,
+                EconomicRejectionRequest(
+                    country_id=debtor_id,
+                    source_id=plan.contract_id,
+                    indicator="foreign_debt",
+                    value=plan.principal,
+                    reason="Duplicate deterministic financing request.",
+                    at_minute=now,
+                ),
+            )
             return
         assert plan.contract_row is not None
         self._append_rows(state, "debt_contracts", [plan.contract_row])
@@ -628,12 +636,27 @@ class EconomicHealthSystem(ISystem):
             {"money_reserves": AddCountryValue(-principal)},
         )
 
-    def _resolve_debt_contract(self, state: GameState, action: ActionResolveDebtContract, now: int) -> None:
+    def _prepare_debt_contract_resolution(
+        self,
+        state: GameState,
+        action: ActionResolveDebtContract,
+        now: int,
+    ) -> _DebtContractResolutionContext | None:
         contracts = state.tables["debt_contracts"]
         match = contracts.filter((pl.col("id") == str(action.contract_id)) & (pl.col("status") == "pending"))
         if match.is_empty():
-            self._reject(state, "", str(action.contract_id), "foreign_debt", 0.0, "Pending contract does not exist.", now)
-            return
+            self._reject(
+                state,
+                EconomicRejectionRequest(
+                    country_id="",
+                    source_id=str(action.contract_id),
+                    indicator="foreign_debt",
+                    value=0.0,
+                    reason="Pending contract does not exist.",
+                    at_minute=now,
+                ),
+            )
+            return None
         contract = match.row(0, named=True)
         debtor_id = str(contract["debtor_country_id"])
         creditor_id = str(contract["creditor_country_id"])
@@ -641,8 +664,39 @@ class EconomicHealthSystem(ISystem):
         debtor = self._country(state, debtor_id)
         principal = self._number(contract.get("principal_original"))
         if not player_controls_country(state, action.player_id, creditor_id):
-            self._reject(state, debtor_id, str(contract["id"]), "foreign_debt", principal, "Actor is not authorized for the creditor country.", now)
+            self._reject(
+                state,
+                EconomicRejectionRequest(
+                    country_id=debtor_id,
+                    source_id=str(contract["id"]),
+                    indicator="foreign_debt",
+                    value=principal,
+                    reason="Actor is not authorized for the creditor country.",
+                    at_minute=now,
+                ),
+            )
+            return None
+
+        return _DebtContractResolutionContext(
+            contract=contract,
+            debtor_id=debtor_id,
+            creditor_id=creditor_id,
+            creditor=creditor,
+            debtor=debtor,
+            principal=principal,
+        )
+
+    def _resolve_debt_contract(self, state: GameState, action: ActionResolveDebtContract, now: int) -> None:
+        resolution = self._prepare_debt_contract_resolution(state, action, now)
+        if resolution is None:
             return
+
+        contract = resolution.contract
+        debtor_id = resolution.debtor_id
+        creditor_id = resolution.creditor_id
+        creditor = resolution.creditor
+        debtor = resolution.debtor
+        principal = resolution.principal
         if not action.accept:
             contract["status"] = "rejected"
             contract["reason"] = "Creditor rejected the financing request; no funds moved."
@@ -722,12 +776,32 @@ class EconomicHealthSystem(ISystem):
         contracts = state.tables["debt_contracts"]
         match = contracts.filter(pl.col("id") == str(action.contract_id))
         if match.is_empty():
-            self._reject(state, str(action.country_tag), str(action.contract_id), "debt_restructuring", 0.0, "Debt contract does not exist.", now)
+            self._reject(
+                state,
+                EconomicRejectionRequest(
+                    country_id=str(action.country_tag),
+                    source_id=str(action.contract_id),
+                    indicator="debt_restructuring",
+                    value=0.0,
+                    reason="Debt contract does not exist.",
+                    at_minute=now,
+                ),
+            )
             return
         contract = match.row(0, named=True)
         debtor_id = str(contract["debtor_country_id"])
         if str(action.country_tag) != debtor_id or not player_controls_country(state, action.player_id, debtor_id):
-            self._reject(state, debtor_id, str(contract["id"]), "debt_restructuring", self._number(contract.get("arrears_amount")), "Actor is not authorized for this debtor.", now)
+            self._reject(
+                state,
+                EconomicRejectionRequest(
+                    country_id=debtor_id,
+                    source_id=str(contract["id"]),
+                    indicator="debt_restructuring",
+                    value=self._number(contract.get("arrears_amount")),
+                    reason="Actor is not authorized for this debtor.",
+                    at_minute=now,
+                ),
+            )
             return
         maximum_rate = self._bounded(self._terms(state).get("max_interest_rate"), 0.0, 0.5, 0.5)
         plan = self._debt_restructuring_planner.plan(
@@ -743,12 +817,14 @@ class EconomicHealthSystem(ISystem):
         if plan.rejection_reason is not None:
             self._reject(
                 state,
-                debtor_id,
-                str(contract["id"]),
-                "debt_restructuring",
-                0.0,
-                plan.rejection_reason,
-                now,
+                EconomicRejectionRequest(
+                    country_id=debtor_id,
+                    source_id=str(contract["id"]),
+                    indicator="debt_restructuring",
+                    value=0.0,
+                    reason=plan.rejection_reason,
+                    at_minute=now,
+                ),
             )
             return
 
