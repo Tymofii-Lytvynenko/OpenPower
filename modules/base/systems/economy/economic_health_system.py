@@ -45,6 +45,10 @@ from modules.base.systems.economy.economic_policy_transition import (
     EconomicPolicyTransitionInputs,
     EconomicPolicyTransitionPlanner,
 )
+from modules.base.systems.economy.economic_health_records import (
+    EconomicCauseRecordRequest,
+    EconomicTransitionEventRequest,
+)
 from modules.base.systems.world.authority_policy import player_controls_country
 from modules.base.systems.world.random_event_effects import aggregate_active_effects
 from src.shared.actions import (
@@ -54,7 +58,7 @@ from src.shared.actions import (
     ActionResolveDebtContract,
     ActionSetTax,
 )
-from src.shared.events import EventEconomicTransition, EventRealSecond
+from src.shared.events import EventRealSecond
 from src.shared.state import GameState
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 
@@ -221,62 +225,18 @@ class EconomicHealthSystem(ISystem):
         if expressions:
             state.update_table("countries", frame.with_columns(expressions))
 
-    def _transition_event(
-        self,
-        state: GameState,
-        event_type: str,
-        country_id: str,
-        source_id: str,
-        indicator: str,
-        previous: float,
-        current: float,
-        reason: str,
-        now: int,
-    ) -> None:
-        state.events.append(EventEconomicTransition(
-            event_type=event_type,
-            country_id=country_id,
-            source_id=source_id,
-            indicator=indicator,
-            previous_value=float(previous),
-            new_value=float(current),
-            reason=reason,
-            at_minute=now,
-        ))
+    def _transition_event(self, state: GameState, request: EconomicTransitionEventRequest) -> None:
+        state.events.append(request.to_event())
 
     def _record_cause(
         self,
         state: GameState,
-        *,
-        country_id: str,
-        source_type: str,
-        source_id: str,
-        indicator: str,
-        previous: float,
-        current: float,
-        unit: str,
-        now: int,
-        reason: str,
+        request: EconomicCauseRecordRequest,
         records: list[dict[str, Any]] | None = None,
     ) -> None:
-        if abs(float(current) - float(previous)) < 1e-9:
+        record = request.to_record()
+        if record is None:
             return
-        cause_id = f"{source_id}:{country_id}:{indicator}"
-        record = {
-            "id": cause_id,
-            "country_id": country_id,
-            "source_type": source_type,
-            "source_id": source_id,
-            "indicator": indicator,
-            "previous_value": float(previous),
-            "new_value": float(current),
-            "delta": float(current) - float(previous),
-            "unit": unit,
-            "game_minute": int(now),
-            "reason": reason,
-            "confidence": 1.0,
-            "completeness": "complete",
-        }
         if records is None:
             self._append_rows(state, "economic_cause_records", [record])
         else:
@@ -292,7 +252,19 @@ class EconomicHealthSystem(ISystem):
         reason: str,
         now: int,
     ) -> None:
-        self._transition_event(state, "rejected", country_id, source_id, indicator, value, value, reason, now)
+        self._transition_event(
+            state,
+            EconomicTransitionEventRequest(
+                event_type="rejected",
+                country_id=country_id,
+                source_id=source_id,
+                indicator=indicator,
+                previous_value=value,
+                new_value=value,
+                reason=reason,
+                at_minute=now,
+            ),
+        )
 
     def _request_policy_change(self, state: GameState, action: ActionChangeEconomicPolicy, now: int) -> None:
         country_id = str(action.country_tag)
@@ -366,12 +338,34 @@ class EconomicHealthSystem(ISystem):
         transition_cost = plan.transition_cost
         if transition_cost > 0.0:
             self._country_values(state, country_id, {"money_reserves": ("add", -transition_cost)})
-            self._record_cause(state, country_id=country_id, source_type="policy_transition", source_id=source_id,
-                indicator="money_reserves", previous=self._number(country.get("money_reserves")),
-                current=self._number(country.get("money_reserves")) - transition_cost,
-                unit="currency", now=now, reason=row["reason"])
+            self._record_cause(
+                state,
+                EconomicCauseRecordRequest(
+                    country_id=country_id,
+                    source_type="policy_transition",
+                    source_id=source_id,
+                    indicator="money_reserves",
+                    previous_value=self._number(country.get("money_reserves")),
+                    new_value=self._number(country.get("money_reserves")) - transition_cost,
+                    unit="currency",
+                    game_minute=now,
+                    reason=row["reason"],
+                ),
+            )
         self._append_rows(state, "economic_policy_transitions", [row])
-        self._transition_event(state, "scheduled", country_id, source_id, column, previous, value, row["reason"], now)
+        self._transition_event(
+            state,
+            EconomicTransitionEventRequest(
+                event_type="scheduled",
+                country_id=country_id,
+                source_id=source_id,
+                indicator=column,
+                previous_value=previous,
+                new_value=value,
+                reason=row["reason"],
+                at_minute=now,
+            ),
+        )
 
     def _apply_due_policy_changes(self, state: GameState, now: int) -> None:
         transitions = state.tables.get("economic_policy_transitions")
@@ -398,9 +392,33 @@ class EconomicHealthSystem(ISystem):
             transition["reason"] = f"{policy.replace('_', ' ').title()} changed at its effective time."
             applied.append(transition)
             source_id = str(transition["id"])
-            self._record_cause(state, country_id=country_id, source_type="policy", source_id=source_id,
-                indicator=policy, previous=old, current=target, unit="policy units", now=now, reason=transition["reason"])
-            self._transition_event(state, "applied", country_id, source_id, policy, old, target, transition["reason"], now)
+            self._record_cause(
+                state,
+                EconomicCauseRecordRequest(
+                    country_id=country_id,
+                    source_type="policy",
+                    source_id=source_id,
+                    indicator=policy,
+                    previous_value=old,
+                    new_value=target,
+                    unit="policy units",
+                    game_minute=now,
+                    reason=transition["reason"],
+                ),
+            )
+            self._transition_event(
+                state,
+                EconomicTransitionEventRequest(
+                    event_type="applied",
+                    country_id=country_id,
+                    source_id=source_id,
+                    indicator=policy,
+                    previous_value=old,
+                    new_value=target,
+                    reason=transition["reason"],
+                    at_minute=now,
+                ),
+            )
         self._replace_rows(state, "economic_policy_transitions", applied)
 
     def _request_debt_contract(self, state: GameState, action: ActionRequestDebtContract, now: int) -> None:
@@ -454,14 +472,16 @@ class EconomicHealthSystem(ISystem):
         self._append_rows(state, "debt_contracts", [plan.contract_row])
         self._transition_event(
             state,
-            "requested",
-            debtor_id,
-            plan.contract_id,
-            "foreign_debt",
-            0.0,
-            plan.principal,
-            "Financing request awaits creditor approval.",
-            now,
+            EconomicTransitionEventRequest(
+                event_type="requested",
+                country_id=debtor_id,
+                source_id=plan.contract_id,
+                indicator="foreign_debt",
+                previous_value=0.0,
+                new_value=plan.principal,
+                reason="Financing request awaits creditor approval.",
+                at_minute=now,
+            ),
         )
 
     def _resolve_debt_contract(self, state: GameState, action: ActionResolveDebtContract, now: int) -> None:
@@ -483,13 +503,37 @@ class EconomicHealthSystem(ISystem):
             contract["status"] = "rejected"
             contract["reason"] = "Creditor rejected the financing request; no funds moved."
             self._replace_rows(state, "debt_contracts", [contract])
-            self._transition_event(state, "rejected", debtor_id, str(contract["id"]), "foreign_debt", principal, 0.0, contract["reason"], now)
+            self._transition_event(
+                state,
+                EconomicTransitionEventRequest(
+                    event_type="rejected",
+                    country_id=debtor_id,
+                    source_id=str(contract["id"]),
+                    indicator="foreign_debt",
+                    previous_value=principal,
+                    new_value=0.0,
+                    reason=contract["reason"],
+                    at_minute=now,
+                ),
+            )
             return
         if creditor is None or debtor is None or self._number(creditor.get("money_reserves")) < principal:
             contract["status"] = "rejected"
             contract["reason"] = "Creditor no longer has sufficient reserves; the pending request was closed without a transfer."
             self._replace_rows(state, "debt_contracts", [contract])
-            self._transition_event(state, "rejected", debtor_id, str(contract["id"]), "foreign_debt", principal, 0.0, contract["reason"], now)
+            self._transition_event(
+                state,
+                EconomicTransitionEventRequest(
+                    event_type="rejected",
+                    country_id=debtor_id,
+                    source_id=str(contract["id"]),
+                    indicator="foreign_debt",
+                    previous_value=principal,
+                    new_value=0.0,
+                    reason=contract["reason"],
+                    at_minute=now,
+                ),
+            )
             return
 
         frequency = int(contract["payment_frequency_months"])
@@ -503,10 +547,33 @@ class EconomicHealthSystem(ISystem):
         contract["reason"] = "Creditor approved; principal was transferred once from creditor reserves."
         self._replace_rows(state, "debt_contracts", [contract])
         self._adjust_annual_service(state, debtor_id, 0.0, self._annualized_service(contract))
-        self._record_cause(state, country_id=debtor_id, source_type="debt", source_id=str(contract["id"]), indicator="foreign_debt",
-            previous=self._number(debtor.get("foreign_debt")), current=self._number(debtor.get("foreign_debt")) + principal,
-            unit="currency", now=now, reason=contract["reason"])
-        self._transition_event(state, "approved", debtor_id, str(contract["id"]), "foreign_debt", 0.0, principal, contract["reason"], now)
+        self._record_cause(
+            state,
+            EconomicCauseRecordRequest(
+                country_id=debtor_id,
+                source_type="debt",
+                source_id=str(contract["id"]),
+                indicator="foreign_debt",
+                previous_value=self._number(debtor.get("foreign_debt")),
+                new_value=self._number(debtor.get("foreign_debt")) + principal,
+                unit="currency",
+                game_minute=now,
+                reason=contract["reason"],
+            ),
+        )
+        self._transition_event(
+            state,
+            EconomicTransitionEventRequest(
+                event_type="approved",
+                country_id=debtor_id,
+                source_id=str(contract["id"]),
+                indicator="foreign_debt",
+                previous_value=0.0,
+                new_value=principal,
+                reason=contract["reason"],
+                at_minute=now,
+            ),
+        )
 
     def _request_restructuring(self, state: GameState, action: ActionRequestDebtRestructuring, now: int) -> None:
         contracts = state.tables["debt_contracts"]
@@ -581,14 +648,16 @@ class EconomicHealthSystem(ISystem):
         )
         self._transition_event(
             state,
-            "restructured",
-            debtor_id,
-            str(restructured_contract["id"]),
-            "foreign_debt",
-            plan.old_service,
-            plan.new_service,
-            restructured_contract["reason"],
-            now,
+            EconomicTransitionEventRequest(
+                event_type="restructured",
+                country_id=debtor_id,
+                source_id=str(restructured_contract["id"]),
+                indicator="foreign_debt",
+                previous_value=plan.old_service,
+                new_value=plan.new_service,
+                reason=restructured_contract["reason"],
+                at_minute=now,
+            ),
         )
 
     def _add_months(self, minute: int, months: int) -> int:
@@ -615,27 +684,31 @@ class EconomicHealthSystem(ISystem):
         due_at = installment.due_at_minute
         self._record_cause(
             state,
-            country_id=debtor_id,
-            source_type="debt_service",
-            source_id=f"{contract['id']}:{due_at}",
-            indicator="foreign_debt",
-            previous=settlement.principal,
-            current=settlement.new_principal,
-            unit="currency",
-            now=due_at,
-            reason=contract["reason"],
+            EconomicCauseRecordRequest(
+                country_id=debtor_id,
+                source_type="debt_service",
+                source_id=f"{contract['id']}:{due_at}",
+                indicator="foreign_debt",
+                previous_value=settlement.principal,
+                new_value=settlement.new_principal,
+                unit="currency",
+                game_minute=due_at,
+                reason=contract["reason"],
+            ),
             records=batch.cause_records,
         )
         self._transition_event(
             state,
-            "serviced",
-            debtor_id,
-            str(contract["id"]),
-            "debt_service",
-            settlement.total_due,
-            settlement.paid,
-            contract["reason"],
-            due_at,
+            EconomicTransitionEventRequest(
+                event_type="serviced",
+                country_id=debtor_id,
+                source_id=str(contract["id"]),
+                indicator="debt_service",
+                previous_value=settlement.total_due,
+                new_value=settlement.paid,
+                reason=contract["reason"],
+                at_minute=due_at,
+            ),
         )
 
     def apply_due_debt_shortfall(
@@ -699,14 +772,16 @@ class EconomicHealthSystem(ISystem):
         if plan.previous_status != plan.status:
             self._transition_event(
                 state,
-                plan.status,
-                country_id,
-                plan.case_id,
-                "arrears",
-                0.0,
-                plan.total_arrears,
-                request.reason,
-                request.now,
+                EconomicTransitionEventRequest(
+                    event_type=plan.status,
+                    country_id=country_id,
+                    source_id=plan.case_id,
+                    indicator="arrears",
+                    previous_value=0.0,
+                    new_value=plan.total_arrears,
+                    reason=request.reason,
+                    at_minute=request.now,
+                ),
             )
 
     def _recover_distress_if_eligible(self, state: GameState, country_id: str, now: int) -> None:
@@ -732,7 +807,19 @@ class EconomicHealthSystem(ISystem):
             "economic_political_modifier": 1.0,
             "economic_creditworthiness_modifier": 1.0,
         })
-        self._transition_event(state, "recovered", country_id, str(case["id"]), "arrears", self._number(case.get("arrears_at_entry")), 0.0, case["reason"], now)
+        self._transition_event(
+            state,
+            EconomicTransitionEventRequest(
+                event_type="recovered",
+                country_id=country_id,
+                source_id=str(case["id"]),
+                indicator="arrears",
+                previous_value=self._number(case.get("arrears_at_entry")),
+                new_value=0.0,
+                reason=case["reason"],
+                at_minute=now,
+            ),
+        )
 
     def recover_due_debt_distress(self, state: GameState, country_id: str, now: int) -> None:
         self._recover_distress_if_eligible(state, country_id, now)
@@ -792,15 +879,17 @@ class EconomicHealthSystem(ISystem):
             for cause in projection.cause_changes:
                 self._record_cause(
                     state,
-                    country_id=country_id,
-                    source_type="economic_update",
-                    source_id=source_id,
-                    indicator=cause.indicator,
-                    previous=cause.previous,
-                    current=cause.current,
-                    unit=cause.unit,
-                    now=boundary,
-                    reason=cause.reason,
+                    EconomicCauseRecordRequest(
+                        country_id=country_id,
+                        source_type="economic_update",
+                        source_id=source_id,
+                        indicator=cause.indicator,
+                        previous_value=cause.previous,
+                        new_value=cause.current,
+                        unit=cause.unit,
+                        game_minute=boundary,
+                        reason=cause.reason,
+                    ),
                     records=cause_records,
                 )
 
