@@ -34,6 +34,13 @@ from modules.base.systems.economy.economic_health_action_dispatcher import (
     DeterministicEconomicHealthActionDispatcher,
     EconomicHealthActionDispatcher,
 )
+from modules.base.systems.economy.economic_country_value_updater import (
+    AddCountryValue,
+    CountryValueChange,
+    DeterministicEconomicCountryValueUpdater,
+    EconomicCountryValueUpdater,
+    SetCountryValue,
+)
 from modules.base.systems.economy.due_debt_settlement import (
     DueDebtBatch,
     DueDebtInstallment,
@@ -134,6 +141,7 @@ class EconomicHealthSystem(ISystem):
         policy_application_planner: EconomicPolicyApplicationPlanner | None = None,
         profile_environment_calculator: EconomicProfileEnvironmentCalculator | None = None,
         action_dispatcher: EconomicHealthActionDispatcher | None = None,
+        country_value_updater: EconomicCountryValueUpdater | None = None,
     ) -> None:
         self._profile_calculator = _resolve_component(
             profile_calculator,
@@ -178,6 +186,10 @@ class EconomicHealthSystem(ISystem):
         self._action_dispatcher = _resolve_component(
             action_dispatcher,
             DeterministicEconomicHealthActionDispatcher,
+        )
+        self._country_value_updater = _resolve_component(
+            country_value_updater,
+            DeterministicEconomicCountryValueUpdater,
         )
 
     @property
@@ -234,22 +246,18 @@ class EconomicHealthSystem(ISystem):
     ) -> None:
         replace_rows(state, table_name, records, key=key)
 
-    def _country_values(self, state: GameState, country_id: str, changes: dict[str, Any]) -> None:
+    def _country_values(
+        self,
+        state: GameState,
+        country_id: str,
+        changes: Mapping[str, CountryValueChange],
+    ) -> None:
         frame = state.tables.get("countries")
         if frame is None or frame.is_empty():
             return
-        target = pl.col("id") == str(country_id)
-        expressions = []
-        for column, value in changes.items():
-            if column not in frame.columns:
-                continue
-            if isinstance(value, tuple) and len(value) == 2 and value[0] == "add":
-                expr = pl.col(column).fill_null(0.0) + float(value[1])
-            else:
-                expr = pl.lit(value, dtype=frame.schema[column])
-            expressions.append(pl.when(target).then(expr).otherwise(pl.col(column)).alias(column))
-        if expressions:
-            state.update_table("countries", frame.with_columns(expressions))
+        updated = self._country_value_updater.apply(frame, country_id, changes)
+        if updated is not None:
+            state.update_table("countries", updated)
 
     def _transition_event(self, state: GameState, request: EconomicTransitionEventRequest) -> None:
         state.events.append(request.to_event())
@@ -428,7 +436,7 @@ class EconomicHealthSystem(ISystem):
             self._country_values(
                 state,
                 request.country_id,
-                {"money_reserves": ("add", -transition_cost)},
+                {"money_reserves": AddCountryValue(-transition_cost)},
             )
             self._record_cause(
                 state,
@@ -503,7 +511,7 @@ class EconomicHealthSystem(ISystem):
         assert current_country is not None
         old = self._number(current_country.get(policy))
         target = self._number(transition.get("target_value"))
-        self._country_values(state, country_id, {policy: target})
+        self._country_values(state, country_id, {policy: SetCountryValue(target)})
         transition["status"] = "applied"
         transition["reason"] = application.reason
         source_id = str(transition["id"])
@@ -599,6 +607,27 @@ class EconomicHealthSystem(ISystem):
             ),
         )
 
+    def _transfer_debt_principal(
+        self,
+        state: GameState,
+        debtor_id: str,
+        creditor_id: str,
+        principal: float,
+    ) -> None:
+        self._country_values(
+            state,
+            debtor_id,
+            {
+                "money_reserves": AddCountryValue(principal),
+                "foreign_debt": AddCountryValue(principal),
+            },
+        )
+        self._country_values(
+            state,
+            creditor_id,
+            {"money_reserves": AddCountryValue(-principal)},
+        )
+
     def _resolve_debt_contract(self, state: GameState, action: ActionResolveDebtContract, now: int) -> None:
         contracts = state.tables["debt_contracts"]
         match = contracts.filter((pl.col("id") == str(action.contract_id)) & (pl.col("status") == "pending"))
@@ -653,8 +682,7 @@ class EconomicHealthSystem(ISystem):
 
         frequency = int(contract["payment_frequency_months"])
         maturity_months = max(frequency, int(contract.get("maturity_months") or frequency))
-        self._country_values(state, debtor_id, {"money_reserves": ("add", principal), "foreign_debt": ("add", principal)})
-        self._country_values(state, creditor_id, {"money_reserves": ("add", -principal)})
+        self._transfer_debt_principal(state, debtor_id, creditor_id, principal)
         contract["status"] = "current"
         contract["created_at_minute"] = now
         contract["next_payment_at_minute"] = self._add_months(now, frequency)
@@ -782,7 +810,11 @@ class EconomicHealthSystem(ISystem):
         return calculate_annualized_debt_service(contract)
 
     def _adjust_annual_service(self, state: GameState, debtor_id: str, old: float, new: float) -> None:
-        self._country_values(state, debtor_id, {"annual_debt_service": ("add", new - old)})
+        self._country_values(
+            state,
+            debtor_id,
+            {"annual_debt_service": AddCountryValue(new - old)},
+        )
 
     def _process_due_debt(self, state: GameState, now: int) -> None:
         self._due_debt_processor.process(state, now, self)
@@ -876,13 +908,13 @@ class EconomicHealthSystem(ISystem):
         else:
             self._replace_rows(state, "debt_distress_cases", [plan.case])
         self._country_values(state, country_id, {
-            "debt_distress_status": plan.status,
-            "economic_production_modifier": plan.modifiers["production"],
-            "economic_trade_modifier": plan.modifiers["trade"],
-            "economic_policy_modifier": plan.modifiers["policy"],
-            "economic_health_modifier": plan.modifiers["health"],
-            "economic_political_modifier": plan.modifiers["politics"],
-            "economic_creditworthiness_modifier": plan.modifiers["creditworthiness"],
+            "debt_distress_status": SetCountryValue(plan.status),
+            "economic_production_modifier": SetCountryValue(plan.modifiers["production"]),
+            "economic_trade_modifier": SetCountryValue(plan.modifiers["trade"]),
+            "economic_policy_modifier": SetCountryValue(plan.modifiers["policy"]),
+            "economic_health_modifier": SetCountryValue(plan.modifiers["health"]),
+            "economic_political_modifier": SetCountryValue(plan.modifiers["politics"]),
+            "economic_creditworthiness_modifier": SetCountryValue(plan.modifiers["creditworthiness"]),
         })
         if plan.previous_status != plan.status:
             self._transition_event(
@@ -914,13 +946,13 @@ class EconomicHealthSystem(ISystem):
         case.update(status="closed", updated_at_minute=now, restriction_json="{}", reason="All arrears were cleared and treasury is non-negative; bounded restrictions were removed.")
         self._replace_rows(state, "debt_distress_cases", [case])
         self._country_values(state, country_id, {
-            "debt_distress_status": "current",
-            "economic_production_modifier": 1.0,
-            "economic_trade_modifier": 1.0,
-            "economic_policy_modifier": 1.0,
-            "economic_health_modifier": 1.0,
-            "economic_political_modifier": 1.0,
-            "economic_creditworthiness_modifier": 1.0,
+            "debt_distress_status": SetCountryValue("current"),
+            "economic_production_modifier": SetCountryValue(1.0),
+            "economic_trade_modifier": SetCountryValue(1.0),
+            "economic_policy_modifier": SetCountryValue(1.0),
+            "economic_health_modifier": SetCountryValue(1.0),
+            "economic_political_modifier": SetCountryValue(1.0),
+            "economic_creditworthiness_modifier": SetCountryValue(1.0),
         })
         self._transition_event(
             state,
