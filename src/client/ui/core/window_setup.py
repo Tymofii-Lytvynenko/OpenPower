@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -58,10 +58,13 @@ class WindowSetupPolicy:
         *,
         placements: Mapping[str, WindowPlacement],
         frame_placements: Mapping[str, WindowPlacement],
+        imgui_api: Any = imgui,
+        telemetry_provider: Callable[[], Any] = active_telemetry,
+        layout_resolver: Callable[..., GMLWindowLayout | None] = resolve_gml_layout,
     ) -> WindowSetup:
-        layout, width, height = self._resolve_layout_and_size(request)
-        telemetry = active_telemetry()
-        viewport_width, viewport_height = self._resolve_viewport_size(telemetry)
+        layout, width, height = self._resolve_layout_and_size(request, layout_resolver)
+        telemetry = telemetry_provider()
+        viewport_width, viewport_height = self._resolve_viewport_size(telemetry, imgui_api)
         window_key = self._window_key(request)
         live_placement = telemetry is None or not telemetry.pin_windows
         previous = self._previous_placement(request, window_key, live_placement, placements)
@@ -81,6 +84,7 @@ class WindowSetupPolicy:
             (viewport_width, viewport_height),
             resolved,
             has_layout=layout is not None,
+            imgui_api=imgui_api,
         )
         return WindowSetup(
             layout=layout,
@@ -93,8 +97,9 @@ class WindowSetupPolicy:
     @staticmethod
     def _resolve_layout_and_size(
         request: WindowRequest,
+        layout_resolver: Callable[..., GMLWindowLayout | None],
     ) -> tuple[GMLWindowLayout | None, float, float]:
-        layout = resolve_gml_layout(
+        layout = layout_resolver(
             request.gml_template,
             test_id=request.test_id,
             title=request.title,
@@ -107,12 +112,12 @@ class WindowSetupPolicy:
         return layout, width, height
 
     @staticmethod
-    def _resolve_viewport_size(telemetry: Any) -> tuple[float, float]:
+    def _resolve_viewport_size(telemetry: Any, imgui_api: Any) -> tuple[float, float]:
         if telemetry is not None:
             return telemetry.viewport_size
-        viewport = imgui.get_io().display_size
+        viewport = imgui_api.get_io().display_size
         if viewport.x <= 0 or viewport.y <= 0:
-            viewport = imgui.get_main_viewport().size
+            viewport = imgui_api.get_main_viewport().size
         return viewport.x, viewport.y
 
     @staticmethod
@@ -179,12 +184,13 @@ class WindowSetupPolicy:
         placement: ResolvedWindowPlacement,
         *,
         has_layout: bool,
+        imgui_api: Any,
     ) -> None:
         x, y, width, height = placement.x, placement.y, placement.width, placement.height
-        position_condition = self._position_condition(telemetry, request, window_key)
+        position_condition = self._position_condition(telemetry, request, window_key, imgui_api)
         if placement.viewport_changed:
             # A saved absolute coordinate can leave an anchored panel beyond a resized client area.
-            position_condition = imgui.Cond_.always
+            position_condition = imgui_api.Cond_.always
         viewport_width, viewport_height = viewport_size
         # Authored panels must stay reachable on smaller viewports; overflowing content remains scrollable.
         if viewport_width > 0 and viewport_height > 0:
@@ -193,23 +199,28 @@ class WindowSetupPolicy:
             y = max(0, min(y, viewport_height - height))
             if window_key in self._waiting_for_viewport:
                 # ImGui may create the window before its first valid viewport size arrives.
-                position_condition = imgui.Cond_.always
+                position_condition = imgui_api.Cond_.always
                 self._waiting_for_viewport.discard(window_key)
         else:
             self._waiting_for_viewport.add(window_key)
-        imgui.set_next_window_pos((x, y), position_condition)
+        imgui_api.set_next_window_pos((x, y), position_condition)
         size_condition = (
-            imgui.Cond_.always
+            imgui_api.Cond_.always
             if has_layout or placement.viewport_changed
-            else imgui.Cond_.first_use_ever
+            else imgui_api.Cond_.first_use_ever
         )
-        imgui.set_next_window_size((width, height), size_condition)
+        imgui_api.set_next_window_size((width, height), size_condition)
 
     @staticmethod
-    def _position_condition(telemetry: Any, request: WindowRequest, window_key: str) -> Any:
+    def _position_condition(
+        telemetry: Any,
+        request: WindowRequest,
+        window_key: str,
+        imgui_api: Any,
+    ) -> Any:
         if request.follow_position or request.avoid_overlaps:
-            return imgui.Cond_.always
+            return imgui_api.Cond_.always
         if telemetry is not None and telemetry.pin_windows:
             if window_key not in telemetry.movable_window_ids:
-                return imgui.Cond_.always
-        return imgui.Cond_.first_use_ever
+                return imgui_api.Cond_.always
+        return imgui_api.Cond_.first_use_ever

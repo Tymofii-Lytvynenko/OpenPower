@@ -1,4 +1,5 @@
 from contextlib import ExitStack, contextmanager
+from collections.abc import Callable
 from dataclasses import dataclass
 import sys
 from typing import Any
@@ -32,9 +33,15 @@ class WindowLifecycle:
     """Compose ImGui frame management with optional GML rendering scopes."""
 
     @staticmethod
-    def prepare_presentation(request: WindowRequest, setup: WindowSetup) -> WindowPresentation:
+    def prepare_presentation(
+        request: WindowRequest,
+        setup: WindowSetup,
+        *,
+        imgui_api: Any = imgui,
+        style_factory: Callable[[], Any] = gml_style,
+    ) -> WindowPresentation:
         custom_titlebar = WindowLifecycle._has_custom_titlebar(setup.layout)
-        flags = WindowLifecycle._resolve_flags(request.flags, custom_titlebar)
+        flags = WindowLifecycle._resolve_flags(request.flags, custom_titlebar, imgui_api)
         padding = WindowLifecycle._resolve_padding(request.padding, custom_titlebar)
         title = WindowLifecycle._resolve_imgui_title(request, setup)
         return WindowPresentation(
@@ -42,7 +49,7 @@ class WindowLifecycle:
             flags=flags,
             padding=padding,
             custom_titlebar=custom_titlebar,
-            style_scope=gml_style() if setup.layout is not None else None,
+            style_scope=style_factory() if setup.layout is not None else None,
         )
 
     @staticmethod
@@ -54,12 +61,12 @@ class WindowLifecycle:
         return bool(close_component and title_label)
 
     @staticmethod
-    def _resolve_flags(flags: Any, custom_titlebar: bool) -> Any:
-        flags = flags | imgui.WindowFlags_.no_collapse
+    def _resolve_flags(flags: Any, custom_titlebar: bool, imgui_api: Any) -> Any:
+        flags = flags | imgui_api.WindowFlags_.no_collapse
         if custom_titlebar:
-            flags |= imgui.WindowFlags_.no_title_bar
-            if flags & imgui.WindowFlags_.menu_bar:
-                flags &= ~imgui.WindowFlags_.menu_bar
+            flags |= imgui_api.WindowFlags_.no_title_bar
+            if flags & imgui_api.WindowFlags_.menu_bar:
+                flags &= ~imgui_api.WindowFlags_.menu_bar
         return flags
 
     @staticmethod
@@ -89,17 +96,20 @@ class WindowLifecycle:
         request: WindowRequest,
         setup: WindowSetup,
         presentation: WindowPresentation,
+        *,
+        imgui_api: Any = imgui,
     ):
-        expanded, opened = WindowLifecycle._begin_window(request, presentation)
+        expanded, opened = WindowLifecycle._begin_window(request, presentation, imgui_api)
         try:
             yield expanded, opened
         finally:
-            WindowLifecycle._end_window(setup, presentation, expanded)
+            WindowLifecycle._end_window(setup, presentation, expanded, imgui_api)
 
     @staticmethod
     def _begin_window(
         request: WindowRequest,
         presentation: WindowPresentation,
+        imgui_api: Any,
     ) -> tuple[bool, bool]:
         style_scope = presentation.style_scope
         if style_scope is not None:
@@ -107,16 +117,16 @@ class WindowLifecycle:
         try:
             # A failed Begin must still unwind padding and the GML style stack.
             if presentation.padding is not None:
-                imgui.push_style_var(imgui.StyleVar_.window_padding, presentation.padding)
+                imgui_api.push_style_var(imgui_api.StyleVar_.window_padding, presentation.padding)
             try:
-                return imgui.begin(
+                return imgui_api.begin(
                     presentation.title,
                     True if request.closable else None,
                     presentation.flags,
                 )
             finally:
                 if presentation.padding is not None:
-                    imgui.pop_style_var()
+                    imgui_api.pop_style_var()
         except BaseException:
             if style_scope is not None:
                 style_scope.__exit__(*sys.exc_info())
@@ -127,14 +137,15 @@ class WindowLifecycle:
         setup: WindowSetup,
         presentation: WindowPresentation,
         expanded: bool,
+        imgui_api: Any,
     ) -> None:
         try:
             if setup.layout is not None and expanded:
                 # GML screen coordinates can extend past ImGui's cursor bounds.
-                imgui.dummy((1.0, 1.0))
+                imgui_api.dummy((1.0, 1.0))
         finally:
             try:
-                imgui.end()
+                imgui_api.end()
             finally:
                 if presentation.style_scope is not None:
                     presentation.style_scope.__exit__(None, None, None)
@@ -149,6 +160,7 @@ class WindowLifecycle:
         expanded: bool,
         opened: bool,
         close_requests: set[str],
+        imgui_api: Any = imgui,
     ):
         opened = WindowLifecycle._resolve_open_state(request, opened)
         layout_scope, titlebar_closed = WindowLifecycle._prepare_layout_scope(
@@ -156,6 +168,7 @@ class WindowLifecycle:
             setup,
             presentation,
             expanded,
+            imgui_api,
         )
         if titlebar_closed:
             opened = False
@@ -183,12 +196,14 @@ class WindowLifecycle:
         setup: WindowSetup,
         presentation: WindowPresentation,
         expanded: bool,
+        imgui_api: Any,
     ) -> tuple[Any, bool]:
         if setup.layout is None or not expanded:
             return None, False
         layout_session, window_position = WindowLifecycle._create_layout_session(
             setup.layout,
             request.fit_layout_width,
+            imgui_api,
         )
         titlebar_closed = presentation.custom_titlebar and WindowLifecycle._render_titlebar(
             setup.layout,
@@ -197,6 +212,7 @@ class WindowLifecycle:
             window_position,
             closable=request.closable,
             test_id=request.test_id,
+            imgui_api=imgui_api,
         )
         return use_gml_layout(layout_session), titlebar_closed
 
@@ -213,9 +229,9 @@ class WindowLifecycle:
         return opened
 
     @staticmethod
-    def _create_layout_session(layout: GMLWindowLayout, fit_layout_width: bool):
-        window_position = imgui.get_window_pos()
-        window_size = imgui.get_window_size()
+    def _create_layout_session(layout: GMLWindowLayout, fit_layout_width: bool, imgui_api: Any):
+        window_position = imgui_api.get_window_pos()
+        window_size = imgui_api.get_window_size()
         layout_session = GMLLayoutSession(
             layout,
             (float(window_position.x), float(window_position.y)),
@@ -232,13 +248,22 @@ class WindowLifecycle:
         return layout_session, window_position
 
     @staticmethod
-    def _render_titlebar(layout, title, layout_session, window_position, *, closable, test_id) -> bool:
+    def _render_titlebar(
+        layout,
+        title,
+        layout_session,
+        window_position,
+        *,
+        closable,
+        test_id,
+        imgui_api: Any,
+    ) -> bool:
         close_clicked = False
         close_component = gml_titlebar_close(layout)
         render_gml_title(layout, title, layout_session)
         if closable and close_component is not None:
             close_rect = layout_session.rect_for(close_component)
-            imgui.set_cursor_screen_pos((
+            imgui_api.set_cursor_screen_pos((
                 float(window_position.x) + close_rect.x,
                 float(window_position.y) + close_rect.y,
             ))
@@ -246,7 +271,7 @@ class WindowLifecycle:
                 f"{test_id}.close" if test_id
                 else f"gml.{layout.template}.close"
             )
-            if imgui.button(
+            if imgui_api.button(
                 "×",
                 (close_rect.width, close_rect.height),
                 test_id=close_test_id,
@@ -255,7 +280,7 @@ class WindowLifecycle:
             inner_frame = layout.component("frmInner")
             if inner_frame is not None:
                 inner_rect = layout_session.rect_for(inner_frame)
-                imgui.set_cursor_screen_pos((
+                imgui_api.set_cursor_screen_pos((
                     float(window_position.x) + inner_rect.x,
                     float(window_position.y) + inner_rect.y,
                 ))

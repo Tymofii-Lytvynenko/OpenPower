@@ -1,15 +1,20 @@
 from contextlib import contextmanager
 from typing import Literal
 from src.client.ui.core.instrumented_imgui import imgui
+from src.client.ui.core.testability import active_telemetry
 from src.client.ui.core.ui_anchor_registry import UIAnchorRegistry
 from src.client.ui.core.window_placement import (
     WindowPlacement,
     WindowPlacementPolicy,
-    resolve_window_placement,
 )
 from src.client.ui.core.window_lifecycle import WindowLifecycle
 from src.client.ui.core.window_setup import WindowRequest, WindowSetupPolicy
 from src.client.ui.core.popup_containers import PopupManager
+from src.client.ui.core.window_placement_registry import (
+    WindowPlacementRegistry,
+    WindowPlacementUpdate,
+)
+from src.client.ui.layouts.gml_layout import gml_style, resolve_gml_layout
 
 
 class WindowManager:
@@ -17,8 +22,9 @@ class WindowManager:
     Context manager for creating ImGui windows.
     """
     _close_requests: set[str] = set()
-    _placements: dict[str, WindowPlacement] = {}
-    _frame_placements: dict[str, WindowPlacement] = {}
+    _placement_registry = WindowPlacementRegistry()
+    _placements = _placement_registry.placements
+    _frame_placements = _placement_registry.frame_placements
     _setup_policy = WindowSetupPolicy(WindowPlacementPolicy())
     _lifecycle = WindowLifecycle()
     popup = staticmethod(PopupManager.popup)
@@ -27,13 +33,13 @@ class WindowManager:
     @classmethod
     def begin_frame(cls) -> None:
         """Forget last frame's visible windows before collecting current geometry."""
-        cls._frame_placements.clear()
+        cls._placement_registry.begin_frame()
         UIAnchorRegistry.begin_frame()
 
     @classmethod
     def visible_frame_placements(cls) -> tuple[WindowPlacement, ...]:
         """Return positions for windows recorded during the current frame."""
-        return tuple(cls._frame_placements.values())
+        return cls._placement_registry.visible_frame_placements()
 
     @classmethod
     def request_close(cls, test_id: str) -> None:
@@ -85,15 +91,30 @@ class WindowManager:
             request,
             placements=WindowManager._placements,
             frame_placements=WindowManager._frame_placements,
+            imgui_api=imgui,
+            telemetry_provider=active_telemetry,
+            layout_resolver=resolve_gml_layout,
         )
-        presentation = WindowManager._lifecycle.prepare_presentation(request, setup)
-        with WindowManager._lifecycle.frame(request, setup, presentation) as (expanded, opened):
+        presentation = WindowManager._lifecycle.prepare_presentation(
+            request,
+            setup,
+            imgui_api=imgui,
+            style_factory=gml_style,
+        )
+        with WindowManager._lifecycle.frame(
+            request,
+            setup,
+            presentation,
+            imgui_api=imgui,
+        ) as (expanded, opened):
             WindowManager._update_placement(
-                setup.window_key,
-                (setup.viewport_width, setup.viewport_height),
-                live_placement=setup.live_placement,
-                follow_position=request.follow_position,
-                opened=opened,
+                WindowPlacementUpdate(
+                    window_key=setup.window_key,
+                    viewport_size=(setup.viewport_width, setup.viewport_height),
+                    live_placement=setup.live_placement,
+                    follow_position=request.follow_position,
+                    opened=opened,
+                )
             )
             with WindowManager._lifecycle.body(
                 request,
@@ -102,52 +123,10 @@ class WindowManager:
                 expanded=expanded,
                 opened=opened,
                 close_requests=WindowManager._close_requests,
+                imgui_api=imgui,
             ) as visible:
                 yield visible
 
     @staticmethod
-    def _update_placement(window_key, viewport_size, *, live_placement, follow_position, opened) -> None:
-        viewport_width, viewport_height = viewport_size
-        if viewport_width > 0 and viewport_height > 0:
-            # ImGui can restore an old absolute position from imgui.ini before the
-            # in-memory placement cache has a chance to re-anchor the panel.
-            actual_position = imgui.get_window_pos()
-            actual_size = imgui.get_window_size()
-            visible_placement = resolve_window_placement(
-                (float(actual_position.x), float(actual_position.y)),
-                (float(actual_size.x), float(actual_size.y)),
-                (float(viewport_width), float(viewport_height)),
-            )
-            if (visible_placement.width, visible_placement.height) != (actual_size.x, actual_size.y):
-                imgui.set_window_size(
-                    (visible_placement.width, visible_placement.height),
-                    imgui.Cond_.always,
-                )
-            if (visible_placement.x, visible_placement.y) != (actual_position.x, actual_position.y):
-                imgui.set_window_pos(
-                    (visible_placement.x, visible_placement.y),
-                    imgui.Cond_.always,
-                )
-        if live_placement and not follow_position and viewport_width > 0 and viewport_height > 0:
-            actual_position = imgui.get_window_pos()
-            actual_size = imgui.get_window_size()
-            WindowManager._placements[window_key] = WindowPlacement(
-                float(viewport_width),
-                float(viewport_height),
-                float(actual_position.x),
-                float(actual_position.y),
-                float(actual_size.x),
-                float(actual_size.y),
-            )
-        if opened and viewport_width > 0 and viewport_height > 0:
-            actual_position = imgui.get_window_pos()
-            actual_size = imgui.get_window_size()
-            active_placement = WindowPlacement(
-                float(viewport_width),
-                float(viewport_height),
-                float(actual_position.x),
-                float(actual_position.y),
-                float(actual_size.x),
-                float(actual_size.y),
-            )
-            WindowManager._frame_placements[window_key] = active_placement
+    def _update_placement(request: WindowPlacementUpdate) -> None:
+        WindowManager._placement_registry.update(request, imgui_api=imgui)
