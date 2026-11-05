@@ -9,6 +9,7 @@ from src.client.ui.core.window_placement import (
 )
 from src.client.ui.core.window_lifecycle import WindowLifecycle
 from src.client.ui.core.window_setup import WindowRequest, WindowSetupPolicy
+from src.client.ui.core.popup_containers import PopupManager
 
 
 class WindowManager:
@@ -20,6 +21,8 @@ class WindowManager:
     _frame_placements: dict[str, WindowPlacement] = {}
     _setup_policy = WindowSetupPolicy(WindowPlacementPolicy())
     _lifecycle = WindowLifecycle()
+    popup = staticmethod(PopupManager.popup)
+    centered_modal = staticmethod(PopupManager.centered_modal)
 
     @classmethod
     def begin_frame(cls) -> None:
@@ -148,30 +151,3 @@ class WindowManager:
                 float(actual_size.y),
             )
             WindowManager._frame_placements[window_key] = active_placement
-
-    @staticmethod
-    @contextmanager
-    def popup(title: str):
-        if imgui.begin_popup(title):
-            try:
-                yield
-            finally:
-                imgui.end_popup()
-
-    @staticmethod
-    @contextmanager
-    def centered_modal(name: str, sw: float, sh: float, w: float = 300, h: float = 400):
-        pos_x = (sw - w) / 2
-        pos_y = (sh - h) / 2
-        
-        imgui.set_next_window_pos((pos_x, pos_y))
-        imgui.set_next_window_size((w, h))
-        
-        flags = (imgui.WindowFlags_.no_title_bar | 
-                 imgui.WindowFlags_.no_move)
-        
-        if imgui.begin(name, None, flags):
-            try:
-                yield
-            finally:
-                imgui.end()
