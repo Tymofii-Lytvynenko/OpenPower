@@ -18,10 +18,7 @@ from modules.base.systems.economy.aligned_economy_fast_path import (
     AlignedEconomyLayoutCache,
     update_aligned_economy_tables,
 )
-from modules.base.systems.politics.political_effect_policy import (
-    aggregate_political_effects_by_type,
-    bounded_modifier,
-)
+from modules.base.systems.economy.production_basis_builder import ProductionBasisBuilder
 from modules.base.systems.world.authority_policy import player_controls_country
 from src.shared.events import EventRealSecond, EventResourceProductionIncreased
 from src.shared.actions import ActionIncreaseResourceProduction, ActionUpdateResourcePolicy
@@ -79,6 +76,7 @@ class InternalEconomySystem(ISystem):
         "_production_layout_cache": SYSTEM_STATE_CACHE,
         "_consumption_layout_cache": SYSTEM_STATE_CACHE,
     }
+    _production_basis_builder = ProductionBasisBuilder()
 
     def __init__(self):
         self._missing_columns = set()
@@ -958,109 +956,12 @@ class InternalEconomySystem(ISystem):
         if "economic_health" not in country_schema:
             countries_lf = countries_lf.with_columns(pl.lit(1.0).alias("economic_health"))
 
-        production_basis_lf = prod_table.lazy()
-        infrastructure = state.tables.get("regional_infrastructure")
-        if infrastructure is not None and not infrastructure.is_empty():
-            if "industrial_access_index" in country_schema:
-                industrial_access_lf = countries_lf.select(
-                    pl.col("id"),
-                    pl.col("industrial_access_index").clip(0.0, 1.0).alias("_industrial_access"),
-                )
-                production_basis_lf = production_basis_lf.join(
-                    industrial_access_lf,
-                    left_on="country_id",
-                    right_on="id",
-                    how="left",
-                ).with_columns(
-                    # Infrastructure limits throughput but does not switch an established economy off.
-                    (pl.col("domestic_production") * (0.75 + 0.25 * pl.col("_industrial_access").fill_null(1.0)))
-                    .alias("_effective_production")
-                )
-            else:
-                production_basis_lf = production_basis_lf.with_columns(
-                    pl.col("domestic_production").alias("_effective_production")
-                )
-        else:
-            production_basis_lf = production_basis_lf.with_columns(
-                pl.col("domestic_production").alias("_effective_production")
-            )
-
-        political_effects = state.tables.get("political_effects")
-        now = int(state.time.total_minutes)
-        political_outputs = (
-            aggregate_political_effects_by_type(
-                political_effects,
-                now,
-                selectors={
-                    ("economy", "production_modifier"),
-                    ("labor", "labor_supply_modifier"),
-                },
-            )
-            if political_effects is not None and not political_effects.is_empty()
-            else {}
+        production_basis_lf = self._production_basis_builder.build(
+            state,
+            countries_lf,
+            country_schema,
+            prod_table,
         )
-        political_production = {
-            country_id: value
-            for (country_id, domain, effect), value in political_outputs.items()
-            if (domain, effect) == ("economy", "production_modifier")
-        }
-        political_labor = {
-            country_id: value
-            for (country_id, domain, effect), value in political_outputs.items()
-            if (domain, effect) == ("labor", "labor_supply_modifier")
-        }
-        political_rows = []
-        if political_production or political_labor:
-            political_rows = [
-                {
-                    "_modifier_country_id": country_id,
-                    "_political_production_modifier": bounded_modifier(
-                        political_production.get(country_id, 0.0)
-                    ),
-                    "_political_labor_modifier": bounded_modifier(
-                        political_labor.get(country_id, 0.0)
-                    ),
-                }
-                for country_id in sorted(set(political_production) | set(political_labor))
-            ]
-        has_country_modifier = "economic_production_modifier" in country_schema
-        if has_country_modifier or political_rows:
-            production_modifier = (
-                pl.col("economic_production_modifier").fill_null(1.0).clip(0.5, 1.0)
-                if has_country_modifier
-                else pl.lit(1.0)
-            )
-            production_modifiers_lf = countries_lf.select(
-                pl.col("id").alias("_modifier_country_id"),
-                production_modifier.alias("_economic_production_modifier"),
-            )
-            if political_rows:
-                production_modifiers_lf = production_modifiers_lf.join(
-                    pl.DataFrame(political_rows).lazy(),
-                    on="_modifier_country_id",
-                    how="left",
-                ).with_columns(
-                    pl.col("_political_production_modifier").fill_null(1.0),
-                    pl.col("_political_labor_modifier").fill_null(1.0),
-                )
-            else:
-                production_modifiers_lf = production_modifiers_lf.with_columns(
-                    pl.lit(1.0).alias("_political_production_modifier"),
-                    pl.lit(1.0).alias("_political_labor_modifier"),
-                )
-            production_basis_lf = production_basis_lf.join(
-                production_modifiers_lf,
-                left_on="country_id",
-                right_on="_modifier_country_id",
-                how="left",
-            ).with_columns(
-                (
-                    pl.col("_effective_production")
-                    * pl.col("_economic_production_modifier").fill_null(1.0)
-                    * pl.col("_political_production_modifier").fill_null(1.0)
-                    * pl.col("_political_labor_modifier").fill_null(1.0)
-                ).alias("_effective_production")
-            )
 
         production_effects = aggregate_active_effects(
             state.tables.get("random_event_effects"),
