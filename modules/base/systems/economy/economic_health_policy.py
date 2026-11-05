@@ -152,6 +152,143 @@ def calculate_annualized_debt_service(contract: Mapping[str, Any]) -> float:
 
 
 @dataclass(frozen=True)
+class EconomicPolicyChangeValidationInputs:
+    requested_policy_name: str
+    target_value: Any
+    country: Mapping[str, Any]
+    terms: Mapping[str, Any]
+    spending_policies: frozenset[str]
+
+
+@dataclass(frozen=True)
+class EconomicPolicyChangeValidation:
+    policy_name: str
+    target_value: float
+    previous_value: float
+    rejection_reason: str | None
+    rejection_indicator: str
+    rejection_value: float
+
+    @property
+    def accepted(self) -> bool:
+        return self.rejection_reason is None
+
+
+class EconomicPolicyChangeValidator(Protocol):
+    def validate(
+        self,
+        inputs: EconomicPolicyChangeValidationInputs,
+    ) -> EconomicPolicyChangeValidation: ...
+
+
+class DeterministicEconomicPolicyChangeValidator:
+    """Apply policy naming, numeric, and scenario-bound rules without state access."""
+
+    _POLICIES = {
+        "minimum_wage": "minimum_wage",
+        "interest_rate": "interest_rate",
+        "personal_income_tax_rate": "personal_income_tax_rate",
+    }
+
+    def validate(
+        self,
+        inputs: EconomicPolicyChangeValidationInputs,
+    ) -> EconomicPolicyChangeValidation:
+        policy_name = self._resolve_policy_name(inputs)
+        if policy_name is None:
+            return self._rejected(
+                policy_name=str(inputs.requested_policy_name),
+                reason="Unsupported economic policy.",
+                indicator=str(inputs.requested_policy_name),
+            )
+
+        target_value = self._finite_target_value(inputs.target_value)
+        if target_value is None:
+            return self._rejected(
+                policy_name=policy_name,
+                reason="Policy value must be finite.",
+                indicator=policy_name,
+            )
+
+        lower, upper = self._scenario_bounds(policy_name, inputs.terms, inputs.spending_policies)
+        previous_value = _finite(inputs.country.get(policy_name))
+        if self._outside_scenario_bounds(target_value, lower, upper):
+            return EconomicPolicyChangeValidation(
+                policy_name=policy_name,
+                target_value=target_value,
+                previous_value=previous_value,
+                rejection_reason="Policy value is outside scenario bounds.",
+                rejection_indicator=policy_name,
+                rejection_value=previous_value,
+            )
+        return EconomicPolicyChangeValidation(
+            policy_name=policy_name,
+            target_value=target_value,
+            previous_value=previous_value,
+            rejection_reason=None,
+            rejection_indicator=policy_name,
+            rejection_value=0.0,
+        )
+
+    @classmethod
+    def _resolve_policy_name(
+        cls,
+        inputs: EconomicPolicyChangeValidationInputs,
+    ) -> str | None:
+        requested_policy = str(inputs.requested_policy_name).strip().lower()
+        return cls._POLICIES.get(requested_policy) or (
+            requested_policy if requested_policy in inputs.spending_policies else None
+        )
+
+    @staticmethod
+    def _finite_target_value(value: Any) -> float | None:
+        resolved = _finite(value, math.nan)
+        return resolved if math.isfinite(resolved) else None
+
+    @staticmethod
+    def _scenario_bounds(
+        policy_name: str,
+        terms: Mapping[str, Any],
+        spending_policies: frozenset[str],
+    ) -> tuple[float, float]:
+        default_upper = (
+            1.0
+            if policy_name in spending_policies
+            else 0.5
+            if policy_name in {"interest_rate", "personal_income_tax_rate"}
+            else 1_000_000.0
+        )
+        upper = _clamp(
+            terms.get(f"max_{policy_name}"),
+            0.0,
+            1_000_000_000.0,
+            default_upper,
+        )
+        lower = _clamp(terms.get(f"min_{policy_name}"), 0.0, upper, 0.0)
+        return lower, upper
+
+    @staticmethod
+    def _outside_scenario_bounds(target_value: float, lower: float, upper: float) -> bool:
+        return target_value < lower or target_value > upper
+
+    @staticmethod
+    def _rejected(
+        *,
+        policy_name: str,
+        reason: str,
+        indicator: str,
+    ) -> EconomicPolicyChangeValidation:
+        return EconomicPolicyChangeValidation(
+            policy_name=policy_name,
+            target_value=0.0,
+            previous_value=0.0,
+            rejection_reason=reason,
+            rejection_indicator=indicator,
+            rejection_value=0.0,
+        )
+
+
+@dataclass(frozen=True)
 class DebtServiceSettlementInputs:
     contract: Mapping[str, Any]
     due_at_minute: int

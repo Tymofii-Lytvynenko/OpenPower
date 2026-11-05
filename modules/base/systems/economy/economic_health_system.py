@@ -14,7 +14,10 @@ from modules.base.systems.economy.economic_health_policy import (
     DebtServiceSettlementCalculator,
     DebtServiceSettlementInputs,
     DeterministicDebtServiceSettlementCalculator,
+    DeterministicEconomicPolicyChangeValidator,
     DeterministicEconomicProfileCalculator,
+    EconomicPolicyChangeValidationInputs,
+    EconomicPolicyChangeValidator,
     EconomicProfileCalculator,
     EconomicProfileEnvironment,
     EconomicProfileInputs,
@@ -60,6 +63,7 @@ class EconomicHealthSystem(ISystem):
         self,
         profile_calculator: EconomicProfileCalculator | None = None,
         debt_service_calculator: DebtServiceSettlementCalculator | None = None,
+        policy_change_validator: EconomicPolicyChangeValidator | None = None,
     ) -> None:
         self._profile_calculator = (
             profile_calculator
@@ -70,6 +74,11 @@ class EconomicHealthSystem(ISystem):
             debt_service_calculator
             if debt_service_calculator is not None
             else DeterministicDebtServiceSettlementCalculator()
+        )
+        self._policy_change_validator = (
+            policy_change_validator
+            if policy_change_validator is not None
+            else DeterministicEconomicPolicyChangeValidator()
         )
 
     @property
@@ -255,30 +264,30 @@ class EconomicHealthSystem(ISystem):
             self._reject(state, country_id, source_id, action.policy_name, 0.0, "Actor is not authorized for this country.", now)
             return
 
-        policies = {
-            "minimum_wage": "minimum_wage",
-            "interest_rate": "interest_rate",
-            "personal_income_tax_rate": "personal_income_tax_rate",
-        }
-        requested_policy = str(action.policy_name).strip().lower()
-        column = policies.get(requested_policy)
-        if column is None and requested_policy in self.SPENDING_POLICIES:
-            column = requested_policy
-        if column is None:
-            self._reject(state, country_id, source_id, str(action.policy_name), 0.0, "Unsupported economic policy.", now)
-            return
-        value = self._number(action.target_value, math.nan)
-        if not math.isfinite(value):
-            self._reject(state, country_id, source_id, column, 0.0, "Policy value must be finite.", now)
-            return
-
         terms = self._terms(state)
-        default_upper = 1.0 if column in self.SPENDING_POLICIES else (0.5 if column in {"interest_rate", "personal_income_tax_rate"} else 1_000_000.0)
-        upper = self._bounded(terms.get(f"max_{column}"), 0.0, 1_000_000_000.0, default_upper)
-        lower = self._bounded(terms.get(f"min_{column}"), 0.0, upper, 0.0)
-        if value < lower or value > upper:
-            self._reject(state, country_id, source_id, column, self._number(country.get(column)), "Policy value is outside scenario bounds.", now)
+        validation = self._policy_change_validator.validate(
+            EconomicPolicyChangeValidationInputs(
+                requested_policy_name=str(action.policy_name),
+                target_value=action.target_value,
+                country=country,
+                terms=terms,
+                spending_policies=self.SPENDING_POLICIES,
+            )
+        )
+        if validation.rejection_reason is not None:
+            self._reject(
+                state,
+                country_id,
+                source_id,
+                validation.rejection_indicator,
+                validation.rejection_value,
+                validation.rejection_reason,
+                now,
+            )
             return
+        column = validation.policy_name
+        value = validation.target_value
+        previous = validation.previous_value
 
         transitions = state.tables["economic_policy_transitions"]
         cooldowns = transitions.filter(
@@ -288,10 +297,9 @@ class EconomicHealthSystem(ISystem):
             & (pl.col("cooldown_until_minute") > now)
         )
         if not cooldowns.is_empty():
-            self._reject(state, country_id, source_id, column, self._number(country.get(column)), "Policy cooldown has not elapsed.", now)
+            self._reject(state, country_id, source_id, column, previous, "Policy cooldown has not elapsed.", now)
             return
 
-        previous = self._number(country.get(column))
         configured_cost = terms.get(f"{column}_transition_cost", terms.get("policy_transition_cost", 0.0))
         transition_cost = self._bounded(configured_cost, 0.0, 1_000_000_000_000.0)
         if self._number(country.get("money_reserves")) < transition_cost:
