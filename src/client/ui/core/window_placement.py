@@ -23,6 +23,75 @@ class ResolvedWindowPlacement:
     viewport_changed: bool
 
 
+@dataclass(frozen=True)
+class WindowPlacementRequest:
+    requested_position: tuple[float, float]
+    requested_size: tuple[float, float]
+    viewport_size: tuple[float, float]
+    previous: WindowPlacement | None
+    occupied: tuple[WindowPlacement, ...]
+    avoid_overlaps: bool
+    horizontal_anchor: Literal["left", "right"]
+    horizontal_margin: float
+    fixed_size: bool
+    placement_margin: float
+    top_clearance: float
+    bottom_clearance: float
+
+
+class WindowPlacementPolicy:
+    """Resolve requested window geometry against prior and visible placements."""
+
+    def resolve(self, request: WindowPlacementRequest) -> ResolvedWindowPlacement:
+        x, y = request.requested_position
+        preserved_placement = self._previous_placement_for_same_viewport(request)
+        if preserved_placement is not None:
+            x, y = preserved_placement.x, preserved_placement.y
+
+        resolved = resolve_window_placement(
+            (x, y),
+            request.requested_size,
+            request.viewport_size,
+            request.previous,
+            horizontal_anchor=request.horizontal_anchor,
+            horizontal_margin=request.horizontal_margin,
+            fixed_size=request.fixed_size,
+        )
+        if request.avoid_overlaps:
+            x, y = resolve_non_overlapping_position(
+                (resolved.x, resolved.y),
+                (resolved.width, resolved.height),
+                request.viewport_size,
+                request.occupied,
+                margin=request.placement_margin,
+                top_clearance=request.top_clearance,
+                bottom_clearance=request.bottom_clearance,
+            )
+            return ResolvedWindowPlacement(
+                x,
+                y,
+                resolved.width,
+                resolved.height,
+                resolved.viewport_changed,
+            )
+        return resolved
+
+    @staticmethod
+    def _previous_placement_for_same_viewport(
+        request: WindowPlacementRequest,
+    ) -> WindowPlacement | None:
+        if not request.avoid_overlaps:
+            return None
+        previous = request.previous
+        if previous is None:
+            return None
+        if previous.viewport_width != request.viewport_size[0]:
+            return None
+        if previous.viewport_height != request.viewport_size[1]:
+            return None
+        return previous
+
+
 def center_window(
     viewport_size: tuple[float, float], window_size: tuple[float, float]
 ) -> tuple[float, float]:
