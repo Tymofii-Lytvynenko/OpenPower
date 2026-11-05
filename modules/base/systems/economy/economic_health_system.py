@@ -24,6 +24,11 @@ from modules.base.systems.economy.economic_health_policy import (
     EconomicProfileInputs,
     calculate_annualized_debt_service,
 )
+from modules.base.systems.economy.economic_profile_environment import (
+    DeterministicEconomicProfileEnvironmentCalculator,
+    EconomicProfileEnvironmentCalculator,
+    EconomicProfileEnvironmentInputs,
+)
 from modules.base.systems.economy.due_debt_settlement import (
     DueDebtBatch,
     DueDebtInstallment,
@@ -53,7 +58,6 @@ from modules.base.systems.economy.economic_health_records import (
     EconomicTransitionEventRequest,
 )
 from modules.base.systems.world.authority_policy import player_controls_country
-from modules.base.systems.world.random_event_effects import aggregate_active_effects
 from src.shared.actions import (
     ActionChangeEconomicPolicy,
     ActionRequestDebtContract,
@@ -110,10 +114,15 @@ class EconomicHealthSystem(ISystem):
         debt_distress_planner: DebtDistressPlanner | None = None,
         policy_transition_planner: EconomicPolicyTransitionPlanner | None = None,
         policy_application_planner: EconomicPolicyApplicationPlanner | None = None,
+        profile_environment_calculator: EconomicProfileEnvironmentCalculator | None = None,
     ) -> None:
         self._profile_calculator = _resolve_component(
             profile_calculator,
             DeterministicEconomicProfileCalculator,
+        )
+        self._profile_environment_calculator = _resolve_component(
+            profile_environment_calculator,
+            DeterministicEconomicProfileEnvironmentCalculator,
         )
         self._debt_service_calculator = _resolve_component(
             debt_service_calculator,
@@ -961,78 +970,11 @@ class EconomicHealthSystem(ISystem):
         now: int,
         regions: pl.DataFrame | None,
     ) -> EconomicProfileEnvironment:
-        return EconomicProfileEnvironment(
-            country_effects=aggregate_active_effects(
-                state.tables.get("random_event_effects"),
-                now,
-                categories={"labour", "employment"},
-                subject_type="country",
-            ),
-            health_effect_by_country=self._health_effect_by_country(state, now, regions),
-            labor_by_country=self._labor_supply_by_country(regions),
-            shortage_by_country=self._resource_shortage_by_country(state),
-        )
-
-    def _health_effect_by_country(
-        self,
-        state: GameState,
-        now: int,
-        regions: pl.DataFrame | None,
-    ) -> dict[str, float]:
-        regional_health_effects = aggregate_active_effects(
-            state.tables.get("random_event_effects"),
-            now,
-            categories={"health"},
-            subject_type="region",
-        )
-        region_owners = {}
-        if regions is not None and {"id", "owner"}.issubset(regions.columns):
-            region_owners = {
-                str(row.get("id")): str(row.get("owner") or "").strip().upper()
-                for row in regions.select("id", "owner").iter_rows(named=True)
-            }
-        health_effect_by_country: dict[str, float] = {}
-        for (_, region_id, _), magnitude in regional_health_effects.items():
-            owner = region_owners.get(region_id, "")
-            if owner:
-                health_effect_by_country[owner] = (
-                    health_effect_by_country.get(owner, 0.0) + magnitude
-                )
-        return health_effect_by_country
-
-    def _labor_supply_by_country(
-        self,
-        regions: pl.DataFrame | None,
-    ) -> dict[str, float]:
-        if regions is None or not {"owner", "pop_15_64"}.issubset(regions.columns):
-            return {}
-        return {
-            str(row["owner"]): max(0.0, self._number(row["labor_supply"]))
-            for row in regions.group_by("owner").agg(
-                pl.col("pop_15_64").fill_null(0).sum().alias("labor_supply")
-            ).iter_rows(named=True)
-        }
-
-    def _resource_shortage_by_country(
-        self,
-        state: GameState,
-    ) -> dict[str, float]:
-        ledger = state.tables.get("resource_ledger")
-        if ledger is None or not {
-            "country_id",
-            "balance_usd",
-            "consumption_usd",
-        }.issubset(ledger.columns):
-            return {}
-        shortage = ledger.group_by("country_id").agg(
-            pl.col("balance_usd").filter(pl.col("balance_usd") < 0).abs().sum().alias("shortage"),
-            pl.col("consumption_usd").sum().alias("demand"),
-        )
-        return {
-            str(row["country_id"]): self._bounded(
-                self._number(row["shortage"]) / max(1.0, self._number(row["demand"])),
-                0.0,
-                1.0,
+        return self._profile_environment_calculator.calculate(
+            EconomicProfileEnvironmentInputs(
+                now=now,
+                random_event_effects=state.tables.get("random_event_effects"),
+                regions=regions,
+                resource_ledger=state.tables.get("resource_ledger"),
             )
-            for row in shortage.iter_rows(named=True)
-        }
+        )
