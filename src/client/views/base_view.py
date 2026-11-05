@@ -1,6 +1,13 @@
 import arcade
 from typing import Optional, Any
 from src.client.services.imgui_service import ImGuiService
+from src.client.views.imgui_input_router import (
+    ImGuiInputRouter,
+    MouseButtonInput,
+    MouseDragInput,
+    MouseMotionInput,
+    MouseScrollInput,
+)
 
 class BaseImGuiView(arcade.View):
     """
@@ -8,6 +15,10 @@ class BaseImGuiView(arcade.View):
     """
     def __init__(self):
         super().__init__()
+        self._imgui_input_router = ImGuiInputRouter(
+            arcade.MOUSE_BUTTON_RIGHT,
+            arcade.MOUSE_BUTTON_MIDDLE,
+        )
 
     @property
     def nav(self) -> Any:
@@ -64,55 +75,69 @@ class BaseImGuiView(arcade.View):
 
     # --- DRY INPUT ROUTING ---
     def on_mouse_press(self, x, y, button, modifiers):
-        if self.imgui and self.imgui.on_mouse_press(x, y, button, modifiers):
-            # Allow "Pass Through" for navigation (Right/Middle click) even if hovering UI
-            if button not in (arcade.MOUSE_BUTTON_RIGHT, arcade.MOUSE_BUTTON_MIDDLE):
-                return
-        self.on_game_mouse_press(x, y, button, modifiers)
+        self._imgui_input_router.dispatch_mouse_press(
+            self.imgui,
+            MouseButtonInput(x, y, button, modifiers),
+            self.on_game_mouse_press,
+        )
     
     def on_mouse_motion(self, x: float, y: float, dx: float, dy: float):
         """
         CRITICAL FIX: Updates ImGui mouse position.
         Without this, hover states won't work and clicks will require double-pressing.
         """
-        if self.imgui:
-            self.imgui.on_mouse_motion(x, y, dx, dy)
-        self.on_game_mouse_motion(x, y, dx, dy)
+        self._imgui_input_router.dispatch_mouse_motion(
+            self.imgui,
+            MouseMotionInput(x, y, dx, dy),
+            self.on_game_mouse_motion,
+        )
 
     def on_mouse_release(self, x, y, button, modifiers):
-        if self.imgui and self.imgui.on_mouse_release(x, y, button, modifiers):
-             if button not in (arcade.MOUSE_BUTTON_RIGHT, arcade.MOUSE_BUTTON_MIDDLE):
-                return
-        self.on_game_mouse_release(x, y, button, modifiers)
+        self._imgui_input_router.dispatch_mouse_release(
+            self.imgui,
+            MouseButtonInput(x, y, button, modifiers),
+            self.on_game_mouse_release,
+        )
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
-        if self.imgui and self.imgui.on_mouse_drag(x, y, dx, dy, buttons, modifiers):
-             # Bitwise check for Middle/Right drag pass-through
-             if not (buttons & (arcade.MOUSE_BUTTON_RIGHT | arcade.MOUSE_BUTTON_MIDDLE)):
-                return
-        self.on_game_mouse_drag(x, y, dx, dy, buttons, modifiers)
+        self._imgui_input_router.dispatch_mouse_drag(
+            self.imgui,
+            MouseDragInput(x, y, dx, dy, buttons, modifiers),
+            self.on_game_mouse_drag,
+        )
 
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
-        if self.imgui and self.imgui.on_mouse_scroll(x, y, scroll_x, scroll_y):
-            return
-        self.on_game_mouse_scroll(x, y, scroll_x, scroll_y)
+        self._imgui_input_router.dispatch_mouse_scroll(
+            self.imgui,
+            MouseScrollInput(x, y, scroll_x, scroll_y),
+            self.on_game_mouse_scroll,
+        )
 
     def on_key_press(self, symbol, modifiers):
-        captured = self.imgui.on_key_press(symbol, modifiers) if self.imgui else False
+        captured = self._imgui_input_router.key_press_captured(
+            self.imgui,
+            symbol,
+            modifiers,
+        )
         if self._handle_global_shortcut(symbol):
             return
         if not captured:
             self.on_game_key_press(symbol, modifiers)
 
     def on_key_release(self, symbol, modifiers):
-        captured = self.imgui.on_key_release(symbol, modifiers) if self.imgui else False
-        if not captured:
-            self.on_game_key_release(symbol, modifiers)
+        self._imgui_input_router.dispatch_key_release(
+            self.imgui,
+            symbol,
+            modifiers,
+            self.on_game_key_release,
+        )
 
     def on_text(self, text: str):
-        if self.imgui and self.imgui.on_text(text):
-            return
-        self.on_game_text(text)
+        self._imgui_input_router.dispatch_text(
+            self.imgui,
+            text,
+            self.on_game_text,
+        )
 
     def _handle_global_shortcut(self, symbol) -> bool:
         if symbol != arcade.key.F11:
