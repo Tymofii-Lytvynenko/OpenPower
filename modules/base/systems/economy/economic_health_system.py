@@ -30,6 +30,10 @@ from modules.base.systems.economy.economic_profile_environment import (
     EconomicProfileEnvironmentCalculator,
     EconomicProfileEnvironmentInputs,
 )
+from modules.base.systems.economy.economic_health_action_dispatcher import (
+    DeterministicEconomicHealthActionDispatcher,
+    EconomicHealthActionDispatcher,
+)
 from modules.base.systems.economy.due_debt_settlement import (
     DueDebtBatch,
     DueDebtInstallment,
@@ -129,6 +133,7 @@ class EconomicHealthSystem(ISystem):
         policy_transition_planner: EconomicPolicyTransitionPlanner | None = None,
         policy_application_planner: EconomicPolicyApplicationPlanner | None = None,
         profile_environment_calculator: EconomicProfileEnvironmentCalculator | None = None,
+        action_dispatcher: EconomicHealthActionDispatcher | None = None,
     ) -> None:
         self._profile_calculator = _resolve_component(
             profile_calculator,
@@ -170,6 +175,10 @@ class EconomicHealthSystem(ISystem):
             policy_application_planner,
             DeterministicEconomicPolicyApplicationPlanner,
         )
+        self._action_dispatcher = _resolve_component(
+            action_dispatcher,
+            DeterministicEconomicHealthActionDispatcher,
+        )
 
     @property
     def id(self) -> str:
@@ -185,21 +194,7 @@ class EconomicHealthSystem(ISystem):
 
         now = max(0, int(state.time.total_minutes))
         for action in state.current_actions:
-            if isinstance(action, ActionChangeEconomicPolicy):
-                self._request_policy_change(state, action, now)
-            elif isinstance(action, ActionSetTax):
-                self._request_policy_change(state, ActionChangeEconomicPolicy(
-                    player_id=action.player_id,
-                    country_tag=action.country_tag,
-                    policy_name="personal_income_tax_rate",
-                    target_value=action.new_tax_rate,
-                ), now)
-            elif isinstance(action, ActionRequestDebtContract):
-                self._request_debt_contract(state, action, now)
-            elif isinstance(action, ActionResolveDebtContract):
-                self._resolve_debt_contract(state, action, now)
-            elif isinstance(action, ActionRequestDebtRestructuring):
-                self._request_restructuring(state, action, now)
+            self._action_dispatcher.dispatch(state, action, now, self)
 
         self._apply_due_policy_changes(state, now)
         self._process_due_debt(state, now)
