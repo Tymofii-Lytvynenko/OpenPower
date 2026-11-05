@@ -36,6 +36,7 @@ from modules.base.systems.military.unit_catalog import MILITARY_UNIT_TYPES
 from modules.base.systems.military.naval_invasion_policy import NavalInvasionPolicy
 from modules.base.systems.military.readiness_system import ReadinessSystem
 from modules.base.systems.military.unit_reorganization import UnitReorganization
+from modules.base.systems.military.market_purchase_service import MilitaryMarketPurchaseService
 from modules.base.systems.military.territory_entry import authorized_entry_moves
 from modules.base.systems.world.demilitarization_policy import DemilitarizationPolicy
 from src.core.map.engagement_geometry import interpolate_geo
@@ -121,6 +122,22 @@ UNIT_ORDER_FEEDBACK_SCHEMA: dict[str, pl.DataType] = {
 
 class UnitFactory:
     """Creates normalized unit records without coupling callers to table details."""
+
+    def next_id(
+        self,
+        unit_rows: list[dict[str, Any]],
+        country_tag: str,
+        unit_type: str,
+    ) -> str:
+        clean_unit_type = unit_type or DEFAULT_UNIT_TYPE
+        prefix = f"{country_tag}-{clean_unit_type}"
+        existing_ids = {str(row["id"]) for row in unit_rows}
+        index = 1
+        while True:
+            unit_id = f"{prefix}-{index:03d}"
+            if unit_id not in existing_ids:
+                return unit_id
+            index += 1
 
     def create(
         self,
@@ -220,6 +237,7 @@ class MilitarySystem(ISystem):
         "_weapons_trade_policy": SYSTEM_STATE_HELPER,
         "_readiness_system": SYSTEM_STATE_HELPER,
         "_demilitarization_policy": SYSTEM_STATE_HELPER,
+        "_market_purchase_service": SYSTEM_STATE_HELPER,
         "_manpower_cache_key": SYSTEM_STATE_CACHE,
         "_manpower_by_owner": SYSTEM_STATE_CACHE,
     }
@@ -242,6 +260,17 @@ class MilitarySystem(ISystem):
         self._weapons_trade_policy = WeaponsTradePolicy()
         self._readiness_system = ReadinessSystem()
         self._demilitarization_policy = DemilitarizationPolicy()
+        self._market_purchase_service = MilitaryMarketPurchaseService(
+            unit_factory=self._unit_factory,
+            duration_policy=self._duration_policy,
+            access_policy=self._access_policy,
+            route_planner=self._route_planner,
+            demilitarization_policy=self._demilitarization_policy,
+            weapons_trade_policy=self._weapons_trade_policy,
+            authorization_policy=player_controls_country,
+            route_schema=MOVEMENT_ROUTE_SCHEMA,
+            default_unit_type=DEFAULT_UNIT_TYPE,
+        )
         self._manpower_cache_key: tuple[int, int, int] | None = None
         self._manpower_by_owner = pl.DataFrame(
             schema={"owner": pl.Utf8, "total_core_manpower": pl.Float64}
@@ -950,179 +979,18 @@ class MilitarySystem(ISystem):
             return units
         countries = self._ensure_country_columns(state.get_table("countries"))
         regions = state.get_table("regions")
-        home_regions = self._home_regions_by_country(regions)
-        region_locations = self._duration_policy.region_locations(regions)
-        region_rows = regions.to_dicts()
-        adjacency = state.tables.get("region_adjacency")
-        adjacency_rows = [] if adjacency is None else adjacency.to_dicts()
-        movement_table = state.tables.get("unit_movement_routes")
-        movement_rows = [] if movement_table is None else movement_table.to_dicts()
-        movement_by_unit = {str(item.get("unit_id") or ""): item for item in movement_rows}
-        listing_rows = listings_table.to_dicts()
-        listings_by_id = {str(row.get("id") or ""): row for row in listing_rows}
-        country_rows = countries.to_dicts()
-        countries_by_tag = {str(row.get("id") or "").strip().upper(): row for row in country_rows}
-        design_rows = state.tables.get("unit_designs")
-        designs_by_id = {} if design_rows is None else {
-            str(row.get("id") or ""): row
-            for row in design_rows.to_dicts()
-        }
-        unit_rows = units.to_dicts()
-        changed = False
-
-        for action in actions:
-            listing = listings_by_id.get(str(action.listing_id))
-            buyer_tag = str(action.buyer_country_tag or "").strip().upper()
-            seller_tag = str(listing.get("seller_country_id") or "").strip().upper() if listing else ""
-            buyer, seller = countries_by_tag.get(buyer_tag), countries_by_tag.get(seller_tag)
-            if not self._market_actor_authorized(state, str(action.player_id or ""), buyer_tag):
-                state.journal.append_command_result({
-                    "tick": int(state.globals.get("tick", 0)),
-                    "player_id": str(action.player_id or ""),
-                    "action_type": type(action).__name__,
-                    "status": "rejected",
-                    "reason": "The issuer does not control the purchasing country.",
-                })
-                continue
-            if listing is None or buyer is None or seller is None or str(listing.get("status") or "listed").lower() != "listed":
-                continue
-            quantity = max(0, min(int(action.quantity), int(listing.get("quantity") or 0)))
-            if not self._demilitarization_policy.can_add(
-                state,
-                buyer_tag,
-                quantity,
-                unit_rows=unit_rows,
-            ):
-                continue
-            price = max(0.0, float(listing.get("price") or 0.0))
-            if quantity <= 0 or not self._weapons_trade_policy.can_order(
-                state.tables.get("treaty_effects"), buyer_tag, seller_tag, str(listing.get("eligibility") or "open"),
-            ):
-                continue
-            total_cost = price * quantity
-            if float(buyer.get("money_reserves") or 0.0) < total_cost:
-                continue
-            home_region_id = home_regions.get(str(buyer.get("id") or ""))
-            if home_region_id is None:
-                continue
-            used_unit_id = str(listing.get("unit_id") or "")
-            if used_unit_id:
-                source_unit = next((row for row in unit_rows if str(row.get("id") or "") == used_unit_id and str(row.get("owner") or "").strip().upper() == seller_tag and not bool(row.get("is_moving"))), None)
-                if source_unit is None or quantity > int(source_unit.get("strength") or 0):
-                    continue
-                source_region_id = int(source_unit.get("current_region_id") or 0)
-                access_context = self._access_policy.for_country(state, buyer_tag)
-                route_plan = self._route_planner.plan(
-                    source_region_id,
-                    int(home_region_id),
-                    region_rows,
-                    adjacency_rows,
-                    lambda region, final: (
-                        access_context.can_station(region)
-                        if final else (
-                            str(region.get("owner") or "").strip().upper() in {buyer_tag, seller_tag}
-                            or access_context.can_transit(region)
-                        )
-                    ),
-                    segment_cost=lambda left, right: self._route_segment_minutes(left, right, region_locations),
-                )
-                if not route_plan.is_valid:
-                    continue
-                first_region_id = route_plan.region_ids[1] if len(route_plan.region_ids) > 1 else 0
-                first_geo = region_locations.get(first_region_id) if first_region_id else None
-                if len(route_plan.region_ids) > 1 and first_geo is None:
-                    continue
-                total_cost = price * quantity
-                if float(buyer.get("money_reserves") or 0.0) < total_cost:
-                    continue
-                buyer["money_reserves"] = float(buyer.get("money_reserves") or 0.0) - total_cost
-                buyer["military_count"] = int(buyer.get("military_count") or 0) + quantity
-                seller["money_reserves"] = float(seller.get("money_reserves") or 0.0) + total_cost
-                seller["military_count"] = max(0, int(seller.get("military_count") or 0) - quantity)
-                if quantity < int(source_unit.get("strength") or 0):
-                    source_strength = max(1, int(source_unit.get("strength") or 0))
-                    source_equipment = max(0, int(source_unit.get("equipment_quantity") or 0))
-                    travel_equipment = min(
-                        source_equipment,
-                        int(round(source_equipment * quantity / source_strength)),
-                    )
-                    source_unit["strength"] = source_strength - quantity
-                    source_unit["equipment_quantity"] = source_equipment - travel_equipment
-                    travel_unit = dict(source_unit)
-                    travel_unit["id"] = self._next_unit_id(unit_rows, buyer_tag, str(source_unit.get("unit_type") or DEFAULT_UNIT_TYPE))
-                    travel_unit["strength"] = quantity
-                    travel_unit["equipment_quantity"] = travel_equipment
-                    unit_rows.append(travel_unit)
-                else:
-                    travel_unit = source_unit
-                source_geo = GeoCoordinate(float(travel_unit.get("latitude") or 0.0), float(travel_unit.get("longitude") or 0.0))
-                target_geo = region_locations.get(int(home_region_id), GeoCoordinate(0.0, 0.0))
-                travel_unit.update(
-                    owner=str(buyer.get("id") or buyer_tag),
-                    foreign_order_id=f"market:{listing['id']}",
-                    original_cost=self._row_float(listing, "original_cost"),
-                    current_region_id=source_region_id,
-                    unit_lifecycle="in_transit" if len(route_plan.region_ids) > 1 else "available",
-                )
-                listing["quantity"] = int(listing.get("quantity") or 0) - quantity
-                if len(route_plan.region_ids) > 1:
-                    travel_unit.update(
-                        current_region_id=0,
-                        source_region_id=source_region_id,
-                        source_latitude=source_geo.latitude,
-                        source_longitude=source_geo.longitude,
-                        target_region_id=first_region_id,
-                        target_latitude=first_geo.latitude,
-                        target_longitude=first_geo.longitude,
-                        departed_at_minute=int(state.time.total_minutes),
-                        arrival_at_minute=int(state.time.total_minutes) + self._duration_policy.estimate_between(source_geo, first_geo),
-                        movement_progress=0.0,
-                        is_moving=True,
-                        engagement_mode="",
-                    )
-                    movement_by_unit[str(travel_unit.get("id"))] = {
-                        "unit_id": str(travel_unit.get("id")), "owner_country_id": buyer_tag,
-                        "source_region_id": source_region_id, "destination_region_id": int(home_region_id),
-                        "route_region_ids": list(route_plan.region_ids), "route_index": 1,
-                        "destination_latitude": target_geo.latitude, "destination_longitude": target_geo.longitude,
-                        "has_custom_destination": False, "is_naval_invasion": False,
-                        "status": "in_transit", "rejection_reason": "", "updated_at_minute": int(state.time.total_minutes),
-                    }
-                changed = True
-                continue
-
-            buyer["money_reserves"] = float(buyer.get("money_reserves") or 0.0) - total_cost
-            buyer["military_count"] = int(buyer.get("military_count") or 0) + quantity
-            seller["money_reserves"] = float(seller.get("money_reserves") or 0.0) + total_cost
-            listing["quantity"] = int(listing.get("quantity") or 0) - quantity
-            design = designs_by_id.get(str(listing.get("design_id") or ""), {})
-            unit_type = str(design.get("class_name") or DEFAULT_UNIT_TYPE).strip().lower().replace(" ", "_") or DEFAULT_UNIT_TYPE
-            unit_rows.append(
-                self._unit_factory.create(
-                    unit_id=self._next_unit_id(unit_rows, str(buyer.get("id") or buyer_tag), unit_type),
-                    owner=str(buyer.get("id") or buyer_tag),
-                    unit_type=unit_type,
-                    strength=quantity,
-                    region_id=home_region_id,
-                    geo=region_locations.get(home_region_id, GeoCoordinate(0.0, 0.0)),
-                    current_minute=state.time.total_minutes,
-                    design_id=str(listing.get("design_id") or ""),
-                )
-            )
-            changed = True
-
-        if not changed:
+        purchase_rows = self._market_purchase_service.process(
+            state=state,
+            units=units,
+            countries=countries,
+            listings_table=listings_table,
+            actions=actions,
+            home_regions_by_country=self._home_regions_by_country(regions),
+            region_locations=self._duration_policy.region_locations(regions),
+        )
+        if purchase_rows is None:
             return units
-        state.update_table("countries", pl.DataFrame(country_rows, schema=countries.schema))
-        remaining_listings = [row for row in listing_rows if int(row.get("quantity") or 0) > 0]
-        state.update_table("unit_market_listings", pl.DataFrame(remaining_listings, schema=listings_table.schema))
-        if movement_table is not None:
-            movement_frame = pl.DataFrame(list(movement_by_unit.values(),), schema=MOVEMENT_ROUTE_SCHEMA) if movement_by_unit else pl.DataFrame(schema=MOVEMENT_ROUTE_SCHEMA)
-            state.update_table("unit_movement_routes", movement_frame)
-        return self._units_from_rows(unit_rows)
-
-    def _market_actor_authorized(self, state: GameState, player_id: str, buyer_country: str) -> bool:
-        return player_controls_country(state, player_id, buyer_country)
+        return self._units_from_rows(purchase_rows)
 
     def _process_attack_actions(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
         actions = [action for action in state.current_actions if isinstance(action, ActionAttackUnit)]
@@ -1411,18 +1279,6 @@ class MilitarySystem(ISystem):
             )
         self._write_unit_order_feedback(state, feedback_rows)
         return self._units_from_rows(rows)
-
-    def _route_segment_minutes(
-        self,
-        source: dict[str, Any],
-        target: dict[str, Any],
-        locations: dict[int, GeoCoordinate],
-    ) -> float:
-        source_geo = locations.get(int(source.get("id") or 0))
-        target_geo = locations.get(int(target.get("id") or 0))
-        if source_geo is None or target_geo is None:
-            return float(DEFAULT_MOVE_MINUTES)
-        return float(self._duration_policy.estimate_between(source_geo, target_geo))
 
     def _route_segment_minutes_for_unit(self, source, target, locations, unit, state, capability_speed_multiplier=1.0):
         source_geo = locations.get(int(source.get("id") or 0))
@@ -1842,16 +1698,7 @@ class MilitarySystem(ISystem):
         return countries
 
     def _next_unit_id(self, unit_rows: list[dict[str, Any]], country_tag: str, unit_type: str) -> str:
-        clean_unit_type = unit_type or DEFAULT_UNIT_TYPE
-        prefix = f"{country_tag}-{clean_unit_type}"
-        existing_ids = {str(row["id"]) for row in unit_rows}
-        index = 1
-
-        while True:
-            unit_id = f"{prefix}-{index:03d}"
-            if unit_id not in existing_ids:
-                return unit_id
-            index += 1
+        return self._unit_factory.next_id(unit_rows, country_tag, unit_type)
 
     def _normalize_units_table(self, units: pl.DataFrame, state: GameState | None = None) -> pl.DataFrame:
         defaults: dict[str, Any] = {
