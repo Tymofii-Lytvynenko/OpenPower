@@ -140,6 +140,157 @@ def calculate_scheduled_debt_service(
     return interest_due, principal_due
 
 
+def calculate_annualized_debt_service(contract: Mapping[str, Any]) -> float:
+    principal = max(0.0, _finite(contract.get("principal_remaining")))
+    rate = _clamp(contract.get("annual_interest_rate"), 0.0, 0.5)
+    frequency = max(1, int(_finite(contract.get("payment_frequency_months"), 1.0)))
+    installment = min(
+        principal,
+        max(0.0, _finite(contract.get("principal_payment"))),
+    )
+    return principal * rate + installment * 12.0 / frequency
+
+
+@dataclass(frozen=True)
+class DebtServiceSettlementInputs:
+    contract: Mapping[str, Any]
+    due_at_minute: int
+    available_reserves: float
+
+
+@dataclass(frozen=True)
+class DebtServiceSettlement:
+    principal: float
+    old_arrears: float
+    total_due: float
+    paid: float
+    principal_paid: float
+    new_principal: float
+    new_arrears: float
+    old_service: float
+    new_service: float
+    frequency_months: int
+    status: str
+    reason: str
+
+
+class DebtServiceSettlementCalculator(Protocol):
+    def calculate(self, inputs: DebtServiceSettlementInputs) -> DebtServiceSettlement: ...
+
+
+@dataclass(frozen=True)
+class _DebtServiceAllocation:
+    principal: float
+    old_arrears: float
+    total_due: float
+    paid: float
+    principal_paid: float
+    new_principal: float
+    new_arrears: float
+    frequency_months: int
+
+
+class DeterministicDebtServiceSettlementCalculator:
+    """Calculate debt-service allocation without mutating world state."""
+
+    def calculate(self, inputs: DebtServiceSettlementInputs) -> DebtServiceSettlement:
+        contract = inputs.contract
+        allocation = self._calculate_allocation(inputs)
+        updated_contract = dict(contract)
+        updated_contract["principal_remaining"] = allocation.new_principal
+        status = self._updated_status(
+            str(contract["status"]),
+            allocation.new_principal,
+            allocation.new_arrears,
+        )
+        reason = (
+            f"Scheduled service paid {allocation.paid:.2f} of {allocation.total_due:.2f}; "
+            f"principal reduced by {allocation.principal_paid:.2f}; "
+            "unpaid service remains recorded as arrears."
+        )
+        return DebtServiceSettlement(
+            principal=allocation.principal,
+            old_arrears=allocation.old_arrears,
+            total_due=allocation.total_due,
+            paid=allocation.paid,
+            principal_paid=allocation.principal_paid,
+            new_principal=allocation.new_principal,
+            new_arrears=allocation.new_arrears,
+            old_service=calculate_annualized_debt_service(contract),
+            new_service=self._remaining_service(updated_contract, allocation.new_principal),
+            frequency_months=allocation.frequency_months,
+            status=status,
+            reason=reason,
+        )
+
+    def _calculate_allocation(
+        self,
+        inputs: DebtServiceSettlementInputs,
+    ) -> _DebtServiceAllocation:
+        contract = inputs.contract
+        principal = max(0.0, _finite(contract.get("principal_remaining")))
+        frequency = max(1, int(contract.get("payment_frequency_months") or 1))
+        interest_due, principal_due = calculate_scheduled_debt_service(
+            principal_remaining=principal,
+            annual_interest_rate=_finite(contract.get("annual_interest_rate")),
+            principal_installment=_finite(contract.get("principal_payment")),
+            payment_frequency_months=frequency,
+        )
+        maturity_at_minute = int(contract.get("maturity_at_minute") or 0)
+        old_arrears = max(0.0, _finite(contract.get("arrears_amount")))
+        principal_due = self._matured_principal_due(
+            principal_due,
+            principal,
+            inputs.due_at_minute,
+            maturity_at_minute,
+        )
+        total_due = old_arrears + interest_due + principal_due
+        available = max(0.0, _finite(inputs.available_reserves))
+        paid = min(available, total_due)
+        paid_after_arrears = max(0.0, paid - old_arrears)
+        paid_after_interest = max(0.0, paid_after_arrears - interest_due)
+        principal_paid = min(principal_due, paid_after_interest)
+        new_principal = max(0.0, principal - principal_paid)
+        new_arrears = max(0.0, total_due - paid)
+        return _DebtServiceAllocation(
+            principal=principal,
+            old_arrears=old_arrears,
+            total_due=total_due,
+            paid=paid,
+            principal_paid=principal_paid,
+            new_principal=new_principal,
+            new_arrears=new_arrears,
+            frequency_months=frequency,
+        )
+
+    @staticmethod
+    def _matured_principal_due(
+        scheduled_principal_due: float,
+        principal: float,
+        due_at_minute: int,
+        maturity_at_minute: int,
+    ) -> float:
+        return (
+            principal
+            if due_at_minute >= maturity_at_minute
+            else scheduled_principal_due
+        )
+
+    @staticmethod
+    def _remaining_service(contract: Mapping[str, Any], new_principal: float) -> float:
+        if new_principal <= 1e-9:
+            return 0.0
+        return calculate_annualized_debt_service(contract)
+
+    @staticmethod
+    def _updated_status(status: str, new_principal: float, new_arrears: float) -> str:
+        if new_principal <= 1e-9 and new_arrears <= 1e-9:
+            return "paid"
+        elif new_arrears > 1e-9:
+            return "arrears"
+        return "current" if status != "restructured" else status
+
+
 @dataclass(frozen=True)
 class EconomicProfileEnvironment:
     country_effects: Mapping[tuple[str, str, str], Any]

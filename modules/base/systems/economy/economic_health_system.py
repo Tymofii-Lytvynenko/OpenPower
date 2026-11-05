@@ -11,11 +11,14 @@ from typing import Any
 import polars as pl
 
 from modules.base.systems.economy.economic_health_policy import (
+    DebtServiceSettlementCalculator,
+    DebtServiceSettlementInputs,
+    DeterministicDebtServiceSettlementCalculator,
     DeterministicEconomicProfileCalculator,
     EconomicProfileCalculator,
     EconomicProfileEnvironment,
     EconomicProfileInputs,
-    calculate_scheduled_debt_service,
+    calculate_annualized_debt_service,
 )
 from modules.base.systems.world.authority_policy import player_controls_country
 from modules.base.systems.world.random_event_effects import aggregate_active_effects
@@ -53,11 +56,20 @@ class EconomicHealthSystem(ISystem):
         phase=SystemPhase.ECONOMIC_HEALTH,
     )
 
-    def __init__(self, profile_calculator: EconomicProfileCalculator | None = None) -> None:
+    def __init__(
+        self,
+        profile_calculator: EconomicProfileCalculator | None = None,
+        debt_service_calculator: DebtServiceSettlementCalculator | None = None,
+    ) -> None:
         self._profile_calculator = (
             profile_calculator
             if profile_calculator is not None
             else DeterministicEconomicProfileCalculator()
+        )
+        self._debt_service_calculator = (
+            debt_service_calculator
+            if debt_service_calculator is not None
+            else DeterministicDebtServiceSettlementCalculator()
         )
 
     @property
@@ -509,11 +521,7 @@ class EconomicHealthSystem(ISystem):
         return int((target - GAME_EPOCH).total_seconds() // 60)
 
     def _annualized_service(self, contract: dict[str, Any]) -> float:
-        principal = max(0.0, self._number(contract.get("principal_remaining")))
-        rate = self._bounded(contract.get("annual_interest_rate"), 0.0, 0.5)
-        frequency = max(1, int(self._number(contract.get("payment_frequency_months"), 1)))
-        installment = min(principal, max(0.0, self._number(contract.get("principal_payment"))))
-        return principal * rate + installment * 12.0 / frequency
+        return calculate_annualized_debt_service(contract)
 
     def _adjust_annual_service(self, state: GameState, debtor_id: str, old: float, new: float) -> None:
         self._country_values(state, debtor_id, {"annual_debt_service": ("add", new - old)})
@@ -572,73 +580,50 @@ class EconomicHealthSystem(ISystem):
             debtor_id = str(contract["debtor_country_id"])
             creditor_id = str(contract["creditor_country_id"])
             affected_countries.add(debtor_id)
-            principal = max(0.0, self._number(contract.get("principal_remaining")))
-            rate = self._number(contract.get("annual_interest_rate"))
-            frequency = max(1, int(contract.get("payment_frequency_months") or 1))
-            installment = self._number(contract.get("principal_payment"))
-            interest_due, principal_due = calculate_scheduled_debt_service(
-                principal_remaining=principal,
-                annual_interest_rate=rate,
-                principal_installment=installment,
-                payment_frequency_months=frequency,
-            )
-            maturity_due = due_at >= int(contract.get("maturity_at_minute") or 0)
-            if maturity_due:
-                principal_due = principal
-            old_arrears = max(0.0, self._number(contract.get("arrears_amount")))
-            total_due = old_arrears + interest_due + principal_due
             debtor = country_rows.get(debtor_id)
             available = max(0.0, self._number((debtor or {}).get("money_reserves")))
-            paid = min(available, total_due)
-            paid_after_arrears = max(0.0, paid - old_arrears)
-            paid_after_interest = max(0.0, paid_after_arrears - interest_due)
-            principal_paid = min(principal_due, paid_after_interest)
-            new_principal = max(0.0, principal - principal_paid)
-            new_arrears = max(0.0, total_due - paid)
-            updated_service_contract = dict(contract)
-            updated_service_contract["principal_remaining"] = new_principal
-            new_service = 0.0 if new_principal <= 1e-9 else self._annualized_service(updated_service_contract)
-            old_service = self._annualized_service(contract)
+            settlement = self._debt_service_calculator.calculate(
+                DebtServiceSettlementInputs(
+                    contract=contract,
+                    due_at_minute=due_at,
+                    available_reserves=available,
+                )
+            )
             if debtor is not None:
                 for column, delta in (
-                    ("money_reserves", -paid),
-                    ("foreign_debt", -principal_paid),
-                    ("arrears", new_arrears - old_arrears),
-                    ("annual_debt_service", new_service - old_service),
+                    ("money_reserves", -settlement.paid),
+                    ("foreign_debt", -settlement.principal_paid),
+                    ("arrears", settlement.new_arrears - settlement.old_arrears),
+                    ("annual_debt_service", settlement.new_service - settlement.old_service),
                 ):
                     if column in country_balance_columns:
                         debtor[column] = self._number(debtor.get(column)) + delta
                 changed_countries.add(debtor_id)
             creditor = country_rows.get(creditor_id)
             if creditor is not None and "money_reserves" in country_balance_columns:
-                creditor["money_reserves"] = self._number(creditor.get("money_reserves")) + paid
+                creditor["money_reserves"] = self._number(creditor.get("money_reserves")) + settlement.paid
                 changed_countries.add(creditor_id)
-            contract["principal_remaining"] = new_principal
-            contract["arrears_amount"] = new_arrears
+            contract["principal_remaining"] = settlement.new_principal
+            contract["arrears_amount"] = settlement.new_arrears
             contract["last_payment_at_minute"] = due_at
-            contract["next_payment_at_minute"] = self._add_months(due_at, frequency)
-            if new_principal <= 1e-9 and new_arrears <= 1e-9:
-                contract["status"] = "paid"
-            elif new_arrears > 1e-9:
-                contract["status"] = "arrears"
-            elif contract["status"] != "restructured":
-                contract["status"] = "current"
-            contract["reason"] = (
-                f"Scheduled service paid {paid:.2f} of {total_due:.2f}; "
-                f"principal reduced by {principal_paid:.2f}; unpaid service remains recorded as arrears."
+            contract["next_payment_at_minute"] = self._add_months(
+                due_at,
+                settlement.frequency_months,
             )
+            contract["status"] = settlement.status
+            contract["reason"] = settlement.reason
             due_contracts[contract_id] = contract
             next_due = int(contract["next_payment_at_minute"])
             if contract["status"] in {"current", "arrears", "restructured"} and next_due <= now:
                 heapq.heappush(payment_queue, (next_due, contract_id))
             country_balances[debtor_id] = self._number((debtor or {}).get("arrears"))
             self._record_cause(state, country_id=debtor_id, source_type="debt_service", source_id=f"{contract['id']}:{due_at}",
-                indicator="foreign_debt", previous=principal, current=new_principal, unit="currency", now=due_at,
+                indicator="foreign_debt", previous=settlement.principal, current=settlement.new_principal, unit="currency", now=due_at,
                 reason=contract["reason"], records=cause_records)
-            self._transition_event(state, "serviced", debtor_id, str(contract["id"]), "debt_service", total_due, paid, contract["reason"], due_at)
-            if new_arrears > 1e-9:
+            self._transition_event(state, "serviced", debtor_id, str(contract["id"]), "debt_service", settlement.total_due, settlement.paid, contract["reason"], due_at)
+            if settlement.new_arrears > 1e-9:
                 self._flush_debt_country_updates(state, country_rows, changed_countries, country_balance_columns)
-                self._set_distress(state, debtor_id, "arrears", "scheduled_service_shortfall", new_arrears, due_at, contract["reason"])
+                self._set_distress(state, debtor_id, "arrears", "scheduled_service_shortfall", settlement.new_arrears, due_at, contract["reason"])
 
         self._replace_rows(state, "debt_contracts", list(due_contracts.values()))
         self._flush_debt_country_updates(state, country_rows, changed_countries, country_balance_columns)
