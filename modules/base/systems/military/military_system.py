@@ -47,17 +47,20 @@ from modules.base.systems.military.market_purchase_service import MilitaryMarket
 from modules.base.systems.military.territory_entry import authorized_entry_moves
 from modules.base.systems.world.demilitarization_policy import DemilitarizationPolicy
 from modules.base.systems.military.war_policy import hostile_country_pairs
+from modules.base.systems.military.home_region_policy import MilitaryHomeRegionPolicy
+from modules.base.systems.military.production_completion_service import (
+    MilitaryProductionCompletionService,
+)
+from modules.base.systems.military.unit_factory import DEFAULT_UNIT_TYPE, UnitFactory
 from modules.base.systems.military.contact_transition_preflight import (
     MilitaryContactTransitionPreflight,
 )
 from modules.base.systems.military.deployment_service import (
-    DeploymentOrderSpec,
     MilitaryDeploymentService,
 )
 
 
 UNIT_TABLE = "units"
-DEFAULT_UNIT_TYPE = "army"
 UNIT_SCHEMA: dict[str, pl.DataType] = {
     "id": pl.Utf8,
     "owner": pl.Utf8,
@@ -122,91 +125,6 @@ MOVEMENT_ROUTE_SCHEMA: dict[str, pl.DataType] = {
     "updated_at_minute": pl.Int64,
 }
 
-class UnitFactory:
-    """Creates normalized unit records without coupling callers to table details."""
-
-    def next_id(
-        self,
-        unit_rows: list[dict[str, Any]],
-        country_tag: str,
-        unit_type: str,
-    ) -> str:
-        clean_unit_type = unit_type or DEFAULT_UNIT_TYPE
-        prefix = f"{country_tag}-{clean_unit_type}"
-        existing_ids = {str(row["id"]) for row in unit_rows}
-        index = 1
-        while True:
-            unit_id = f"{prefix}-{index:03d}"
-            if unit_id not in existing_ids:
-                return unit_id
-            index += 1
-
-    def create(
-        self,
-        unit_id: str,
-        owner: str,
-        unit_type: str,
-        strength: int,
-        region_id: int,
-        geo: GeoCoordinate,
-        current_minute: int,
-        design_id: str = "",
-        training_level: str = "Recruit",
-        equipment_quantity: int | None = None,
-    ) -> dict[str, Any]:
-        safe_strength = max(1, int(strength))
-        return {
-            "id": unit_id,
-            "owner": owner,
-            "unit_type": unit_type or DEFAULT_UNIT_TYPE,
-            "design_id": str(design_id or ""),
-            "unit_domain": get_role_profile(unit_type or DEFAULT_UNIT_TYPE).domain,
-            "strength": safe_strength,
-            "equipment_quantity": max(
-                0,
-                int(safe_strength if equipment_quantity is None else equipment_quantity),
-            ),
-            "current_region_id": int(region_id),
-            "latitude": float(geo.latitude),
-            "longitude": float(geo.longitude),
-            "source_region_id": int(region_id),
-            "source_latitude": float(geo.latitude),
-            "source_longitude": float(geo.longitude),
-            "target_region_id": NO_TARGET_REGION,
-            "target_latitude": float(geo.latitude),
-            "target_longitude": float(geo.longitude),
-            "departed_at_minute": int(current_minute),
-            "arrival_at_minute": int(current_minute),
-            "movement_progress": 0.0,
-            "is_moving": False,
-            "engagement_mode": "",
-            "readiness_status": "parked",
-            "readiness_transition_id": "",
-            "readiness_progress": 0.0,
-            "readiness_eta_minute": 0,
-            "training_level": training_level,
-            "training_state": "",
-            "training_progress": 0.0,
-            "training_facility_id": "",
-            "training_location_region_id": 0,
-            "combat_posture": "hold",
-            "combat_strength_modifier": 1.0,
-            "war_exhaustion_modifier": 1.0,
-            "combat_casualty_modifier": 1.0,
-            "combat_defense_modifier": 1.0,
-            "combat_attack_risk_modifier": 1.0,
-            "combat_readiness_modifier": 1.0,
-            "combat_holding_modifier": 1.0,
-            "combat_counterattack_modifier": 1.0,
-            "cohesion": 1.0,
-            "reorganization_until_minute": 0,
-            "production_order_id": "",
-            "foreign_order_id": "",
-            "original_cost": 0.0,
-            "unit_lifecycle": "available",
-        }
-
-
 class MilitarySystem(ISystem):
     access = SystemAccess(
         reads=frozenset({'countries', 'regions', 'region_adjacency', 'treaty_effects', 'units', 'production_orders', 'unit_designs', 'unit_capability_projections', 'countries_wars', 'unit_readiness_transitions', 'unit_pending_orders', 'unit_movement_routes', 'unit_deployment_orders', 'political_effects', 'battles', 'battle_units', 'unit_training_orders', 'unit_market_listings'}),
@@ -231,6 +149,7 @@ class MilitarySystem(ISystem):
         "_missing_columns": SYSTEM_STATE_CACHE,
         "_duration_policy": SYSTEM_STATE_HELPER,
         "_unit_factory": SYSTEM_STATE_HELPER,
+        "_home_region_policy": SYSTEM_STATE_HELPER,
         "_access_policy": SYSTEM_STATE_HELPER,
         "_movement_batch_updater": SYSTEM_STATE_HELPER,
         "_movement_progression": SYSTEM_STATE_HELPER,
@@ -246,6 +165,7 @@ class MilitarySystem(ISystem):
         "_unit_order_workflow": SYSTEM_STATE_HELPER,
         "_contact_transition_preflight": SYSTEM_STATE_HELPER,
         "_deployment_service": SYSTEM_STATE_HELPER,
+        "_production_completion_service": SYSTEM_STATE_HELPER,
         "_manpower_cache_key": SYSTEM_STATE_CACHE,
         "_manpower_by_owner": SYSTEM_STATE_CACHE,
     }
@@ -254,6 +174,7 @@ class MilitarySystem(ISystem):
         self._missing_columns = set()
         self._duration_policy = MovementDurationPolicy()
         self._unit_factory = UnitFactory()
+        self._home_region_policy = MilitaryHomeRegionPolicy()
         self._access_policy = MovementAccessPolicy()
         self._movement_batch_updater = MovementBatchUpdater(self._access_policy)
         self._route_planner = MilitaryRoutePlanner()
@@ -310,6 +231,15 @@ class MilitarySystem(ISystem):
             route_schema=MOVEMENT_ROUTE_SCHEMA,
             default_unit_type=DEFAULT_UNIT_TYPE,
         )
+        self._production_completion_service = MilitaryProductionCompletionService(
+            unit_factory=self._unit_factory,
+            demilitarization_policy=self._demilitarization_policy,
+            duration_policy=self._duration_policy,
+            deployment_order_creator=self._deployment_service,
+            home_region_policy=self._home_region_policy,
+            ensure_country_columns=self._ensure_country_columns,
+            units_from_rows=self._units_from_rows,
+        )
         self._manpower_cache_key: tuple[int, int, int] | None = None
         self._manpower_by_owner = pl.DataFrame(
             schema={"owner": pl.Utf8, "total_core_manpower": pl.Float64}
@@ -365,15 +295,6 @@ class MilitarySystem(ISystem):
     def _interpolate_row_geo(self, row: dict[str, Any], progress: float) -> GeoCoordinate:
         return self._contact_transition_preflight.interpolate_row_geo(row, progress)
 
-    def _row_float(self, row: dict[str, Any], key: str, fallback: Any = 0.0) -> float:
-        value = row.get(key)
-        if value is None:
-            value = fallback
-        try:
-            return float(value if value is not None else 0.0)
-        except (TypeError, ValueError):
-            return 0.0
-
     def _ensure_units_table(self, state: GameState) -> pl.DataFrame:
         if UNIT_TABLE not in state.tables or state.tables[UNIT_TABLE].is_empty():
             units = self._create_initial_units(state)
@@ -425,31 +346,7 @@ class MilitarySystem(ISystem):
         return self._units_from_rows(rows)
 
     def _home_regions_by_country(self, regions: pl.DataFrame) -> dict[str, int]:
-        required = {"id", "owner"}
-        if regions.is_empty() or not required.issubset(set(regions.columns)):
-            return {}
-
-        score_columns = [col for col in ("pop_15_64", "area_km2") if col in regions.columns]
-        selected: dict[str, tuple[int, float]] = {}
-
-        for row in regions.iter_rows(named=True):
-            owner = row.get("owner")
-            region_id = row.get("id")
-            if not owner or owner == "None" or region_id is None:
-                continue
-
-            score = 0.0
-            for column in score_columns:
-                value = row.get(column)
-                if value is not None:
-                    score += float(value)
-
-            owner_key = str(owner)
-            current = selected.get(owner_key)
-            if current is None or score > current[1]:
-                selected[owner_key] = (int(region_id), score)
-
-        return {owner: region_id for owner, (region_id, _) in selected.items()}
+        return self._home_region_policy.home_regions_by_country(regions)
 
     def _country_strengths(self, countries: pl.DataFrame) -> dict[str, int]:
         if "military_count" not in countries.columns:
@@ -544,113 +441,7 @@ class MilitarySystem(ISystem):
         return result
 
     def _process_completed_production_orders(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
-        required_tables = {"countries", "regions", "unit_designs", "production_orders"}
-        if not required_tables.issubset(state.tables):
-            return units
-
-        orders_table = state.get_table("production_orders")
-        if orders_table.is_empty():
-            return units
-        countries = self._ensure_country_columns(state.get_table("countries"))
-        regions = state.get_table("regions")
-        home_regions = self._home_regions_by_country(regions)
-        region_locations = self._duration_policy.region_locations(regions)
-        country_rows = countries.to_dicts()
-        countries_by_tag = {str(row.get("id") or "").strip().upper(): row for row in country_rows}
-        designs_by_id = {
-            str(row.get("id") or ""): row
-            for row in state.get_table("unit_designs").to_dicts()
-        }
-        order_rows = orders_table.to_dicts()
-        unit_rows = units.to_dicts()
-        deployment_table = state.tables.get("unit_deployment_orders")
-        deployment_rows = [] if deployment_table is None else deployment_table.to_dicts()
-        changed = False
-
-        for order in order_rows:
-            if str(order.get("status") or "").lower() not in {
-                "completed",
-                "held_by_demilitarization",
-            }:
-                continue
-            country_tag = str(order.get("country_id") or "").strip().upper()
-            country = countries_by_tag.get(country_tag)
-            design = designs_by_id.get(str(order.get("design_id") or ""))
-            quantity = max(0, int(order.get("quantity") or 0))
-            if country is None or design is None or quantity <= 0:
-                continue
-            if str(design.get("country_id") or "").strip().upper() != country_tag:
-                continue
-            if not self._demilitarization_policy.can_add(
-                state,
-                country_tag,
-                quantity,
-                unit_rows=unit_rows,
-            ):
-                order["status"] = "held_by_demilitarization"
-                order["blocking_reason"] = (
-                    "Production is complete but delivery exceeds an active demilitarization limit."
-                )
-                changed = True
-                continue
-            home_region_id = home_regions.get(str(country.get("id") or ""))
-            if home_region_id is None:
-                continue
-
-            unit_type = str(design.get("class_name") or DEFAULT_UNIT_TYPE).strip().lower().replace(" ", "_")
-            unit_type = unit_type or DEFAULT_UNIT_TYPE
-            owner = str(country.get("id") or country_tag)
-            origin_geo = region_locations.get(home_region_id, GeoCoordinate(0.0, 0.0))
-            unit_id = self._next_unit_id(unit_rows, owner, unit_type)
-            unit = self._unit_factory.create(
-                unit_id=unit_id,
-                owner=owner,
-                unit_type=unit_type,
-                strength=quantity,
-                region_id=0,
-                geo=GeoCoordinate(0.0, 0.0),
-                current_minute=state.time.total_minutes,
-                design_id=str(order.get("design_id") or ""),
-                training_level=str(order.get("requested_training_level") or "Recruit"),
-            )
-            unit.update(
-                source_region_id=home_region_id,
-                source_latitude=origin_geo.latitude,
-                source_longitude=origin_geo.longitude,
-                production_order_id=str(order.get("id") or ""),
-                original_cost=max(0.0, self._row_float(order, "unit_cost")) * quantity,
-                unit_lifecycle="deployment_queued",
-            )
-            unit_rows.append(unit)
-            deployment_rows.append(
-                self._deployment_service.create_order_record(
-                    DeploymentOrderSpec(
-                        production_order_id=str(order.get("id") or ""),
-                        unit_id=unit_id,
-                        country_id=owner,
-                        quantity=quantity,
-                        source_region_id=home_region_id,
-                        created_at_minute=int(state.time.total_minutes),
-                    ),
-                    existing_deployments=deployment_rows,
-                )
-            )
-            country["military_count"] = int(country.get("military_count") or 0) + quantity
-            order["status"] = "awaiting_deployment"
-            order["blocking_reason"] = "Completed; waiting for deployment and route arrival."
-            order["eta_days"] = 0
-            changed = True
-
-        if not changed:
-            return units
-        state.update_table("countries", pl.DataFrame(country_rows, schema=countries.schema))
-        state.update_table("production_orders", pl.DataFrame(order_rows, schema=orders_table.schema))
-        if deployment_table is not None:
-            state.update_table(
-                "unit_deployment_orders",
-                pl.DataFrame(deployment_rows, schema=deployment_table.schema),
-            )
-        return self._units_from_rows(unit_rows)
+        return self._production_completion_service.process_completed_orders(state, units)
 
     def _process_deployment_actions(self, state: GameState, units: pl.DataFrame):
         return self._deployment_service.process_actions(state, units)
