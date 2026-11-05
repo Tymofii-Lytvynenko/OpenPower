@@ -46,16 +46,30 @@ class WindowManager:
         """Use the same close path for shortcuts and title-bar buttons."""
         cls._close_requests.add(test_id)
     
-    @staticmethod
+    @classmethod
     @contextmanager
-    def window(title: str, x: float = 0, y: float = 0, w: float = 300, h: float = 400, 
-               closable: bool = True, flags=0, test_id: str | None = None,
-               gml_template: str | None = None, padding: tuple[float, float] | None = None,
-               follow_position: bool = False, size_override: tuple[float, float] | None = None,
-               horizontal_anchor: Literal["left", "right"] = "left",
-               horizontal_margin: float = 0.0, fit_layout_width: bool = False,
-               avoid_overlaps: bool = False, placement_margin: float = 8.0,
-               bottom_clearance: float = 0.0, top_clearance: float = 0.0):
+    def window(
+        cls,
+        title: str,
+        x: float = 0,
+        y: float = 0,
+        w: float = 300,
+        h: float = 400,
+        closable: bool = True,
+        flags=0,
+        test_id: str | None = None,
+        gml_template: str | None = None,
+        padding: tuple[float, float] | None = None,
+        follow_position: bool = False,
+        size_override: tuple[float, float] | None = None,
+        horizontal_anchor: Literal["left", "right"] = "left",
+        horizontal_margin: float = 0.0,
+        fit_layout_width: bool = False,
+        avoid_overlaps: bool = False,
+        placement_margin: float = 8.0,
+        bottom_clearance: float = 0.0,
+        top_clearance: float = 0.0,
+    ):
         """
         Creates a standard panel window.
         Yields 'True' if the window is open and expanded.
@@ -81,33 +95,33 @@ class WindowManager:
             bottom_clearance=bottom_clearance,
             top_clearance=top_clearance,
         )
-        with WindowManager._window_context(request) as opened:
+        with cls._window_context(request) as opened:
             yield opened
 
-    @staticmethod
+    @classmethod
     @contextmanager
-    def _window_context(request: WindowRequest):
-        setup = WindowManager._setup_policy.prepare(
+    def _window_context(cls, request: WindowRequest):
+        setup = cls._setup_policy.prepare(
             request,
-            placements=WindowManager._placements,
-            frame_placements=WindowManager._frame_placements,
+            placements=cls._placements,
+            frame_placements=cls._frame_placements,
             imgui_api=imgui,
             telemetry_provider=active_telemetry,
             layout_resolver=resolve_gml_layout,
         )
-        presentation = WindowManager._lifecycle.prepare_presentation(
+        presentation = cls._lifecycle.prepare_presentation(
             request,
             setup,
             imgui_api=imgui,
             style_factory=gml_style,
         )
-        with WindowManager._lifecycle.frame(
+        with cls._lifecycle.frame(
             request,
             setup,
             presentation,
             imgui_api=imgui,
         ) as (expanded, opened):
-            WindowManager._update_placement(
+            cls._update_placement(
                 WindowPlacementUpdate(
                     window_key=setup.window_key,
                     viewport_size=(setup.viewport_width, setup.viewport_height),
@@ -116,17 +130,17 @@ class WindowManager:
                     opened=opened,
                 )
             )
-            with WindowManager._lifecycle.body(
+            with cls._lifecycle.body(
                 request,
                 setup,
                 presentation,
                 expanded=expanded,
                 opened=opened,
-                close_requests=WindowManager._close_requests,
+                close_requests=cls._close_requests,
                 imgui_api=imgui,
             ) as visible:
                 yield visible
 
-    @staticmethod
-    def _update_placement(request: WindowPlacementUpdate) -> None:
-        WindowManager._placement_registry.update(request, imgui_api=imgui)
+    @classmethod
+    def _update_placement(cls, request: WindowPlacementUpdate) -> None:
+        cls._placement_registry.update(request, imgui_api=imgui)
