@@ -27,8 +27,14 @@ from modules.base.systems.military.movement_batch_updater import MovementBatchUp
 from modules.base.systems.military.movement_constants import NO_TARGET_REGION
 from modules.base.systems.military.movement_duration import MovementDurationPolicy, DEFAULT_MOVE_MINUTES
 from modules.base.systems.military.movement_progression import MovementProgression
+from modules.base.systems.military.movement_order_policy import MilitaryMovementOrderPolicy
+from modules.base.systems.military.movement_order_service import MilitaryMoveOrderService
 from modules.base.systems.military.attack_order_service import MilitaryAttackOrderService
-from modules.base.systems.military.movement_domains import (unit_domain, has_domain_metadata, domain_route_compatible, region_is_water)
+from modules.base.systems.military.unit_order_workflow import (
+    UNIT_ORDER_FEEDBACK_SCHEMA,
+    UNIT_PENDING_ORDER_SCHEMA,
+    UnitOrderWorkflowService,
+)
 from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
 from modules.base.systems.military.authority_policy import player_controls_country
 from modules.base.systems.military.route_policy import MilitaryRoutePlanner
@@ -109,17 +115,6 @@ MOVEMENT_ROUTE_SCHEMA: dict[str, pl.DataType] = {
     "rejection_reason": pl.Utf8,
     "updated_at_minute": pl.Int64,
 }
-
-UNIT_ORDER_FEEDBACK_SCHEMA: dict[str, pl.DataType] = {
-    "id": pl.Utf8,
-    "unit_id": pl.Utf8,
-    "owner_country_id": pl.Utf8,
-    "order_type": pl.Utf8,
-    "status": pl.Utf8,
-    "reason": pl.Utf8,
-    "created_at_minute": pl.Int64,
-}
-
 
 class UnitFactory:
     """Creates normalized unit records without coupling callers to table details."""
@@ -233,6 +228,8 @@ class MilitarySystem(ISystem):
         "_access_policy": SYSTEM_STATE_HELPER,
         "_movement_batch_updater": SYSTEM_STATE_HELPER,
         "_movement_progression": SYSTEM_STATE_HELPER,
+        "_movement_order_policy": SYSTEM_STATE_HELPER,
+        "_movement_order_service": SYSTEM_STATE_HELPER,
         "_route_planner": SYSTEM_STATE_HELPER,
         "_naval_invasion_policy": SYSTEM_STATE_HELPER,
         "_weapons_trade_policy": SYSTEM_STATE_HELPER,
@@ -240,6 +237,7 @@ class MilitarySystem(ISystem):
         "_demilitarization_policy": SYSTEM_STATE_HELPER,
         "_market_purchase_service": SYSTEM_STATE_HELPER,
         "_attack_order_service": SYSTEM_STATE_HELPER,
+        "_unit_order_workflow": SYSTEM_STATE_HELPER,
         "_manpower_cache_key": SYSTEM_STATE_CACHE,
         "_manpower_by_owner": SYSTEM_STATE_CACHE,
     }
@@ -252,22 +250,33 @@ class MilitarySystem(ISystem):
         self._movement_batch_updater = MovementBatchUpdater(self._access_policy)
         self._route_planner = MilitaryRoutePlanner()
         self._naval_invasion_policy = NavalInvasionPolicy()
+        self._movement_order_policy = MilitaryMovementOrderPolicy(self._duration_policy)
         self._movement_progression = MovementProgression(
             access_policy=self._access_policy,
             duration_policy=self._duration_policy,
             naval_invasion_policy=self._naval_invasion_policy,
-            duration_calculator=self._route_segment_minutes_for_unit,
+            duration_calculator=self._movement_order_policy.route_segment_minutes_for_unit,
             route_schema=MOVEMENT_ROUTE_SCHEMA,
         )
         self._weapons_trade_policy = WeaponsTradePolicy()
         self._readiness_system = ReadinessSystem()
+        self._unit_order_workflow = UnitOrderWorkflowService(self._readiness_system)
+        self._movement_order_service = MilitaryMoveOrderService(
+            route_planner=self._route_planner,
+            access_policy=self._access_policy,
+            naval_invasion_policy=self._naval_invasion_policy,
+            movement_order_policy=self._movement_order_policy,
+            readiness_preparer=self._readiness_system,
+            unit_order_workflow=self._unit_order_workflow,
+            units_from_rows=self._units_from_rows,
+            route_schema=MOVEMENT_ROUTE_SCHEMA,
+        )
         self._demilitarization_policy = DemilitarizationPolicy()
         self._attack_order_service = MilitaryAttackOrderService(
             readiness_preparer=self._readiness_system,
             unit_movement=self._movement_progression,
             hostility_policy=hostile_country_pairs,
-            fortification_release=self._release_fortified_for_order,
-            pending_order_queue=self._queue_pending_attack,
+            unit_order_workflow=self._unit_order_workflow,
             units_from_rows=self._units_from_rows,
         )
         self._market_purchase_service = MilitaryMarketPurchaseService(
@@ -1012,285 +1021,30 @@ class MilitarySystem(ISystem):
         additional_actions: Iterable[ActionMoveUnit] = (),
         capability_speed_by_unit: dict[str, float] | None = None,
     ) -> pl.DataFrame:
-        move_actions = [a for a in state.current_actions if isinstance(a, ActionMoveUnit)]
-        move_actions.extend(additional_actions)
-        if not move_actions or units.is_empty() or "regions" not in state.tables:
-            return units
-
-        action_by_unit = {
-            action.unit_id: action
-            for action in move_actions
-        }
-        if not action_by_unit:
-            return units
-
-        rows = []
-        now = int(state.time.total_minutes)
-        regions = state.get_table("regions")
-        region_locations = self._duration_policy.region_locations(regions)
-        adjacency = state.tables.get("region_adjacency")
-        prepared_graph = self._route_planner.prepare(regions, adjacency)
-        region_by_id = prepared_graph.region_by_id
-        route_table = state.tables.get("unit_movement_routes")
-        route_rows = [] if route_table is None else route_table.to_dicts()
-        route_by_unit = {str(item.get("unit_id") or ""): item for item in route_rows}
-        feedback_table = state.tables.get("unit_order_feedback")
-        feedback_rows = [] if feedback_table is None else feedback_table.to_dicts()
-        has_domain_metadata = self._has_domain_route_metadata(region_by_id.values())
-
-        for row in units.to_dicts():
-            action = action_by_unit.get(str(row["id"]))
-            if action is None:
-                rows.append(row)
-                continue
-            unit_id = str(row.get("id") or "")
-            owner = str(row.get("owner") or "").strip().upper()
-            deployment_dispatch = str(row.get("unit_lifecycle") or "") in {"deployment_queued", "deployment_blocked"}
-            # Deployment transit is logistics, not a combat posture change; parked units retain
-            # their readiness until they arrive and receive a normal player order.
-            released_fortification = False
-            source_region_id = int(row.get("source_region_id") or 0) if deployment_dispatch else int(row["current_region_id"])
-            target_region_id = int(action.target_region_id)
-            if target_region_id not in region_by_id:
-                self._record_unit_order_feedback(feedback_rows, unit_id, owner, "move", "rejected", "The destination region is invalid.", now)
-                rows.append(row)
-                continue
-            source_geo = GeoCoordinate(
-                latitude=self._row_float(row, "source_latitude", row.get("latitude")) if deployment_dispatch else float(row["latitude"]),
-                longitude=self._row_float(row, "source_longitude", row.get("longitude")) if deployment_dispatch else float(row["longitude"]),
-            )
-            target_geo = self._resolve_action_target_geo(action, target_region_id, region_locations)
-            if target_geo is None:
-                self._record_unit_order_feedback(feedback_rows, unit_id, owner, "move", "rejected", "The destination has no valid geographic location.", now)
-                rows.append(row)
-                continue
-
-            if action.is_naval_invasion:
-                valid_landing, landing_reason = self._naval_invasion_policy.validate(
-                    state, row, region_by_id[target_region_id], units.to_dicts(),
-                    (source_geo.latitude, source_geo.longitude),
-                )
-                if not valid_landing:
-                    self._record_unit_order_feedback(feedback_rows, unit_id, owner, "naval_invasion", "rejected", landing_reason, now)
-                    rows.append(row)
-                    continue
-
-            unit_domain = self._domain_for_unit(row)
-            access_context = self._access_policy.for_country(state, owner)
-            segment_duration = self._route_segment_cost_for_unit(
-                region_locations,
-                row,
-                state,
-                (capability_speed_by_unit or {}).get(unit_id, 1.0),
-                prepared_graph.edge_distance_km,
-            )
-            blocked_domains: list[int] = []
-
-            def can_enter(region: dict[str, Any], final: bool) -> bool:
-                domain_allowed, domain_reason = self._domain_route_compatible(
-                    unit_domain, region, final, action.is_naval_invasion,
-                    region_by_id.values(), metadata_available=has_domain_metadata,
-                )
-                if not domain_allowed:
-                    blocked_domains.append(int(region.get("id") or 0))
-                    return False
-                return access_context.can_station(region) if final else access_context.can_transit(region)
-
-            route_plan = self._route_planner.plan(
-                source_region_id,
-                target_region_id,
-                region_by_id.values(),
-                adjacency,
-                can_enter,
-                segment_cost=segment_duration,
-                explicit_waypoints=action.via_region_ids if action.via_region_ids else None,
-                prepared_graph=prepared_graph,
-            )
-            if not route_plan.is_valid:
-                reason = route_plan.rejection_reason
-                if blocked_domains:
-                    reason = f"The route contains a region incompatible with the {unit_domain} domain (region {min(blocked_domains)})."
-                self._record_unit_order_feedback(feedback_rows, unit_id, owner, "move", "rejected", reason, now)
-                rows.append(row)
-                continue
-            if len(route_plan.region_ids) < 2 and deployment_dispatch:
-                row.update(
-                    current_region_id=target_region_id,
-                    latitude=target_geo.latitude,
-                    longitude=target_geo.longitude,
-                    source_region_id=target_region_id,
-                    source_latitude=target_geo.latitude,
-                    source_longitude=target_geo.longitude,
-                    target_region_id=NO_TARGET_REGION,
-                    target_latitude=target_geo.latitude,
-                    target_longitude=target_geo.longitude,
-                    unit_lifecycle="available",
-                    is_moving=False,
-                    movement_progress=0.0,
-                )
-                route_by_unit[unit_id] = {
-                    "unit_id": unit_id,
-                    "owner_country_id": owner,
-                    "source_region_id": source_region_id,
-                    "destination_region_id": target_region_id,
-                    "route_region_ids": list(route_plan.region_ids),
-                    "route_index": 0,
-                    "destination_latitude": target_geo.latitude,
-                    "destination_longitude": target_geo.longitude,
-                    "has_custom_destination": False,
-                    "is_naval_invasion": False,
-                    "status": "arrived",
-                    "rejection_reason": "",
-                    "updated_at_minute": now,
-                }
-                self._record_unit_order_feedback(feedback_rows, unit_id, owner, "deployment", "arrived", "Deployment origin already matches the destination.", now)
-                rows.append(row)
-                continue
-            if len(route_plan.region_ids) < 2 and str(row.get("engagement_mode") or "").lower() == "positional":
-                released_fortification = self._release_fortified_for_order(state, row)
-                can_execute = released_fortification or self._readiness_system.prepare_order(state, unit_id)
-                if not can_execute:
-                    self._queue_pending_move(state, action)
-                    self._record_unit_order_feedback(
-                        feedback_rows, unit_id, owner, "move", "queued",
-                        "The move will begin when the readiness transition completes.", now,
-                    )
-                    rows.append(row)
-                    continue
-                row["readiness_status"] = "ready"
-                row["readiness_progress"] = 0.0
-                row["readiness_transition_id"] = ""
-                row["readiness_eta_minute"] = 0
-                row["engagement_mode"] = "assault"
-                self._record_unit_order_feedback(
-                    feedback_rows, unit_id, owner, "move", "accepted",
-                    "The unit escalated its existing contact instead of leaving the battle.", now,
-                )
-                rows.append(row)
-                continue
-            if len(route_plan.region_ids) < 2 and str(row.get("engagement_mode") or "").lower() != "positional":
-                self._record_unit_order_feedback(feedback_rows, unit_id, owner, "move", "arrived", "The unit is already at the destination.", now)
-                rows.append(row)
-                continue
-
-            path = list(route_plan.region_ids)
-            next_region_id = path[1]
-            next_geo = (
-                target_geo
-                if next_region_id == target_region_id
-                else region_locations.get(next_region_id)
-            )
-            if next_geo is None:
-                self._record_unit_order_feedback(feedback_rows, unit_id, owner, "move", "rejected", "The route contains a region without valid coordinates.", now)
-                rows.append(row)
-                continue
-
-            # Rejected orders must not clear a fortified posture; release it only after route validation.
-            released_fortification = False if deployment_dispatch else self._release_fortified_for_order(state, row)
-            can_execute = deployment_dispatch or released_fortification or self._readiness_system.prepare_order(state, str(row.get("id") or ""))
-            if not can_execute:
-                self._queue_pending_move(state, action)
-                self._record_unit_order_feedback(feedback_rows, unit_id, owner, "move", "queued", "The move will begin when the readiness transition completes.", now)
-                rows.append(row)
-                continue
-            if not deployment_dispatch:
-                row["readiness_status"] = "ready"
-                row["readiness_progress"] = 0.0
-                row["readiness_transition_id"] = ""
-                row["readiness_eta_minute"] = 0
-            if str(row.get("engagement_mode") or "").lower() == "positional":
-                row["engagement_mode"] = "assault"
-                self._record_unit_order_feedback(feedback_rows, unit_id, owner, "move", "accepted", "The unit escalated its existing contact instead of leaving the battle.", now)
-                rows.append(row)
-                continue
-            duration = segment_duration(
-                region_by_id[source_region_id], region_by_id[next_region_id]
-            )
-            row["source_region_id"] = source_region_id
-            row["source_latitude"] = source_geo.latitude
-            row["source_longitude"] = source_geo.longitude
-            row["target_region_id"] = next_region_id
-            row["target_latitude"] = next_geo.latitude
-            row["target_longitude"] = next_geo.longitude
-            row["departed_at_minute"] = now
-            row["arrival_at_minute"] = now + duration
-            row["movement_progress"] = 0.0
-            row["is_moving"] = True
-            if deployment_dispatch:
-                row["unit_lifecycle"] = "deployment_transit"
-            route_by_unit[unit_id] = {
-                "unit_id": unit_id,
-                "owner_country_id": owner,
-                "source_region_id": source_region_id,
-                "destination_region_id": target_region_id,
-                "route_region_ids": path,
-                "route_index": 1,
-                "destination_latitude": target_geo.latitude,
-                "destination_longitude": target_geo.longitude,
-                "has_custom_destination": action.target_latitude is not None and action.target_longitude is not None,
-                "is_naval_invasion": bool(action.is_naval_invasion),
-                "status": "in_transit",
-                "rejection_reason": "",
-                "updated_at_minute": now,
-            }
-            self._record_unit_order_feedback(feedback_rows, unit_id, owner, "move", "accepted", "Route accepted.", now)
-            rows.append(row)
-
-        routes_changed = route_table is None or route_rows != list(route_by_unit.values())
-        if routes_changed:
-            state.update_table(
-                "unit_movement_routes",
-                pl.DataFrame(list(route_by_unit.values()), schema=MOVEMENT_ROUTE_SCHEMA),
-            )
-        self._write_unit_order_feedback(state, feedback_rows)
-        return self._units_from_rows(rows)
-
-    def _route_segment_minutes_for_unit(self, source, target, locations, unit, state, capability_speed_multiplier=1.0):
-        source_geo = locations.get(int(source.get("id") or 0))
-        target_geo = locations.get(int(target.get("id") or 0))
-        if source_geo is None or target_geo is None:
-            base = DEFAULT_MOVE_MINUTES
-        else:
-            base = self._duration_policy.estimate_between(source_geo, target_geo)
-        domain = self._domain_for_unit(unit)
-        domain_multipliers = state.globals.get("military_domain_duration_multipliers", {})
-        domain_multiplier = 1.0
-        if isinstance(domain_multipliers, dict):
-            domain_multiplier = self._bounded_multiplier(domain_multipliers.get(domain), 1.0)
-        size_coefficient = max(0.0, min(0.5, self._row_float_from_mapping(state.globals.get("military_force_size_duration_coefficient"), 0.0)))
-        strength = max(1, int(unit.get("strength") or 1))
-        size_multiplier = 1.0 + min(1.0, math.log10(strength) / 4.0) * size_coefficient
-        infrastructure = max(0.0, min(1.0, self._row_float(target, "infrastructure", 0.0)))
-        infrastructure_coefficient = max(0.0, min(0.5, self._row_float_from_mapping(state.globals.get("military_infrastructure_duration_coefficient", 0.25), 0.25)))
-        infrastructure_multiplier = 1.0 / (1.0 + infrastructure * infrastructure_coefficient)
-        telecom = max(
-            0.0,
-            min(
-                1.0,
-                self._row_float(
-                    target,
-                    "telecom_capacity",
-                    self._row_float(target, "communications", 0.0),
-                ),
-            ),
+        return self._movement_order_service.process(
+            state,
+            units,
+            additional_actions,
+            capability_speed_by_unit,
         )
-        telecom_coefficient = max(
-            0.0,
-            min(
-                0.5,
-                self._row_float_from_mapping(
-                    state.globals.get("military_telecom_coordination_coefficient", 0.15),
-                    0.15,
-                ),
-            ),
+
+    def _route_segment_minutes_for_unit(
+        self,
+        source,
+        target,
+        locations,
+        unit,
+        state,
+        capability_speed_multiplier=1.0,
+    ):
+        return self._movement_order_policy.route_segment_minutes_for_unit(
+            source,
+            target,
+            locations,
+            unit,
+            state,
+            capability_speed_multiplier,
         )
-        telecom_multiplier = 1.0 / (1.0 + telecom * telecom_coefficient)
-        owner = str(unit.get("owner") or "").strip().upper()
-        target_owner = str(target.get("owner") or "").strip().upper()
-        territory_key = "military_domestic_duration_multiplier" if not target_owner or target_owner == owner else "military_foreign_duration_multiplier"
-        territory_multiplier = self._bounded_multiplier(state.globals.get(territory_key), 1.0)
-        speed_multiplier = max(0.5, min(1.5, self._row_float_from_mapping(capability_speed_multiplier, 1.0)))
-        return int(max(360, min(10080, round(base * domain_multiplier * size_multiplier * infrastructure_multiplier * telecom_multiplier * territory_multiplier / speed_multiplier))))
 
     def _route_segment_cost_for_unit(
         self,
@@ -1300,106 +1054,13 @@ class MilitarySystem(ISystem):
         capability_speed_multiplier: float = 1.0,
         edge_distance_km: dict[tuple[int, int], float] | None = None,
     ) -> Callable[[dict[str, Any], dict[str, Any]], int]:
-        """Prepare unit-wide movement factors once for a route search."""
-        domain = self._domain_for_unit(unit)
-        domain_multipliers = state.globals.get("military_domain_duration_multipliers", {})
-        domain_multiplier = (
-            self._bounded_multiplier(domain_multipliers.get(domain), 1.0)
-            if isinstance(domain_multipliers, dict)
-            else 1.0
+        return self._movement_order_policy.route_segment_cost_for_unit(
+            locations,
+            unit,
+            state,
+            capability_speed_multiplier,
+            edge_distance_km,
         )
-        size_coefficient = max(
-            0.0,
-            min(
-                0.5,
-                self._row_float_from_mapping(
-                    state.globals.get("military_force_size_duration_coefficient"), 0.0
-                ),
-            ),
-        )
-        strength = max(1, int(unit.get("strength") or 1))
-        size_multiplier = 1.0 + min(1.0, math.log10(strength) / 4.0) * size_coefficient
-        infrastructure_coefficient = max(
-            0.0,
-            min(
-                0.5,
-                self._row_float_from_mapping(
-                    state.globals.get("military_infrastructure_duration_coefficient", 0.25),
-                    0.25,
-                ),
-            ),
-        )
-        telecom_coefficient = max(
-            0.0,
-            min(
-                0.5,
-                self._row_float_from_mapping(
-                    state.globals.get("military_telecom_coordination_coefficient", 0.15),
-                    0.15,
-                ),
-            ),
-        )
-        owner = str(unit.get("owner") or "").strip().upper()
-        speed_multiplier = max(
-            0.5,
-            min(1.5, self._row_float_from_mapping(capability_speed_multiplier, 1.0)),
-        )
-        target_multipliers: dict[int, tuple[float, float, float]] = {}
-        prepared_edge_distances = edge_distance_km or {}
-
-        def cost(source: dict[str, Any], target: dict[str, Any]) -> int:
-            source_geo = locations.get(int(source.get("id") or 0))
-            target_id = int(target.get("id") or 0)
-            target_geo = locations.get(target_id)
-            source_id = int(source.get("id") or 0)
-            edge_key = (source_id, target_id) if source_id < target_id else (target_id, source_id)
-            edge_distance = prepared_edge_distances.get(edge_key)
-            if edge_distance is not None:
-                base = self._duration_policy.estimate_from_distance(edge_distance)
-            elif source_geo is None or target_geo is None:
-                base = DEFAULT_MOVE_MINUTES
-            else:
-                base = self._duration_policy.estimate_between(source_geo, target_geo)
-
-            target_multiplier = target_multipliers.get(target_id)
-            if target_multiplier is None:
-                infrastructure = max(
-                    0.0, min(1.0, self._row_float(target, "infrastructure", 0.0))
-                )
-                telecom = max(
-                    0.0,
-                    min(
-                        1.0,
-                        self._row_float(
-                            target,
-                            "telecom_capacity",
-                            self._row_float(target, "communications", 0.0),
-                        ),
-                    ),
-                )
-                target_owner = str(target.get("owner") or "").strip().upper()
-                territory_key = (
-                    "military_domestic_duration_multiplier"
-                    if not target_owner or target_owner == owner
-                    else "military_foreign_duration_multiplier"
-                )
-                target_multiplier = (
-                    1.0 / (1.0 + infrastructure * infrastructure_coefficient),
-                    1.0 / (1.0 + telecom * telecom_coefficient),
-                    self._bounded_multiplier(state.globals.get(territory_key), 1.0),
-                )
-                target_multipliers[target_id] = target_multiplier
-
-            infrastructure_multiplier, telecom_multiplier, territory_multiplier = target_multiplier
-            duration = base * domain_multiplier
-            duration *= size_multiplier
-            duration *= infrastructure_multiplier
-            duration *= telecom_multiplier
-            duration *= territory_multiplier
-            duration /= speed_multiplier
-            return int(max(360, min(10080, round(duration))))
-
-        return cost
 
     def _capability_speed_by_unit(self, state: GameState) -> dict[str, float]:
         table = state.tables.get("unit_capability_projections")
@@ -1424,22 +1085,26 @@ class MilitarySystem(ISystem):
         return factors
 
     def _domain_for_unit(self, unit):
-        return unit_domain(unit)
+        return self._movement_order_policy.domain_for_unit(unit)
 
     def _has_domain_route_metadata(self, all_regions):
-        return has_domain_metadata(all_regions)
+        return self._movement_order_policy.has_domain_metadata(all_regions)
 
     def _domain_route_compatible(self, domain, region, final, naval_invasion, all_regions, *, metadata_available=None):
-        return domain_route_compatible(domain, region, final, naval_invasion, all_regions,
-                                       metadata_available=metadata_available)
+        return self._movement_order_policy.domain_route_compatible(
+            domain,
+            region,
+            final,
+            naval_invasion,
+            all_regions,
+            metadata_available=metadata_available,
+        )
 
     def _region_is_water(self, region):
-        return region_is_water(region)
+        return self._movement_order_policy.region_is_water(region)
 
     def _bounded_multiplier(self, value, default):
-        if value is None:
-            return default
-        return max(0.25, min(4.0, self._row_float_from_mapping(value, default)))
+        return self._movement_order_policy.bounded_multiplier(value, default)
 
     def _row_float_from_mapping(self, value, default):
         try:
@@ -1458,100 +1123,39 @@ class MilitarySystem(ISystem):
         reason: str,
         current_minute: int,
     ) -> None:
-        rows.append({
-            "id": f"{unit_id}-{current_minute}-{len(rows) + 1}",
-            "unit_id": unit_id,
-            "owner_country_id": owner,
-            "order_type": order_type,
-            "status": status,
-            "reason": reason,
-            "created_at_minute": current_minute,
-        })
-        if len(rows) > 500:
-            del rows[:-500]
+        self._unit_order_workflow.record_feedback(
+            rows,
+            unit_id,
+            owner,
+            order_type,
+            status,
+            reason,
+            current_minute,
+        )
 
     def _write_unit_order_feedback(self, state: GameState, rows: list[dict[str, Any]]) -> None:
-        frame = pl.DataFrame(rows, schema=UNIT_ORDER_FEEDBACK_SCHEMA) if rows else pl.DataFrame(schema=UNIT_ORDER_FEEDBACK_SCHEMA)
-        current = state.tables.get("unit_order_feedback")
-        if current is None or not current.equals(frame):
-            state.update_table("unit_order_feedback", frame)
+        self._unit_order_workflow.write_feedback(state, rows)
 
     def _release_fortified_for_order(self, state: GameState, unit: dict[str, Any]) -> bool:
-        """Release a stable fortified posture before validating an order's route."""
-        unit_id = str(unit.get("id") or "")
-        if str(unit.get("readiness_status") or "").strip().lower() != "fortified":
-            return False
-        if self._unit_is_transitioning(state, unit_id):
-            return False
-        if not self._readiness_system.prepare_order(state, unit_id):
-            return False
-        unit["readiness_status"] = "ready"
-        unit["readiness_progress"] = 0.0
-        unit["readiness_transition_id"] = ""
-        unit["readiness_eta_minute"] = 0
-        return True
+        return self._unit_order_workflow.release_fortified_for_order(state, unit)
 
     def _unit_is_transitioning(self, state: GameState, unit_id: str) -> bool:
-        transitions = state.tables.get("unit_readiness_transitions")
-        return transitions is not None and not transitions.is_empty() and "unit_id" in transitions.columns and transitions.filter(pl.col("unit_id") == unit_id).height > 0
+        return self._unit_order_workflow.unit_is_transitioning(state, unit_id)
 
     def _queue_pending_move(self, state: GameState, action: ActionMoveUnit) -> str:
-        pending = self._ensure_pending_table(state.tables.get("unit_pending_orders"))
-        rows = [row for row in pending.to_dicts() if str(row.get("unit_id") or "") != str(action.unit_id)]
-        order_id = f"pending-{action.unit_id}-move-{state.time.total_minutes}"
-        rows.append({
-            "id": order_id, "unit_id": str(action.unit_id), "player_id": str(action.player_id),
-            "order_type": "move", "target_region_id": int(action.target_region_id),
-            "target_latitude": float(action.target_latitude or 0.0), "target_longitude": float(action.target_longitude or 0.0),
-            "target_unit_id": "", "via_region_ids": list(action.via_region_ids),
-            "created_at_minute": int(state.time.total_minutes), "status": "queued",
-        })
-        state.update_table("unit_pending_orders", pl.DataFrame(rows, schema=self._pending_schema()))
-        self._attach_pending_to_transition(state, action.unit_id, order_id)
-        return order_id
+        return self._unit_order_workflow.queue_move(state, action)
 
     def _queue_pending_attack(self, state: GameState, action: ActionAttackUnit) -> str:
-        pending = self._ensure_pending_table(state.tables.get("unit_pending_orders"))
-        rows = [row for row in pending.to_dicts() if str(row.get("unit_id") or "") != str(action.attacker_unit_id)]
-        order_id = f"pending-{action.attacker_unit_id}-attack-{state.time.total_minutes}"
-        rows.append({
-            "id": order_id, "unit_id": str(action.attacker_unit_id), "player_id": str(action.player_id),
-            "order_type": "attack", "target_region_id": 0, "target_latitude": 0.0, "target_longitude": 0.0,
-            "target_unit_id": str(action.defender_unit_id), "via_region_ids": [],
-            "created_at_minute": int(state.time.total_minutes), "status": "queued",
-        })
-        state.update_table("unit_pending_orders", pl.DataFrame(rows, schema=self._pending_schema()))
-        self._attach_pending_to_transition(state, action.attacker_unit_id, order_id)
-        return order_id
+        return self._unit_order_workflow.queue_attack(state, action)
 
     def _attach_pending_to_transition(self, state: GameState, unit_id: str, order_id: str) -> None:
-        transitions = state.tables.get("unit_readiness_transitions")
-        if transitions is None or transitions.is_empty() or "unit_id" not in transitions.columns:
-            return
-        rows = transitions.to_dicts()
-        for row in rows:
-            if str(row.get("unit_id") or "") == str(unit_id):
-                row["pending_order_id"] = order_id
-        state.update_table("unit_readiness_transitions", pl.DataFrame(rows, schema=transitions.schema))
+        self._unit_order_workflow.attach_pending_to_transition(state, unit_id, order_id)
 
     def _pending_schema(self) -> dict[str, pl.DataType]:
-        return {
-            "id": pl.Utf8, "unit_id": pl.Utf8, "player_id": pl.Utf8,
-            "order_type": pl.Utf8, "target_region_id": pl.Int32,
-            "target_latitude": pl.Float64, "target_longitude": pl.Float64,
-            "target_unit_id": pl.Utf8, "via_region_ids": pl.List(pl.Int32),
-            "created_at_minute": pl.Int64, "status": pl.Utf8,
-        }
+        return dict(UNIT_PENDING_ORDER_SCHEMA)
 
     def _ensure_pending_table(self, pending: pl.DataFrame | None) -> pl.DataFrame:
-        schema = self._pending_schema()
-        if pending is None:
-            return pl.DataFrame(schema=schema)
-        for column, dtype in schema.items():
-            if column not in pending.columns:
-                default: Any = [] if dtype == pl.List(pl.Int32) else (0 if dtype in (pl.Int32, pl.Int64, pl.Float64) else "")
-                pending = pending.with_columns(pl.lit(default).cast(dtype).alias(column))
-        return pending.select([pl.col(column).cast(dtype) for column, dtype in schema.items()])
+        return self._unit_order_workflow.ensure_pending_table(pending)
 
     def _resolve_action_target_geo(
         self,
@@ -1559,13 +1163,11 @@ class MilitarySystem(ISystem):
         target_region_id: int,
         region_locations: dict[int, GeoCoordinate],
     ) -> GeoCoordinate | None:
-        if action.target_latitude is not None and action.target_longitude is not None:
-            return GeoCoordinate(
-                latitude=float(action.target_latitude),
-                longitude=float(action.target_longitude),
-            )
-
-        return region_locations.get(target_region_id)
+        return self._movement_order_policy.resolve_target_geo(
+            action,
+            target_region_id,
+            region_locations,
+        )
 
     def _try_update_uncontested_movement_batch(
         self,

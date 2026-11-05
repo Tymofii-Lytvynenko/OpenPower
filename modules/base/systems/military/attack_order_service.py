@@ -22,6 +22,12 @@ class _UnitMovement(Protocol):
     def stop_unit_at(self, row: dict[str, Any], geo: GeoCoordinate, current_minute: int) -> None: ...
 
 
+class _UnitOrderWorkflow(Protocol):
+    def release_fortified_for_order(self, state: GameState, unit: dict[str, Any]) -> bool: ...
+
+    def queue_attack(self, state: GameState, action: ActionAttackUnit) -> str: ...
+
+
 @dataclass
 class _AttackOrderContext:
     state: GameState
@@ -39,15 +45,13 @@ class MilitaryAttackOrderService:
         readiness_preparer: _ReadinessPreparer,
         unit_movement: _UnitMovement,
         hostility_policy: Callable[[list[dict[str, Any]]], set[frozenset[str]]],
-        fortification_release: Callable[[GameState, dict[str, Any]], bool],
-        pending_order_queue: Callable[[GameState, ActionAttackUnit], str],
+        unit_order_workflow: _UnitOrderWorkflow,
         units_from_rows: Callable[[list[dict[str, Any]]], pl.DataFrame],
     ) -> None:
         self._readiness_preparer = readiness_preparer
         self._unit_movement = unit_movement
         self._hostility_policy = hostility_policy
-        self._fortification_release = fortification_release
-        self._pending_order_queue = pending_order_queue
+        self._unit_order_workflow = unit_order_workflow
         self._units_from_rows = units_from_rows
 
     def process(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
@@ -142,7 +146,10 @@ class MilitaryAttackOrderService:
         attacker: dict[str, Any],
     ) -> bool:
         attacker_id = str(attacker.get("id") or "")
-        released_fortification = self._fortification_release(state, attacker)
+        released_fortification = self._unit_order_workflow.release_fortified_for_order(
+            state,
+            attacker,
+        )
         can_execute = released_fortification or self._readiness_preparer.prepare_order(
             state,
             attacker_id,
@@ -150,7 +157,7 @@ class MilitaryAttackOrderService:
         if can_execute:
             self._reset_attacker_readiness(attacker)
             return True
-        self._pending_order_queue(state, action)
+        self._unit_order_workflow.queue_attack(state, action)
         return False
 
     def _reset_attacker_readiness(self, attacker: dict[str, Any]) -> None:
