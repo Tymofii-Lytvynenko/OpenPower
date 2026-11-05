@@ -11,6 +11,7 @@ from typing import Any, Mapping
 import polars as pl
 
 from modules.base.systems.demographics.migration_policy import (
+    BorderAccessDecision,
     DestinationCapacity,
     assess_destination_capacity,
     build_route_index,
@@ -83,6 +84,51 @@ class MigrationFlowCompletionBatch:
     completed: list[dict[str, Any]] = dataclass_field(default_factory=list)
     updates: list[dict[str, Any]] = dataclass_field(default_factory=list)
     redirected_flows: list[dict[str, Any]] = dataclass_field(default_factory=list)
+
+
+@dataclass
+class RouteEvaluationBatch:
+    state: GameState
+    now: int
+    region_map: dict[int, dict[str, Any]]
+    country_map: dict[str, dict[str, Any]]
+    event_migration: Mapping[tuple[str, str, str], Any]
+    pairs: list[tuple[int, int]]
+    policies: dict[str, dict[str, Any]]
+    reserved_out: dict[int, tuple[int, int, int]]
+    reserved_in: dict[int, int]
+    pending_routes: set[tuple[int, int]]
+    known_flow_ids: set[str]
+    new_flows: list[dict[str, Any]] = dataclass_field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RouteEvaluationCandidate:
+    origin_region_id: int
+    destination_region_id: int
+    origin_country_id: str
+    destination_country_id: str
+    flow_id: str
+    origin: dict[str, Any]
+    destination: dict[str, Any]
+    destination_policy: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class RouteSourceAvailability:
+    cohorts: dict[str, int]
+    source_available: int
+    reserved_source: tuple[int, int, int]
+    destination_capacity: DestinationCapacity
+
+
+@dataclass(frozen=True)
+class RouteMigrationEstimate:
+    count: int
+    opportunity: float
+    access_rate: float
+    displacement: float
+    event_effect: float
 
 
 class MigrationSystem(ISystem):
@@ -814,10 +860,24 @@ class MigrationSystem(ISystem):
         return self._stable_json(factors)
 
     def _evaluate_routes(self, state: GameState, now: int) -> None:
+        batch = self._build_route_evaluation_batch(state, now)
+        if batch is None:
+            return
+
+        for origin_id, destination_id in batch.pairs:
+            self._evaluate_route_pair(batch, origin_id, destination_id)
+        self._append_records(state, "migration_flows", batch.new_flows)
+
+    def _build_route_evaluation_batch(
+        self,
+        state: GameState,
+        now: int,
+    ) -> RouteEvaluationBatch | None:
         regions = state.get_table("regions")
         countries = state.get_table("countries")
         if regions.is_empty() or countries.is_empty():
-            return
+            return None
+
         route_index = self._get_route_index(state)
         region_rows = regions.to_dicts()
         region_map = {self._integer(row.get("id")): row for row in region_rows}
@@ -840,7 +900,7 @@ class MigrationSystem(ISystem):
         )
         pairs = self._incident_pairs(dirty_regions, route_index)
         if not pairs:
-            return
+            return None
 
         policies = self._effective_policy_map(state, now)
         flows = state.get_table("migration_flows")
@@ -849,164 +909,263 @@ class MigrationSystem(ISystem):
         reserved_out = self._reserved_cohorts(pending_rows)
         reserved_in = self._reserved_incoming(pending_rows)
         pending_routes = {
-            (self._integer(row.get("origin_region_id")), self._integer(row.get("destination_region_id")))
+            (
+                self._integer(row.get("origin_region_id")),
+                self._integer(row.get("destination_region_id")),
+            )
             for row in pending_rows
         }
         known_flow_ids = {str(row.get("id") or "") for row in flow_rows}
-        new_flows: list[dict[str, Any]] = []
-        for origin_id, destination_id in pairs:
-            if (origin_id, destination_id) in pending_routes:
-                continue
-            origin = region_map.get(origin_id)
-            destination = region_map.get(destination_id)
-            if origin is None or destination is None:
-                continue
-            origin_country = self._tag(origin.get("owner"))
-            destination_country = self._tag(destination.get("owner"))
-            if not origin_country or not destination_country:
-                continue
-            if origin_country not in country_map or destination_country not in country_map:
-                continue
-            flow_id = f"migration-{now:012d}-{origin_id}-{destination_id}"
-            if flow_id in known_flow_ids:
-                continue
+        return RouteEvaluationBatch(
+            state=state,
+            now=now,
+            region_map=region_map,
+            country_map=country_map,
+            event_migration=event_migration,
+            pairs=pairs,
+            policies=policies,
+            reserved_out=reserved_out,
+            reserved_in=reserved_in,
+            pending_routes=pending_routes,
+            known_flow_ids=known_flow_ids,
+        )
 
-            origin_policy = policies.get(origin_country, self._default_policy(origin_country, now))
-            destination_policy = policies.get(
-                destination_country,
-                self._default_policy(destination_country, now),
-            )
-            border = self._border_decision(
-                state,
-                origin_country,
-                destination_country,
-                policies,
-            )
-            if not border.eligible:
-                rejected = self._rejected_flow(
-                    flow_id,
-                    origin_id,
-                    destination_id,
-                    origin_country,
-                    destination_country,
-                    now,
-                    border.reason_code,
-                )
-                new_flows.append(rejected)
-                known_flow_ids.add(flow_id)
-                continue
+    def _evaluate_route_pair(
+        self,
+        batch: RouteEvaluationBatch,
+        origin_region_id: int,
+        destination_region_id: int,
+    ) -> None:
+        route = (origin_region_id, destination_region_id)
+        if route in batch.pending_routes:
+            return
 
-            origin_cohorts = self._cohort_counts(origin)
-            reserved_source = reserved_out.get(origin_id, (0, 0, 0))
-            available_cohorts = {
-                "pop_14": max(0, origin_cohorts[0] - reserved_source[0]),
-                "pop_15_64": max(0, origin_cohorts[1] - reserved_source[1]),
-                "pop_65": max(0, origin_cohorts[2] - reserved_source[2]),
-            }
-            source_available = sum(available_cohorts.values())
-            if source_available <= 0:
-                continue
+        candidate = self._route_candidate(batch, origin_region_id, destination_region_id)
+        if candidate is None:
+            return
 
-            destination_capacity = assess_destination_capacity(
-                destination,
-                current_population=self._population(destination),
-                reserved_population=reserved_in.get(destination_id, 0),
-            )
-            if not destination_capacity.eligible:
-                rejected = self._rejected_flow(
-                    flow_id,
-                    origin_id,
-                    destination_id,
-                    origin_country,
-                    destination_country,
-                    now,
-                    "no_destination_capacity",
-                )
-                new_flows.append(rejected)
-                known_flow_ids.add(flow_id)
-                continue
+        border = self._border_decision(
+            batch.state,
+            candidate.origin_country_id,
+            candidate.destination_country_id,
+            batch.policies,
+        )
+        if not border.eligible:
+            self._record_rejected_route(batch, candidate, border.reason_code)
+            return
 
-            migration_effect = event_migration.get(("region", str(origin_id), "migration"), 0.0)
-            access_rate = border.access_rate
-            displacement = self._bounded_ratio(origin.get("displacement_pressure"))
-            access_rate *= (1.0 - displacement) + (
-                displacement * self._bounded_ratio(destination_policy.get("asylum_rate"), 0.25)
-            )
-            count, opportunity = estimate_migration_count(
-                origin,
-                destination,
-                country_map[origin_country],
-                country_map[destination_country],
-                access_rate=access_rate,
-                source_available=source_available,
-                destination_available=destination_capacity.available_people,
-            )
-            count = min(
-                source_available,
-                destination_capacity.available_people,
-                max(0, int(round(count * (1.0 + min(0.5, max(-0.5, migration_effect))))))
-            )
-            if count <= 0:
-                continue
-            cohorts = calculate_migrant_cohorts(
-                count,
-                available_cohorts,
-                skilled_worker_preference=self._bounded_ratio(
-                    destination_policy.get("skilled_worker_preference")
-                ),
-                family_reunification_rate=self._bounded_ratio(
-                    destination_policy.get("family_reunification_rate"), 0.5
-                ),
-            )
-            actual_count = sum(cohorts)
-            if actual_count <= 0:
-                continue
+        availability = self._route_source_availability(batch, candidate)
+        if availability is None:
+            return
+        if not availability.destination_capacity.eligible:
+            self._record_rejected_route(batch, candidate, "no_destination_capacity")
+            return
 
-            reason_code = border.reason_code
-            record = {
-                "id": flow_id,
-                "origin_region_id": origin_id,
-                "destination_region_id": destination_id,
-                "origin_country_id": origin_country,
-                "destination_country_id": destination_country,
-                "dependent_count": cohorts[0],
-                "working_age_count": cohorts[1],
-                "elderly_count": cohorts[2],
-                "population_count": actual_count,
-                "reason_code": reason_code,
-                "reason_factors_json": self._reason_factors(
-                    access_rate=access_rate,
-                    opportunity=opportunity,
-                    displacement_pressure=displacement,
-                    capacity=destination_capacity.available_people,
-                    event_migration_effect=migration_effect,
-                ),
-                "created_at_minute": now,
-                "authorized_at_minute": now,
-                "expected_completion_at_minute": now + FLOW_EVALUATION_PERIOD_MINUTES,
-                "completed_at_minute": 0,
-                "transition_rule": "finish_authorized",
-                "status": FLOW_STATUS_PENDING,
-            }
-            new_flows.append(record)
-            known_flow_ids.add(flow_id)
-            pending_routes.add((origin_id, destination_id))
-            reserved_out[origin_id] = tuple(
-                reserved_source[index] + cohorts[index] for index in range(3)
-            )
-            reserved_in[destination_id] = reserved_in.get(destination_id, 0) + actual_count
-            state.events.append(
-                EventMigrationFlowCreated(
-                    flow_id=flow_id,
-                    origin_region_id=origin_id,
-                    destination_region_id=destination_id,
-                    population_count=actual_count,
-                    reason_code=reason_code,
-                    at_minute=now,
-                )
-            )
+        record = self._route_flow_record(batch, candidate, border, availability)
+        if record is not None:
+            self._record_new_route(batch, candidate, availability, record)
 
-        self._append_records(state, "migration_flows", new_flows)
+    def _route_candidate(
+        self,
+        batch: RouteEvaluationBatch,
+        origin_region_id: int,
+        destination_region_id: int,
+    ) -> RouteEvaluationCandidate | None:
+        origin = batch.region_map.get(origin_region_id)
+        destination = batch.region_map.get(destination_region_id)
+        if origin is None or destination is None:
+            return None
+
+        origin_country_id = self._tag(origin.get("owner"))
+        destination_country_id = self._tag(destination.get("owner"))
+        if not origin_country_id or not destination_country_id:
+            return None
+        if origin_country_id not in batch.country_map or destination_country_id not in batch.country_map:
+            return None
+
+        flow_id = f"migration-{batch.now:012d}-{origin_region_id}-{destination_region_id}"
+        if flow_id in batch.known_flow_ids:
+            return None
+        destination_policy = batch.policies.get(
+            destination_country_id,
+            self._default_policy(destination_country_id, batch.now),
+        )
+        return RouteEvaluationCandidate(
+            origin_region_id=origin_region_id,
+            destination_region_id=destination_region_id,
+            origin_country_id=origin_country_id,
+            destination_country_id=destination_country_id,
+            flow_id=flow_id,
+            origin=origin,
+            destination=destination,
+            destination_policy=destination_policy,
+        )
+
+    def _record_rejected_route(
+        self,
+        batch: RouteEvaluationBatch,
+        candidate: RouteEvaluationCandidate,
+        reason_code: str,
+    ) -> None:
+        batch.new_flows.append(
+            self._rejected_flow(
+                candidate.flow_id,
+                candidate.origin_region_id,
+                candidate.destination_region_id,
+                candidate.origin_country_id,
+                candidate.destination_country_id,
+                batch.now,
+                reason_code,
+            )
+        )
+        batch.known_flow_ids.add(candidate.flow_id)
+
+    def _route_source_availability(
+        self,
+        batch: RouteEvaluationBatch,
+        candidate: RouteEvaluationCandidate,
+    ) -> RouteSourceAvailability | None:
+        origin_cohorts = self._cohort_counts(candidate.origin)
+        reserved_source = batch.reserved_out.get(candidate.origin_region_id, (0, 0, 0))
+        available_cohorts = {
+            "pop_14": max(0, origin_cohorts[0] - reserved_source[0]),
+            "pop_15_64": max(0, origin_cohorts[1] - reserved_source[1]),
+            "pop_65": max(0, origin_cohorts[2] - reserved_source[2]),
+        }
+        source_available = sum(available_cohorts.values())
+        if source_available <= 0:
+            return None
+
+        destination_capacity = assess_destination_capacity(
+            candidate.destination,
+            current_population=self._population(candidate.destination),
+            reserved_population=batch.reserved_in.get(candidate.destination_region_id, 0),
+        )
+        return RouteSourceAvailability(
+            cohorts=available_cohorts,
+            source_available=source_available,
+            reserved_source=reserved_source,
+            destination_capacity=destination_capacity,
+        )
+
+    def _route_migration_estimate(
+        self,
+        batch: RouteEvaluationBatch,
+        candidate: RouteEvaluationCandidate,
+        border: BorderAccessDecision,
+        availability: RouteSourceAvailability,
+    ) -> RouteMigrationEstimate:
+        migration_effect = batch.event_migration.get(
+            ("region", str(candidate.origin_region_id), "migration"),
+            0.0,
+        )
+        access_rate = border.access_rate
+        displacement = self._bounded_ratio(candidate.origin.get("displacement_pressure"))
+        access_rate *= (1.0 - displacement) + (
+            displacement * self._bounded_ratio(candidate.destination_policy.get("asylum_rate"), 0.25)
+        )
+        count, opportunity = estimate_migration_count(
+            candidate.origin,
+            candidate.destination,
+            batch.country_map[candidate.origin_country_id],
+            batch.country_map[candidate.destination_country_id],
+            access_rate=access_rate,
+            source_available=availability.source_available,
+            destination_available=availability.destination_capacity.available_people,
+        )
+        count = min(
+            availability.source_available,
+            availability.destination_capacity.available_people,
+            max(0, int(round(count * (1.0 + min(0.5, max(-0.5, migration_effect))))))
+        )
+        return RouteMigrationEstimate(
+            count=count,
+            opportunity=opportunity,
+            access_rate=access_rate,
+            displacement=displacement,
+            event_effect=migration_effect,
+        )
+
+    def _route_flow_record(
+        self,
+        batch: RouteEvaluationBatch,
+        candidate: RouteEvaluationCandidate,
+        border: BorderAccessDecision,
+        availability: RouteSourceAvailability,
+    ) -> dict[str, Any] | None:
+        estimate = self._route_migration_estimate(batch, candidate, border, availability)
+        if estimate.count <= 0:
+            return None
+
+        cohorts = calculate_migrant_cohorts(
+            estimate.count,
+            availability.cohorts,
+            skilled_worker_preference=self._bounded_ratio(
+                candidate.destination_policy.get("skilled_worker_preference")
+            ),
+            family_reunification_rate=self._bounded_ratio(
+                candidate.destination_policy.get("family_reunification_rate"),
+                0.5,
+            ),
+        )
+        actual_count = sum(cohorts)
+        if actual_count <= 0:
+            return None
+
+        return {
+            "id": candidate.flow_id,
+            "origin_region_id": candidate.origin_region_id,
+            "destination_region_id": candidate.destination_region_id,
+            "origin_country_id": candidate.origin_country_id,
+            "destination_country_id": candidate.destination_country_id,
+            "dependent_count": cohorts[0],
+            "working_age_count": cohorts[1],
+            "elderly_count": cohorts[2],
+            "population_count": actual_count,
+            "reason_code": border.reason_code,
+            "reason_factors_json": self._reason_factors(
+                access_rate=estimate.access_rate,
+                opportunity=estimate.opportunity,
+                displacement_pressure=estimate.displacement,
+                capacity=availability.destination_capacity.available_people,
+                event_migration_effect=estimate.event_effect,
+            ),
+            "created_at_minute": batch.now,
+            "authorized_at_minute": batch.now,
+            "expected_completion_at_minute": batch.now + FLOW_EVALUATION_PERIOD_MINUTES,
+            "completed_at_minute": 0,
+            "transition_rule": "finish_authorized",
+            "status": FLOW_STATUS_PENDING,
+        }
+
+    def _record_new_route(
+        self,
+        batch: RouteEvaluationBatch,
+        candidate: RouteEvaluationCandidate,
+        availability: RouteSourceAvailability,
+        record: dict[str, Any],
+    ) -> None:
+        batch.new_flows.append(record)
+        batch.known_flow_ids.add(candidate.flow_id)
+        batch.pending_routes.add((candidate.origin_region_id, candidate.destination_region_id))
+        cohorts = (record["dependent_count"], record["working_age_count"], record["elderly_count"])
+        batch.reserved_out[candidate.origin_region_id] = tuple(
+            availability.reserved_source[index] + cohorts[index]
+            for index in range(3)
+        )
+        batch.reserved_in[candidate.destination_region_id] = (
+            batch.reserved_in.get(candidate.destination_region_id, 0) + record["population_count"]
+        )
+        batch.state.events.append(
+            EventMigrationFlowCreated(
+                flow_id=candidate.flow_id,
+                origin_region_id=candidate.origin_region_id,
+                destination_region_id=candidate.destination_region_id,
+                population_count=record["population_count"],
+                reason_code=record["reason_code"],
+                at_minute=batch.now,
+            )
+        )
 
     def _update_signals(
         self,
