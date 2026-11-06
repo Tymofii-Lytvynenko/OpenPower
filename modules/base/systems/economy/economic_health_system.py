@@ -83,6 +83,7 @@ from src.shared.actions import (
 from src.shared.events import EventRealSecond
 from src.shared.state import GameState
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
+from src.shared.system_state import SYSTEM_STATE_HELPER
 
 TComponent = TypeVar("TComponent")
 
@@ -156,6 +157,20 @@ class EconomicHealthSystem(ISystem):
         }),
         phase=SystemPhase.ECONOMIC_HEALTH,
     )
+    runtime_state_contract = {
+        "_action_dispatcher": SYSTEM_STATE_HELPER,
+        "_country_value_updater": SYSTEM_STATE_HELPER,
+        "_debt_contract_request_planner": SYSTEM_STATE_HELPER,
+        "_debt_distress_planner": SYSTEM_STATE_HELPER,
+        "_debt_restructuring_planner": SYSTEM_STATE_HELPER,
+        "_debt_service_calculator": SYSTEM_STATE_HELPER,
+        "_due_debt_processor": SYSTEM_STATE_HELPER,
+        "_policy_application_planner": SYSTEM_STATE_HELPER,
+        "_policy_change_validator": SYSTEM_STATE_HELPER,
+        "_policy_transition_planner": SYSTEM_STATE_HELPER,
+        "_profile_calculator": SYSTEM_STATE_HELPER,
+        "_profile_environment_calculator": SYSTEM_STATE_HELPER,
+    }
 
     def __init__(
         self,

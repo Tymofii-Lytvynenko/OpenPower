@@ -2458,7 +2458,7 @@ def test_treaty_list_filters_and_selection_map_to_openpower_treaty_browser_route
     base_source = resolve_reference_file(root, ".codex/Client/Source/reference_base_window.cpp").read_text(encoding="utf-8")
     panel = (root / "src/client/ui/panels/politics/treaties_live.py").read_text(encoding="utf-8")
     filters = (root / "src/client/ui/panels/politics/treaty_filters.py").read_text(encoding="utf-8")
-    containers = (root / "src/client/ui/core/containers.py").read_text(encoding="utf-8")
+    gml_layout = (root / "src/client/ui/layouts/gml_layout.py").read_text(encoding="utf-8")
 
     assert "GBaseWindow::ExitWindow" in base_source
     assert "m_pObjApplyBtn->Hide();" in source
@@ -2471,7 +2471,7 @@ def test_treaty_list_filters_and_selection_map_to_openpower_treaty_browser_route
     assert '"treaties.filter_member"' in panel and '"treaties.filter_type"' in panel
     assert "treaties.active.{treaty_id}" in panel
     assert "treaties.pending.{proposal_id}" in panel
-    assert "apply_base_window_titlebar_rules" in containers
+    assert "apply_base_window_titlebar_rules" in gml_layout
     assert "Treaties_Window/frmTitle/btnApply" in bindings
 
     journey_expectations = {

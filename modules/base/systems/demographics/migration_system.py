@@ -35,7 +35,7 @@ from src.shared.events import (
 )
 from src.shared.state import GameState
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
-from src.shared.system_state import SYSTEM_STATE_CACHE
+from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_HELPER
 
 
 MINUTES_PER_DAY = 1_440
@@ -170,6 +170,7 @@ class MigrationSystem(ISystem):
         phase=SystemPhase.MIGRATION,
     )
     runtime_state_contract = {
+        "_signal_calculator": SYSTEM_STATE_HELPER,
         "_route_index": SYSTEM_STATE_CACHE,
         "_adjacency_revision": SYSTEM_STATE_CACHE,
         "_region_signatures": SYSTEM_STATE_CACHE,
