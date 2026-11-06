@@ -40,6 +40,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pyinstrument",
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
 ]
 
 [project.scripts]
@@ -59,4 +61,10 @@ namespaces = true
 
 [tool.pyright]
 extraPaths = ["."]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+]
 
