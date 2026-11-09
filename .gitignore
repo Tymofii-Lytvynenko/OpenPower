@@ -245,6 +245,9 @@ __marimo__/
 /.codex/
 /.repowise/
 
+# Local assistant configuration.
+/.claude/
+
 # Generated reports, screenshots, and other temporary run outputs.
 /artifacts/
 
