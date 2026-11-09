@@ -3,7 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from src.client.ui.layouts.gml_rows import row_layout
+from src.client.ui.layouts.gml_rows import _component_kind, gml_row, row_layout
 from src.client.ui.layouts.gml_layout import GMLLayoutSession
 from utils.export_gml_ui_rows import export_rows
 from utils.reference_paths import resolve_reference_file
@@ -73,3 +73,28 @@ def test_repeated_row_can_scale_into_a_narrow_parent():
 
     priority = session.rect_for("lstUnitProductionItem/cboPriority")
     assert priority.x + priority.width <= layout.width * 0.95
+
+
+def test_custom_combo_and_toggle_component_names_are_classified():
+    assert _component_kind("checkPolicy") == "toggle"
+    assert _component_kind("cboBlackArrowUp") == "combobox"
+
+
+def test_gml_row_restores_imgui_state_and_scales_to_parent_width():
+    native = MagicMock()
+    start = SimpleNamespace(x=10.0, y=20.0)
+    native.get_cursor_screen_pos.return_value = start
+    native.get_scroll_x.return_value = 4.0
+    native.get_scroll_y.return_value = 6.0
+    row_widgets = object()
+
+    with patch("src.client.ui.layouts.gml_rows.imgui", native), patch(
+        "src.client.ui.layouts.gml_rows.GMLWidgets", return_value=row_widgets
+    ):
+        with gml_row("lstUnitProductionItem", "row-1", width=300.0) as widgets:
+            assert widgets is row_widgets
+
+    native.set_cursor_screen_pos.assert_called_once_with(start)
+    native.dummy.assert_called_once_with((300.0, row_layout("lstUnitProductionItem").height))
+    native.pop_style_var.assert_called_once_with(2)
+    native.pop_id.assert_called_once()

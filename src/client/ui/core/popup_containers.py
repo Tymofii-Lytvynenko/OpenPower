@@ -9,10 +9,12 @@ class PopupManager:
     @staticmethod
     @contextmanager
     def popup(title: str):
-        if imgui.begin_popup(title):
-            try:
-                yield
-            finally:
+        is_open = imgui.begin_popup(title)
+        # A context manager must yield when a popup is closed, or entering it raises RuntimeError.
+        try:
+            yield is_open
+        finally:
+            if is_open:
                 imgui.end_popup()
 
     @staticmethod
@@ -26,8 +28,10 @@ class PopupManager:
 
         flags = imgui.WindowFlags_.no_title_bar | imgui.WindowFlags_.no_move
 
-        if imgui.begin(name, None, flags):
-            try:
-                yield
-            finally:
+        is_open = imgui.begin(name, None, flags)
+        # Preserve context-manager semantics while letting callers skip closed modal contents.
+        try:
+            yield is_open
+        finally:
+            if is_open:
                 imgui.end()

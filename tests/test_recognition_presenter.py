@@ -58,3 +58,21 @@ def test_presenter_projects_roster_counts_selected_vote_status_and_sorted_cases(
     assert region["former_owner_id"] == "D"
     assert region["recognized_count"] == 1
     assert region["country_status"] == "recognized"
+
+
+def test_presenter_returns_empty_results_for_missing_cases():
+    state = GameState(tables={})
+
+    assert RecognitionPresenter().cases_for_country(state, "USA") == []
+
+
+def test_presenter_returns_none_when_region_has_no_recognition_case():
+    state = GameState(
+        tables={
+            "recognition_cases": pl.DataFrame(
+                {"id": ["case-1"], "region_id": [1], "opened_at_minute": [10]}
+            )
+        }
+    )
+
+    assert RecognitionPresenter().for_region(state, 2, "USA") is None

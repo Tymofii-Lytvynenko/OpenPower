@@ -8,7 +8,7 @@ from src.engine.mod_manager import ModManager
 from src.server.io.migrations import CORE_SAVE_MIGRATIONS
 from src.server.state_migrations import migrate_political_state
 from src.shared.config import GameConfig
-from src.shared.migrations import MigrationRegistry
+from src.shared.migrations import MigrationRegistry, SaveMigration
 from src.shared.schema import ColumnSpec, TableSchema, WorldSchemaRegistry
 from src.shared.state import GameState
 
@@ -257,6 +257,26 @@ class TestSchemaModMigrations(unittest.TestCase):
             "advisor_recommendations",
         }.issubset(runtime.schemas.table_names))
         self.assertIn("objective_type", runtime.schemas.get("objectives").columns)
+
+    def test_save_migration_requires_a_single_version_step(self):
+        with self.assertRaisesRegex(ValueError, "advance exactly one version"):
+            SaveMigration(1, 3, lambda _meta, _tables: None)
+
+    def test_migration_registry_rejects_duplicate_owner_for_version(self):
+        registry = MigrationRegistry(
+            [SaveMigration(1, 2, lambda _meta, _tables: None, owner="mod")]
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "Duplicate save migration"):
+            registry.register(
+                SaveMigration(1, 2, lambda _meta, _tables: None, owner="mod")
+            )
+
+    def test_migration_registry_rejects_missing_version_path(self):
+        registry = MigrationRegistry()
+
+        with self.assertRaisesRegex(RuntimeError, "No save migration registered"):
+            registry.migrate({"version": 1}, {}, target_version=2)
 
 
 if __name__ == "__main__":

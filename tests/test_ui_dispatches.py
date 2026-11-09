@@ -34,6 +34,42 @@ def test_refusal_dispatch_is_visible_only_to_the_recorded_sponsor():
     assert dispatch["payload"] == payload
 
 
+def test_trade_and_treaty_proposal_dispatches_include_actionable_context():
+    state = SimpleNamespace(
+        journal=SimpleNamespace(
+            domain_events=[
+                {
+                    "event_id": "trade-updated",
+                    "event_type": "EventDiplomaticTradeChanged",
+                    "payload": {
+                        "deal_id": "deal-7",
+                        "source_country_id": "UKR",
+                        "status": "amended",
+                        "reason": "The requested quantity changed.",
+                    },
+                },
+                {
+                    "event_id": "treaty-proposed",
+                    "event_type": "EventTreatyProposed",
+                    "payload": {
+                        "treaty_id": "treaty-9",
+                        "source_country_tag": "UKR",
+                    },
+                },
+            ]
+        )
+    )
+
+    dispatches = journal_dispatches(state, "UKR")
+
+    by_kind = {dispatch["kind"]: dispatch for dispatch in dispatches}
+    assert by_kind["trade"]["reference"] == "deal-7"
+    assert by_kind["trade"]["subject"] == "Trade amended: deal-7"
+    assert by_kind["trade"]["body"] == "The requested quantity changed."
+    assert by_kind["treaty"]["reference"] == "treaty-9"
+    assert by_kind["treaty"]["subject"] == "Treaty proposal: treaty-9"
+
+
 def test_refusal_report_uses_recorded_acceptances_and_explicit_missing_reason():
     from src.client.ui.panels.service.treaty_refusal_report import treaty_refusal_report
 

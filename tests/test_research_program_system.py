@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import polars as pl
 
-from modules.base.systems.military.research_program_system import ResearchProgramSystem
+from modules.base.systems.military.research_program_system import ResearchProgramSystem, _finite
 from modules.base.schema import ensure_base_tables
 from modules.base.systems.military.capability_catalog import DEFAULT_ROLE_PROFILES
 from modules.base.systems.military.military_system import MilitarySystem
@@ -410,6 +410,145 @@ class ResearchProgramSystemTest(unittest.TestCase):
         system.update(state, 0.0)
         self.assertTrue(state.get_table("production_orders").is_empty())
         self.assertEqual(state.get_table("countries")["money_reserves"][0], before)
+
+    def test_update_and_action_helper_ignore_missing_tables_or_actions(self) -> None:
+        system = ResearchProgramSystem()
+        system.update(GameState(tables={}), 0.0)
+        system._apply_actions(self._state())
+
+    def test_unauthorized_research_and_order_actions_are_rejected(self) -> None:
+        state = self._state()
+        state.update_table(
+            "production_orders",
+            pl.DataFrame([{"id": "order-1", "country_id": "USA", "status": "queued"}]),
+        )
+        state.current_actions = [
+            ActionUpdateResearchFunding("unauthorized-player", "USA", "ground", 0.5),
+            ActionCancelProductionOrder("unauthorized-player", "order-1"),
+            ActionSetProductionPaused("unauthorized-player", "order-1", True),
+            ActionSetProductionPriority("unauthorized-player", "order-1", 7),
+        ]
+
+        ResearchProgramSystem().update(state, 0.0)
+
+        results = state.journal.command_results
+        self.assertEqual(len(results), 4)
+        self.assertTrue(all(result["status"] == "rejected" for result in results))
+        self.assertTrue(all("does not control" in result["reason"] for result in results))
+
+    def test_design_rejects_missing_owner_and_ignores_non_mapping_requirements(self) -> None:
+        missing_owner = self._state()
+        missing_owner.globals["player_country_map"] = {"player": "CAN"}
+        missing_owner.current_actions = [ActionCreateUnitDesign(
+            "player", "CAN", "ground", "artillery", "Missing Owner", {"cost": 10.0, "firepower": 2.0},
+        )]
+        ResearchProgramSystem().update(missing_owner, 0.0)
+        self.assertEqual(
+            missing_owner.journal.command_results[-1]["reason"],
+            "The design owner does not exist.",
+        )
+
+        malformed_requirements = self._state()
+        malformed_requirements.current_actions = [ActionCreateUnitDesign(
+            "player",
+            "USA",
+            "ground",
+            "artillery",
+            "Requirements Defaulted",
+            {"cost": 10.0, "firepower": 2.0, "research_requirements": ["ground"]},
+        )]
+        ResearchProgramSystem().update(malformed_requirements, 0.0)
+        self.assertEqual(malformed_requirements.get_table("unit_designs")["display_name"][0], "Requirements Defaulted")
+
+    def test_queue_rejects_invalid_authority_design_domain_and_funding(self) -> None:
+        system = ResearchProgramSystem()
+        state = self._state()
+        tracks = state.get_table("research_tracks").to_dicts()
+        countries = state.get_table("countries").to_dicts()
+        action = ActionQueueUnitProduction("player", "USA", "design-1", 1)
+
+        system._queue_production(
+            state, [], [], tracks, countries,
+            ActionQueueUnitProduction("unauthorized-player", "USA", "design-1", 1),
+        )
+        self.assertIn("does not control", state.journal.command_results[-1]["reason"])
+
+        system._queue_production(state, [], [], tracks, countries, action)
+
+        invalid_domain = [{
+            "id": "design-1",
+            "country_id": "USA",
+            "domain": "space",
+            "cost": 1.0,
+            "research_requirements_json": "{}",
+        }]
+        system._queue_production(state, [], invalid_domain, tracks, countries, action)
+
+        valid_design = [{
+            "id": "design-1",
+            "country_id": "USA",
+            "domain": "land",
+            "cost": 2000.0,
+            "research_requirements_json": "{}",
+        }]
+        with patch.object(system._demilitarization_policy, "can_add", return_value=False):
+            system._queue_production(state, [], valid_design, tracks, countries, action)
+        self.assertEqual(
+            state.journal.command_results[-1]["reason"],
+            "The order would exceed an active demilitarization limit.",
+        )
+
+        with patch.object(system._demilitarization_policy, "can_add", return_value=True):
+            system._queue_production(state, [], valid_design, tracks, countries, action)
+
+    def test_terminal_orders_are_skipped_by_cancel_and_pause_actions(self) -> None:
+        system = ResearchProgramSystem()
+        orders = [
+            {"id": "other-order", "status": "queued"},
+            {"id": "order-1", "status": "completed"},
+        ]
+
+        system._cancel_production(orders, ActionCancelProductionOrder("player", "order-1"))
+        system._set_production_paused(orders, ActionSetProductionPaused("player", "order-1", True))
+
+        self.assertEqual(orders[1]["status"], "completed")
+        self.assertNotIn("blocking_reason", orders[1])
+
+    def test_configured_prerequisites_block_research_progress(self) -> None:
+        state = self._state()
+        tracks = state.get_table("research_tracks")
+        state.update_table(
+            "research_tracks",
+            pl.DataFrame(
+                [{
+                    "id": "advanced-weapons",
+                    "country_id": "USA",
+                    "branch": "advanced_weapons",
+                    "research_level": 0,
+                    "progress": 0.25,
+                    "funding_ratio": 1.0,
+                }],
+                schema=tracks.schema,
+            ),
+        )
+        state.globals["research_prerequisites"] = {"advanced_weapons": {"ground": 2}}
+
+        ResearchProgramSystem()._advance_research(state, 0.5)
+
+        result = state.get_table("research_tracks").to_dicts()[0]
+        self.assertEqual(result["progress"], 0.25)
+        self.assertEqual(result["blocking_reason"], "Requires ground research level 2.")
+
+    def test_frame_and_numeric_helpers_cover_empty_and_invalid_values(self) -> None:
+        state = self._state()
+        system = ResearchProgramSystem()
+        frame = system._frame(state, "research_tracks", [])
+
+        self.assertTrue(frame.is_empty())
+        self.assertEqual(_finite(2.5), 2.5)
+        self.assertEqual(_finite("invalid"), 0.0)
+        self.assertEqual(_finite(float("inf")), 0.0)
+        self.assertEqual(_finite(float("nan")), 0.0)
 
     def _state(self) -> GameState:
         state = GameState(tables={

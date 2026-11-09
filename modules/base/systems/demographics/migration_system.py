@@ -1281,9 +1281,6 @@ class MigrationSystem(ISystem):
         for country_id in changed_countries:
             dirty.update(owner_regions.get(country_id, ()))
 
-        valid_region_ids = set(current_signatures)
-        if not dirty and not self._region_signatures and valid_region_ids:
-            dirty.update(valid_region_ids)
         # An explicit endpoint set avoids mapping/set mixing and keeps invalidation route-scoped.
         route_region_ids = set(route_index)
         route_region_ids.update(

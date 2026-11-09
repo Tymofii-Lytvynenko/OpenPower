@@ -860,6 +860,9 @@ class MilitarySystem(ISystem):
             "training_level": "Recruit",
             "training_state": "",
             "training_progress": 0.0,
+            # Older unit snapshots omit optional fields required by UNIT_SCHEMA.
+            "training_facility_id": "",
+            "training_location_region_id": 0,
             "combat_posture": "hold",
             "combat_strength_modifier": 1.0,
             "war_exhaustion_modifier": 1.0,
@@ -869,6 +872,8 @@ class MilitarySystem(ISystem):
             "combat_readiness_modifier": 1.0,
             "combat_holding_modifier": 1.0,
             "combat_counterattack_modifier": 1.0,
+            "cohesion": 1.0,
+            "reorganization_until_minute": 0,
             "production_order_id": "",
             "foreign_order_id": "",
             "original_cost": 0.0,

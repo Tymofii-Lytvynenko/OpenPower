@@ -1,5 +1,6 @@
 import unittest
 from graphlib import CycleError
+from unittest.mock import patch
 
 import polars as pl
 
@@ -63,6 +64,56 @@ class TestEngineDeterminism(unittest.TestCase):
 
         self.assertIn("sys.a", captured.output[0])
         self.assertIn("sys.b", captured.output[0])
+
+    def test_registration_rejects_empty_ids_and_non_list_dependencies(self):
+        with self.assertRaisesRegex(RuntimeError, "id cannot be empty"):
+            Engine().register_systems([DummySystem(" ", [])])
+        with self.assertRaisesRegex(TypeError, "dependencies must be a list"):
+            Engine().register_systems([DummySystem("bad-dependencies", ())])
+
+    def test_scheduler_rejects_active_sorter_without_ready_systems(self):
+        class BrokenSorter:
+            def prepare(self):
+                return None
+
+            def get_ready(self):
+                return ()
+
+            def is_active(self):
+                return True
+
+        engine = Engine()
+        engine.register_systems([DummySystem("sys.a", [])])
+        with patch("src.engine.simulator.TopologicalSorter", return_value=BrokenSorter()):
+            with self.assertRaisesRegex(RuntimeError, "without a ready system"):
+                engine._rebuild_execution_order()
+
+    def test_checkpoint_restore_rejects_non_mapping_payloads(self):
+        class CheckpointSystem(DummySystem):
+            def export_persistent_state(self):
+                return {}
+
+            def import_persistent_state(self, data):
+                return None
+
+        engine = Engine()
+        engine.register_systems([CheckpointSystem("checkpointed", [])])
+        state = GameState()
+        state.system_state["checkpointed"] = "invalid"
+
+        with self.assertRaisesRegex(TypeError, "must be a dict"):
+            engine.restore_system_state(state)
+
+    def test_dev_mode_reraises_system_failures(self):
+        class FailingSystem(DummySystem):
+            def update(self, state, dt):
+                raise RuntimeError("system failed")
+
+        engine = Engine(dev_mode=True)
+        engine.register_systems([FailingSystem("failing", [])])
+
+        with self.assertRaisesRegex(RuntimeError, "system failed"):
+            engine.step(GameState(), [], 0.1)
 
     def test_training_replay_matches_across_equivalent_engine_snapshots(self):
         original = self._military_state()

@@ -63,3 +63,84 @@ def test_presenter_exposes_thresholds_obligations_causes_and_read_only_values():
     assert inflation_trend.delta == 0.02
     with pytest.raises(AttributeError):
         view.inflation_rate = 0.0
+
+
+def test_presenter_returns_none_for_missing_country_and_defaults_invalid_numbers():
+    presenter = EconomyPresenter()
+    missing_country = GameState(tables={"countries": pl.DataFrame({"id": ["A"]})})
+    assert presenter.present(missing_country, "B") is None
+
+    invalid_number = GameState(
+        tables={
+            "countries": pl.DataFrame(
+                {"id": ["A"], "economic_health": ["not-a-number"]}
+            )
+        }
+    )
+    view = presenter.present(invalid_number, "A")
+    assert view is not None
+    assert view.economic_health == 1.0
+
+
+def test_presenter_keeps_latest_indicator_and_exposes_scheduled_policy_and_distress():
+    state = GameState(
+        tables={
+            "countries": pl.DataFrame({"id": ["A"]}),
+            "economic_cause_records": pl.DataFrame(
+                [
+                    {
+                        "id": "latest",
+                        "country_id": "A",
+                        "indicator": "inflation_rate",
+                        "previous_value": 0.1,
+                        "new_value": 0.2,
+                        "delta": 0.1,
+                        "game_minute": 20,
+                        "reason": "Latest reading",
+                    },
+                    {
+                        "id": "older",
+                        "country_id": "A",
+                        "indicator": "inflation_rate",
+                        "previous_value": 0.05,
+                        "new_value": 0.1,
+                        "delta": 0.05,
+                        "game_minute": 10,
+                        "reason": "Earlier reading",
+                    },
+                ]
+            ),
+            "economic_policy_transitions": pl.DataFrame(
+                [
+                    {
+                        "id": "policy-1",
+                        "country_id": "A",
+                        "status": "scheduled",
+                        "effective_at_minute": 60,
+                        "policy_name": "income_tax",
+                        "target_value": 0.2,
+                        "transition_cost": 5.0,
+                        "cooldown_until_minute": 120,
+                    }
+                ]
+            ),
+            "debt_distress_cases": pl.DataFrame(
+                [
+                    {
+                        "country_id": "A",
+                        "status": "arrears",
+                        "entered_at_minute": 10,
+                        "recovery_condition": "Positive balance",
+                    }
+                ]
+            ),
+        }
+    )
+
+    view = EconomyPresenter().present(state, "A")
+
+    assert view is not None
+    assert len(view.indicator_trends) == 1
+    assert view.indicator_trends[0].current_value == 0.2
+    assert view.active_policies[0].policy_name == "income_tax"
+    assert view.recovery_condition == "Positive balance"

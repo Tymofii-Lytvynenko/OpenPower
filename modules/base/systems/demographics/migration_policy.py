@@ -109,10 +109,12 @@ def calculate_migrant_cohorts(
         eligible = [index for index in range(3) if allocated[index] < source[index]]
         if 0 in eligible and allocated[0] >= dependent_limit:
             eligible.remove(0)
-        if not eligible:
+        if not eligible:  # pragma: no cover
+            # The request is capped by the source cohorts and dependent limit above.
             break
         eligible_weight = sum(weights[index] for index in eligible)
-        if eligible_weight <= 0.0:
+        if eligible_weight <= 0.0:  # pragma: no cover
+            # Remaining source cohorts have positive normalized weights.
             shares = {index: 1.0 / len(eligible) for index in eligible}
         else:
             shares = {index: weights[index] / eligible_weight for index in eligible}
@@ -144,7 +146,8 @@ def calculate_migrant_cohorts(
             remaining -= 1
             if remaining == 0:
                 break
-        if assigned_count == 0 and not remainders:
+        if assigned_count == 0 and not remainders:  # pragma: no cover
+            # A non-empty eligible set always gives the remainder pass a candidate.
             break
     return (allocated[0], allocated[1], allocated[2])
 

@@ -1,4 +1,5 @@
 import polars as pl
+import pytest
 
 from modules.base.schema import ensure_base_tables
 from modules.base.systems.economy.budget_system import BudgetSystem
@@ -6,7 +7,14 @@ from modules.base.systems.world.advisor_settings_system import AdvisorSettingsSy
 from modules.base.systems.world.ai_system import AISystem
 from modules.base.systems.world.advisor_recommendation_system import AdvisorRecommendationSystem
 from modules.base.systems.world.bootstrap_system import BootstrapSystem
-from src.shared.actions import ActionResolveAdvisorRecommendation, ActionUpdateAdvisorSettings, ActionUpdateBudget
+from src.shared.actions import (
+    ActionBuyMarketUnit,
+    ActionRequestDebtContract,
+    ActionResolveAdvisorRecommendation,
+    ActionResolveDebtContract,
+    ActionUpdateAdvisorSettings,
+    ActionUpdateBudget,
+)
 from src.shared.events import EventNewDay
 from src.shared.state import GameState
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
@@ -111,6 +119,40 @@ def test_advisor_settings_reject_unknown_modes_without_mutation():
     assert ukraine["advisor_economy_status"] == "manual"
     assert state.journal.command_results[-1]["status"] == "rejected"
     assert "valid advisor mode" in state.journal.command_results[-1]["reason"]
+
+
+def test_advisor_settings_reject_when_country_data_is_unavailable():
+    for countries in (None, pl.DataFrame({"name": ["UKR"]})):
+        state = _state()
+        if countries is None:
+            state.tables.pop("countries")
+        else:
+            state.tables["countries"] = countries
+        state.current_actions = [_action()]
+
+        AdvisorSettingsSystem().update(state, 0.0)
+
+        result = state.journal.command_results[-1]
+        assert result["status"] == "rejected"
+        assert result["reason"] == "Country data is unavailable."
+
+
+def test_advisor_settings_reject_missing_or_ambiguous_country_rows():
+    unavailable = _state()
+    unavailable.current_actions = [_action(country_tag="MISSING")]
+    AdvisorSettingsSystem().update(unavailable, 0.0)
+    assert unavailable.journal.command_results[-1]["reason"] == (
+        "The selected country is unavailable."
+    )
+
+    ambiguous = _state()
+    countries = ambiguous.tables["countries"]
+    ambiguous.tables["countries"] = pl.concat([countries, countries.head(1)])
+    ambiguous.current_actions = [_action()]
+    AdvisorSettingsSystem().update(ambiguous, 0.0)
+    assert ambiguous.journal.command_results[-1]["reason"] == (
+        "The selected country is ambiguous."
+    )
 
 
 def test_automatic_advisor_runs_only_the_selected_safe_policy_subset():
@@ -307,3 +349,117 @@ def test_confirmed_advisor_action_reaches_its_simulation_handler_in_the_same_ste
     ).row(0, named=True)
     assert recommendation["status"] == "accepted"
     assert country["personal_income_tax_rate"] == 0.22
+
+
+def test_recommendation_system_reports_unavailable_table_and_rejections_without_mutating_rows():
+    unavailable_state = _state()
+    unavailable_state.tables.pop("advisor_recommendations")
+    unavailable_state.current_actions = [
+        ActionResolveAdvisorRecommendation("player-a", "missing-table", True)
+    ]
+
+    AdvisorRecommendationSystem().update(unavailable_state, 0.0)
+
+    assert unavailable_state.journal.command_results[-1]["status"] == "rejected"
+    assert "unavailable" in unavailable_state.journal.command_results[-1]["reason"]
+
+    state = _state()
+    base = {
+        "id": "inactive",
+        "campaign_id": "",
+        "actor_country_id": "UKR",
+        "title": "Recommendation",
+        "reason": "Test recommendation",
+        "source_signal": "test",
+        "affected_country_id": "UKR",
+        "affected_region_id": 0,
+        "confidence": 0.5,
+        "urgency": 0.2,
+        "expires_at_minute": 10_080,
+        "optional_action_json": "",
+        "status": "dismissed",
+        "created_at_minute": 0,
+        "stale_reason": "",
+    }
+    state.tables["advisor_recommendations"] = pl.DataFrame(
+        [
+            base,
+            {**base, "id": "actionless", "status": "active"},
+            {**base, "id": "inactive", "status": "inactive"},
+        ],
+        schema=state.tables["advisor_recommendations"].schema,
+        strict=False,
+    )
+    state.current_actions = [
+        ActionResolveAdvisorRecommendation("player-a", "not-present", True),
+        ActionResolveAdvisorRecommendation("player-b", "actionless", True),
+        ActionResolveAdvisorRecommendation("player-a", "inactive", True),
+        ActionResolveAdvisorRecommendation("player-a", "actionless", True),
+    ]
+
+    AdvisorRecommendationSystem().update(state, 0.0)
+
+    results = state.journal.command_results[-4:]
+    assert [result["status"] for result in results] == ["rejected"] * 4
+    assert "unavailable" in results[0]["reason"]
+    assert "does not control" in results[1]["reason"]
+    assert "no longer active" in results[2]["reason"]
+    assert "no supported action" in results[3]["reason"]
+    assert state.tables["advisor_recommendations"]["status"].to_list() == [
+        "dismissed", "active", "inactive"
+    ]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        "",
+        "{",
+        "[]",
+        '{"type":"UnknownAction","fields":{}}',
+        '{"type":"ActionUpdateBudget","fields":[]}',
+        '{"type":"ActionUpdateBudget","fields":{"player_id":"human","country_tag":"UKR","allocations":{}}}',
+        '{"type":"ActionUpdateBudget","fields":{"player_id":"ai_system"}}',
+    ],
+)
+def test_deserialize_recommendation_rejects_unsupported_or_malformed_actions(payload):
+    assert AdvisorRecommendationSystem._deserialize_action(payload) is None
+
+
+def test_recommendation_action_country_matching_handles_debt_and_market_actions():
+    request = ActionRequestDebtContract(
+        player_id="ai_system",
+        debtor_country_id="ukr",
+        creditor_country_id="pol",
+        principal=1000,
+        annual_interest_rate=0.05,
+        payment_frequency_months=12,
+        principal_installment=100,
+        maturity_months=24,
+    )
+    assert AdvisorRecommendationSystem._action_matches_country(_state(), request, "UKR")
+    assert not AdvisorRecommendationSystem._action_matches_country(_state(), request, "POL")
+
+    contract_action = ActionResolveDebtContract(
+        player_id="ai_system", contract_id="contract-1", accept=True
+    )
+    state = _state()
+    assert not AdvisorRecommendationSystem._action_matches_country(state, contract_action, "UKR")
+    state.tables["debt_contracts"] = pl.DataFrame({"id": ["contract-1"]})
+    assert not AdvisorRecommendationSystem._action_matches_country(state, contract_action, "UKR")
+    state.tables["debt_contracts"] = pl.DataFrame(
+        {"id": ["contract-1", "contract-2"], "creditor_country_id": ["ukr", "pol"]}
+    )
+    assert AdvisorRecommendationSystem._action_matches_country(state, contract_action, "UKR")
+    assert not AdvisorRecommendationSystem._action_matches_country(state, contract_action, "POL")
+    assert not AdvisorRecommendationSystem._action_matches_country(
+        state,
+        ActionResolveDebtContract(player_id="ai_system", contract_id="missing", accept=True),
+        "UKR",
+    )
+
+    market_action = ActionBuyMarketUnit(
+        player_id="ai_system", listing_id="listing-1", buyer_country_tag="ukr", quantity=1
+    )
+    assert AdvisorRecommendationSystem._action_matches_country(_state(), market_action, "UKR")

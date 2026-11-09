@@ -87,6 +87,17 @@ class TestSimulationTooling(unittest.TestCase):
         self.assertTrue(report.report_path.exists())
         self.assertEqual(report.fingerprints, ("same-fingerprint", "same-fingerprint"))
 
+    def test_comparison_requires_at_least_two_runs(self):
+        config = SimulationRunConfig(
+            project_root=PROJECT_ROOT,
+            run_id="invalid-comparison",
+            days=0,
+            export_final_tables=False,
+        )
+
+        with self.assertRaisesRegex(ValueError, "at least two runs"):
+            DeterminismComparisonRunner(config, runs=1, output_dir=self.output_dir)
+
     def _report(self, run_id: str, fingerprint: str) -> SimulationRunReport:
         run_dir = self.output_dir / run_id
         return SimulationRunReport(

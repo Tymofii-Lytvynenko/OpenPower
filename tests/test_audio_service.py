@@ -104,6 +104,27 @@ def test_stop_releases_player_even_when_backend_returns_no_stream() -> None:
     assert service.current_track_path is None
 
 
+def test_stop_clears_state_when_backend_reports_an_already_stopped_stream(caplog) -> None:
+    service = AudioService()
+    service.current_stream = object()
+    service.current_player = object()
+    service.current_track_path = "music.ogg"
+
+    with (
+        caplog.at_level(logging.DEBUG),
+        patch(
+            "src.client.services.audio_service.arcade.stop_sound",
+            side_effect=RuntimeError("stream already stopped"),
+        ),
+    ):
+        service.stop_music()
+
+    assert service.current_stream is None
+    assert service.current_player is None
+    assert service.current_track_path is None
+    assert "Audio stream had already stopped" in caplog.text
+
+
 def test_volume_is_finite_bounded_and_applied_to_active_stream() -> None:
     stream = SimpleNamespace(playing=True, volume=0.5)
     service = AudioService()

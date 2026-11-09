@@ -2,7 +2,11 @@ import unittest
 
 import polars as pl
 
-from src.shared.snapshots import StateSnapshotDecoder, StateSnapshotEncoder
+from src.shared.snapshots import (
+    SnapshotProtocolError,
+    StateSnapshotDecoder,
+    StateSnapshotEncoder,
+)
 from src.shared.state import GameState
 
 
@@ -100,6 +104,81 @@ class TestSnapshotProtocol(unittest.TestCase):
 
         self.assertEqual(delta["removed_tables"], ["temporary"])
         self.assertNotIn("temporary", restored.tables)
+
+    def test_unknown_acknowledgements_are_ignored(self):
+        encoder = StateSnapshotEncoder()
+
+        encoder.acknowledge(42)
+
+        self.assertEqual(encoder.base_sequence, 0)
+        self.assertEqual(encoder._sent, {})
+
+    def test_encoder_bounds_unacknowledged_descriptor_history(self):
+        encoder = StateSnapshotEncoder()
+        state = GameState()
+
+        for _ in range(257):
+            encoder.encode(state)
+
+        self.assertEqual(len(encoder._sent), 256)
+        self.assertIn(encoder.base_sequence, encoder._sent)
+        self.assertNotIn(2, encoder._sent)
+        self.assertIn(encoder.sequence, encoder._sent)
+
+    def test_decoder_rejects_unsupported_protocol_versions(self):
+        with self.assertRaisesRegex(SnapshotProtocolError, "Unsupported snapshot protocol"):
+            StateSnapshotDecoder().decode({"protocol_version": 99, "kind": "full"})
+
+    def test_decoder_rejects_delta_before_full_snapshot(self):
+        packet = {"protocol_version": 3, "kind": "delta"}
+
+        with self.assertRaisesRegex(SnapshotProtocolError, "before a full snapshot"):
+            StateSnapshotDecoder().decode(packet)
+
+    def test_decoder_rejects_delta_based_on_future_sequence(self):
+        decoder = StateSnapshotDecoder()
+        full = StateSnapshotEncoder().encode(GameState())
+        decoder.decode(full)
+
+        with self.assertRaisesRegex(SnapshotProtocolError, "client has"):
+            decoder.decode(
+                {
+                    "protocol_version": 3,
+                    "kind": "delta",
+                    "base_sequence": decoder.sequence + 1,
+                }
+            )
+
+    def test_decoder_rejects_appends_without_a_retained_prefix(self):
+        decoder = StateSnapshotDecoder()
+        decoder.decode(StateSnapshotEncoder().encode(GameState()))
+
+        with self.assertRaisesRegex(SnapshotProtocolError, "Missing append prefix"):
+            decoder.decode(
+                {
+                    "protocol_version": 3,
+                    "kind": "delta",
+                    "base_sequence": decoder.sequence,
+                    "tables": {},
+                    "appended_tables": {
+                        "history_snapshots": {"offset": 1, "data": b""}
+                    },
+                }
+            )
+
+    def test_decoder_rejects_unknown_packet_kinds(self):
+        with self.assertRaisesRegex(SnapshotProtocolError, "Unknown snapshot kind"):
+            StateSnapshotDecoder().decode(
+                {"protocol_version": 3, "kind": "unknown"}
+            )
+
+    def test_duplicate_journal_identifiers_are_not_appended(self):
+        target = [{"event_id": "event-1", "payload": "original"}]
+        incoming = [{"event_id": "event-1", "payload": "duplicate"}]
+
+        StateSnapshotDecoder._merge_journal(target, incoming, "event_id")
+
+        self.assertEqual(target, [{"event_id": "event-1", "payload": "original"}])
 
 
 if __name__ == "__main__":

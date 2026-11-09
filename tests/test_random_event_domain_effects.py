@@ -133,6 +133,12 @@ def test_effect_aggregation_filters_lifecycle_and_uses_bounded_scope_keys() -> N
     )
 
     assert totals == {("region", "1", "health"): -0.03}
+    assert (
+        aggregate_active_effects(
+            state.get_table("random_event_effects"), 15, categories=set()
+        )
+        == {}
+    )
 
 
 def test_health_event_increases_regional_mortality_without_mutating_region_schema() -> None:

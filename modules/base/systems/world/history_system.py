@@ -348,8 +348,6 @@ class HistorySystem(ISystem):
                     continue
                 if not due and not changed:
                     continue
-                if value is None and not due and previous is None:
-                    continue
                 boundary = "initial" if previous is None else ("interval" if due else "change")
                 value_kind = kinds.get(subject_id, "authoritative")
                 confidence = 0.9 if value_kind == "derived" else 1.0

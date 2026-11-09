@@ -165,3 +165,26 @@ def test_ai_system_dispatches_profitable_military_roi_build() -> None:
     assert action.country_tag == "AAA"
     assert action.unit_type == "infantry"
     assert action.count == 1
+
+
+def test_budget_survival_policy_skips_action_without_a_tax_value() -> None:
+    assert BudgetSurvivalPolicy().resolve_action({"tax_value": None}) is None
+
+
+def test_budget_policy_resolves_discretionary_allocation_and_tax_values() -> None:
+    action = BudgetPolicy().resolve_action(
+        {
+            "country_id": "AAA",
+            "allocation_column": "__discretionary__",
+            "budget_gov_ratio": 0.5,
+            "tax_value": 0.22,
+        }
+    )
+
+    assert isinstance(action, ActionUpdateBudget)
+    assert action.allocations["budget_gov_ratio"] == 0.4
+    assert action.allocations["personal_income_tax_rate"] == 0.22
+
+
+def test_budget_policy_returns_none_when_candidate_has_no_allocations() -> None:
+    assert BudgetPolicy().resolve_action({"allocation_column": "", "tax_value": None}) is None

@@ -81,6 +81,18 @@ def new_day(system, state, minute=1440):
     system.update(state, 0.0)
 
 
+def _wars_frame(rows):
+    return pl.DataFrame(
+        rows,
+        schema={
+            "id": pl.Utf8,
+            "side_a": pl.List(pl.Utf8),
+            "side_b": pl.List(pl.Utf8),
+            "status": pl.Utf8,
+        },
+    )
+
+
 @pytest.mark.parametrize("kind,identity_id", [("language", "russian"), ("religion", "catholic")])
 def test_identity_policy_changes_authoritative_state_and_pressure(world, kind, identity_id):
     execute(IdentityPolicySystem(), world, ActionSetCountryIdentityPolicy("UKR", "UKR", kind, identity_id, "restricted"))
@@ -240,3 +252,248 @@ def test_staged_identity_swap_is_accepted_by_authoritative_system(world):
     rows = world.tables["country_identity_groups"].filter(pl.col("identity_type") == "language")
     assert rows.filter(pl.col("identity_id") == "russian").item(0, "legal_status") == "legal"
     assert rows.filter(pl.col("identity_id") == "ukrainian").item(0, "legal_status") == "illegal"
+
+
+def test_create_rejects_unauthorized_participants_and_invalid_packages(world):
+    system = BilateralTradeSystem()
+    execute(
+        system,
+        world,
+        ActionCreateTradeDeal(
+            "POL", "UKR", "POL", [], [{"type": "cash", "amount": 100}], 30
+        ),
+    )
+    assert world.journal.command_results[-1]["status"] == "rejected"
+
+    execute(
+        system,
+        world,
+        ActionCreateTradeDeal(
+            "UKR", "UKR", "UKR", [], [{"type": "cash", "amount": 100}], 30
+        ),
+    )
+    assert "different valid countries" in world.journal.command_results[-1]["reason"]
+
+    invalid_cases = [
+        ([{"type": "unsupported"}], []),
+        ([{"type": "cash", "amount": 100}], [{"type": "unsupported"}]),
+        ([], []),
+        ([{"type": "cash", "amount": 1_000_000}], []),
+    ]
+    for offered, requested in invalid_cases:
+        execute(
+            system,
+            world,
+            ActionCreateTradeDeal("UKR", "UKR", "POL", offered, requested, 30),
+        )
+        assert world.journal.command_results[-1]["status"] == "rejected"
+
+    execute(
+        system,
+        world,
+        ActionCreateTradeDeal(
+            "UKR", "UKR", "POL", [], [{"type": "cash", "amount": 100}], "invalid"
+        ),
+    )
+    row = world.tables["diplomatic_trade_deals"].row(-1, named=True)
+    assert row["expires_at_minute"] == 30 * 1440
+
+
+def test_counter_rejects_missing_expired_wrong_and_unauthorized_offers(world):
+    system = BilateralTradeSystem()
+    execute(
+        system,
+        world,
+        ActionCounterTradeDeal(
+            "POL", "missing", "POL", [], [{"type": "cash", "amount": 100}]
+        ),
+    )
+    assert world.journal.command_results[-1]["status"] == "rejected"
+
+    deal_id = proposal(system, world, days=1)
+    world.time.total_minutes = 1440
+    execute(
+        system,
+        world,
+        ActionCounterTradeDeal(
+            "POL", deal_id, "POL", [], [{"type": "cash", "amount": 100}]
+        ),
+    )
+    assert world.tables["diplomatic_trade_deals"].filter(
+        pl.col("id") == deal_id
+    ).item(0, "status") == "expired"
+
+    world.time.total_minutes = 0
+    deal_id = proposal(system, world)
+    execute(
+        system,
+        world,
+        ActionCounterTradeDeal(
+            "UKR", deal_id, "UKR", [], [{"type": "cash", "amount": 100}]
+        ),
+    )
+    assert "recipient" in world.journal.command_results[-1]["reason"]
+    execute(
+        system,
+        world,
+        ActionCounterTradeDeal(
+            "UKR", deal_id, "POL", [], [{"type": "cash", "amount": 100}]
+        ),
+    )
+    assert "control" in world.journal.command_results[-1]["reason"]
+
+
+def test_counter_revalidates_war_status_and_handles_an_empty_counteroffer(world):
+    system = BilateralTradeSystem()
+    deal_id = proposal(system, world)
+    wars = _wars_frame(
+        [
+            {"id": "old-war", "side_a": ["UKR"], "side_b": ["POL"], "status": "concluded"},
+            {"id": "active-war", "side_a": ["UKR"], "side_b": ["POL"], "status": "active"},
+        ]
+    )
+    world.update_table(
+        "countries_wars",
+        wars,
+    )
+
+    execute(
+        system,
+        world,
+        ActionCounterTradeDeal(
+            "POL", deal_id, "POL", [], [{"type": "cash", "amount": 100}]
+        ),
+    )
+    assert "peace deal" in world.journal.command_results[-1]["reason"]
+    assert world.tables["diplomatic_trade_deals"].filter(
+        pl.col("id") == deal_id
+    ).item(0, "status") == "pending"
+
+    world.update_table("countries_wars", wars.head(0))
+    execute(system, world, ActionCounterTradeDeal("POL", deal_id, "POL", [], []))
+    assert "at least one asset" in world.journal.command_results[-1]["reason"]
+
+
+def test_respond_and_withdraw_cover_stale_expired_rejected_and_unauthorized_actions(world):
+    system = BilateralTradeSystem()
+    execute(system, world, ActionRespondTradeDeal("POL", "missing", "POL", True))
+    assert world.journal.command_results[-1]["status"] == "rejected"
+
+    deal_id = proposal(system, world)
+    execute(system, world, ActionRespondTradeDeal("UKR", deal_id, "UKR", True))
+    assert "controlled recipient" in world.journal.command_results[-1]["reason"]
+
+    deal_id = proposal(system, world, days=1)
+    world.time.total_minutes = 1440
+    execute(system, world, ActionRespondTradeDeal("POL", deal_id, "POL", True))
+    assert world.tables["diplomatic_trade_deals"].filter(
+        pl.col("id") == deal_id
+    ).item(0, "status") == "expired"
+
+    world.time.total_minutes = 0
+    deal_id = proposal(system, world)
+    execute(system, world, ActionRespondTradeDeal("POL", deal_id, "POL", False))
+    assert world.tables["diplomatic_trade_deals"].filter(
+        pl.col("id") == deal_id
+    ).item(0, "status") == "rejected"
+
+    execute(system, world, ActionWithdrawTradeDeal("UKR", "missing", "UKR"))
+    assert world.journal.command_results[-1]["status"] == "rejected"
+
+    deal_id = proposal(system, world, days=1)
+    world.time.total_minutes = 1440
+    execute(system, world, ActionWithdrawTradeDeal("UKR", deal_id, "UKR"))
+    assert world.tables["diplomatic_trade_deals"].filter(
+        pl.col("id") == deal_id
+    ).item(0, "status") == "expired"
+
+    world.time.total_minutes = 0
+    deal_id = proposal(system, world)
+    execute(system, world, ActionWithdrawTradeDeal("POL", deal_id, "POL"))
+    assert "proposing country" in world.journal.command_results[-1]["reason"]
+
+
+def test_ai_trade_paths_skip_resolved_deals_reject_invalid_offers_and_decline_no_counter(world, monkeypatch):
+    system = BilateralTradeSystem()
+    system._expire_and_process_ai(world, [{"status": "accepted"}])
+
+    world.globals["ai_controlled_countries"] = ["POL"]
+    invalid = {
+        "id": "invalid-ai-offer",
+        "source_country_id": "MEX",
+        "target_country_id": "POL",
+        "status": "pending",
+        "expires_at_minute": 100_000,
+        "offered_assets_json": "[]",
+        "requested_assets_json": "[]",
+    }
+    system._expire_and_process_ai(world, [invalid])
+    assert invalid["status"] == "rejected"
+
+    deal_id = proposal(
+        system,
+        world,
+        offered=[{"type": "cash", "amount": 100}],
+        requested=[{"type": "cash", "amount": 5000}],
+    )
+    monkeypatch.setattr(system, "_build_ai_counter_package", lambda *_args: [])
+    deals = world.tables["diplomatic_trade_deals"].to_dicts()
+    system._expire_and_process_ai(world, deals)
+    row = next(row for row in deals if row["id"] == deal_id)
+    assert row["status"] == "rejected"
+    assert "below the acceptance threshold" in row["reason"]
+
+
+def test_ai_counter_package_keeps_affordable_assets_and_cash(world):
+    system = BilateralTradeSystem()
+    assets = [
+        {"type": "territory", "region_id": 4},
+        {"type": "cash", "amount": 500},
+    ]
+
+    package = system._build_ai_counter_package(
+        assets,
+        "POL",
+        "UKR",
+        1_000_000_000_000,
+        world.tables["countries"],
+        world.tables["regions"],
+        world.tables["research_tracks"],
+    )
+
+    assert package == assets
+
+
+def test_trade_validation_and_primitive_helper_edges(world):
+    from modules.base.systems.world.bilateral_trade_system import BilateralTradeSystem
+
+    system = BilateralTradeSystem()
+    assert "different valid countries" in system._validate_participants(world, "", "POL")
+    assert "countries table" in system._validate_participants(SimpleNamespace(tables={}), "UKR", "POL")
+    assert "countries table" in system._validate_participants(
+        SimpleNamespace(tables={"countries": pl.DataFrame({"name": ["UKR"]})}),
+        "UKR",
+        "POL",
+    )
+    assert "must exist" in system._validate_participants(world, "UKR", "MEX")
+    assert system._validate_participants(world, "UKR", "POL") == ""
+
+    wars = _wars_frame(
+        [{"id": "active-war", "side_a": ["UKR"], "side_b": ["POL"], "status": "active"}]
+    )
+    world.update_table(
+        "countries_wars",
+        wars,
+    )
+    assert "peace deal" in system._validate_participants(world, "UKR", "POL")
+    assert "Country and territory data" in system._validate_packages(
+        SimpleNamespace(tables={}), "UKR", "POL", [], []
+    )
+
+    execute(system, world, ActionCreateTradeDeal("UKR", "UKR", "POL", [], [{"type": "cash", "amount": 100}], 30))
+    assert system._is_ai_country(
+        SimpleNamespace(globals={"ai_controlled_countries": {"POL"}}), "pol"
+    )
+    assert BilateralTradeSystem._tags("POL") == set()
+    assert BilateralTradeSystem._tags([" pol ", ""]) == {"POL"}
+    assert BilateralTradeSystem._now(SimpleNamespace(time=SimpleNamespace(total_minutes="invalid"))) == 0

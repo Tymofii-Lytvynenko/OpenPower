@@ -93,3 +93,49 @@ def test_foreign_missing_and_malformed_offers_are_unavailable():
     state.update_table("unit_training_quotes", state.get_table("unit_training_quotes").with_columns(
         pl.lit(float("nan")).alias("cost")))
     assert training_offer(state, "unit-1", "UKR") is None
+
+
+@pytest.mark.parametrize("column,value", [
+    ("is_moving", True),
+    ("engagement_mode", "battle"),
+    ("training_state", "training"),
+])
+def test_training_offer_is_unavailable_for_units_already_in_transition(column, value):
+    state = training_state()
+    state.update_table("units", state.get_table("units").with_columns(pl.lit(value).alias(column)))
+
+    assert training_offer(state, "unit-1", "UKR") is None
+
+
+def test_batch_request_validates_selection_and_confirms_the_complete_training_plan():
+    state = training_state()
+    units = state.get_table("units")
+    units = units.vstack(pl.DataFrame([{
+        "id": "unit-2", "owner": "UKR", "strength": 800, "training_level": "Recruit",
+        "current_region_id": 2,
+    }], schema=units.schema))
+    quotes = state.get_table("unit_training_quotes")
+    quotes = quotes.vstack(pl.DataFrame([{
+        "unit_id": "unit-2", "country_id": "UKR", "from_level": "Recruit",
+        "target_level": "Veteran", "cost": 1250.0, "required_days": 45.0,
+        "available": True, "reason": "",
+    }], schema=quotes.schema))
+    state.update_table("units", units)
+    state.update_table("unit_training_quotes", quotes)
+    confirmation, client, _notify = controller()
+    confirmation.question.show = Mock(return_value=True)
+
+    assert confirmation.request_many(state, ["", None]) is False
+    assert confirmation.request_many(state, ["unit-1", "missing"]) is False
+    assert confirmation.request_many(state, ["unit-1", "unit-2", "unit-1"])
+
+    message, accept, _cancel = confirmation.question.show.call_args.args
+    assert "Train 2 selected units to Regular, Veteran?" in message
+    assert "Estimated duration: 30–45 days" in message
+    assert "Combined cost: $ 2,250.00" in message
+    accept()
+    assert {call.args[0].unit_id for call in client.send_action.call_args_list} == {"unit-1", "unit-2"}
+
+    confirmation.question.render = Mock()
+    confirmation.render(state)
+    confirmation.question.render.assert_called_once_with()

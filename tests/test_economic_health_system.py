@@ -1,4 +1,6 @@
 import math
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import polars as pl
 
@@ -6,6 +8,7 @@ from modules.base.schema import build_base_schema_registry
 from modules.base.systems.economy.economic_health_system import EconomicHealthSystem
 from src.shared.actions import (
     ActionRequestDebtContract,
+    ActionRequestDebtRestructuring,
     ActionResolveDebtContract,
 )
 from src.shared.state import GameState
@@ -438,3 +441,129 @@ def test_unauthorized_or_invalid_financing_request_changes_no_reserves():
 
     assert state.get_table("debt_contracts").is_empty()
     assert state.get_table("countries").get_column("money_reserves").to_list() == [100.0, 1_000.0]
+
+
+def test_empty_world_guards_and_injected_components():
+    injected_profile_calculator = object()
+    system = EconomicHealthSystem(profile_calculator=injected_profile_calculator)
+    empty_state = GameState()
+
+    assert system._profile_calculator is injected_profile_calculator
+    system.update(empty_state, 0.0)
+    assert system._country(empty_state, "A") is None
+    system._country_values(empty_state, "A", {})
+    no_id_state = GameState(tables={"countries": pl.DataFrame({"name": ["A"]})})
+    assert system._country(no_id_state, "A") is None
+
+
+def test_policy_transition_rejection_paths_are_recorded():
+    state = _state()
+    system = EconomicHealthSystem()
+    request = SimpleNamespace(
+        country_id="A",
+        policy_name="minimum_wage",
+        source_id="policy:A:minimum_wage:1",
+        player_id="A",
+        previous_value=10.0,
+        target_value=12.0,
+        terms={},
+        country={"money_reserves": 100.0},
+        rejection_request=lambda reason, now: (reason, now),
+    )
+    draft = SimpleNamespace(rejection_reason=None)
+    planner = SimpleNamespace(
+        prepare=Mock(return_value=draft),
+        finalize=Mock(
+            return_value=SimpleNamespace(rejection_reason="duplicate transition")
+        ),
+    )
+    system._policy_transition_planner = planner
+    system._reject = Mock()
+
+    assert system._plan_policy_transition_request(state, request, 1) is None
+    system._reject.assert_called_once_with(state, ("duplicate transition", 1))
+
+    transition_table = state.get_table("economic_policy_transitions")
+    transition = {
+        "id": "unsupported-policy",
+        "country_id": "A",
+        "policy_name": "unsupported_policy",
+        "previous_value": 0.0,
+        "target_value": 1.0,
+        "status": "scheduled",
+        "effective_at_minute": 0,
+    }
+    state.update_table(
+        "economic_policy_transitions",
+        pl.DataFrame([transition], schema=transition_table.schema, strict=False),
+    )
+    EconomicHealthSystem()._apply_due_policy_changes(state, 0)
+
+    saved = state.get_table("economic_policy_transitions").row(0, named=True)
+    assert saved["status"] == "rejected"
+    assert saved["reason"]
+
+
+def test_creditor_rejection_and_restructuring_guards_leave_contracts_unchanged():
+    state = _state()
+    system = EconomicHealthSystem()
+    state.current_actions = [
+        ActionRequestDebtContract(
+            player_id="A",
+            debtor_country_id="A",
+            creditor_country_id="B",
+            principal=300.0,
+            annual_interest_rate=0.12,
+            payment_frequency_months=1,
+            principal_installment=50.0,
+            maturity_months=6,
+        )
+    ]
+    system.update(state, 0.0)
+    contract = state.get_table("debt_contracts").row(0, named=True)
+    balances_before = state.get_table("countries").sort("id")["money_reserves"].to_list()
+
+    state.current_actions = [
+        ActionResolveDebtContract(
+            player_id="B", contract_id=contract["id"], accept=False
+        )
+    ]
+    system.update(state, 0.0)
+    rejected = state.get_table("debt_contracts").row(0, named=True)
+    assert rejected["status"] == "rejected"
+    assert state.get_table("countries").sort("id")["money_reserves"].to_list() == balances_before
+
+    missing_contract_request = ActionRequestDebtRestructuring(
+        player_id="A",
+        country_tag="A",
+        contract_id="missing-contract",
+        annual_interest_rate=0.1,
+        payment_frequency_months=1,
+        principal_installment=20.0,
+        maturity_months=6,
+    )
+    system._request_restructuring(state, missing_contract_request, 0)
+
+    unauthorized_request = ActionRequestDebtRestructuring(
+        player_id="B",
+        country_tag="B",
+        contract_id=str(contract["id"]),
+        annual_interest_rate=0.1,
+        payment_frequency_months=1,
+        principal_installment=20.0,
+        maturity_months=6,
+    )
+    system._request_restructuring(state, unauthorized_request, 0)
+    assert state.get_table("debt_contracts").row(0, named=True)["status"] == "rejected"
+
+
+def test_distress_and_profile_helpers_skip_ineligible_state():
+    system = EconomicHealthSystem()
+    system._set_distress(GameState(), SimpleNamespace(country_id="A"))
+    system._recover_distress_if_eligible(GameState(), "A", 0)
+
+    state = _state()
+    system._recover_distress_if_eligible(state, "A", 0)
+    system._update_due_economic_profiles(state, 0)
+
+    assert state.get_table("debt_distress_cases").is_empty()

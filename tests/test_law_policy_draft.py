@@ -30,6 +30,13 @@ def test_law_drafts_dispatch_only_on_apply_and_once():
     assert state.tables["country_laws"].item(0, "value") == "Permitted"
 
 
+def test_law_draft_rejects_values_outside_the_snapshot_choices():
+    row, _state, _context, draft, _actions = setup()
+
+    assert not draft.choose(row, "Unknown")
+    assert not draft.pending
+
+
 @pytest.mark.parametrize("change", ["removed", "value", "choices", "scheduled", "foreign"])
 def test_stale_or_unauthorized_law_draft_dispatches_nothing(change):
     row, state, context, draft, actions = setup()

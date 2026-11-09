@@ -160,3 +160,42 @@ def test_game_view_routes_an_empty_map_click_to_the_drawn_battle():
     GameView.on_game_mouse_release(view, 120, 130, arcade.MOUSE_BUTTON_LEFT, 0)
     layout.select_battle_at.assert_called_once_with(renderer, 120, 130, 720)
     viewport.on_mouse_press.assert_not_called()
+
+
+def test_participant_can_read_recorded_losses_and_postures():
+    state = make_state()
+    selection = BattleInspection("UKR", lambda action: None, "UKR")
+    assert selection.open(state, "battle-own")
+
+    assert isinstance(selection.recorded_losses(state), list)
+    assert isinstance(selection.own_postures(state), list)
+
+
+def test_observer_does_not_receive_participant_losses_or_postures():
+    state = make_state()
+    selection = BattleInspection("USA", lambda action: None, "USA")
+    assert selection.open(state, "battle-observer")
+
+    assert selection.recorded_losses(state) == []
+    assert selection.own_postures(state) == []
+
+
+def test_final_result_builds_display_row_with_the_winner_balance():
+    state = make_state()
+    selection = BattleInspection("UKR", lambda action: None, "UKR")
+    assert selection.open(state, "battle-own")
+    assert selection.display_row(state)["id"] == "battle-own"
+
+    final_result = result()
+    final_result["payload"]["victor_side"] = "SIDE_B"
+    state.journal.domain_events.append(final_result)
+    state.update_table(
+        "battles",
+        state.tables["battles"].filter(pl.col("id") != "battle-own"),
+    )
+
+    assert selection.poll_result(state)["victor_side"] == "SIDE_B"
+    displayed = selection.display_row(state)
+
+    assert displayed["status"] == "concluded"
+    assert displayed["balance"] == 0.0

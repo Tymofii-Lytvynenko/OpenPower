@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 import polars as pl
 
@@ -118,6 +119,171 @@ class StrategicWarfareAIPolicyTest(unittest.TestCase):
         evaluation = DeclarativeAIFramework(StrategicWarfarePolicy()).evaluate(self._context(state))
 
         self.assertEqual(evaluation.actions, ())
+
+    def test_policy_respects_doctrine_and_empty_schedule(self) -> None:
+        policy = StrategicWarfarePolicy()
+        state = self._state()
+        state.globals["strategic_ai_doctrine"] = "first_strike"
+        self.assertTrue(policy.build_candidates(self._context(state)).collect().is_empty())
+
+        state = self._state()
+        countries = state.get_table("countries").with_columns(
+            pl.lit(False).alias("is_playable")
+        )
+        state.update_table("countries", countries)
+        self.assertTrue(policy.build_candidates(self._context(state)).collect().is_empty())
+
+    def test_policy_handles_missing_required_table_and_stale_scheduled_country(self) -> None:
+        policy = StrategicWarfarePolicy()
+        state = self._state()
+        state.tables.pop("strategic_weapons")
+        self.assertTrue(policy.build_candidates(self._context(state)).collect().is_empty())
+
+        state = self._state()
+        state.update_table(
+            "countries",
+            state.get_table("countries").filter(pl.col("id") != "CAN"),
+        )
+        scheduled = pl.DataFrame({"country_id": ["CAN"]}).lazy()
+        with patch(
+            "modules.base.systems.world.ai.strategic_warfare_policy.country_frame",
+            return_value=scheduled,
+        ):
+            candidates = policy.build_candidates(self._context(state)).collect()
+        self.assertTrue(candidates.is_empty())
+
+    def test_policy_requires_program_research_for_a_retaliation(self) -> None:
+        state = self._state()
+        tracks = state.get_table("research_tracks").with_columns(
+            pl.when(pl.col("branch") == "strategic_program")
+            .then(pl.lit(0))
+            .otherwise(pl.col("research_level"))
+            .alias("research_level")
+        )
+        state.update_table("research_tracks", tracks)
+
+        candidates = StrategicWarfarePolicy().build_candidates(self._context(state)).collect()
+
+        self.assertTrue(candidates.is_empty())
+
+    def test_policy_ignores_missing_active_wars_and_unconfirmed_incoming_orders(self) -> None:
+        policy = StrategicWarfarePolicy()
+        state = self._state()
+        state.update_table("countries_wars", state.get_table("countries_wars").head(0))
+        self.assertTrue(policy.build_candidates(self._context(state)).collect().is_empty())
+
+        state = self._state()
+        state.update_table(
+            "strategic_launch_orders",
+            state.get_table("strategic_launch_orders").with_columns(
+                pl.lit("pending").alias("status")
+            ),
+        )
+        self.assertTrue(policy.build_candidates(self._context(state)).collect().is_empty())
+
+    def test_policy_rejects_unknown_or_incomplete_action_rows(self) -> None:
+        policy = StrategicWarfarePolicy()
+
+        self.assertIsNone(policy.resolve_action({"action_kind": "unknown"}))
+        self.assertIsNone(
+            policy.resolve_action(
+                {
+                    "action_kind": "launch_strategic_strike",
+                    "country_id": "CAN",
+                    "target_country_id": "USA",
+                    "weapon_id": "",
+                    "target_region_id": 1,
+                }
+            )
+        )
+
+    def test_policy_requires_an_owned_origin_and_a_target_region(self) -> None:
+        policy = StrategicWarfarePolicy()
+        state = self._state()
+        regions = state.get_table("regions").with_columns(
+            pl.when(pl.col("id") == 2)
+            .then(pl.lit(""))
+            .otherwise(pl.col("owner"))
+            .alias("owner")
+        )
+        state.update_table("regions", regions)
+        self.assertTrue(policy.build_candidates(self._context(state)).collect().is_empty())
+
+        state = self._state()
+        regions = state.get_table("regions").with_columns(
+            pl.when(pl.col("id") == 1)
+            .then(pl.lit("MEX"))
+            .otherwise(pl.col("owner"))
+            .alias("owner")
+        )
+        state.update_table("regions", regions)
+        self.assertTrue(policy.build_candidates(self._context(state)).collect().is_empty())
+
+    def test_policy_filters_inoperable_unfunded_and_foreign_origin_weapons(self) -> None:
+        policy = StrategicWarfarePolicy()
+
+        state = self._state()
+        state.update_table(
+            "strategic_weapons",
+            state.get_table("strategic_weapons").with_columns(
+                pl.lit(False).alias("operational")
+            ),
+        )
+        self.assertTrue(policy.build_candidates(self._context(state)).collect().is_empty())
+
+        state = self._state()
+        state.update_table(
+            "countries",
+            state.get_table("countries").with_columns(
+                pl.when(pl.col("id") == "CAN")
+                .then(pl.lit(0.0))
+                .otherwise(pl.col("money_reserves"))
+                .alias("money_reserves")
+            ),
+        )
+        state.update_table(
+            "strategic_weapons",
+            state.get_table("strategic_weapons").with_columns(
+                pl.lit(1.0).alias("launch_cost")
+            ),
+        )
+        self.assertTrue(policy.build_candidates(self._context(state)).collect().is_empty())
+
+        state = self._state()
+        state.update_table(
+            "strategic_weapons",
+            state.get_table("strategic_weapons").with_columns(
+                pl.lit(1).cast(pl.Int32).alias("origin_region_id")
+            ),
+        )
+        self.assertTrue(policy.build_candidates(self._context(state)).collect().is_empty())
+
+        state = self._state()
+        state.update_table(
+            "strategic_weapons",
+            state.get_table("strategic_weapons").with_columns(
+                pl.lit(999).cast(pl.Int32).alias("origin_region_id")
+            ),
+        )
+        candidates = policy.build_candidates(self._context(state)).collect()
+        self.assertEqual(candidates["target_region_id"].to_list(), [1])
+
+    def test_origin_region_prefers_the_government_capital(self) -> None:
+        policy = StrategicWarfarePolicy()
+        first = {"id": 2, "owner": "CAN"}
+        capital = {"id": 3, "owner": "CAN"}
+
+        selected = policy._origin_region(
+            "CAN",
+            {"CAN": [first, capital]},
+            {2: first, 3: capital},
+            {"CAN": 3},
+        )
+
+        self.assertIs(selected, capital)
+
+    def test_policy_number_parser_uses_the_given_default_for_invalid_text(self) -> None:
+        self.assertEqual(StrategicWarfarePolicy()._number("not-a-number", 4.5), 4.5)
 
 
 if __name__ == "__main__":

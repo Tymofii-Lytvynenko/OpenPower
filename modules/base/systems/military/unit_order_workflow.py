@@ -111,7 +111,8 @@ class UnitOrderWorkflowService:
         unit_id = str(unit.get("id") or "")
         if str(unit.get("readiness_status") or "").strip().lower() != "fortified":
             return False
-        if self._unit_is_transitioning(state, unit_id):
+        # The former private name did not exist and raised before readiness could be checked.
+        if self.unit_is_transitioning(state, unit_id):
             return False
         if not self._readiness_preparer.prepare_order(state, unit_id):
             return False

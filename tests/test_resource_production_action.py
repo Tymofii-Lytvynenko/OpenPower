@@ -6,6 +6,7 @@ from modules.base.systems.economy.internal_economy_system import InternalEconomy
 from src.shared.actions import ActionIncreaseResourceProduction
 from src.shared.events import EventResourceProductionIncreased
 from src.shared.resource_production_policy import (
+    _finite_nonnegative,
     estimate_production_increase_cost,
     production_increase_basis,
 )
@@ -154,3 +155,155 @@ def test_regional_records_outside_country_control_do_not_fall_back_to_national_t
     assert state.tables["domestic_production"].filter(pl.col("country_id") == "UKR")["domestic_production"][0] == 100.0
     assert state.journal.command_results[-1]["status"] == "rejected"
     assert "positive production value" in state.journal.command_results[-1]["reason"]
+
+
+def test_production_basis_rejects_invalid_identity_schema_and_ambiguous_totals() -> None:
+    state = _state()
+
+    assert production_increase_basis(state, "", "fossil_fuels") is None
+    assert production_increase_basis(state, "UKR", "unknown_resource") is None
+
+    state.tables["domestic_production"] = pl.DataFrame({"country_id": ["UKR"]})
+    assert production_increase_basis(state, "UKR", "fossil_fuels") is None
+
+    state.tables["domestic_production"] = pl.DataFrame(
+        {
+            "country_id": ["UKR", "UKR"],
+            "game_resource_id": ["fossil_fuels", "fossil_fuels"],
+            "domestic_production": [100.0, 200.0],
+        }
+    )
+    assert production_increase_basis(state, "UKR", "fossil_fuels") is None
+
+
+def test_production_basis_rejects_nonpositive_national_values_and_invalid_numbers() -> None:
+    state = _state()
+    for value in (0.0, None, float("nan")):
+        state.tables["domestic_production"] = pl.DataFrame(
+            {
+                "country_id": ["UKR"],
+                "game_resource_id": ["fossil_fuels"],
+                "domestic_production": [value],
+            }
+        )
+        assert production_increase_basis(state, "UKR", "fossil_fuels") is None
+
+    assert _finite_nonnegative("not-a-number") is None
+    assert _finite_nonnegative(float("inf")) is None
+    assert _finite_nonnegative(-1.0) is None
+
+
+def test_production_basis_falls_back_to_national_when_regional_data_is_unavailable() -> None:
+    state = _state()
+    state.tables["regional_production"] = pl.DataFrame({"country_id": ["UKR"]})
+
+    basis = production_increase_basis(state, "UKR", "fossil_fuels")
+
+    assert basis is not None
+    assert basis.source == "national"
+
+    state.tables["regional_production"] = pl.DataFrame(
+        [
+            {
+                "id": "pol-row",
+                "country_id": "POL",
+                "region_id": 3,
+                "game_resource_id": "fossil_fuels",
+                "domestic_production": 60.0,
+            }
+        ],
+    )
+    basis = production_increase_basis(state, "UKR", "fossil_fuels")
+
+    assert basis is not None
+    assert basis.source == "national"
+
+
+def test_regional_basis_requires_valid_region_schema_and_skips_malformed_ids() -> None:
+    state = _state(
+        regional_rows=[
+            {
+                "id": "ukr-row",
+                "country_id": "UKR",
+                "region_id": 1,
+                "game_resource_id": "fossil_fuels",
+                "domestic_production": 40.0,
+            }
+        ]
+    )
+    state.tables["regions"] = pl.DataFrame({"id": [1]})
+    assert production_increase_basis(state, "UKR", "fossil_fuels") is None
+
+    state.tables["regions"] = pl.DataFrame({"id": ["bad-id"], "owner": ["UKR"]})
+    assert production_increase_basis(state, "UKR", "fossil_fuels") is None
+
+    state.tables["regions"] = pl.DataFrame(
+        {"id": [1, 2], "owner": ["UKR", "UKR"], "controller": ["UKR", "UKR"]}
+    )
+    state.tables["regional_production"] = pl.DataFrame(
+        {
+            "id": ["bad-region-row"],
+            "country_id": ["UKR"],
+            "region_id": ["bad-id"],
+            "game_resource_id": ["fossil_fuels"],
+            "domestic_production": [40.0],
+        }
+    )
+    assert production_increase_basis(state, "UKR", "fossil_fuels") is None
+
+
+def test_regional_basis_rejects_bad_rows_duplicate_ids_and_zero_total() -> None:
+    state = _state(
+        regional_rows=[
+            {
+                "id": "",
+                "country_id": "UKR",
+                "region_id": 1,
+                "game_resource_id": "fossil_fuels",
+                "domestic_production": 40.0,
+            }
+        ]
+    )
+    assert production_increase_basis(state, "UKR", "fossil_fuels") is None
+
+    state.tables["regional_production"] = pl.DataFrame(
+        [
+            {
+                "id": "duplicate",
+                "country_id": "UKR",
+                "region_id": 1,
+                "game_resource_id": "fossil_fuels",
+                "domestic_production": 20.0,
+            },
+            {
+                "id": "duplicate",
+                "country_id": "UKR",
+                "region_id": 1,
+                "game_resource_id": "fossil_fuels",
+                "domestic_production": 30.0,
+            },
+        ],
+        schema=state.tables["regional_production"].schema,
+    )
+    assert production_increase_basis(state, "UKR", "fossil_fuels") is None
+
+    state.tables["regional_production"] = pl.DataFrame(
+        [
+            {
+                "id": "zero-row",
+                "country_id": "UKR",
+                "region_id": 1,
+                "game_resource_id": "fossil_fuels",
+                "domestic_production": 0.0,
+            }
+        ],
+        schema=state.tables["regional_production"].schema,
+    )
+    assert production_increase_basis(state, "UKR", "fossil_fuels") is None
+
+
+def test_cost_estimate_rejects_unsupported_percentages_and_nonpositive_values() -> None:
+    for percent in (True, 3, 0, 100, 25.0):
+        assert estimate_production_increase_cost(100.0, percent) is None
+    for annual_value in (0.0, -1.0, None, float("nan")):
+        assert estimate_production_increase_cost(annual_value, 25) is None

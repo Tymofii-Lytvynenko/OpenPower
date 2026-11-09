@@ -4,7 +4,11 @@ import unittest
 
 import polars as pl
 
-from src.client.ui.panels.service.event_feed_presenter import EventCategory, EventFeedPresenter
+from src.client.ui.panels.service.event_feed_presenter import (
+    EventCategory,
+    EventFeedItem,
+    EventFeedPresenter,
+)
 
 
 class TestEventFeedPresenter(unittest.TestCase):
@@ -193,6 +197,124 @@ class TestEventFeedPresenter(unittest.TestCase):
         self.assertEqual(epidemic.response_options, (("public_health_response", 15_000.0),))
         self.assertEqual(items[1].recovery_summary, "recovery pending")
         self.assertIn("Insufficient authority", items[2].body)
+
+    def test_counts_fallback_events_and_item_summary_handle_empty_headlines(self):
+        state = SimpleNamespace(
+            tables={},
+            globals={
+                "active_events": [
+                    {"id": "war", "event_type": "war", "severity": 0.9, "start_minute": 5},
+                    {"id": "market", "event_type": "economic_boom", "severity": 0.5, "start_minute": 1},
+                ]
+            },
+        )
+        presenter = EventFeedPresenter()
+
+        counts = presenter.counts(state)
+        item = EventFeedItem(
+            id="body-only",
+            category=EventCategory.GENERAL,
+            country_tag="",
+            headline="",
+            body="A headline was unavailable.",
+            created_at="",
+        )
+
+        self.assertEqual(counts[EventCategory.MILITARY], 1)
+        self.assertEqual(counts[EventCategory.ECONOMIC], 1)
+        self.assertEqual(item.summary, "A headline was unavailable.")
+
+    def test_active_event_projection_ignores_non_list_global_payloads(self):
+        state = SimpleNamespace(tables={}, globals={"active_events": ("invalid",)})
+
+        self.assertEqual(EventFeedPresenter()._active_event_items(state), [])
+
+    def test_journal_projection_filters_invalid_and_duplicate_lifecycle_records(self):
+        records = [
+            "not a record",
+            {"event_type": "OtherEvent", "payload": {}},
+            {"event_type": "EventRandomEventLifecycleChanged", "payload": "invalid"},
+            {
+                "event_type": "EventRandomEventLifecycleChanged",
+                "payload": {"event_id": "", "status": "resolved"},
+            },
+            {
+                "event_type": "EventRandomEventLifecycleChanged",
+                "payload": {"event_id": "controls", "status": "controls_changed"},
+            },
+            {
+                "event_type": "EventRandomEventLifecycleChanged",
+                "payload": {"event_id": "started", "status": "started"},
+            },
+            {
+                "event_type": "EventRandomEventLifecycleChanged",
+                "payload": {"event_id": "represented", "status": "cancelled"},
+            },
+            {
+                "tick": 42,
+                "event_type": "EventRandomEventLifecycleChanged",
+                "payload": {
+                    "event_id": "rejected",
+                    "event_type": "war",
+                    "status": "response_rejected",
+                    "reason": "No authority.",
+                    "at_minute": "invalid",
+                },
+            },
+            {
+                "event_type": "EventRandomEventLifecycleChanged",
+                "payload": {
+                    "event_id": "unrepresented",
+                    "event_type": "economic",
+                    "status": "resolved",
+                    "at_minute": 25,
+                },
+            },
+        ]
+        state = SimpleNamespace(journal=SimpleNamespace(domain_events=records))
+        represented = EventFeedItem(
+            id="instance:represented",
+            category=EventCategory.GENERAL,
+            country_tag="",
+            headline="Existing instance",
+            body="",
+            created_at="",
+        )
+
+        items = EventFeedPresenter()._journal_event_items(state, {}, [represented])
+
+        self.assertEqual(
+            [item.id for item in items],
+            ["lifecycle:rejected:response_rejected:42", "lifecycle:unrepresented:resolved:8"],
+        )
+        self.assertEqual(items[0].severity, "warning")
+        self.assertIn("Minute 0", items[0].created_at)
+        self.assertIn("No authority.", items[0].body)
+        self.assertEqual(items[1].status, "resolved")
+
+    def test_event_feed_parsers_formatters_and_numeric_fallbacks(self):
+        presenter = EventFeedPresenter()
+
+        self.assertEqual(presenter._journal_event_items(
+            SimpleNamespace(journal=SimpleNamespace(domain_events=())), {}, []
+        ), [])
+        self.assertEqual(presenter._response_options("not-json"), ())
+        self.assertEqual(presenter._response_options("{}"), ())
+        self.assertEqual(presenter._recovery_summary("not-json", "active"), "")
+        self.assertEqual(
+            presenter._recovery_summary('{"progress": 2, "state": "recovering"}', "active"),
+            "100% recovering",
+        )
+        self.assertEqual(presenter._recovery_summary('{"state": " paused "}', "active"), "paused")
+        self.assertEqual(
+            presenter._format_effect({"category": "gdp_per_capita", "magnitude": 0.25, "unit": "currency"}),
+            "gdp per capita +0.25 currency",
+        )
+        self.assertEqual(presenter._text(None, "fallback"), "fallback")
+        self.assertEqual(presenter._integer("invalid"), 0)
+        self.assertEqual(presenter._ratio("invalid"), 0.0)
+        self.assertEqual(presenter._severity_label(0.5), "warning")
+        self.assertEqual(presenter._number(object(), 7.5), 7.5)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,14 @@ from modules.base.systems.world.ai import (
     ProcurementPolicy,
     WarPolicy,
 )
+from modules.base.systems.world.ai.common import (
+    country_strength,
+    relation_matrix,
+    treaty_member_rows,
+)
 from modules.base.systems.world.ai.military_policies import MilitaryROIPolicy
+from modules.base.systems.world.ai.military_policies import _finite_float, _safe_int
+from modules.base.systems.military.capability_catalog import TRAINING_LEVELS
 from modules.base.systems.world.ai.diplomacy_policy import TREATY_PROFILES
 from modules.base.systems.world.ai_system import AISystem
 from src.core.ai_framework import AITableContext, DeclarativeAIFramework
@@ -19,6 +26,8 @@ from src.shared.actions import (
     ActionAttackUnit,
     ActionBuildUnit,
     ActionBuyMarketUnit,
+    ActionJoinTreaty,
+    ActionLeaveTreaty,
     ActionDeclareWar,
     ActionMoveUnit,
     ActionOfferPeace,
@@ -34,6 +43,81 @@ from src.shared.treaties import TREATY_DEFINITIONS
 
 
 class TestTabularAIPolicies(unittest.TestCase):
+    def test_diplomacy_resolves_membership_actions_and_rejects_invalid_proposals(self):
+        policy = DiplomacyPolicy()
+
+        join = policy.resolve_action(
+            {"action_kind": "join_treaty", "treaty_id": "alliance", "country_id": "AAA"}
+        )
+        leave = policy.resolve_action(
+            {"action_kind": "leave_treaty", "treaty_id": "alliance", "country_id": "AAA"}
+        )
+
+        self.assertIsInstance(join, ActionJoinTreaty)
+        self.assertIsInstance(leave, ActionLeaveTreaty)
+        self.assertIsNone(policy.resolve_action({"action_kind": "unknown"}))
+        self.assertIsNone(
+            policy.resolve_action(
+                {
+                    "action_kind": "create_treaty",
+                    "country_id": "AAA",
+                    "target_country": "",
+                    "treaty_type": "not_a_treaty",
+                }
+            )
+        )
+
+    def test_diplomacy_candidate_builders_ignore_missing_or_incomplete_tables(self):
+        policy = DiplomacyPolicy()
+
+        self.assertTrue(policy._proposal_candidates(self._context({})).collect().is_empty())
+        context = self._context(
+            {
+                "countries": self._countries(["AAA"]),
+                "pending_treaties": pl.DataFrame({"id": ["treaty-1"]}),
+            }
+        )
+        self.assertTrue(policy._response_candidates(context).collect().is_empty())
+
+    def test_shared_ai_helpers_reject_incomplete_table_contracts_safely(self):
+        context = AITableContext(
+            tables={
+                "countries": pl.DataFrame({"id": ["AAA"], "military_count": [12.0]}),
+                "units": pl.DataFrame({"unit_id": ["unit-1"]}),
+                "countries_relations": pl.DataFrame({"source": ["AAA"]}),
+                "countries_treaties": pl.DataFrame({"unrelated": ["value"]}),
+            },
+            day_ordinal=0,
+            total_minutes=0,
+            date_text="",
+        )
+
+        self.assertTrue(relation_matrix(context).collect().is_empty())
+        self.assertEqual(
+            country_strength(context).collect().to_dicts(),
+            [{"country_id": "AAA", "military_strength": 12.0}],
+        )
+        members = treaty_member_rows(context).collect()
+        self.assertTrue(members.is_empty())
+        self.assertEqual(
+            members.columns,
+            ["treaty_id", "treaty_type", "country_id", "status", "open_to_new_members"],
+        )
+
+    def test_war_policy_skips_missing_country_targets_and_ignores_unknown_actions(self):
+        context = AITableContext(
+            tables={},
+            day_ordinal=0,
+            total_minutes=0,
+            date_text="",
+        )
+        policy = WarPolicy()
+
+        candidates = policy._declaration_candidates(context).collect()
+
+        self.assertTrue(candidates.is_empty())
+        self.assertIsNone(policy.resolve_action({"action_kind": "unrecognized"}))
+
     def test_policy_contracts_are_lazy_and_cover_current_treaty_vocabulary(self):
         context = self._context(
             {
@@ -638,6 +722,125 @@ class TestTabularAIPolicies(unittest.TestCase):
             if isinstance(action, ActionUpdateBudget)
         }
         self.assertEqual(country_sources, {"AI"})
+
+    def test_military_policy_resolvers_reject_unknown_actions_and_invalid_numbers(self):
+        self.assertIsNone(MilitaryROIPolicy().resolve_action({"action_kind": "unknown"}))
+        self.assertIsNone(ProcurementPolicy().resolve_action({"action_kind": "unknown"}))
+        self.assertIsNone(MilitaryTrainingPolicy().resolve_action({"action_kind": "unknown"}))
+        self.assertIsNone(MilitaryOperationsPolicy().resolve_action({"action_kind": "unknown"}))
+        self.assertEqual(_finite_float("not-a-number"), 0.0)
+        self.assertEqual(_safe_int("not-an-integer"), 0)
+
+    def test_procurement_policy_handles_malformed_optional_tables_and_research(self):
+        policy = ProcurementPolicy()
+        tables = self._procurement_tables()
+        tables["production_orders"] = pl.DataFrame({"unexpected": []})
+        need = policy._procurement_need(self._context(tables)).collect()
+        self.assertGreater(need.height, 0)
+
+        need_frame = pl.DataFrame({"country_id": ["AAA"]}).lazy()
+        missing_design_columns = self._context(
+            {"unit_designs": pl.DataFrame({"unexpected": []})}
+        )
+        self.assertTrue(
+            policy._production_candidates(missing_design_columns, need_frame)
+            .collect()
+            .is_empty()
+        )
+
+        missing_listing_columns = self._context(
+            {
+                "unit_market_listings": pl.DataFrame({"unexpected": []}),
+                "unit_designs": pl.DataFrame({"id": ["design-1"]}),
+            }
+        )
+        self.assertTrue(
+            policy._market_candidates(missing_listing_columns, need_frame)
+            .collect()
+            .is_empty()
+        )
+
+        invalid_research_level = self._context(
+            {
+                "research_tracks": pl.DataFrame(
+                    {
+                        "country_id": ["AAA"],
+                        "branch": ["land"],
+                        "research_level": ["invalid"],
+                    }
+                )
+            }
+        )
+        designs = pl.DataFrame(
+            {
+                "id": ["design-1"],
+                "country_id": ["AAA"],
+                "research_requirements_json": ["{}"],
+            }
+        ).lazy()
+        self.assertEqual(
+            policy._research_eligible_design_ids(invalid_research_level, designs),
+            ["design-1"],
+        )
+
+    def test_military_training_skips_invalid_unit_schema_and_training_levels(self):
+        policy = MilitaryTrainingPolicy()
+        invalid_schema = self._context(
+            {
+                "units": pl.DataFrame({"unexpected": []}),
+                "unit_training_facilities": pl.DataFrame(),
+            }
+        )
+        self.assertTrue(policy.build_candidates(invalid_schema).collect().is_empty())
+
+        blank_id = self._training_tables(money_reserves=1_000.0)
+        blank_id["units"] = blank_id["units"].with_columns(pl.lit("").alias("id"))
+        self.assertTrue(
+            policy.build_candidates(self._context(blank_id)).collect().is_empty()
+        )
+
+        unknown_level = self._training_tables(money_reserves=1_000.0)
+        unknown_level["units"] = unknown_level["units"].with_columns(
+            pl.lit("Unlisted").alias("training_level")
+        )
+        self.assertTrue(
+            policy.build_candidates(self._context(unknown_level)).collect().is_empty()
+        )
+
+        maxed_level = self._training_tables(money_reserves=1_000.0)
+        maxed_level["units"] = maxed_level["units"].with_columns(
+            pl.lit(TRAINING_LEVELS[-1]).alias("training_level")
+        )
+        self.assertTrue(
+            policy.build_candidates(self._context(maxed_level)).collect().is_empty()
+        )
+
+    def test_military_training_uses_design_domain_and_excludes_units_in_battles(self):
+        tables = self._training_tables(money_reserves=1_000.0)
+        second_unit = tables["units"].with_columns(
+            pl.lit("a2").alias("id"),
+            pl.lit("design-2").alias("design_id"),
+        )
+        tables["units"] = pl.concat([tables["units"], second_unit])
+        tables["battle_units"] = pl.DataFrame({"unit_id": ["a2"]})
+        tables["unit_designs"] = pl.DataFrame(
+            {"id": ["design-1", "design-2"], "domain": ["air", "land"]}
+        )
+        tables["units"] = tables["units"].with_columns(
+            pl.when(pl.col("id") == "a1")
+            .then(pl.lit("design-1"))
+            .otherwise(pl.col("design_id"))
+            .alias("design_id")
+        )
+        tables["unit_training_facilities"] = tables[
+            "unit_training_facilities"
+        ].with_columns(pl.Series("supported_domains", [["air"]]))
+
+        candidates = MilitaryTrainingPolicy().build_candidates(
+            self._context(tables)
+        ).collect()
+
+        self.assertEqual(candidates["unit_id"].to_list(), ["a1"])
 
     def _evaluate(
         self,

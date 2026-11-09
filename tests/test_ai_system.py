@@ -1,8 +1,10 @@
 import unittest
+from types import SimpleNamespace
 
 import polars as pl
 
 from modules.base.systems.world.ai_system import AISystem
+from src.core.ai_framework import AITableContext
 from src.shared.actions import ActionCreateTreaty, ActionDeclareWar, ActionOfferPeace
 from src.shared.events import EventNewDay
 from src.shared.state import GameState
@@ -112,6 +114,50 @@ class TestAISystem(unittest.TestCase):
         self.assertTrue(peace_actions)
         self.assertEqual(peace_actions[0].source_country_tag, "USA")
         self.assertEqual(peace_actions[0].war_id, "war-001")
+
+    def test_update_returns_when_countries_table_is_missing(self):
+        state = GameState(tables={})
+
+        self.system.update(state, 0.1)
+
+        self.assertEqual(state.current_actions, [])
+
+    def test_player_advisor_rejects_ambiguous_player_country_rows(self):
+        state = GameState(tables={"countries": pl.DataFrame({"id": ["USA", "USA"]})})
+        context = AITableContext(
+            tables=state.tables,
+            day_ordinal=0,
+            total_minutes=0,
+            date_text="2001-01-01 00:00",
+            player_tag="USA",
+        )
+
+        self.assertIsNone(self.system._evaluate_player_advisor(state, context))
+
+    def test_player_advisor_skips_resolved_actions_for_other_countries(self):
+        state = GameState()
+        action = object()
+        evaluation = SimpleNamespace(
+            modes={"budget": "automatic"},
+            player_tag="USA",
+            evaluation=SimpleNamespace(
+                resolved_actions=[
+                    ({"country_id": "CAN", "policy_id": "budget"}, action),
+                ],
+            ),
+        )
+
+        self.system._apply_player_advisor(state, evaluation)
+
+        self.assertNotIn(action, state.current_actions)
+
+    def test_queue_recommendation_rejects_missing_domain_before_serializing(self):
+        self.assertFalse(
+            AISystem._queue_recommendation([], set(), "USA", None, {}, object(), 0, "")
+        )
+
+    def test_delegated_domains_are_empty_without_delegation_tables(self):
+        self.assertEqual(AISystem._delegated_domains(GameState(tables={})), {})
 
 
 if __name__ == "__main__":

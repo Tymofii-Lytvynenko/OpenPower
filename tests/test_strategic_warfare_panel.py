@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import polars as pl
+import pytest
 
 from modules.base.schema import ensure_base_tables
 from src.client.ui.panels.military.presenter import MilitaryPresenter
@@ -202,3 +203,353 @@ def test_panel_dispatches_production_action_for_configured_design() -> None:
     assert action.country_tag == "USA"
     assert action.weapon_id == "usa-icbm"
     assert action.quantity == 1
+
+
+@pytest.mark.parametrize(
+    ("viewport_width", "window_open", "content_available"),
+    [
+        (800, False, True),
+        (1600, True, False),
+        (1600, True, True),
+    ],
+)
+def test_render_positions_window_and_opens_planner_only_for_available_content(
+    viewport_width: int,
+    window_open: bool,
+    content_available: bool,
+) -> None:
+    panel = StrategicWarfarePanel()
+    context = SimpleNamespace()
+    mock_imgui = MagicMock()
+    mock_imgui.get_main_viewport.return_value.size = SimpleNamespace(
+        x=viewport_width,
+        y=400,
+    )
+    window = MagicMock()
+    window.return_value.__enter__.return_value = window_open
+    panel._render_content = MagicMock(return_value=content_available)
+    panel._planner.render = MagicMock()
+
+    with patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.imgui",
+        mock_imgui,
+    ), patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.WindowManager.window",
+        window,
+    ), patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.WIDE_LAYOUT_MIN_WIDTH",
+        1000,
+    ):
+        result = panel.render(_strategic_ui_state(), context)
+
+    max_x = max(0.0, viewport_width - panel._GML_SIZE[0] - panel._VIEWPORT_MARGIN)
+    expected_x = (
+        max_x
+        if viewport_width < 1000
+        else min(max(panel._INITIAL_POSITION[0], viewport_width - panel._GML_SIZE[0] * 2.0), max_x)
+    )
+    assert window.call_args.kwargs["x"] == expected_x
+    assert window.call_args.kwargs["y"] == 0.0
+    assert result is window_open
+    assert panel._render_content.call_count == int(window_open)
+    assert panel._planner.render.call_count == int(window_open and content_available)
+
+
+def test_content_returns_when_required_tables_are_missing() -> None:
+    panel = StrategicWarfarePanel()
+
+    with patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.draw_required_tables",
+        return_value=False,
+    ):
+        assert panel._render_content(_strategic_ui_state(), SimpleNamespace()) is False
+
+
+def test_content_opens_owned_target_planner_and_renders_empty_inventory() -> None:
+    panel = StrategicWarfarePanel()
+    panel._presenter = MagicMock()
+    panel._presenter.strategic_inventory_for_country.return_value = []
+    panel._presenter.strategic_payload_profiles.return_value = {}
+    panel._planner.open = MagicMock()
+    panel._render_defenses = MagicMock()
+    panel._render_production_orders = MagicMock()
+    panel._render_recent_strikes = MagicMock()
+    context = SimpleNamespace(
+        target_tag=" usa ",
+        selected_region_id=2,
+        is_own_country=True,
+    )
+    mock_imgui = MagicMock()
+    mock_imgui.button.return_value = True
+
+    with patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.imgui",
+        mock_imgui,
+    ), patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.draw_required_tables",
+        return_value=True,
+    ), patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.draw_empty_state",
+    ) as draw_empty:
+        assert panel._render_content(_strategic_ui_state(), context) is True
+
+    panel._planner.open.assert_called_once_with("USA", 2, payload_levels={})
+    draw_empty.assert_called_once()
+    panel._render_defenses.assert_called_once()
+    panel._render_production_orders.assert_called_once()
+    panel._render_recent_strikes.assert_called_once()
+
+
+def test_weapon_selection_prepares_launch_and_renders_each_target_defense_state() -> None:
+    state = _strategic_ui_state()
+    panel = StrategicWarfarePanel()
+    context = SimpleNamespace(
+        target_tag="USA",
+        selected_region_id=2,
+        is_own_country=True,
+        net_client=SimpleNamespace(player_id="USA", send_action=MagicMock()),
+    )
+    row = {
+        "id": "usa-icbm",
+        "weapon_class": "icbm",
+        "ready": 1,
+        "quantity": 2,
+        "defense_rating": 0.25,
+        "research_permitted": True,
+        "payload_cap": 2,
+        "payload_level": 1,
+    }
+    defense = {
+        "interception_probability": 0.3,
+        "covered_layers": [
+            {
+                "layer": "long_range",
+                "covered": True,
+                "researched_and_operational": True,
+                "coverage_region_ids": [1],
+                "coverage_radius_km": 20.0,
+                "range_km": 100.0,
+                "effective_first_attempt_probability": 0.6,
+                "effective_second_attempt_probability": 0.5,
+                "layer_interception_probability": 0.8,
+            },
+            {
+                "layer": "mid_range",
+                "covered": True,
+                "researched_and_operational": False,
+            },
+            {
+                "layer": "point",
+                "covered": False,
+                "researched_and_operational": True,
+                "coverage_radius_km": 10.0,
+            },
+        ],
+    }
+    mock_imgui = MagicMock()
+    mock_imgui.begin_combo.return_value = True
+    mock_imgui.selectable.side_effect = lambda label, *_args, **_kwargs: (
+        label == "cabinet" or label.startswith("Level 2:"),
+        False,
+    )
+    mock_imgui.button.side_effect = lambda label, *_args, **_kwargs: label.startswith(
+        "PREPARE MILITARY"
+    )
+
+    with patch.object(
+        panel._presenter,
+        "strategic_authorization_contexts",
+        return_value=["cabinet"],
+    ), patch.object(
+        panel._presenter,
+        "strategic_payload_profiles",
+        return_value={1: (100.0, 1.0), 2: (200.0, 2.0)},
+    ), patch.object(
+        panel._presenter,
+        "strategic_defense_estimate_for_region",
+        return_value=defense,
+    ), patch.object(
+        panel._presenter,
+        "strategic_launch_preview",
+        return_value={
+            "authorization": "authorized by cabinet",
+            "flight_minutes": 4,
+            "reasons": [],
+            "can_launch": True,
+        },
+    ), patch.object(
+        panel._presenter,
+        "strategic_production_preview",
+        return_value={"can_produce": False, "reasons": ["Production is unavailable."]},
+    ), patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.imgui",
+        mock_imgui,
+    ), patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.Prims.right_align_text",
+    ):
+        panel._render_weapon(state, context, "USA", row, {1: (100.0, 1.0), 2: (200.0, 2.0)})
+
+    assert panel._selected_payloads["usa-icbm"] == 2
+    assert panel._selected_authorization_contexts["USA"] == "cabinet"
+    assert panel._planner.plan.target_mode == "military"
+    assert panel._planner.plan.selected_weapons == {"usa-icbm"}
+    assert panel._planner.plan.authorization_context == "cabinet"
+    assert panel._planner.plan.payload_levels["usa-icbm"] == 2
+    assert mock_imgui.same_line.call_count == 2
+    rendered = " ".join(str(call.args[0]) for call in mock_imgui.text_wrapped.call_args_list)
+    assert "covers target" in rendered
+    assert "inactive or unresearched" in rendered
+    assert "outside coverage" in rendered
+    assert "regions 1; radius 20 km; range 100 km" in rendered
+    assert "no configured area" in rendered
+
+
+def test_weapon_without_research_and_pending_launch_shows_blocking_reasons() -> None:
+    panel = StrategicWarfarePanel()
+    mock_imgui = MagicMock()
+    row = {
+        "id": "usa-icbm",
+        "weapon_class": "icbm",
+        "ready": 0,
+        "quantity": 1,
+        "research_permitted": False,
+    }
+    with patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.imgui",
+        mock_imgui,
+    ), patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.Prims.right_align_text",
+    ):
+        panel._render_weapon(_strategic_ui_state(), SimpleNamespace(), "USA", row, {})
+
+    mock_imgui.text_wrapped.assert_any_call(
+        "Unavailable: complete the strategic program and weapon research first."
+    )
+
+    state = _strategic_ui_state()
+    row["research_permitted"] = True
+    row["pending_order_status"] = "pending"
+    row["pending_target_region_id"] = 2
+    panel._presenter.strategic_authorization_contexts = MagicMock(return_value=[])
+    panel._presenter.strategic_payload_profiles = MagicMock(return_value={})
+    panel._presenter.strategic_launch_preview = MagicMock(
+        return_value={
+            "authorization": "not authorized",
+            "flight_minutes": 0,
+            "reasons": ["Authorization is required."],
+            "can_launch": False,
+        }
+    )
+    panel._presenter.strategic_production_preview = MagicMock(
+        return_value={"can_produce": False, "reasons": ["Production is unavailable."]}
+    )
+    context = SimpleNamespace(
+        selected_region_id=None,
+        is_own_country=True,
+        net_client=None,
+    )
+
+    with patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.imgui",
+        mock_imgui,
+    ), patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.Prims.right_align_text",
+    ):
+        panel._render_weapon(state, context, "USA", row, {})
+
+    rendered = " ".join(str(call.args[0]) for call in mock_imgui.text_wrapped.call_args_list)
+    assert "Select an enemy region to preview target coverage" in rendered
+    assert "Authorization is required." in rendered
+    assert "Pending launch · target region 2" in rendered
+    assert "Production is unavailable." in rendered
+
+
+def test_target_defense_handles_missing_estimate_and_empty_layer_list() -> None:
+    panel = StrategicWarfarePanel()
+    state = _strategic_ui_state()
+    mock_imgui = MagicMock()
+    panel._presenter.strategic_defense_estimate_for_region = MagicMock(
+        return_value={"interception_probability": 0.0, "covered_layers": []}
+    )
+
+    with patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.imgui",
+        mock_imgui,
+    ):
+        panel._render_target_defense(state, "USA", 2, None, "")
+        panel._render_target_defense(state, "USA", 2, {"id": 2}, "CAN")
+
+    panel._presenter.strategic_defense_estimate_for_region.assert_called_once_with(
+        state,
+        "CAN",
+        2,
+    )
+    rendered = " ".join(str(call.args[0]) for call in mock_imgui.text_wrapped.call_args_list)
+    assert "Select an enemy region" in rendered
+    assert "No configured defense layer" in rendered
+
+
+def test_panel_history_sections_show_empty_states_and_recent_records() -> None:
+    panel = StrategicWarfarePanel()
+    mock_imgui = MagicMock()
+    defenses = [
+        {
+            "layer": "long_range",
+            "operational": True,
+            "researched": True,
+            "readiness": 1.0,
+            "range_km": 1000.0,
+            "first_attempt_probability": None,
+        },
+        {
+            "layer": "point",
+            "operational": True,
+            "researched": False,
+            "readiness": 0.5,
+            "range_km": 100.0,
+            "first_attempt_probability": None,
+        },
+    ]
+    production_orders = [
+        {"weapon_id": "usa-icbm", "quantity": 2, "status": "queued", "reason": "Budget approved."}
+    ]
+    launch_orders = [
+        {"country_id": "", "target_mode": "civilian", "status": "resolved", "reason": "Impact recorded."}
+    ]
+    impacts = [
+        {"region_id": 2, "category": "population", "severity": 0.25, "collateral": True},
+        {"region_id": 3, "category": "infrastructure", "severity": 0.1, "collateral": False},
+    ]
+
+    with patch(
+        "src.client.ui.panels.military.strategic_warfare_panel.imgui",
+        mock_imgui,
+    ):
+        panel._presenter.missile_defense_for_country = MagicMock(side_effect=[[], defenses])
+        panel._render_defenses(_strategic_ui_state(), "USA")
+        panel._render_defenses(_strategic_ui_state(), "USA")
+
+        panel._presenter.strategic_production_orders_for_country = MagicMock(
+            side_effect=[[], production_orders]
+        )
+        panel._render_production_orders(_strategic_ui_state(), "USA")
+        panel._render_production_orders(_strategic_ui_state(), "USA")
+
+        panel._presenter.strategic_orders_for_country = MagicMock(
+            side_effect=[[], launch_orders]
+        )
+        panel._presenter.strategic_impacts_for_country = MagicMock(side_effect=[[], impacts])
+        panel._render_recent_strikes(_strategic_ui_state(), "USA")
+        panel._render_recent_strikes(_strategic_ui_state(), "USA")
+
+    disabled = " ".join(str(call.args[0]) for call in mock_imgui.text_disabled.call_args_list)
+    rendered = " ".join(str(call.args[0]) for call in mock_imgui.text_wrapped.call_args_list)
+    assert "No missile-defense layers are fielded." in disabled
+    assert "No strategic weapon production orders." in disabled
+    assert "No known launch orders." in disabled
+    assert "readiness 100% · range 1,000 km · first attempt 60%" in rendered
+    assert "Unknown · civilian · resolved" in " ".join(
+        str(call.args[0]) for call in mock_imgui.text.call_args_list
+    )
+    assert "collateral" in rendered
+    assert "intended" in rendered

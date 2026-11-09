@@ -258,11 +258,11 @@ class DataInspectorPanel:
         """Helper to color-code values based on type."""
         val_str = str(val)
         
-        if isinstance(val, (int, float)):
-            imgui.text_colored(GAMETHEME.colors.accent, val_str)
-        elif isinstance(val, bool):
+        if isinstance(val, bool):
             col = GAMETHEME.colors.positive if val else GAMETHEME.colors.negative
             imgui.text_colored(col, val_str)
+        elif isinstance(val, (int, float)):
+            imgui.text_colored(GAMETHEME.colors.accent, val_str)
         elif val is None:
             imgui.text_disabled("None")
         else:

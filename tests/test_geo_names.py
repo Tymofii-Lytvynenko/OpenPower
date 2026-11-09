@@ -50,6 +50,12 @@ class TestGeoNameResolution(unittest.TestCase):
         self.assertEqual(normalize_geo_language_code("UK"), "uk")
         self.assertEqual(normalize_geo_language_code("zz"), "en")
 
+    def test_resolver_uses_fallbacks_for_empty_or_unknown_codes(self):
+        resolver = get_geo_name_resolver("en")
+
+        self.assertEqual(resolver.country_name(None, "Unknown country"), "Unknown country")
+        self.assertEqual(resolver.region_name("ZZ-INVALID", "Unknown region"), "Unknown region")
+
 
 if __name__ == "__main__":
     unittest.main()

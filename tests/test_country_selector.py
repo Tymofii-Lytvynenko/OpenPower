@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import polars as pl
 
+from src.client.ui.components.hud import country_selector as country_selector_module
 from src.client.controllers.viewport_controller import ViewportController
 from src.client.ui.components.hud import central_bar as central_bar_module
 from src.client.ui.components.hud.central_bar import CentralBar
@@ -19,6 +20,21 @@ from src.client.ui.layouts import game_layout as game_layout_module
 from src.client.ui.layouts.game_layout import GameLayout
 from src.client.ui.components.shared.dirty_close_confirmation import SaveConfirmationPreferences
 from src.shared.state import GameState
+
+
+def _install_country_selector_imgui(*, viewport_y=0.0, window_open=True):
+    native = MagicMock()
+    native.is_popup_open.return_value = True
+    native.get_font_size.return_value = 20.0
+    native.get_text_line_height.return_value = 20.0
+    native.get_main_viewport.return_value = SimpleNamespace(
+        pos=SimpleNamespace(y=viewport_y)
+    )
+    native.begin_popup.return_value = window_open
+    native.selectable.return_value = (False, False)
+    native.is_item_clicked.return_value = False
+    native.is_item_hovered.return_value = False
+    return native
 
 
 class TestCountryOptions(unittest.TestCase):
@@ -69,6 +85,68 @@ class TestCountryOptions(unittest.TestCase):
     def test_returns_empty_options_when_country_table_is_unavailable(self) -> None:
         self.assertEqual(country_options_from_state(SimpleNamespace(tables={})), ())
         self.assertEqual(country_options_from_state(None), ())
+
+    def test_popup_renders_sized_rows_and_selects_country_by_row(self) -> None:
+        native = _install_country_selector_imgui()
+        native.selectable.side_effect = [(True, False), (False, False)]
+        native.is_item_hovered.side_effect = [True, False]
+        flags = MagicMock()
+        selector = CountrySelector(flag_renderer=flags)
+        state = SimpleNamespace(
+            tables={
+                "countries": pl.DataFrame(
+                    {"id": ["UKR", "CAN"], "name": ["Ukraine", "Canada"]}
+                )
+            },
+            table_revisions={"countries": 1},
+        )
+
+        with patch.object(country_selector_module, "imgui", native):
+            selector.open((100.0, 300.0), 220.0)
+            selected_tag = selector.render(state, "CAN")
+
+        self.assertEqual(selected_tag, "CAN")
+
+        native.open_popup.assert_called_once_with(CountrySelector.POPUP_ID)
+        self.assertAlmostEqual(
+            native.set_next_window_pos.call_args.args[0][1], 229.6
+        )
+        native.set_next_window_size.assert_called_once()
+        self.assertEqual(flags.draw_flag.call_count, 2)
+        native.set_item_default_focus.assert_called_once_with()
+        native.set_tooltip.assert_called_once_with("CAN")
+        native.close_current_popup.assert_called_once_with()
+        native.pop_style_color.assert_called_once_with(5)
+        native.pop_style_var.assert_called_once_with(4)
+
+    def test_popup_renders_error_when_no_country_options_exist(self) -> None:
+        native = _install_country_selector_imgui()
+        selector = CountrySelector(flag_renderer=MagicMock())
+
+        with patch.object(country_selector_module, "imgui", native):
+            selected_tag = selector.render(SimpleNamespace(tables={}), "UKR")
+
+        self.assertIsNone(selected_tag)
+
+        native.text_colored.assert_called_once_with(
+            country_selector_module.GAMETHEME.colors.error,
+            "No country data loaded",
+        )
+        native.end_popup.assert_called_once_with()
+
+    def test_clicking_a_flag_selects_its_country(self) -> None:
+        native = _install_country_selector_imgui()
+        native.is_item_clicked.return_value = True
+        selector = CountrySelector(flag_renderer=MagicMock())
+        state = SimpleNamespace(
+            tables={"countries": pl.DataFrame({"id": ["UKR"], "name": ["Ukraine"]})}
+        )
+
+        with patch.object(country_selector_module, "imgui", native):
+            selected_tag = selector.render(state, "CAN")
+
+        self.assertEqual(selected_tag, "UKR")
+        native.close_current_popup.assert_called_once_with()
 
     def test_resolves_player_alliance_and_neutral_statuses(self) -> None:
         state = GameState(

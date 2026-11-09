@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from modules.base.systems.world.ai.random_event_policy import choose_event_response
 from modules.base.systems.world.random_event_policy import EventResponseDefinition
 from modules.base.systems.world.random_events_system import RandomEventsSystem
@@ -22,6 +24,28 @@ def test_ai_policy_selects_available_most_effective_response_that_fits_treasury(
     )
 
     assert selected is responses[1]
+
+
+@pytest.mark.parametrize("treasury", [None, "not-a-number"])
+def test_ai_policy_rejects_unparseable_treasury(treasury):
+    assert choose_event_response(
+        (), treasury=treasury, starts_at_minute=0, now_minute=0
+    ) is None
+
+
+@pytest.mark.parametrize("treasury", [-1.0, float("nan")])
+def test_ai_policy_rejects_negative_or_nonfinite_treasury(treasury):
+    assert choose_event_response(
+        (), treasury=treasury, starts_at_minute=0, now_minute=0
+    ) is None
+
+
+def test_ai_policy_returns_none_when_every_response_is_unavailable():
+    response = EventResponseDefinition("later", "region_owner", 100.0, 2, 0.8, 0.0)
+
+    assert choose_event_response(
+        [response], treasury=100.0, starts_at_minute=0, now_minute=0
+    ) is None
 
 
 def test_ai_response_uses_the_same_authorized_payment_and_mitigation_path():

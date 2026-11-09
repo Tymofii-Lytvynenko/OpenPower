@@ -5,6 +5,7 @@ import unittest
 from src.shared.research_funding import (
     RESEARCH_CATEGORY_FUNDING_GROUP,
     STRATEGIC_PROGRAM_FUNDING_GROUP,
+    _ratio,
     linked_research_funding_group,
     redistribute_linked_funding,
 )
@@ -89,6 +90,27 @@ class LinkedResearchFundingTests(unittest.TestCase):
             STRATEGIC_PROGRAM_FUNDING_GROUP,
         )
         self.assertEqual(linked_research_funding_group("general"), ("general",))
+
+    def test_unlinked_branch_updates_only_the_selected_ratio(self) -> None:
+        result = redistribute_linked_funding(
+            {"ground": 0.2, "general": 0.4},
+            "general",
+            1.5,
+            ("ground",),
+        )
+
+        self.assertEqual(result, {"ground": 0.2, "general": 1.0})
+
+    def test_linked_funding_returns_early_when_there_are_no_peers(self) -> None:
+        result = redistribute_linked_funding(
+            {"ground": 0.4}, "ground", 0.4, ("ground",)
+        )
+
+        self.assertEqual(result, {"ground": 0.4})
+
+    def test_ratio_defaults_to_zero_for_invalid_and_nonfinite_values(self) -> None:
+        self.assertEqual(_ratio("not-a-number"), 0.0)
+        self.assertEqual(_ratio(float("inf")), 0.0)
 
 
 if __name__ == "__main__":

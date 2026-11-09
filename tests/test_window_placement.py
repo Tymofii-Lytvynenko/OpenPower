@@ -1,10 +1,19 @@
+from unittest.mock import Mock
+
 from src.client.ui.core.window_placement import (
     WindowPlacement,
+    WindowPlacementPolicy,
+    WindowPlacementRequest,
     center_window,
     max_unoccupied_horizontal_width,
     resolve_non_overlapping_position,
     resolve_window_placement,
 )
+from src.client.ui.core.window_placement_registry import (
+    WindowPlacementRegistry,
+    WindowPlacementUpdate,
+)
+from src.client.ui.core.containers import WindowManager
 
 
 def test_centered_window_is_viewport_relative_even_when_oversized():
@@ -181,6 +190,68 @@ def test_tutorial_can_use_free_horizontal_strip_beside_military_panel():
     width = max_unoccupied_horizontal_width(800, occupied, margin=8)
 
     assert width == 277.0
+
+
+def test_window_placement_policy_preserves_previous_position_and_resolves_overlap():
+    previous = WindowPlacement(800, 600, 120, 90, 100, 80)
+    request = WindowPlacementRequest(
+        requested_position=(20, 30),
+        requested_size=(100, 80),
+        viewport_size=(800, 600),
+        previous=previous,
+        occupied=(),
+        avoid_overlaps=True,
+        horizontal_anchor="left",
+        horizontal_margin=0,
+        fixed_size=True,
+        placement_margin=8,
+        top_clearance=0,
+        bottom_clearance=0,
+    )
+
+    resolved = WindowPlacementPolicy().resolve(request)
+
+    assert (resolved.x, resolved.y) == (120, 90)
+    assert (resolved.width, resolved.height) == (100, 80)
+    assert not resolved.viewport_changed
+
+
+def test_window_placement_policy_only_reuses_previous_position_for_same_viewport():
+    previous = WindowPlacement(800, 600, 120, 90, 100, 80)
+
+    def request_for(previous_placement, *, viewport_size=(800, 600), avoid_overlaps=True):
+        return WindowPlacementRequest(
+            requested_position=(20, 30),
+            requested_size=(100, 80),
+            viewport_size=viewport_size,
+            previous=previous_placement,
+            occupied=(),
+            avoid_overlaps=avoid_overlaps,
+            horizontal_anchor="left",
+            horizontal_margin=0,
+            fixed_size=True,
+            placement_margin=8,
+            top_clearance=0,
+            bottom_clearance=0,
+        )
+
+    assert WindowPlacementPolicy._previous_placement_for_same_viewport(
+        request_for(None)
+    ) is None
+    assert WindowPlacementPolicy._previous_placement_for_same_viewport(
+        request_for(previous, viewport_size=(801, 600))
+    ) is None
+    assert WindowPlacementPolicy._previous_placement_for_same_viewport(
+        request_for(previous, viewport_size=(800, 601))
+    ) is None
+    assert WindowPlacementPolicy._previous_placement_for_same_viewport(
+        request_for(previous, avoid_overlaps=False)
+    ) is None
+
+
+def test_horizontal_unoccupied_width_is_zero_for_nonpositive_viewport():
+    assert max_unoccupied_horizontal_width(0, ()) == 0.0
+    assert max_unoccupied_horizontal_width(-100, ()) == 0.0
 
 
 def test_window_manager_reanchors_live_panel_after_viewport_resize(tmp_path):
@@ -425,3 +496,35 @@ def test_live_inspection_preserves_moved_window_while_scenario_telemetry_pins_it
                 native.destroy_context(context)
     finally:
         bridge.close()
+
+
+def test_placement_registry_skips_invalid_viewports_and_exposes_the_frame():
+    registry = WindowPlacementRegistry()
+    imgui_api = Mock()
+    request = WindowPlacementUpdate(
+        window_key="invalid.viewport",
+        viewport_size=(0.0, 0.0),
+        live_placement=True,
+        follow_position=False,
+        opened=True,
+    )
+
+    assert registry.visible_frame_placements() == ()
+    registry.update(request, imgui_api=imgui_api)
+
+    assert registry.placements == {}
+    assert registry.visible_frame_placements() == ()
+    imgui_api.get_window_pos.assert_not_called()
+
+
+def test_window_manager_forwards_placement_and_close_requests(monkeypatch):
+    placements = (WindowPlacement(800, 600, 10, 20, 300, 200),)
+    registry = Mock()
+    registry.visible_frame_placements.return_value = placements
+    monkeypatch.setattr(WindowManager, "_placement_registry", registry)
+    monkeypatch.setattr(WindowManager, "_close_requests", set())
+
+    assert WindowManager.visible_frame_placements() is placements
+    WindowManager.request_close("test.window")
+
+    assert WindowManager._close_requests == {"test.window"}

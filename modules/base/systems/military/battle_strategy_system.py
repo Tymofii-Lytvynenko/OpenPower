@@ -112,8 +112,6 @@ class BattleStrategySystem(ISystem):
             if isinstance(action, ActionOccupyRegion):
                 self._occupy_cleared_region(state, action, units, orders, routes, now)
                 continue
-            if not isinstance(action, ActionSetBattleStrategy):
-                continue
             battle = next((row for row in battles if str(row.get("id")) == str(action.battle_id) and str(row.get("status") or "active") == "active"), None)
             if battle is None:
                 self._reject(state, action, "The battle is not active.")

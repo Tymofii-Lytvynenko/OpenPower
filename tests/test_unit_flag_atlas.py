@@ -22,6 +22,7 @@ from src.client.renderers.unit_flag_atlas import (
     UnitFlagAtlas,
 )
 from src.client.renderers.unit_projection import ProjectedUnit
+import src.client.renderers.unit_flag_atlas as unit_flag_atlas_module
 
 
 def _fake_upload(atlas: UnitFlagAtlas, uploaded: list[Image.Image]) -> None:
@@ -30,6 +31,15 @@ def _fake_upload(atlas: UnitFlagAtlas, uploaded: list[Image.Image]) -> None:
         return SimpleNamespace(glo=100 + len(uploaded))
 
     atlas._upload_to_gpu = upload
+
+
+class WritableTexture:
+    def __init__(self, texture_id: int):
+        self.glo = texture_id
+        self.writes: list[tuple[bytes, tuple[int, int, int, int]]] = []
+
+    def write(self, data: bytes, *, viewport: tuple[int, int, int, int]) -> None:
+        self.writes.append((data, viewport))
 
 
 def test_flag_atlas_builds_rgba_cells_with_transparent_padding(tmp_path: Path) -> None:
@@ -97,6 +107,104 @@ def test_resized_flag_cache_reuses_unchanged_sources_and_reloads_modified_files(
 
     assert refreshed is not first
     assert refreshed.getpixel((8, 8)) == (10, 220, 20, 255)
+
+
+def test_atlas_ignores_empty_and_already_loaded_owner_requests() -> None:
+    atlas = UnitFlagAtlas()
+    atlas._build_atlas = Mock()
+    atlas.ensure_owners([])
+    atlas._texture_id = 77
+    atlas._owners_key = frozenset({"AAA"})
+
+    atlas.ensure_owners(["AAA"])
+
+    atlas._build_atlas.assert_not_called()
+
+
+def test_atlas_appends_into_reserved_cells_then_rebuilds_when_capacity_is_full(tmp_path: Path) -> None:
+    for owner in ("AAA", "BBB", "CCC", "DDD"):
+        Image.new("RGBA", (32, 22), (20, 40, 60, 255)).save(tmp_path / f"{owner}.png")
+    atlas = UnitFlagAtlas()
+    atlas.flags_dir = tmp_path
+    texture = WritableTexture(77)
+    atlas._upload_to_gpu = Mock(return_value=texture)
+
+    atlas.ensure_owners(["AAA", "BBB"])
+    original_entries = dict(atlas._entries)
+    atlas.ensure_owners(["CCC"])
+
+    assert len(texture.writes) == 1
+    assert atlas._upload_to_gpu.call_count == 1
+    assert all(atlas.entry_for(owner) == entry for owner, entry in original_entries.items())
+    assert atlas.entry_for("CCC") is not None
+    assert atlas._append_new_owners(atlas._owners_key)
+
+    atlas.ensure_owners(["DDD"])
+
+    assert atlas._upload_to_gpu.call_count == 2
+    assert atlas.entry_for("DDD") is not None
+
+
+def test_atlas_rebuilds_after_partial_texture_write_failure(tmp_path: Path) -> None:
+    first_texture = WritableTexture(77)
+
+    def fail_write(_data: bytes, *, viewport: tuple[int, int, int, int]) -> None:
+        raise RuntimeError(f"cannot write viewport {viewport}")
+
+    first_texture.write = fail_write
+    rebuilt_texture = WritableTexture(78)
+    atlas = UnitFlagAtlas()
+    atlas.flags_dir = tmp_path
+    atlas._upload_to_gpu = Mock(side_effect=[first_texture, rebuilt_texture])
+    atlas.ensure_owners(["AAA", "BBB"])
+
+    with patch("builtins.print"):
+        atlas.ensure_owners(["CCC"])
+
+    assert atlas.texture is rebuilt_texture
+    assert atlas.texture_id == 78
+    assert atlas.entry_for("CCC") is not None
+
+
+def test_atlas_handles_upload_failure_texture_ids_and_draw_failure() -> None:
+    atlas = UnitFlagAtlas()
+    atlas._upload_to_gpu = Mock(return_value=None)
+    atlas._build_atlas(frozenset({"AAA"}))
+    assert atlas.texture is None
+    assert atlas.texture_id == 0
+    assert atlas.entry_for("AAA") is None
+
+    assert atlas._extract_texture_id(SimpleNamespace()) == 0
+    assert atlas._extract_texture_id(SimpleNamespace(glo=SimpleNamespace(glo_id=12))) == 12
+    assert atlas._extract_texture_id(SimpleNamespace(glo=SimpleNamespace(value=13))) == 13
+
+    draw_list = SimpleNamespace(add_image=Mock())
+    assert not atlas.draw_flag(draw_list, "AAA", 0, 0, 10, 10)
+    atlas._entries = {"AAA": FlagAtlasEntry(0.1, 0.2, 0.3, 0.4)}
+    atlas._texture_id = 77
+    with patch.object(unit_flag_atlas_module.imgui, "ImTextureRef", side_effect=RuntimeError("bad texture")), patch(
+        "builtins.print"
+    ) as print_mock:
+        assert not atlas.draw_flag(draw_list, "AAA", 0, 0, 10, 10)
+        assert not atlas.draw_flag(draw_list, "AAA", 0, 0, 10, 10)
+    assert print_mock.call_count == 1
+
+
+def test_gpu_upload_uses_window_context_and_returns_none_when_context_is_missing() -> None:
+    atlas = UnitFlagAtlas()
+    image = Image.new("RGBA", (4, 4), (1, 2, 3, 255))
+    texture = SimpleNamespace(filter=None)
+    context = SimpleNamespace(LINEAR=1, texture=Mock(return_value=texture))
+
+    with patch.object(unit_flag_atlas_module.arcade, "get_window", return_value=SimpleNamespace(ctx=context)):
+        assert atlas._upload_to_gpu(image) is texture
+    assert texture.filter == (1, 1)
+    context.texture.assert_called_once_with((4, 4), components=4, data=image.tobytes())
+
+    with patch.object(unit_flag_atlas_module.arcade, "get_window", side_effect=RuntimeError("no window")), patch(
+        "builtins.print"
+    ):
+        assert atlas._upload_to_gpu(image) is None
 
 
 def test_draw_flag_uses_atlas_texture_and_normalized_uv_entry() -> None:

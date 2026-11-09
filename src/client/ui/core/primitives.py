@@ -424,13 +424,18 @@ class UIPrimitives:
     @staticmethod
     @contextlib.contextmanager
     def dark_child_box(id: str, width: float = -1.0, height: float = 0.0, border: bool = True):
+        """Balance child styles and expose whether ImGui wants its contents drawn."""
         imgui.push_style_color(imgui.Col_.child_bg, GAMETHEME.colors.panel_bg_dark)
         imgui.push_style_var(imgui.StyleVar_.child_rounding, 0.0)
-        if imgui.begin_child(id, (width, height), border, imgui.WindowFlags_.none):
-            yield
-        imgui.end_child()
-        imgui.pop_style_var()
-        imgui.pop_style_color()
+        try:
+            visible = imgui.begin_child(
+                id, (width, height), border, imgui.WindowFlags_.none
+            )
+            yield visible
+        finally:
+            imgui.end_child()
+            imgui.pop_style_var()
+            imgui.pop_style_color()
 
     @staticmethod
     def combo_row(label: str, selected_idx: int, items: list[str], label_width: float = 80.0) -> int:

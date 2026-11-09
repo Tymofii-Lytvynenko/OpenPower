@@ -4,6 +4,10 @@ import polars as pl
 
 from modules.base.systems.military.covert_operations_system import CovertOperationsSystem
 from modules.base.systems.military.covert_resource_effects import (
+    _adjust_national_only,
+    _adjust_national_total,
+    _finite,
+    _region_id,
     apply_resource_production_delta,
     resource_production_total,
 )
@@ -252,6 +256,76 @@ class CovertResolutionEffectsTest(unittest.TestCase):
         rows = state.get_table("regional_production").sort("region_id")
         self.assertEqual(rows["domestic_production"].to_list(), [49.5, 148.5])
         self.assertEqual(state.get_table("domestic_production")["domestic_production"][0], 198.0)
+
+    def test_invalid_resource_scope_and_zero_delta_are_noops(self):
+        state = self._state()
+
+        self.assertEqual(resource_production_total(GameState(), "CAN", "cereals"), 0.0)
+        self.assertEqual(resource_production_total(state, "", "cereals"), 0.0)
+        self.assertEqual(resource_production_total(state, "CAN", ""), 0.0)
+        self.assertEqual(apply_resource_production_delta(state, "", "cereals", 10.0), 0.0)
+        self.assertEqual(apply_resource_production_delta(state, "CAN", "", 10.0), 0.0)
+        self.assertEqual(apply_resource_production_delta(state, "CAN", "cereals", 0.0), 0.0)
+
+    def test_national_only_fallback_handles_an_invalid_regional_schema(self):
+        state = GameState(tables={
+            "regional_production": pl.DataFrame({"id": ["legacy-row"]}),
+            "domestic_production": pl.DataFrame({
+                "country_id": ["CAN"],
+                "game_resource_id": ["cereals"],
+                "domestic_production": [100.0],
+            }),
+        })
+
+        self.assertEqual(resource_production_total(state, "can", "CEREALS"), 100.0)
+        self.assertEqual(apply_resource_production_delta(state, "can", "CEREALS", 20.0), 20.0)
+        self.assertEqual(state.get_table("domestic_production")["domestic_production"][0], 120.0)
+
+        bounded_state = GameState(tables={
+            "regional_production": pl.DataFrame({"id": ["legacy-row"]}),
+            "domestic_production": pl.DataFrame({
+                "country_id": ["CAN"],
+                "game_resource_id": ["cereals"],
+                "domestic_production": [100.0],
+            }),
+        })
+        self.assertEqual(
+            apply_resource_production_delta(bounded_state, "CAN", "cereals", -200.0), -99.0
+        )
+        self.assertEqual(
+            bounded_state.get_table("domestic_production")["domestic_production"][0], 1.0
+        )
+
+    def test_national_total_helpers_ignore_missing_unmatched_and_empty_rows(self):
+        empty = GameState()
+        _adjust_national_total(empty, "CAN", "cereals", 10.0)
+        self.assertEqual(_adjust_national_only(empty, "CAN", "cereals", 10.0), 0.0)
+
+        unmatched = GameState(tables={
+            "domestic_production": pl.DataFrame({
+                "country_id": ["USA"],
+                "game_resource_id": ["cereals"],
+                "domestic_production": [100.0],
+            }),
+        })
+        _adjust_national_total(unmatched, "CAN", "cereals", 10.0)
+        self.assertEqual(_adjust_national_only(unmatched, "CAN", "cereals", 10.0), 0.0)
+
+        zero = GameState(tables={
+            "domestic_production": pl.DataFrame({
+                "country_id": ["CAN"],
+                "game_resource_id": ["cereals"],
+                "domestic_production": [0.0],
+            }),
+        })
+        _adjust_national_total(zero, "CAN", "cereals", 10.0)
+        self.assertEqual(_adjust_national_only(zero, "CAN", "cereals", 10.0), 0.0)
+
+    def test_invalid_region_ids_and_numbers_use_safe_defaults(self):
+        self.assertIsNone(_region_id(None))
+        self.assertIsNone(_region_id("not-a-region"))
+        self.assertEqual(_finite("not-a-number"), 0.0)
+        self.assertEqual(_finite(float("inf")), 0.0)
 
 
 if __name__ == "__main__":

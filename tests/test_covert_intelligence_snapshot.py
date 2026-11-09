@@ -6,6 +6,7 @@ import polars as pl
 from modules.base.systems.military.covert_intelligence_snapshot import (
     IntelligenceSnapshotServices,
     build_intelligence_snapshot,
+    target_regional_telecom_capacity,
 )
 
 
@@ -70,3 +71,45 @@ def test_government_snapshot_uses_population_metrics_and_bounds_estimates():
         "law_ids": ["a", "b", "c"],
         "confidence": 0.75,
     }
+
+
+def test_regional_telecom_defaults_when_regions_are_unavailable():
+    state = SimpleNamespace(tables={})
+
+    capacity = target_regional_telecom_capacity(
+        state,
+        {"id": "cell-1"},
+        {"id": "CAN"},
+        services=_services(),
+    )
+
+    assert capacity == 1.0
+
+
+def test_military_snapshot_without_design_or_weapon_tables_keeps_unit_estimates():
+    state = SimpleNamespace(
+        tables={
+            "units": pl.DataFrame(
+                {
+                    "owner": ["CAN"],
+                    "design_id": ["unknown-design"],
+                    "unit_type": ["infantry"],
+                    "readiness_status": ["ready"],
+                }
+            )
+        }
+    )
+
+    snapshot = build_intelligence_snapshot(
+        state,
+        {"id": "can"},
+        "military_espionage",
+        0.8,
+        None,
+        None,
+        services=_services(),
+    )
+
+    assert snapshot["unit_count_estimate"] == 1
+    assert sum(snapshot["unit_role_count_estimates"].values()) == 1
+    assert snapshot["strategic_weapon_quantity_estimate"] == 0

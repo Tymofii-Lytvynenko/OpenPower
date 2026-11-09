@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from importlib import import_module
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import polars as pl
 
@@ -516,6 +519,475 @@ class BattleStrategySystemTest(unittest.TestCase):
                     {name: state.table_revisions.get(name, 0) for name in table_names}, revisions,
                 )
                 self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+
+    def test_update_skips_incomplete_idle_state_and_rejects_invalid_strategy_requests(self) -> None:
+        system = BattleStrategySystem()
+        system.update(GameState(tables={}), 0.0)
+
+        idle = self._state()
+        idle.current_actions = []
+        system.update(idle, 0.0)
+
+        cases = (
+            ("missing-battle", "attack", "infantry"),
+            ("battle-1", "unsupported", "infantry"),
+            ("battle-1", "attack", "armor"),
+        )
+        for battle_id, strategy, unit_type in cases:
+            with self.subTest(battle_id=battle_id, strategy=strategy, unit_type=unit_type):
+                state = self._state()
+                state.current_actions = [ActionSetBattleStrategy(
+                    "USA", battle_id, strategy, country_tag="USA", unit_type=unit_type,
+                )]
+
+                system.update(state, 0.0)
+
+                self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+
+    def test_withdrawal_helpers_reject_missing_routes_and_reorganization_requirements(self) -> None:
+        system = BattleStrategySystem()
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        battle = state.get_table("battles").to_dicts()[0]
+        state.tables.pop("regions")
+
+        self.assertFalse(system._begin_retreat(state, unit, "USA", battle, []))
+        self.assertFalse(system._begin_back_off(state, unit, "USA", battle, []))
+
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        battle = state.get_table("battles").to_dicts()[0]
+        self.assertFalse(system._begin_retreat(state, unit, "USA", battle, []))
+
+        system._battle_rear_position = lambda *_args: None
+        self.assertFalse(system._begin_rear_withdrawal(
+            state,
+            unit,
+            "USA",
+            battle,
+            [],
+            {1: GeoCoordinate(10.0, 20.0)},
+            SimpleNamespace(),
+            lifecycle="battle_retreating",
+            route_status="retreating",
+        ))
+
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        state.tables.pop("countries")
+        self.assertFalse(system._start_reorganization(
+            state, unit, "USA", [], "battle-1", "USA", 0,
+        ))
+
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        state.update_table("regions", pl.DataFrame([{
+            "id": 1, "owner": "CAN", "controller": "CAN",
+            "latitude": 10.0, "longitude": 20.0,
+        }]))
+        self.assertFalse(system._start_reorganization(
+            state, unit, "USA", [], "battle-1", "USA", 0,
+        ))
+
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        country_schema = state.get_table("countries").schema
+        state.update_table("countries", pl.DataFrame([{
+            "id": "USA", "money_reserves": 0.0,
+        }], schema=country_schema))
+        self.assertFalse(system._start_reorganization(
+            state, unit, "USA", [], "battle-1", "USA", 0,
+        ))
+
+    def test_strategy_constraints_and_coordinate_helpers_cover_invalid_inputs(self) -> None:
+        system = BattleStrategySystem()
+        state = self._state()
+        state.globals["battle_strategy_constraints"] = "invalid"
+        self.assertIsNone(system._scenario_constraint_rejection(
+            state, "battle-1", "USA", "infantry", "attack",
+        ))
+
+        state.globals["battle_strategy_constraints"] = [
+            None,
+            {"battle_id": "other", "required_strategy": "defend"},
+            {"country_id": "CAN", "allowed_strategies": []},
+            {"unit_type": "armor", "allowed_strategies": []},
+            {"required_strategy": "defend"},
+        ]
+        self.assertIn("requires defend", system._scenario_constraint_rejection(
+            state, "battle-1", "USA", "infantry", "attack",
+        ))
+
+        self.assertEqual(system._unit_coordinate(None, GeoCoordinate(1.0, 2.0)), GeoCoordinate(1.0, 2.0))
+        self.assertEqual(system._unit_coordinate({"latitude": "bad", "longitude": 0}, None), None)
+        self.assertEqual(system._unit_coordinate({"latitude": 91, "longitude": 0}, None), None)
+        self.assertEqual(system._finite(object()), 0.0)
+
+    def test_lifecycle_cancels_missing_forces_and_interrupted_disengagements(self) -> None:
+        system = BattleStrategySystem()
+        state = self._state()
+        state.time.is_paused = True
+        paused_posture = {"unit_id": "missing", "status": "reorganizing"}
+        system._advance_posture_lifecycle(state, [], [paused_posture], [], [], 10)
+        self.assertEqual(paused_posture["status"], "reorganizing")
+
+        state.time.is_paused = False
+        missing_posture = {"unit_id": "missing", "status": "retreating"}
+        system._advance_posture_lifecycle(state, [], [missing_posture], [], [], 10)
+        self.assertEqual(missing_posture["status"], "cancelled")
+
+        unit = state.get_table("units").to_dicts()[0]
+        unit.update(
+            is_moving=True,
+            unit_lifecycle="battle_disengaging",
+            movement_progress=0.25,
+            departed_at_minute=0,
+            arrival_at_minute=100,
+            source_latitude=10.0,
+            source_longitude=19.0,
+            target_latitude=10.0,
+            target_longitude=21.0,
+        )
+        posture = {
+            "unit_id": "usa-1", "battle_id": "battle-1",
+            "strategy": "back_off", "status": "disengaging",
+        }
+        route = {"unit_id": "usa-1", "status": "moving"}
+        system._advance_posture_lifecycle(
+            state,
+            [unit],
+            [posture],
+            [route],
+            [{"id": "battle-1", "status": "concluded"}],
+            50,
+        )
+        self.assertEqual(posture["status"], "cancelled")
+        self.assertEqual(route["status"], "interrupted")
+        self.assertFalse(unit["is_moving"])
+        self.assertEqual(unit["combat_posture"], "hold")
+
+        blocked_posture = {
+            "unit_id": "usa-1", "battle_id": "battle-1",
+            "strategy": "back_off", "status": "disengaging",
+        }
+        blocked_route = {
+            "unit_id": "usa-1", "status": "blocked", "rejection_reason": "",
+        }
+        system._advance_posture_lifecycle(
+            state,
+            [unit],
+            [blocked_posture],
+            [blocked_route],
+            [{"id": "battle-1", "status": "active"}],
+            60,
+        )
+        self.assertEqual(blocked_posture["status"], "blocked")
+        self.assertFalse(unit["is_moving"])
+
+    def test_occupation_distribution_and_route_helpers_return_safely_on_missing_data(self) -> None:
+        system = BattleStrategySystem()
+        state = self._state()
+        state.tables.pop("unit_movement_routes")
+        system._plan_occupation_distribution(
+            state, "USA", target_country_ids={1, 2}, occupied_region_ids={1},
+            units=[], routes=[], now=0,
+        )
+
+        state = self._state()
+        regions_schema = state.get_table("regions").schema
+        state.update_table("regions", pl.DataFrame(schema=regions_schema))
+        system._plan_occupation_distribution(
+            state, "USA", target_country_ids={1, 2}, occupied_region_ids={1},
+            units=[], routes=[], now=0,
+        )
+
+        plan = SimpleNamespace(region_ids=[1, 2])
+        self.assertFalse(system._start_occupation_route(
+            state, "USA", {"id": "usa-1", "current_region_id": 1}, plan,
+            [], {}, SimpleNamespace(), 0,
+        ))
+
+    def test_identity_fallback_participants_and_failed_posture_routes(self) -> None:
+        system = BattleStrategySystem()
+        self.assertEqual(system.id, "base.battle_strategy")
+        self.assertEqual(system.dependencies, ["base.time", "base.military"])
+
+        state = self._state()
+        state.tables.pop("battle_units")
+        state.current_actions = [ActionSetBattleStrategy(
+            "USA", "battle-1", "attack", country_tag="USA", unit_type="infantry",
+        )]
+        system.update(state, 0.0)
+        self.assertEqual(state.get_table("units")["combat_posture"].to_list(), ["attack"])
+
+        retreat_state = self._state()
+        retreat_state.current_actions = [ActionSetBattleStrategy(
+            "USA", "battle-1", "retreat", country_tag="USA",
+        )]
+        system.update(retreat_state, 0.0)
+        self.assertIn("No valid route", retreat_state.journal.command_results[-1]["reason"])
+
+        back_off_state = self._state()
+        back_off_state.current_actions = [ActionSetBattleStrategy(
+            "USA", "battle-1", "back_off", country_tag="USA",
+        )]
+        system._begin_back_off = lambda *_args: False
+        system.update(back_off_state, 0.0)
+        self.assertIn("No valid route", back_off_state.journal.command_results[-1]["reason"])
+
+        reorganize_state = self._state()
+        country_schema = reorganize_state.get_table("countries").schema
+        reorganize_state.update_table("countries", pl.DataFrame([{
+            "id": "USA", "money_reserves": 0.0,
+        }], schema=country_schema))
+        reorganize_state.current_actions = [ActionSetBattleStrategy(
+            "USA", "battle-1", "reorganize", country_tag="USA",
+        )]
+        BattleStrategySystem().update(reorganize_state, 0.0)
+        self.assertIn("sufficient funds", reorganize_state.journal.command_results[-1]["reason"])
+
+    def test_rear_withdrawal_reuses_route_and_calculates_enemy_or_anchor_bearing(self) -> None:
+        system = BattleStrategySystem()
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        battle = state.get_table("battles").to_dicts()[0]
+        system._battle_rear_position = lambda *_args: GeoCoordinate(10.0, 21.0)
+        route = {"unit_id": "usa-1", "status": "old"}
+        duration = SimpleNamespace(estimate_between=lambda *_args: 5)
+
+        self.assertTrue(system._begin_rear_withdrawal(
+            state, unit, "USA", battle, [route], {1: GeoCoordinate(10.0, 20.0)}, duration,
+            lifecycle="battle_retreating", route_status="retreating",
+        ))
+        self.assertEqual(route["status"], "retreating")
+        self.assertEqual(route["updated_at_minute"], state.time.total_minutes)
+
+        system = BattleStrategySystem()
+        self.assertIsNone(system._battle_rear_position(
+            state, {"current_region_id": 99}, "USA", battle, {},
+        ))
+        anchored = system._battle_rear_position(
+            state,
+            unit,
+            "USA",
+            {**battle, "anchor_latitude": 0.0, "anchor_longitude": 0.0},
+            {1: GeoCoordinate(10.0, 20.0)},
+        )
+        self.assertIsInstance(anchored, GeoCoordinate)
+
+        enemy = UnitFactory().create(
+            "can-1", "CAN", "infantry", 50, 1, GeoCoordinate(9.0, 19.0), 0,
+        )
+        state.update_table("units", pl.concat([
+            state.get_table("units"), pl.DataFrame([enemy], schema=UNIT_SCHEMA),
+        ]))
+        participants = state.get_table("battle_units")
+        state.update_table("battle_units", pl.concat([
+            participants,
+            pl.DataFrame([{
+                "battle_id": "battle-1", "unit_id": "can-1", "country_id": "CAN",
+            }], schema=participants.schema),
+        ]))
+        rear = system._battle_rear_position(
+            state, unit, "USA", battle, {1: GeoCoordinate(10.0, 20.0)},
+        )
+        self.assertIsInstance(rear, GeoCoordinate)
+
+    def test_retreat_lifecycle_blocks_failed_return_and_handles_empty_participants(self) -> None:
+        system = BattleStrategySystem()
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        regrouping = {
+            "unit_id": "usa-1", "battle_id": "battle-1", "country_id": "USA",
+            "strategy": "retreat", "status": "reorganizing", "expires_at_minute": 10,
+        }
+        system._advance_posture_lifecycle(
+            state, [unit], [regrouping], [], [{"id": "battle-1", "status": "active"}], 10,
+        )
+        self.assertEqual(regrouping["status"], "blocked")
+        self.assertEqual(unit["combat_posture"], "back_off")
+
+        returning = {
+            "unit_id": "usa-1", "battle_id": "battle-1", "country_id": "USA",
+            "strategy": "retreat", "status": "returning",
+        }
+        blocked_route = {"unit_id": "usa-1", "status": "blocked", "rejection_reason": ""}
+        system._advance_posture_lifecycle(
+            state,
+            [unit],
+            [returning],
+            [blocked_route],
+            [{"id": "battle-1", "status": "active"}],
+            20,
+        )
+        self.assertEqual(returning["status"], "blocked")
+        self.assertEqual(returning["reason"], "The return route became unavailable.")
+
+        state.tables.pop("battle_units")
+        system._remove_battle_participant(state, "battle-1", "usa-1")
+
+    def test_return_to_capital_validates_route_and_updates_existing_route(self) -> None:
+        system = BattleStrategySystem()
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        state.tables.pop("regions")
+        self.assertFalse(system._begin_return_to_capital(state, unit, "USA", [], 5))
+
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        system._plan_capital_route = lambda *_args: (99, SimpleNamespace(region_ids=[1]))
+        self.assertFalse(system._begin_return_to_capital(state, unit, "USA", [], 5))
+
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        system._plan_capital_route = lambda *_args: (1, SimpleNamespace(region_ids=[1, 99]))
+        self.assertFalse(system._begin_return_to_capital(state, unit, "USA", [], 5))
+
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        unit.update(latitude="invalid", longitude="invalid", current_region_id=99)
+        system._plan_capital_route = lambda *_args: (1, SimpleNamespace(region_ids=[99, 1]))
+        self.assertFalse(system._begin_return_to_capital(state, unit, "USA", [], 5))
+
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        system._plan_capital_route = lambda *_args: (1, SimpleNamespace(region_ids=[1]))
+        route = {"unit_id": "usa-1", "status": "old"}
+        self.assertTrue(system._begin_return_to_capital(state, unit, "USA", [route], 5))
+        self.assertEqual(route["status"], "arrived")
+        self.assertEqual(route["route_index"], 0)
+
+        state = self._state()
+        unit = state.get_table("units").to_dicts()[0]
+        appended_routes = []
+        self.assertTrue(system._begin_return_to_capital(
+            state, unit, "USA", appended_routes, 5,
+        ))
+        self.assertEqual(appended_routes[0]["status"], "arrived")
+
+    def test_occupation_rejects_missing_region_and_force_outside_target(self) -> None:
+        system = BattleStrategySystem()
+        state = self._state()
+        state.tables.pop("regions")
+        system._occupy_cleared_region(
+            state, ActionOccupyRegion("USA", 1, "USA"), [], [], [], 0,
+        )
+        self.assertIn("target region", state.journal.command_results[-1]["reason"])
+
+        state = self._state()
+        state.update_table("regions", pl.DataFrame([{
+            "id": 1, "owner": "CAN", "controller": "CAN",
+            "latitude": 0.0, "longitude": 0.0,
+        }]))
+        state.update_table("countries_wars", pl.DataFrame([{
+            "id": "war-1", "side_a": ["USA"], "side_b": ["CAN"], "status": "active",
+        }], schema={
+            "id": pl.Utf8, "side_a": pl.List(pl.Utf8),
+            "side_b": pl.List(pl.Utf8), "status": pl.Utf8,
+        }))
+        system._occupy_cleared_region(
+            state,
+            ActionOccupyRegion("USA", 1, "USA"),
+            [],
+            [],
+            [],
+            0,
+        )
+        self.assertIn("No eligible force", state.journal.command_results[-1]["reason"])
+
+    def test_occupation_route_updates_existing_route_and_handles_filtered_units(self) -> None:
+        system = BattleStrategySystem()
+        state = self._state()
+        unit = {
+            "id": "usa-1", "current_region_id": 1,
+            "latitude": 10.0, "longitude": 20.0,
+        }
+        route = {"unit_id": "usa-1", "status": "old"}
+        duration = SimpleNamespace(
+            estimate_from_distance=lambda _distance: 8,
+            estimate_between=lambda *_args: 12,
+        )
+        self.assertTrue(system._start_occupation_route(
+            state,
+            "USA",
+            unit,
+            SimpleNamespace(region_ids=[1, 2]),
+            [route],
+            {1: GeoCoordinate(10.0, 20.0), 2: GeoCoordinate(11.0, 21.0)},
+            duration,
+            10,
+            {(1, 2): 30.0},
+        ))
+        self.assertEqual(route["status"], "moving")
+        self.assertEqual(unit["arrival_at_minute"], 18)
+
+        state.tables["unit_movement_routes"] = state.get_table("unit_movement_routes")
+        system._plan_occupation_distribution(
+            state,
+            "USA",
+            target_country_ids={1, 2},
+            occupied_region_ids={1},
+            units=[{"id": "can-1", "owner": "CAN", "current_region_id": 1, "strength": 5}],
+            routes=[],
+            now=0,
+        )
+
+    def test_occupation_distribution_uses_location_cost_when_graph_edge_cost_is_missing(self) -> None:
+        module = import_module("modules.base.systems.military.battle_strategy_system")
+        state = self._state()
+        state.update_table("regions", pl.DataFrame([
+            {"id": 1, "owner": "CAN", "latitude": 10.0, "longitude": 20.0},
+            {"id": 2, "owner": "CAN", "latitude": 11.0, "longitude": 21.0},
+        ]))
+        prepared = SimpleNamespace(
+            region_by_id={
+                1: {"id": 1, "owner": "CAN"},
+                2: {"id": 2, "owner": "CAN"},
+            },
+            edge_distance_km={},
+        )
+
+        class _Planner:
+            def prepare(self, *_args):
+                return prepared
+
+            def plan(self, *_args, segment_cost, **_kwargs):
+                cost = segment_cost({"id": 1}, {"id": 2})
+                return SimpleNamespace(is_valid=True, region_ids=[1, 2], travel_cost=cost)
+
+        class _DurationPolicy:
+            def region_locations(self, _regions):
+                return {1: GeoCoordinate(10.0, 20.0), 2: GeoCoordinate(11.0, 21.0)}
+
+            def estimate_between(self, source, target):
+                assert source is not None and target is not None
+                return 12
+
+        class _AccessPolicy:
+            def for_country(self, *_args):
+                return SimpleNamespace(can_station=lambda _region: True, can_transit=lambda _region: True)
+
+        system = BattleStrategySystem()
+        system._start_occupation_route = lambda *_args, **_kwargs: False
+        units = [
+            {"id": "usa-1", "owner": "USA", "current_region_id": 1, "strength": 5},
+            {"id": "usa-2", "owner": "USA", "current_region_id": 1, "strength": 5},
+        ]
+
+        with (
+            patch.object(module, "MilitaryRoutePlanner", _Planner),
+            patch.object(module, "MovementDurationPolicy", _DurationPolicy),
+            patch.object(module, "MovementAccessPolicy", _AccessPolicy),
+        ):
+            system._plan_occupation_distribution(
+                state,
+                "USA",
+                target_country_ids={1, 2},
+                occupied_region_ids={1},
+                units=units,
+                routes=[],
+                now=0,
+            )
 
 
 if __name__ == "__main__":

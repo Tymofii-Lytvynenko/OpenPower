@@ -49,6 +49,9 @@ class BattleStrategyAITest(unittest.TestCase):
             globals=globals or {},
         )
 
+    def test_policy_ignores_rows_for_other_action_kinds(self) -> None:
+        self.assertIsNone(BattleStrategyPolicy().resolve_action({"action_kind": "pause"}))
+
     def test_policy_selects_deterministic_posture_for_ai_participants(self) -> None:
         tables = self._tables()
         policy = BattleStrategyPolicy()

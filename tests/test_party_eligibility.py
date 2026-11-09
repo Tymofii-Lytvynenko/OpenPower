@@ -3,8 +3,14 @@ import polars as pl
 import pytest
 
 from modules.base.schema import ensure_base_tables
+from modules.base.systems.politics.party_eligibility_policy import (
+    process_party_changes,
+    validate_party_changes,
+)
+from modules.base.systems.politics.party_constitution_policy import plan_party_constitution
 from modules.base.systems.politics.political_lifecycle_system import PoliticalLifecycleSystem
 from src.client.ui.core.panel_context import PanelRenderContext
+from src.client.ui.panels.politics import party_policy_draft as party_draft_module
 from src.client.ui.panels.politics.party_policy_draft import PartyPolicyDraft
 from src.shared.actions import ActionSetPartyEligibility
 from src.shared.events import EventPoliticalPartyEligibilityChanged
@@ -130,6 +136,40 @@ def test_invalid_party_batch_blocks_other_policy_drafts_before_dispatch():
     assert panel._party_draft.pending and panel._law_draft.pending
 
 
+def test_direct_party_validation_rejects_count_outside_current_form_limits():
+    state, _ = world()
+    government = state.tables["country_governments"].row(0, named=True)
+    rule = state.tables["government_form_rules"].row(0, named=True)
+    parties = state.tables["political_parties"].to_dicts()
+    action = ActionSetPartyEligibility("player", "AAA", "custom", {"a": False})
+
+    reason = validate_party_changes(government, rule, parties, action)
+
+    assert reason == "This party count requires a configured constitutional transition; the government form has not changed."
+
+
+def test_party_change_rejection_reports_unavailable_country():
+    state, _ = world()
+    action = ActionSetPartyEligibility("player", "ZZZ", "custom", {"a": False})
+
+    process_party_changes(state, action, 0)
+
+    assert state.journal.command_results[-1]["reason"] == "The selected country is unavailable."
+
+
+def test_party_change_rejection_reports_active_political_crisis():
+    state, _ = world()
+    state.update_table(
+        "political_crises",
+        pl.DataFrame([{"country_id": "AAA", "status": "active"}]),
+    )
+    action = ActionSetPartyEligibility("player", "AAA", "custom", {"a": False})
+
+    process_party_changes(state, action, 0)
+
+    assert state.journal.command_results[-1]["reason"] == "Party status cannot change during an active political crisis."
+
+
 def transition_world():
     import json
     state, system = world()
@@ -139,6 +179,54 @@ def transition_world():
         .otherwise(pl.col("party_count_transitions_json")).alias("party_count_transitions_json"))
     state.update_table("government_form_rules", rules)
     return state, system
+
+
+def _transition_plan_inputs():
+    state, _ = transition_world()
+    form_rules = state.tables["government_form_rules"].to_dicts()
+    rule = next(row for row in form_rules if row["government_form_id"] == "custom")
+    parties = state.tables["political_parties"].to_dicts()
+    action = ActionSetPartyEligibility(
+        "player", "AAA", "custom", {"a": False}, "single-party democracy"
+    )
+    return rule, form_rules, parties, action
+
+
+def test_constitution_plan_rejects_transition_to_current_form():
+    rule, form_rules, parties, action = _transition_plan_inputs()
+    rule["government_form_id"] = "single-party democracy"
+
+    plan, reason = plan_party_constitution(rule, form_rules, parties, action, 0)
+
+    assert plan is None
+    assert reason == "The constitutional transition must select another government form."
+
+
+def test_constitution_plan_rejects_missing_target_form():
+    rule, form_rules, parties, action = _transition_plan_inputs()
+    form_rules = [
+        row for row in form_rules if row["government_form_id"] != "single-party democracy"
+    ]
+
+    plan, reason = plan_party_constitution(rule, form_rules, parties, action, 0)
+
+    assert plan is None
+    assert reason == "The configured constitutional target is unavailable or ambiguous."
+
+
+def test_constitution_plan_rejects_election_date_overflow():
+    rule, form_rules, parties, action = _transition_plan_inputs()
+    target = next(
+        row for row in form_rules if row["government_form_id"] == "single-party democracy"
+    )
+    target.update(election_eligible=True, election_interval_minutes=1)
+
+    plan, reason = plan_party_constitution(
+        rule, form_rules, parties, action, 9_223_372_036_854_775_807
+    )
+
+    assert plan is None
+    assert reason == "The target government's election date exceeds the supported range."
 
 
 def test_confirmed_party_transition_changes_form_and_resolves_dependent_schedules():
@@ -213,3 +301,150 @@ def test_question_answer_is_one_shot_and_no_restores_the_previous_draft():
     question.answer(True)
     question.answer(False)
     assert calls == [True]
+
+
+def test_party_draft_rejects_non_authoritative_inputs_and_reverts_changes():
+    draft = PartyPolicyDraft()
+    draft.select_country("AAA")
+    ruling = SimpleNamespace(party_id="r", eligible=True, is_ruling=True)
+    unknown = SimpleNamespace(party_id="x", eligible=None, is_ruling=False)
+    party = SimpleNamespace(party_id="a", eligible=True, is_ruling=False)
+
+    draft.choose(ruling, False, "custom")
+    draft.choose(unknown, True, "custom")
+    draft.choose(party, 1, "custom")
+    assert draft.pending == {}
+
+    draft.choose(party, False, "custom")
+    assert draft.status(party) is False
+    draft.choose(party, True, "custom")
+    assert draft.pending == {}
+    assert draft.status(party) is True
+
+
+def test_party_draft_checkpoint_restores_confirmation_and_rejects_stale_fingerprint():
+    draft = PartyPolicyDraft()
+    draft.select_country("AAA")
+    party = SimpleNamespace(party_id="a", eligible=True, is_ruling=False)
+    draft.choose(party, False, "custom")
+    fingerprint = draft.fingerprint()
+    assert draft.confirm_transition("single-party democracy", fingerprint)
+    checkpoint = draft.checkpoint()
+
+    draft.choose(party, True, "custom")
+    draft.restore(checkpoint)
+
+    assert draft.pending == {"a": (True, False)}
+    assert draft.confirm_transition("another form", ("stale",)) is False
+
+
+def test_party_policy_helpers_handle_missing_party_table():
+    assert party_draft_module._country_parties(None, "AAA") == []
+
+
+def test_transition_target_rejects_missing_pending_and_invalid_current_limits(monkeypatch):
+    state, _ = world()
+    draft = PartyPolicyDraft()
+    draft.select_country("AAA")
+    assert draft.transition_target(state) is None
+
+    party = SimpleNamespace(party_id="a", eligible=True, is_ruling=False)
+    draft.choose(party, False, "custom")
+    monkeypatch.setattr(party_draft_module, "_count_limits", lambda _rule: ("invalid", 0))
+
+    assert draft.transition_target(state) is None
+
+
+def test_transition_target_rejects_missing_or_ineligible_destination_rules():
+    party = SimpleNamespace(party_id="a", eligible=True, is_ruling=False)
+
+    state, _ = transition_world()
+    draft = PartyPolicyDraft()
+    draft.select_country("AAA")
+    draft.choose(party, False, "custom")
+    state.update_table(
+        "government_form_rules",
+        state.tables["government_form_rules"].filter(
+            pl.col("government_form_id") != "single-party democracy"
+        ),
+    )
+    assert draft.transition_target(state) is None
+
+    state, _ = transition_world()
+    draft = PartyPolicyDraft()
+    draft.select_country("AAA")
+    draft.choose(party, False, "custom")
+    state.update_table(
+        "government_form_rules",
+        state.tables["government_form_rules"].with_columns(
+            pl.when(pl.col("government_form_id") == "single-party democracy")
+            .then(pl.lit(2))
+            .otherwise(pl.col("minimum_eligible_parties"))
+            .alias("minimum_eligible_parties")
+        ),
+    )
+    assert draft.transition_target(state) is None
+
+
+def test_prepare_rejects_uncontrolled_country_and_changed_authority():
+    state, _ = world()
+    draft = PartyPolicyDraft()
+    draft.select_country("AAA")
+    draft.choose(
+        SimpleNamespace(party_id="a", eligible=True, is_ruling=False),
+        False,
+        "custom",
+    )
+    context = PanelRenderContext(
+        "AAA",
+        False,
+        net_client=SimpleNamespace(player_id="player"),
+    )
+    assert draft.prepare(state, context)[1] == "This country's party policy is outside your control."
+
+    state, _ = world()
+    state.update_table(
+        "government_form_rules",
+        state.tables["government_form_rules"].with_columns(
+            pl.lit(False).alias("party_policy_editable")
+        ),
+    )
+    assert draft.prepare(state, PanelRenderContext(
+        "AAA", True, net_client=SimpleNamespace(player_id="player")
+    ))[1] == "The government form or its party-policy authority changed."
+
+
+def test_prepare_rejects_invalid_limits_and_requires_transition_confirmation():
+    state, _ = world()
+    draft = PartyPolicyDraft()
+    draft.select_country("AAA")
+    draft.choose(
+        SimpleNamespace(party_id="a", eligible=True, is_ruling=False),
+        False,
+        "custom",
+    )
+    state.update_table(
+        "government_form_rules",
+        state.tables["government_form_rules"].with_columns(
+            pl.when(pl.col("government_form_id") == "custom")
+            .then(pl.lit(0))
+            .otherwise(pl.col("minimum_eligible_parties"))
+            .alias("minimum_eligible_parties")
+        ),
+    )
+    context = PanelRenderContext(
+        "AAA", True, net_client=SimpleNamespace(player_id="player")
+    )
+    assert draft.prepare(state, context)[1] == "The configured party-count limits are invalid."
+
+    state, _ = transition_world()
+    draft = PartyPolicyDraft()
+    draft.select_country("AAA")
+    draft.choose(
+        SimpleNamespace(party_id="a", eligible=True, is_ruling=False),
+        False,
+        "custom",
+    )
+    assert draft.prepare(state, context)[1] == (
+        "Confirm the constitutional transition before applying this party policy."
+    )

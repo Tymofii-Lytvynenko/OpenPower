@@ -26,6 +26,37 @@ def _context(countries: pl.DataFrame, *, contracts: pl.DataFrame | None = None, 
     )
 
 
+def test_missing_country_and_incomplete_debt_tables_produce_no_candidates():
+    policy = EconomicPolicy()
+    empty_context = AITableContext(
+        tables={},
+        day_ordinal=0,
+        total_minutes=0,
+        date_text="",
+    )
+    assert policy.build_candidates(empty_context).collect().is_empty()
+
+    incomplete_context = AITableContext(
+        tables={
+            "countries": pl.DataFrame({"id": ["AAA"]}),
+            "debt_contracts": pl.DataFrame({"id": ["loan"]}),
+        },
+        day_ordinal=0,
+        total_minutes=0,
+        date_text="",
+    )
+    assert policy._debt_candidates(incomplete_context, pl.DataFrame().lazy()) is None
+
+
+def test_economic_action_resolution_and_numeric_bounds_handle_unexpected_values():
+    policy = EconomicPolicy()
+
+    assert policy.resolve_action({"action_kind": "unrecognized"}) is None
+    assert policy._bound(float("nan"), 0.0, 1.0, 0.5) == 0.5
+    assert policy._bound(float("inf"), 0.0, 1.0, 0.5) == 0.5
+    assert policy._bound(2.0, 0.0, 1.0, 0.5) == 1.0
+
+
 def test_ai_policy_selects_effective_dated_interest_action_and_skips_player_country():
     countries = pl.DataFrame({
         "id": ["AI_COUNTRY", "PLAYER"],

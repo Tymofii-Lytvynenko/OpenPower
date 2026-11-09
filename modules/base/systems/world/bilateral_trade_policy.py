@@ -86,7 +86,6 @@ def validate_trade_packages(
     if source_country_id not in country_by_id or target_country_id not in country_by_id:
         return "Both countries must exist in the current world."
     region_by_id = {_integer(row.get("id")): row for row in regions}
-    government_by_id = {_tag(row.get("country_id")): row for row in governments}
     track_by_branch = {
         (_tag(row.get("country_id")), _branch(row.get("branch"))): row
         for row in research_tracks
@@ -110,16 +109,12 @@ def validate_trade_packages(
         }
         if len(owned_regions - set(outgoing_regions)) < 1:
             return f"{owner} must keep at least one region."
-        capital_id = _integer(government_by_id.get(owner, {}).get("capital_region_id"))
         for region_id in outgoing_regions:
             region = region_by_id.get(region_id)
             if region is None or _tag(region.get("owner")) != owner:
                 return f"{owner} no longer owns territory {region_id}."
             if region_id in occupied:
                 return f"Occupied territory {region_id} cannot be transferred through a trade."
-            if region_id == capital_id and len(owned_regions) <= 1:
-                return f"{owner} cannot transfer its only capital region."
-
         for asset in assets:
             if asset.get("type") != "technology":
                 continue
@@ -290,8 +285,6 @@ def validate_trade_package_frames(
         remaining_owned = owned.filter(~pl.col("id").is_in(outgoing_regions)).height
         if remaining_owned < 1:
             return f"{owner} must keep at least one region."
-        government = _frame_row_by_tag(governments, "country_id", owner)
-        capital_id = _integer(None if government is None else government.get("capital_region_id"))
         for region_id in outgoing_regions:
             region = _frame_row_by_integer(regions, "id", region_id)
             if region is None or _tag(region.get("owner")) != owner:
@@ -299,9 +292,6 @@ def validate_trade_package_frames(
             if occupations is not None and "region_id" in occupations.columns:
                 if not occupations.filter(pl.col("region_id").cast(pl.Int64, strict=False) == region_id).is_empty():
                     return f"Occupied territory {region_id} cannot be transferred through a trade."
-            if region_id == capital_id and owned.height <= 1:
-                return f"{owner} cannot transfer its only capital region."
-
         receiver = target_country_id if owner == source_country_id else source_country_id
         for asset in assets:
             if asset.get("type") != "technology":

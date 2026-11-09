@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from src.client.services.navigation_service import NavigationService
@@ -47,3 +48,28 @@ def test_editor_route_builds_task_and_loads_editor_view_on_success() -> None:
     assert task is task_type.return_value
     assert on_success(context) is editor_view_type.return_value
     editor_view_type.assert_called_once_with(context, config)
+
+
+def test_load_saved_game_routes_success_with_snapshot_player_or_default() -> None:
+    window = Mock()
+    service = NavigationService(window)
+    config = object()
+
+    for snapshot, expected_player in (
+        (None, "USA"),
+        (SimpleNamespace(globals={"player_tag": "CAN"}), "CAN"),
+    ):
+        session = Mock()
+        session.get_state_snapshot.return_value = snapshot
+        with (
+            patch("src.client.tasks.load_game_task.LoadGameTask") as task_type,
+            patch.object(service, "show_loading") as show_loading,
+            patch.object(service, "show_game_view") as show_game_view,
+        ):
+            service.load_saved_game(config, "campaign")
+            task_type.assert_called_once_with(window, config, "campaign")
+            task, on_success = show_loading.call_args.args
+            assert task is task_type.return_value
+            on_success(session)
+            assert window.session is session
+            show_game_view.assert_called_once_with(session, config, expected_player)

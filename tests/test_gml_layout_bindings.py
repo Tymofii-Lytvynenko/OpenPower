@@ -1,10 +1,60 @@
 """Regression coverage for data-dependent relocation of live panel text."""
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 from types import SimpleNamespace
 import pytest
 
-from src.client.ui.layouts.gml_layout import GMLLayoutSession, all_gml_layouts, get_gml_layout
+from src.client.ui.layouts.gml_layout import (
+    GMLComponent,
+    GMLLayoutSession,
+    GMLRect,
+    GMLWindowLayout,
+    all_gml_layouts,
+    create_gml_layout_session,
+    draw_gml_separator,
+    get_gml_layout,
+    gml_child_frame,
+    render_gml_title,
+    resume_gml_layout,
+    suspend_gml_layout,
+    use_gml_layout,
+)
 from src.client.ui.core.primitives import UIPrimitives
+
+
+def _component(
+    path,
+    component_id,
+    parent,
+    rect,
+    *,
+    kind="frame",
+    anchor="top,left",
+    visible=True,
+    text_align="",
+):
+    return GMLComponent(
+        path=path,
+        component_id=component_id,
+        kind=kind,
+        gml_type=kind,
+        parent=parent,
+        order=0,
+        sequence=0,
+        z_order=None,
+        rect=rect,
+        local_rect=rect,
+        anchor=anchor,
+        text_token="",
+        tooltip_token="",
+        enabled=True,
+        visible=visible,
+        text_align=text_align,
+    )
+
+
+def _layout(template, components, width=100, height=100):
+    return GMLWindowLayout(template, width, height, (), tuple(components))
 
 
 def test_nonclosable_window_uses_no_native_open_pointer():
@@ -445,3 +495,130 @@ def test_unit_reserve_tabs_use_exported_gml_metrics_and_runtime_page_offset():
     assert session.apply_tab_page_runtime_geometry(tab_path) == tab
     assert session.rect_for(list_path).y == 94.0
     assert layout.component(list_path).rect.y == 77.0
+
+
+def test_layout_geometry_and_invalid_component_paths_are_handled_explicitly():
+    root_rect = GMLRect(0.0, 0.0, 100.0, 100.0)
+    root = _component("TestLayout", "TestLayout", "", root_rect)
+    centered = _component(
+        "TestLayout/centered", "centered", "TestLayout", GMLRect(10.0, 10.0, 20.0, 20.0),
+        anchor="top,bottom",
+    )
+    bottom = _component(
+        "TestLayout/bottom", "bottom", "TestLayout", GMLRect(10.0, 20.0, 20.0, 20.0),
+        anchor="left,bottom",
+    )
+    layout = _layout("TestLayout", (root, centered, bottom))
+    session = GMLLayoutSession(layout, (0.0, 0.0), (200.0, 160.0))
+
+    centered_rect = session.rect_for(centered)
+    bottom_rect = session.rect_for(bottom)
+    assert (centered_rect.x, centered_rect.height) == (60.0, 80.0)
+    assert bottom_rect.y == 80.0
+
+    with pytest.raises(KeyError, match="No reachable GML window layout"):
+        get_gml_layout("Unregistered_Window")
+    with pytest.raises(KeyError, match="No GML component exists"):
+        session.move_subtree("TestLayout/missing")
+    with pytest.raises(ValueError, match="finite and positive"):
+        session.scale_subtree_x("TestLayout", 0.0)
+    with pytest.raises(KeyError, match="No GML component or layout root"):
+        session.scale_subtree_x("missing", 1.2)
+
+    session._rects.pop(bottom.path)
+    session.scale_subtree_x("TestLayout", 1.1)
+
+    tab_layout = get_gml_layout("Unit_Ground_Deployment_Window")
+    tab_path = "Unit_Ground_Deployment_Window/frmInner/tabGroups"
+    tab_session = GMLLayoutSession(tab_layout, (0.0, 0.0), (507.0, 390.0))
+    assert tab_session.tab_button_rect("missing", 0) is None
+    assert tab_session.tab_button_rect(tab_path, 100) is None
+    assert tab_session.apply_tab_page_runtime_geometry("missing") is None
+    assert create_gml_layout_session("Battle_Window", (10.0, 20.0), (1024.0, 768.0)).window_position == (10.0, 20.0)
+
+
+def test_widget_placement_rejects_unmatched_slots_and_resizes_known_widget_types():
+    layout = get_gml_layout("Generic_Question_Window")
+    session = GMLLayoutSession(layout, (0.0, 0.0), (267.0, 130.0))
+    native = MagicMock()
+    native.get_scroll_x.return_value = 0.0
+    native.get_scroll_y.return_value = 0.0
+    native.calc_text_size.return_value = SimpleNamespace(x=20.0, y=8.0)
+    native.get_font_size.return_value = 12.0
+    component = layout.components[0]
+    size = (session.rect_for(component).width, session.rect_for(component).height)
+
+    with patch("src.client.ui.core.instrumented_imgui.imgui", native):
+        assert session.place_widget("unknown_widget", (), explicit_id=component.path) is None
+        assert session.place_widget(
+            "button", ("not a button",), explicit_id="Generic_Question_Window/lblMessage"
+        ) is None
+        assert GMLLayoutSession._is_native_chrome(
+            replace(component, path="Battle_Window/frmTitle", component_id="frmTitle")
+        )
+
+        invisible_button = session._place(component, "invisible_button", ("##hit",))[0]
+        button = session._place(component, "button", ("Run", "old-size"))[0]
+        child = session._place(component, "begin_child", ("child", (1.0, 1.0), 0))[0]
+        table = session._place(component, "begin_table", ("table", 4, 0, (1.0, 1.0), 0))[0]
+        progress = session._place(component, "progress_bar", (0.5, (1.0, 1.0)))[0]
+        multiline = session._place(component, "input_text_multiline", ("Text", "value", (1.0, 1.0)))[0]
+        session._place(component, "combo", ("Combo", "one", ("one", "two")))
+        session._place(component, "slider_float", ("Slider", 0.0, 1.0, 0.5))
+        session._place(replace(component, text_align="Center"), "text", ("centered",), align="center")
+
+    assert invisible_button[1] == size
+    assert button[1] == size
+    assert child[1] == size
+    assert table[3] == size
+    assert progress[1] == size
+    assert multiline[2] == size
+    assert native.set_next_item_width.call_count == 3
+    assert GMLLayoutSession._label("text", ()) == ""
+
+
+def test_active_layout_child_frames_separators_and_title_restore_runtime_state():
+    root_rect = GMLRect(0.0, 0.0, 100.0, 100.0)
+    root = _component("TestUI", "TestUI", "", root_rect)
+    vertical = _component("TestUI/vertical", "vertical", "TestUI", GMLRect(2.0, 3.0, 4.0, 12.0))
+    horizontal = _component("TestUI/horizontal", "horizontal", "TestUI", GMLRect(4.0, 5.0, 12.0, 4.0))
+    empty = _component("TestUI/empty", "empty", "TestUI", GMLRect(0.0, 0.0, 0.0, 0.0))
+    hidden = _component("TestUI/hidden", "hidden", "TestUI", GMLRect(0.0, 0.0, 10.0, 2.0), visible=False)
+    layout = _layout("TestUI", (root, vertical, horizontal, empty, hidden))
+    session = GMLLayoutSession(layout, (100.0, 200.0), (100.0, 100.0))
+    native = MagicMock()
+    native.ChildFlags_.borders = 1
+    native.StyleVar_.window_padding = 2
+    native.begin_child.return_value = True
+
+    assert not draw_gml_separator(vertical.path, color=(1.0, 1.0, 1.0, 1.0))
+    with patch("src.client.ui.core.instrumented_imgui.imgui", native), use_gml_layout(session):
+        token = suspend_gml_layout()
+        assert token is not None
+        assert not draw_gml_separator(vertical.path, color=(1.0, 1.0, 1.0, 1.0))
+        resume_gml_layout(token)
+        assert not draw_gml_separator(hidden.path, color=(1.0, 1.0, 1.0, 1.0))
+        assert not draw_gml_separator(empty.path, color=(1.0, 1.0, 1.0, 1.0))
+        assert draw_gml_separator(vertical.path, color=(1.0, 1.0, 1.0, 1.0))
+        assert draw_gml_separator(horizontal.path, color=(1.0, 1.0, 1.0, 1.0))
+        with gml_child_frame("TestUI/missing") as opened:
+            assert not opened
+        with gml_child_frame(vertical.path, bordered=False, test_id="gml-child") as opened:
+            assert opened
+        native.end_child.assert_called_once()
+
+    title_root = _component("TitleOnly", "TitleOnly", "", root_rect)
+    title_frame = _component("TitleOnly/frmTitle", "frmTitle", "TitleOnly", GMLRect(0.0, 0.0, 100.0, 20.0))
+    title_label = _component(
+        "TitleOnly/frmTitle/lblTitle", "lblTitle", "TitleOnly/frmTitle", GMLRect(5.0, 5.0, 80.0, 10.0), kind="label"
+    )
+    no_inner_layout = _layout("TitleOnly", (title_root, title_frame, title_label))
+    no_inner_session = GMLLayoutSession(no_inner_layout, (0.0, 0.0), (100.0, 100.0))
+    no_title_layout = _layout("NoTitle", (root,))
+    native.get_window_pos.return_value = SimpleNamespace(x=10.0, y=20.0)
+    native.get_cursor_screen_pos.return_value = (7.0, 8.0)
+
+    render_gml_title(no_title_layout, "Ignored")
+    with patch("src.client.ui.core.instrumented_imgui.imgui", native):
+        render_gml_title(no_inner_layout, "Visible title##suffix", no_inner_session)
+    assert native.set_cursor_screen_pos.call_args_list[-1].args[0] == (7.0, 8.0)

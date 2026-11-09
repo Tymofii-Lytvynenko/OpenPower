@@ -5,6 +5,7 @@ import unittest
 import polars as pl
 
 from modules.base.systems.military.military_system import MilitarySystem
+from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
 from modules.base.schema import ensure_base_tables
 from src.shared.actions import ActionBuyMarketUnit
 from src.shared.state import GameState
@@ -66,6 +67,20 @@ class WeaponsTradeTest(unittest.TestCase):
             "price": [100.0], "eligibility": ["members_only"],
         }))
         return state
+
+
+def test_malformed_weapons_access_detail_does_not_grant_members_only_access():
+    effects = pl.DataFrame(
+        [
+            {
+                "effect": "weapons_market_access",
+                "country_id": "USA",
+                "detail": "{malformed-json",
+            }
+        ]
+    )
+
+    assert not WeaponsTradePolicy().can_order(effects, "USA", "CAN", "members_only")
 
 
 if __name__ == "__main__":

@@ -78,3 +78,40 @@ def test_load_game_cancellation_after_completion_releases_unclaimed_session() ->
     task.cancel()
 
     session.shutdown.assert_called_once_with()
+
+
+def test_load_game_forwards_startup_progress_to_task_status() -> None:
+    task, _, _ = _task()
+    session = SimpleNamespace(shutdown=Mock())
+    progress_updates = []
+
+    def start_session(*args, on_progress, **kwargs):
+        on_progress(0.5, "Loading modules")
+        progress_updates.append((task.progress, task.status_text))
+        return session
+
+    with (
+        patch("src.client.tasks.load_game_task.create_session_until_ready", side_effect=start_session),
+        patch("src.client.tasks.load_game_task.wait_for_initial_state"),
+    ):
+        task.run()
+
+    assert progress_updates == [(0.5, "Server: Loading modules")]
+
+
+def test_load_game_releases_session_when_cancelled_during_startup() -> None:
+    task, _, _ = _task()
+    session = SimpleNamespace(shutdown=Mock())
+
+    def start_session(*args, **kwargs):
+        task._cancel_event.set()
+        return session
+
+    with (
+        patch("src.client.tasks.load_game_task.create_session_until_ready", side_effect=start_session),
+        patch("src.client.tasks.load_game_task.wait_for_initial_state"),
+    ):
+        assert task.run() is session
+
+    session.shutdown.assert_called_once_with()
+    assert task._session is None

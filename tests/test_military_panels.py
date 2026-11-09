@@ -206,6 +206,73 @@ class UnitListPanelTest(unittest.TestCase):
             text_calls,
         )
 
+    def test_render_delegates_to_content_only_when_window_is_open(self) -> None:
+        panel = MilitaryPanel()
+        panel._render_content = MagicMock()
+        context = PanelRenderContext(target_tag="USA", is_own_country=True)
+        state = object()
+        window = MagicMock()
+
+        for is_open in (False, True):
+            window.__enter__.return_value = is_open
+            with patch(
+                "src.client.ui.panels.military_panel.main_pillar_position",
+                return_value=(12, 34),
+            ), patch(
+                "src.client.ui.panels.military_panel.WindowManager.window",
+                return_value=window,
+            ) as open_window:
+                rendered = panel.render(state, context)
+
+            self.assertEqual(rendered, is_open)
+            open_window.assert_called_once()
+            if is_open:
+                panel._render_content.assert_called_once_with(state, "USA", True)
+            else:
+                panel._render_content.assert_not_called()
+                panel._render_content.reset_mock()
+
+    def test_military_panel_invokes_enabled_action_callbacks(self) -> None:
+        callbacks = {
+            name: MagicMock()
+            for name in (
+                "open_unit_list_cb",
+                "open_production_cb",
+                "open_research_cb",
+                "open_design_cb",
+                "open_market_cb",
+                "open_covert_cb",
+                "open_wars_cb",
+                "open_battle_cb",
+                "open_strategic_cb",
+                "open_reserves_cb",
+            )
+        }
+        panel = MilitaryPanel(**callbacks)
+        summary = MagicMock(
+            branches=(),
+            moving_units=0,
+            active_wars=0,
+            covert_cells=0,
+            strategic_ready=1,
+            strategic_total=2,
+            missile_defense_pct=50.0,
+        )
+        panel._presenter = MagicMock()
+        panel._presenter.build_summary.return_value = summary
+        widgets = MagicMock()
+        widgets.button.return_value = True
+        widgets.button_at.return_value = True
+
+        with patch(
+            "src.client.ui.panels.military_panel.GMLWidgets",
+            return_value=widgets,
+        ):
+            panel._render_content(object(), "USA", True)
+
+        for callback in callbacks.values():
+            callback.assert_called()
+
     def test_design_panel_separates_fixed_role_interactions_from_adjustable_values(self) -> None:
         panel = UnitDesignPanel()
         panel._presenter = MagicMock()

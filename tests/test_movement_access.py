@@ -43,6 +43,21 @@ class MovementAccessPolicyTest(unittest.TestCase):
         self.assertTrue(context.can_transit({"owner": "FRA"}))
         self.assertTrue(context.can_station({"owner": "USA"}))
 
+    def test_ended_war_does_not_grant_movement_access(self) -> None:
+        state = GameState(tables={
+            "countries_wars": pl.DataFrame({
+                "side_a": [["USA"]], "side_b": [["MEX"]], "status": ["ended"],
+            }),
+        })
+
+        context = MovementAccessPolicy().for_country(state, "USA")
+
+        self.assertFalse(context.can_station({"owner": "MEX"}))
+        self.assertFalse(context.can_transit({"owner": "MEX"}))
+
+    def test_malformed_treaty_detail_has_no_country_tags(self) -> None:
+        self.assertEqual(MovementAccessPolicy()._detail_tags("not-json"), ())
+
 
 if __name__ == "__main__":
     unittest.main()

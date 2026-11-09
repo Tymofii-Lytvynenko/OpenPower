@@ -83,3 +83,28 @@ def test_map_controller_routes_a_move_through_confirmation_before_dispatch():
     controller.move_units_to_target({"one"}, 2, 52, 21)
     client.send_action.assert_not_called()
     assert orders.pending["POL"][0].unit_ids == ("one",)
+
+
+def test_invalid_destination_and_unowned_units_are_rejected():
+    _, client, _, orders = setup_orders()
+
+    assert not orders.request({"one"}, 0, 52, 21)
+    assert not orders.request({"one"}, 999, 52, 21)
+    assert not orders.request({"foreign"}, 2, 52, 21)
+    client.send_action.assert_not_called()
+
+
+def test_malformed_stationing_rights_are_ignored_while_queueing_neutral_move():
+    state, client, _, orders = setup_orders()
+    state.tables["treaty_effects"] = pl.DataFrame(
+        {
+            "country_id": ["POL", "UKR", "UKR"],
+            "effect": ["stationing_rights", "military_access", "stationing_rights"],
+            "detail": ['["POL"]', '["POL"]', "{"],
+        }
+    )
+
+    assert orders.request({"one"}, 2, 52, 21)
+
+    assert len(orders.pending["POL"]) == 1
+    client.send_action.assert_not_called()

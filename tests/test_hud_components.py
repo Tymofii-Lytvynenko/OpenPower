@@ -36,6 +36,41 @@ def test_panel_shortcuts_do_not_intercept_text_entry():
     manager.set_visible.assert_not_called()
 
 
+def test_panel_shortcuts_do_not_intercept_an_open_popup():
+    from src.client.ui.components.hud.panel_shortcuts import consume_panel_shortcuts
+
+    manager, native = Mock(), Mock()
+    native.get_io.return_value = SimpleNamespace(
+        want_text_input=False, key_ctrl=False, key_alt=False, key_super=False
+    )
+    native.is_popup_open.return_value = True
+
+    with patch("src.client.ui.components.hud.panel_shortcuts.imgui", native):
+        consume_panel_shortcuts(manager)
+
+    native.is_key_pressed.assert_not_called()
+    manager.is_visible.assert_not_called()
+    manager.set_visible.assert_not_called()
+
+
+def test_panel_shortcut_opens_hidden_panel_through_the_manager():
+    from src.client.ui.components.hud.panel_shortcuts import consume_panel_shortcuts
+
+    manager, native = Mock(), Mock()
+    manager.is_visible.return_value = False
+    native.get_io.return_value = SimpleNamespace(
+        want_text_input=False, key_ctrl=False, key_alt=False, key_super=False
+    )
+    native.is_popup_open.return_value = False
+    native.is_key_pressed.side_effect = lambda key, repeat: key == native.Key.l
+
+    with patch("src.client.ui.components.hud.panel_shortcuts.imgui", native):
+        consume_panel_shortcuts(manager)
+
+    manager.is_visible.assert_called_once_with("UNIT_LIST")
+    manager.set_visible.assert_called_once_with("UNIT_LIST", True)
+
+
 def test_map_diplomacy_requires_a_real_country_counterpart():
     import polars as pl
     menu = object.__new__(ContextMenu)
@@ -125,6 +160,45 @@ def test_toggle_bar_dispatches_panel_visibility_through_manager() -> None:
         bar.render()
 
     manager.toggle.assert_called_once_with("MILITARY")
+
+
+def test_toggle_bar_returns_early_when_no_entries_have_icons() -> None:
+    manager = Mock()
+    manager.get_entries.return_value = [
+        SimpleNamespace(id="MILITARY", icon=None, color=(1, 1, 1, 1), visible=False)
+    ]
+    bar = ToggleBar(manager)
+
+    with patch("src.client.ui.components.hud.toggle_bar.imgui") as imgui:
+        bar.render()
+
+    imgui.get_style.assert_not_called()
+
+
+def test_toggle_bar_places_multiple_icons_on_one_row() -> None:
+    entries = [
+        SimpleNamespace(id="POL", icon="politics", color=(1, 1, 1, 1), visible=False),
+        SimpleNamespace(id="MILITARY", icon="unit", color=(1, 1, 1, 1), visible=False),
+    ]
+    manager = Mock()
+    manager.get_entries.return_value = entries
+    bar = ToggleBar(manager)
+
+    with (
+        patch("src.client.ui.components.hud.toggle_bar.imgui") as imgui,
+        patch("src.client.ui.components.hud.toggle_bar.Prims.icon_toggle", return_value=False),
+    ):
+        imgui.begin.return_value = True
+        imgui.get_main_viewport.return_value = SimpleNamespace(
+            pos=SimpleNamespace(x=0.0, y=0.0),
+            size=SimpleNamespace(x=1280.0, y=720.0),
+        )
+        imgui.get_style.return_value = SimpleNamespace(
+            window_padding=SimpleNamespace(x=14.0, y=14.0)
+        )
+        bar.render()
+
+    imgui.same_line.assert_called_once_with(0, 10)
 
 
 def test_toggle_bar_uses_clear_compact_viewport_strip() -> None:

@@ -111,6 +111,39 @@ class InfrastructurePolicyTests(unittest.TestCase):
 
         self.assertTrue(candidates.is_empty())
 
+    def test_build_candidates_handles_missing_tables_and_region_columns(self):
+        policy = InfrastructurePolicy()
+        missing_projects = self._context()
+        missing_projects.tables["infrastructure_projects"] = None
+        self.assertTrue(policy.build_candidates(missing_projects).collect().is_empty())
+
+        missing_region_columns = self._context()
+        missing_region_columns.tables["regions"] = pl.DataFrame({"name": ["NPC"]})
+        self.assertTrue(policy.build_candidates(missing_region_columns).collect().is_empty())
+
+    def test_build_candidates_handles_damage_rows_without_restoration_data(self):
+        context = self._context()
+        context.tables["infrastructure_damage_records"] = pl.DataFrame({"other": [1]})
+
+        candidates = InfrastructurePolicy().build_candidates(context).collect()
+
+        self.assertEqual(candidates.height, 1)
+
+    def test_resolve_action_rejects_malformed_candidate_rows(self):
+        policy = InfrastructurePolicy()
+
+        self.assertIsNone(policy.resolve_action({}))
+        self.assertIsNone(
+            policy.resolve_action(
+                {
+                    "country_id": "NPC",
+                    "region_id": 7,
+                    "category": "transport",
+                    "target_level": "invalid",
+                }
+            )
+        )
+
     def test_registered_ai_decision_is_accepted_by_authoritative_infrastructure_system(self):
         state = build_infrastructure_state()
         ensure_base_tables(state)

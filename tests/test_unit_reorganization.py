@@ -1,4 +1,5 @@
 import copy
+from unittest.mock import Mock, patch
 
 import polars as pl
 import pytest
@@ -242,3 +243,52 @@ def test_military_update_executes_disband_and_preserves_delivered_deployment_his
     assert state.tables["units"].is_empty()
     assert state.tables["countries"]["military_count"][0] == 0
     assert state.tables["unit_deployment_orders"]["status"][0] == "delivered"
+
+
+def test_invalid_unit_counts_and_missing_disband_country_data_are_rejected():
+    unit = {"id": "one", "owner": "UKR", "strength": 0, "equipment_quantity": 0}
+    assert UnitReorganization._unavailable_reason(GameState(), unit) == (
+        "The unit has an invalid personnel or equipment count."
+    )
+    assert UnitReorganization._disband(GameState(), [unit], [unit]) == (
+        "Country military totals are unavailable."
+    )
+
+    state = GameState(
+        tables={"countries": pl.DataFrame({"id": ["UKR"], "military_count": [10]})}
+    )
+    foreign_unit = dict(unit, strength=5, owner="POL")
+    assert UnitReorganization._disband(state, [foreign_unit], [foreign_unit]) == (
+        "The owner country is unavailable."
+    )
+
+
+def test_split_retries_a_deterministic_identifier_that_already_exists():
+    state = GameState()
+    unit = {"id": "one", "strength": 10, "equipment_quantity": 3}
+    rows = [unit]
+    runtime = Mock()
+    runtime.next_id.side_effect = ["one", "unit-split-child"]
+
+    with patch(
+        "modules.base.systems.military.unit_reorganization.DeterministicRuntime",
+        return_value=runtime,
+    ):
+        reason = UnitReorganization._split(state, rows, unit, 5)
+
+    assert reason == ""
+    assert [row["id"] for row in rows] == ["one", "unit-split-child"]
+    assert runtime.next_id.call_count == 2
+
+
+def test_merge_rejects_too_few_units_and_invalid_resulting_size():
+    unit = {"id": "one", "strength": 10, "equipment_quantity": 2}
+    assert UnitReorganization._merge([unit], [unit]) == "Select at least two units to merge."
+
+    invalid = [
+        {"id": "one", "strength": 0, "equipment_quantity": 0},
+        {"id": "two", "strength": 1, "equipment_quantity": 0},
+    ]
+    assert UnitReorganization._merge(invalid, invalid) == (
+        "The resulting unit would have an invalid size."
+    )

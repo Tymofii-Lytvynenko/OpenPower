@@ -91,6 +91,14 @@ def test_mission_start_plan_is_validated_without_mutating_simulation_rows():
             "The target sector does not match the selected mission profile.",
         ),
         (
+            _action(target_sector="unknown-sector"),
+            "Choose a valid covert mission target sector.",
+        ),
+        (
+            _action(mission_type="terrorism", target_sector="civilian"),
+            "This mission type does not use a target sector.",
+        ),
+        (
             _action(target_resource_id="unknown-resource"),
             "Choose a resource available to the target country.",
         ),
@@ -132,3 +140,21 @@ def test_mission_start_plan_rejects_unavailable_cell_authority_duplicate_and_fun
         "The target does not match the assignment or this cell already has an active mission."
     )
     assert unfunded.rejection_reason == "The owner cannot fund mission preparation."
+
+
+def test_mission_start_plan_rejects_missing_cell_or_incompatible_cell_assignment():
+    missing_cell, _ = _plan(cells=[])
+    incompatible_assignment, _ = _plan(cells=[_cell(assignment="security")])
+
+    assert missing_cell.rejection_reason == "The cell or mission type is invalid."
+    assert incompatible_assignment.rejection_reason == (
+        "The cell's active assignment does not support this mission."
+    )
+
+
+def test_mission_start_plan_rejects_cell_without_target_access():
+    result, _ = _plan(cells=[_cell(communications_ready=False)])
+
+    assert result.rejection_reason == (
+        "The cell has not reached the target or lacks communications."
+    )

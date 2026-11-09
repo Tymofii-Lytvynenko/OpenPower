@@ -6,7 +6,7 @@ from src.engine.command_pipeline import CommandPipeline
 from src.engine.simulator import Engine
 from src.server.session import GameSession
 from src.shared.actions import ActionSetGameSpeed, ActionSetPaused, ActionSetTax
-from src.shared.commands import CommandEnvelope, CommandStatus
+from src.shared.commands import COMMAND_SCHEMA_VERSION, CommandEnvelope, CommandStatus
 from src.shared.config import GameConfig
 from src.shared.state import GameState
 
@@ -65,6 +65,31 @@ class TestCommandPipeline(unittest.TestCase):
         second = command("two", 2, ActionSetPaused("player", True))
         pipeline.submit(second)
         self.assertEqual(pipeline.prepare(state, tick=2).ready, (second,))
+
+    def test_initial_sequences_and_protocol_envelope_fields_are_validated(self):
+        pipeline = CommandPipeline(initial_sequences={"player": 5})
+        action = ActionSetPaused("player", True)
+        invalid_commands = (
+            CommandEnvelope("schema", "player", 6, action, schema_version=COMMAND_SCHEMA_VERSION + 1),
+            CommandEnvelope("", "player", 6, action),
+            CommandEnvelope("actor", "", 1, action),
+            CommandEnvelope("mismatch", "other", 1, action),
+        )
+        for invalid in invalid_commands:
+            pipeline.submit(invalid)
+
+        result = pipeline.prepare(GameState(), tick=1)
+
+        self.assertEqual(pipeline._last_sequence["player"], 5)
+        self.assertEqual(
+            [rejected.message for rejected in result.rejected],
+            [
+                f"Unsupported command schema {COMMAND_SCHEMA_VERSION + 1}; expected {COMMAND_SCHEMA_VERSION}.",
+                "Command id cannot be empty.",
+                "Actor id cannot be empty.",
+                "Command actor does not match action player_id.",
+            ],
+        )
 
     def test_session_rejects_actions_without_a_registered_consumer(self):
         engine = Engine()

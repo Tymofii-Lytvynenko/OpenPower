@@ -27,6 +27,37 @@ class CameraControllerTest(unittest.TestCase):
         self.assertAlmostEqual(resized_map.yaw, original_sized_map.yaw)
         self.assertAlmostEqual(resized_map.pitch, original_sized_map.pitch)
 
+    def test_drag_and_scroll_apply_sensitivity_and_distance_bounds(self) -> None:
+        camera = CameraController(distance=2.6)
+        original_yaw = camera.yaw
+        original_pitch = camera.pitch
+
+        camera.drag(10, 4)
+        self.assertAlmostEqual(camera.yaw, original_yaw + 0.05)
+        self.assertAlmostEqual(camera.pitch, original_pitch - 0.02)
+
+        camera.zoom_scroll(4)
+        self.assertAlmostEqual(camera.distance, 2.2)
+        camera.zoom_scroll(-1000)
+        self.assertEqual(camera.distance, camera.max_distance)
+        camera.zoom_scroll(1000)
+        self.assertEqual(camera.distance, camera.min_distance)
+
+    def test_compatibility_sync_and_column_major_matrix_getter(self) -> None:
+        camera = CameraController()
+
+        self.assertIsNone(camera.sync_with_arcade(object()))
+        model, view, projection = camera.get_matrices()
+
+        self.assertEqual(len(model), 16)
+        self.assertEqual(len(view), 16)
+        self.assertEqual(len(projection), 16)
+        self.assertEqual(
+            model,
+            (1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+             0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

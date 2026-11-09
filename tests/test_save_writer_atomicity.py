@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from dataclasses import dataclass, fields
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import polars as pl
@@ -74,9 +76,11 @@ class TestSaveWriterAtomicity(unittest.TestCase):
 
     def test_successful_replacement_installs_new_generation_and_cleans_backup(self) -> None:
         target = self.save_root / "slot"
-        target.mkdir()
-        (target / "generation.txt").write_text("old", encoding="utf-8")
         backup = self.save_root / ".slot.backup"
+        target.mkdir()
+        backup.mkdir()
+        (target / "generation.txt").write_text("old", encoding="utf-8")
+        (backup / "generation.txt").write_text("stale backup", encoding="utf-8")
 
         def write_new_generation(state: GameState, path: Path) -> None:
             (path / "generation.txt").write_text("new", encoding="utf-8")
@@ -87,6 +91,60 @@ class TestSaveWriterAtomicity(unittest.TestCase):
         self.assertEqual((target / "generation.txt").read_text(encoding="utf-8"), "new")
         self.assertFalse(backup.exists())
         self.assertFalse(list(self.save_root.glob(".slot.tmp-*")))
+
+    def test_save_recovers_an_orphaned_backup_when_target_is_missing(self) -> None:
+        backup = self.save_root / ".slot.backup"
+        backup.mkdir()
+        (backup / "generation.txt").write_text("orphan", encoding="utf-8")
+
+        def write_new_generation(state: GameState, path: Path) -> None:
+            (path / "generation.txt").write_text("new", encoding="utf-8")
+
+        with patch.object(self.writer, "_write_state_to_disk", side_effect=write_new_generation):
+            self.assertTrue(self.writer.save_game(GameState(), "slot"))
+
+        self.assertEqual(
+            (self.save_root / "slot" / "generation.txt").read_text(encoding="utf-8"),
+            "new",
+        )
+        self.assertFalse(backup.exists())
+
+    def test_write_state_supports_direct_dataframe_persistent_fields(self) -> None:
+        @dataclass
+        class DirectDataFrameState:
+            table: pl.DataFrame
+
+        frame = pl.DataFrame({"id": [1, 2]})
+        state = SimpleNamespace(schema_registry=None, system_state={}, table=frame)
+        output_dir = self.save_root / "direct-frame"
+        output_dir.mkdir()
+
+        with (
+            patch(
+                "src.server.io.save_writer.persistent_state_fields",
+                return_value=fields(DirectDataFrameState),
+            ),
+            patch(
+                "src.server.io.save_writer.persistent_state_field_names",
+                return_value=("table",),
+            ),
+        ):
+            self.writer._write_state_to_disk(state, output_dir)
+
+        self.assertTrue(pl.read_parquet(output_dir / "table.parquet").equals(frame))
+
+    def test_delete_reports_filesystem_errors(self) -> None:
+        (self.save_root / "slot").mkdir()
+
+        with patch("src.server.io.save_writer.shutil.rmtree", side_effect=OSError("access denied")):
+            self.assertFalse(self.writer.delete_save("slot"))
+
+    def test_available_saves_delegates_to_shared_core_helper(self) -> None:
+        saves = [{"name": "slot"}]
+        with patch("src.server.io.save_writer.list_available_saves", return_value=saves) as listing:
+            self.assertEqual(self.writer.get_available_saves(), saves)
+
+        listing.assert_called_once_with(self.writer.config)
 
     def test_commit_failure_rolls_back_previous_slot(self) -> None:
         target = self.save_root / "slot"

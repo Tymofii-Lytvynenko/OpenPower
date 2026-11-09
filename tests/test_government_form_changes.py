@@ -4,6 +4,11 @@ import polars as pl
 import pytest
 
 from modules.base.schema import ensure_base_tables
+from modules.base.systems.politics.foreign_constitutional_policy import (
+    _integer,
+    _tags,
+    build_foreign_government_effects,
+)
 from modules.base.systems.politics.political_lifecycle_system import PoliticalLifecycleSystem
 from src.shared.actions import ActionSetGovernmentForm
 from src.shared.events import (
@@ -217,6 +222,44 @@ def test_confirmed_75_percent_foreign_form_change_releases_regions_and_grants_ac
         event for event in state.events if isinstance(event, EventTreatyLifecycleChanged)
     )
     assert treaty_event.transition == "activated"
+
+
+def test_foreign_effect_builder_releases_matching_occupations_only() -> None:
+    state, _ = _foreign_world(controlled_regions=1, at_war=False)
+    regions = pl.concat(
+        [
+            state.tables["regions"],
+            pl.DataFrame([{"id": 5, "owner": "AAA", "controller": "AAA"}]),
+        ],
+        how="vertical_relaxed",
+    )
+    state.update_table("regions", regions)
+    state.update_table(
+        "occupations",
+        pl.DataFrame(
+            [
+                {
+                    "region_id": 1,
+                    "controller_country_id": "AAA",
+                    "occupation_status": "active",
+                }
+            ],
+            schema=state.tables["occupations"].schema,
+            strict=False,
+        ),
+    )
+
+    updates, events = build_foreign_government_effects(state, "AAA", "POL", 12)
+
+    assert updates["regions"].filter(pl.col("id") == 5).item(0, "controller") == "AAA"
+    assert updates["occupations"].item(0, "occupation_status") == "ended"
+    assert len(events) == 1
+
+
+def test_foreign_policy_helpers_normalize_scalar_tags_and_invalid_ids() -> None:
+    assert _tags(42) == {"42"}
+    assert _tags(0) == set()
+    assert _integer("not-an-integer") == 0
 
 
 @pytest.mark.parametrize(

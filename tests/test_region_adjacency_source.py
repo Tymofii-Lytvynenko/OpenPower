@@ -6,6 +6,7 @@ from pathlib import Path
 import polars as pl
 from PIL import Image
 
+from src.core.region_adjacency import REGION_ADJACENCY_SCHEMA, RegionAdjacencyBuilder
 from src.core.region_adjacency_source import (
     _load_region_adjacency,
     load_region_adjacency,
@@ -30,6 +31,36 @@ def _write_region_map(path: Path, right_color: tuple[int, int, int]) -> None:
     image.putpixel((0, 0), (1, 2, 3))
     image.putpixel((1, 0), right_color)
     image.save(path)
+
+
+def test_region_adjacency_returns_empty_schema_when_no_map_exists(tmp_path: Path) -> None:
+    config = _Config(tmp_path / "data", tmp_path / "missing-regions.png")
+
+    adjacency = load_region_adjacency(config, [1, 2])
+
+    assert adjacency.is_empty()
+    assert adjacency.schema == REGION_ADJACENCY_SCHEMA
+
+
+def test_region_adjacency_builder_returns_empty_schema_without_valid_regions(
+    tmp_path: Path,
+) -> None:
+    adjacency = RegionAdjacencyBuilder().from_image(tmp_path / "regions.png", set())
+
+    assert adjacency.is_empty()
+    assert adjacency.schema == REGION_ADJACENCY_SCHEMA
+
+
+def test_region_adjacency_uses_asset_map_when_data_directory_has_no_map(
+    tmp_path: Path,
+) -> None:
+    fallback = tmp_path / "assets" / "regions.png"
+    _write_region_map(fallback, (1, 2, 4))
+    config = _Config(tmp_path / "data", fallback)
+
+    adjacency = load_region_adjacency(config, [0x010203, 0x010204])
+
+    assert adjacency.rows() == [(0x010203, 0x010204)]
 
 
 def test_region_adjacency_reuses_decoded_map_for_repeated_sessions(tmp_path: Path) -> None:

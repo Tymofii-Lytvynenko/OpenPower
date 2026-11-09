@@ -10,7 +10,12 @@ from modules.base.systems.military.military_system import MilitarySystem
 from modules.base.systems.world.advanced_diplomacy_system import AdvancedDiplomacySystem
 from modules.base.systems.world.peace_deal_policy import PeaceDealPolicy
 from modules.base.systems.world.treaty_diplomacy import DiplomacySystem
-from src.shared.actions import ActionBuildUnit, ActionRespondPeaceDeal, ActionSubmitPeaceDeal
+from src.shared.actions import (
+    ActionBuildUnit,
+    ActionOfferPeace,
+    ActionRespondPeaceDeal,
+    ActionSubmitPeaceDeal,
+)
 from src.shared.events import (
     EventPeaceDealProposed,
     EventPeaceDealResolved,
@@ -290,6 +295,190 @@ def test_opposing_ai_archetypes_score_identical_peace_terms_differently():
     assert math.isclose(conciliatory_score - hawkish_score, 0.24)
 
 
+def test_peace_clause_normalization_rejects_invalid_payload_shapes_and_values():
+    policy = PeaceDealPolicy()
+    normalized, error = policy.normalize_clauses(None)
+    assert normalized == []
+    assert "bounded list" in error
+    normalized, error = policy.normalize_clauses([{}] * (policy.MAX_CLAUSES + 1))
+    assert normalized == []
+    assert "bounded list" in error
+    assert "structured object" in policy.normalize_clauses([None])[1]
+    assert "Unsupported peace clause type" in policy.normalize_clauses([{"type": "unknown"}])[1]
+    assert "distinct payer and recipient" in policy.normalize_clauses(
+        [{"type": "war-reparations", "payer_country_id": "USA", "recipient_country_id": "USA"}]
+    )[1]
+    assert "positive finite amount" in policy.normalize_clauses(
+        [{"type": "war_reparations", "payer_country_id": "USA", "recipient_country_id": "CAN", "amount": 0}]
+    )[1]
+    assert "positive region id" in policy.normalize_clauses(
+        [{"type": "territory_transfer", "region_id": 0, "new_owner_country_id": "CAN"}]
+    )[1]
+    assert "requires a treaty id" in policy.normalize_clauses([{"type": "treaty_annulment"}])[1]
+    assert "non-negative force cap" in policy.normalize_clauses(
+        [{"type": "demilitarization", "country_id": "CAN", "maximum_strength": -1, "duration_days": 0}]
+    )[1]
+
+    normalized, error = policy.normalize_clauses(
+        [{"type": "territory-transfer", "region_id": "2", "new_owner_country_id": " can "}]
+    )
+    assert error == ""
+    assert normalized == [{"type": "territory_transfer", "region_id": 2, "new_owner_country_id": "CAN"}]
+
+
+def test_peace_clause_validation_rejects_invalid_participants_and_duplicate_targets():
+    policy = PeaceDealPolicy()
+    state = _state()
+    war = state.get_table("countries_wars").row(0, named=True)
+    reparations = {
+        "type": "war_reparations",
+        "payer_country_id": "CAN",
+        "recipient_country_id": "USA",
+        "amount": 100.0,
+        "duration_months": 12,
+    }
+    assert "not a participant" in policy.validate_clauses(state, war, "MEX", [])
+    assert policy.validate_clauses(state, war, "CAN", []) == ""
+
+    missing_country = dict(reparations, payer_country_id="MEX")
+    assert "two existing countries" in policy.validate_clauses(state, war, "USA", [missing_country])
+    same_side = dict(reparations, recipient_country_id="GBR")
+    assert "opposing war sides" in policy.validate_clauses(state, war, "USA", [same_side])
+
+    missing_region = {"type": "territory_transfer", "region_id": 999, "new_owner_country_id": "CAN"}
+    assert "existing region and recipient" in policy.validate_clauses(state, war, "USA", [missing_region])
+
+    owner_state = _state()
+    owner_state.update_table(
+        "regions",
+        owner_state.get_table("regions").with_columns(
+            pl.when(pl.col("id") == 2).then(pl.lit("MEX")).otherwise(pl.col("owner")).alias("owner")
+        ),
+    )
+    transfer = {"type": "territory_transfer", "region_id": 2, "new_owner_country_id": "CAN"}
+    assert "not owned by a participant" in policy.validate_clauses(
+        owner_state, war, "USA", [transfer]
+    )
+
+    controller_state = _state()
+    controller_state.update_table(
+        "regions",
+        controller_state.get_table("regions").with_columns(
+            pl.when(pl.col("id") == 2).then(pl.lit("MEX")).otherwise(pl.col("controller")).alias("controller")
+        ),
+    )
+    assert "not controlled by a participant" in policy.validate_clauses(
+        controller_state, war, "USA", [transfer]
+    )
+
+    outsider_state = _state()
+    outsider_countries = pl.concat(
+        [
+            outsider_state.get_table("countries"),
+            outsider_state.get_table("countries").head(1).with_columns(pl.lit("MEX").alias("id")),
+        ],
+        how="vertical_relaxed",
+    )
+    outsider_state.update_table("countries", outsider_countries)
+    same_owner = {"type": "territory_transfer", "region_id": 1, "new_owner_country_id": "USA"}
+    assert "different war participant" in policy.validate_clauses(
+        outsider_state, war, "USA", [same_owner]
+    )
+
+    inactive_state = _state()
+    inactive_state.update_table(
+        "countries_treaties",
+        inactive_state.get_table("countries_treaties").with_columns(pl.lit("expired").alias("status")),
+    )
+    annulment = {"type": "treaty_annulment", "treaty_id": "trade-1"}
+    assert "Only an active treaty" in policy.validate_clauses(inactive_state, war, "USA", [annulment])
+
+    same_side_treaty = _state()
+    treaty_rows = same_side_treaty.get_table("countries_treaties").to_dicts()
+    treaty_rows[0]["members"] = ["CAN", "GBR"]
+    same_side_treaty.update_table("countries_treaties", pl.DataFrame(treaty_rows))
+    assert "does not bind both opposing war sides" in policy.validate_clauses(
+        same_side_treaty, war, "USA", [annulment]
+    )
+
+    invalid_demilitarization = {
+        "type": "demilitarization",
+        "country_id": "MEX",
+        "maximum_strength": 100,
+        "duration_days": 30,
+    }
+    assert "participating in the war" in policy.validate_clauses(
+        state, war, "USA", [invalid_demilitarization]
+    )
+    assert "conflicting duplicate clauses" in policy.validate_clauses(
+        state, war, "USA", [annulment, annulment]
+    )
+
+
+def test_ai_acceptance_scores_reparations_territory_demilitarization_and_annulment():
+    state = _state()
+    war = state.get_table("countries_wars").row(0, named=True)
+    policy = PeaceDealPolicy()
+
+    payer = policy.evaluate_ai_acceptance(
+        state,
+        war,
+        "CAN",
+        [{"type": "war_reparations", "payer_country_id": "CAN", "recipient_country_id": "USA", "amount": 5_000.0}],
+    )
+    recipient = policy.evaluate_ai_acceptance(
+        state,
+        war,
+        "USA",
+        [{"type": "war_reparations", "payer_country_id": "CAN", "recipient_country_id": "USA", "amount": 1_200.0}],
+    )
+    assert 0.0 <= payer <= 1.0
+    assert recipient > policy.evaluate_ai_acceptance(state, war, "USA", [])
+
+    territory_gain = policy.evaluate_ai_acceptance(
+        state,
+        war,
+        "CAN",
+        [{"type": "territory_transfer", "region_id": 2, "new_owner_country_id": "CAN"}],
+    )
+    territory_loss = policy.evaluate_ai_acceptance(
+        state,
+        war,
+        "USA",
+        [{"type": "territory_transfer", "region_id": 1, "new_owner_country_id": "CAN"}],
+    )
+    disarmament = policy.evaluate_ai_acceptance(
+        state,
+        war,
+        "CAN",
+        [{"type": "demilitarization", "country_id": "CAN", "maximum_strength": 100}],
+    )
+    assert territory_gain > policy.evaluate_ai_acceptance(state, war, "CAN", [])
+    assert territory_loss < policy.evaluate_ai_acceptance(state, war, "USA", [])
+    assert disarmament < policy.evaluate_ai_acceptance(state, war, "CAN", [])
+
+    annulment = [{"type": "treaty_annulment", "treaty_id": "trade-1"}]
+    partnership_score = policy.evaluate_ai_acceptance(state, war, "CAN", annulment)
+    state.update_table(
+        "countries_treaties",
+        state.get_table("countries_treaties").with_columns(pl.lit("alliance").alias("type")),
+    )
+    alliance_score = policy.evaluate_ai_acceptance(state, war, "CAN", annulment)
+    assert partnership_score > alliance_score
+
+
+def test_peace_policy_parsers_return_safe_fallbacks():
+    policy = PeaceDealPolicy()
+    assert policy._country_tags("usa, CAN") == {"USA", "CAN"}
+    assert policy._country_tags(["usa", " CAN "]) == {"USA", "CAN"}
+    assert policy._country_tags(None) == set()
+    assert policy._finite("invalid", 7.0) == 7.0
+    assert policy._finite(float("inf"), 7.0) == 7.0
+    assert policy._integer("invalid", 9) == 9
+    assert policy._integer(1.5, 9) == 9
+    assert policy._integer(float("inf"), 9) == 9
+
+
 def test_active_alliance_obligation_reduces_acceptance_unless_suspended_or_expired():
     state = _state()
     policy = PeaceDealPolicy()
@@ -459,3 +648,272 @@ def test_ratified_demilitarization_limit_disarms_excess_and_blocks_recruitment()
     assert state.get_table("unit_order_feedback").filter(
         pl.col("reason").str.contains("demilitarization")
     ).height == 1
+
+
+def test_submit_rejects_inactive_unauthorized_duplicate_and_malformed_packages() -> None:
+    system = AdvancedDiplomacySystem()
+
+    inactive = _state()
+    inactive.update_table(
+        "countries_wars",
+        inactive.get_table("countries_wars").with_columns(pl.lit("ended").alias("status")),
+    )
+    deals = system._submit(
+        inactive,
+        ActionSubmitPeaceDeal("USA", "war-1", "USA"),
+        system._deals(None),
+    )
+    assert deals.is_empty()
+    assert inactive.journal.command_results[-1]["status"] == "rejected"
+
+    unauthorized = _state()
+    system._submit(
+        unauthorized,
+        ActionSubmitPeaceDeal("USA", "war-1", "CAN"),
+        system._deals(None),
+    )
+    assert "war leader" in unauthorized.journal.command_results[-1]["reason"]
+
+    state = _state()
+    action = ActionSubmitPeaceDeal("USA", "war-1", "USA")
+    pending = system._submit(state, action, system._deals(None))
+    system._submit(state, action, pending)
+    assert "already awaiting" in state.journal.command_results[-1]["reason"]
+    closed = pending.with_columns(pl.lit("rejected").alias("status"))
+    system._submit(state, action, closed)
+    assert "already been submitted" in state.journal.command_results[-1]["reason"]
+
+    invalid_offered = _state()
+    system._submit(
+        invalid_offered,
+        ActionSubmitPeaceDeal("USA", "war-1", "USA", offered_clauses=[None]),
+        system._deals(None),
+    )
+    assert "structured object" in invalid_offered.journal.command_results[-1]["reason"]
+
+    invalid_requested = _state()
+    system._submit(
+        invalid_requested,
+        ActionSubmitPeaceDeal("USA", "war-1", "USA", requested_clauses=[None]),
+        system._deals(None),
+    )
+    assert "structured object" in invalid_requested.journal.command_results[-1]["reason"]
+
+    clause = {
+        "type": "war_reparations",
+        "payer_country_id": "CAN",
+        "recipient_country_id": "USA",
+        "amount": 100.0,
+        "duration_months": 12,
+    }
+    too_many = _state()
+    system._submit(
+        too_many,
+        ActionSubmitPeaceDeal(
+            "USA",
+            "war-1",
+            "USA",
+            offered_clauses=[clause] * system._policy.MAX_CLAUSES,
+            requested_clauses=[clause],
+        ),
+        system._deals(None),
+    )
+    assert "more than" in too_many.journal.command_results[-1]["reason"]
+
+    for deadline in ("invalid", 0, 366):
+        state = _state()
+        system._submit(
+            state,
+            ActionSubmitPeaceDeal("USA", "war-1", "USA", expires_after_days=deadline),
+            system._deals(None),
+        )
+        assert state.journal.command_results[-1]["status"] == "rejected"
+
+    no_opposition = _state()
+    no_opposition.update_table(
+        "countries_wars",
+        no_opposition.get_table("countries_wars").with_columns(
+            pl.lit([], dtype=pl.List(pl.Utf8)).alias("side_b")
+        ),
+    )
+    system._submit(
+        no_opposition,
+        ActionSubmitPeaceDeal("USA", "war-1", "USA"),
+        system._deals(None),
+    )
+    assert "no participants" in no_opposition.journal.command_results[-1]["reason"]
+
+
+def test_respond_rejects_missing_deals_ended_wars_and_changed_clauses() -> None:
+    system = AdvancedDiplomacySystem()
+
+    missing = _state()
+    system._respond(
+        missing,
+        ActionRespondPeaceDeal("CAN", "missing", "CAN", True),
+        system._deals(None),
+    )
+    assert "no longer awaiting" in missing.journal.command_results[-1]["reason"]
+
+    duplicate = _state()
+    pending = system._submit(
+        duplicate,
+        ActionSubmitPeaceDeal("USA", "war-1", "USA"),
+        system._deals(None),
+    )
+    deal_id = pending.item(0, "id")
+    pending = system._respond(
+        duplicate, ActionRespondPeaceDeal("CAN", deal_id, "CAN", True), pending
+    )
+    system._respond(
+        duplicate, ActionRespondPeaceDeal("CAN", deal_id, "CAN", True), pending
+    )
+    assert "another response" in duplicate.journal.command_results[-1]["reason"]
+
+    rejected = _state()
+    pending = system._submit(
+        rejected,
+        ActionSubmitPeaceDeal("USA", "war-1", "USA"),
+        system._deals(None),
+    )
+    deal_id = pending.item(0, "id")
+    result = system._respond(
+        rejected, ActionRespondPeaceDeal("CAN", deal_id, "CAN", False), pending
+    )
+    assert result.item(0, "status") == "rejected"
+
+    ended = _state()
+    pending = system._submit(
+        ended,
+        ActionSubmitPeaceDeal("USA", "war-1", "USA"),
+        system._deals(None),
+    )
+    deal_id = pending.item(0, "id")
+    ended.update_table(
+        "countries_wars",
+        ended.get_table("countries_wars").with_columns(pl.lit("ended").alias("status")),
+    )
+    pending = system._respond(
+        ended, ActionRespondPeaceDeal("CAN", deal_id, "CAN", True), pending
+    )
+    result = system._respond(
+        ended, ActionRespondPeaceDeal("GBR", deal_id, "GBR", True), pending
+    )
+    assert result.item(0, "status") == "rejected"
+    assert "no longer active" in ended.journal.command_results[-1]["reason"]
+
+    changed = _state()
+    clause = {
+        "type": "territory_transfer",
+        "region_id": 2,
+        "new_owner_country_id": "CAN",
+    }
+    pending = system._submit(
+        changed,
+        ActionSubmitPeaceDeal("USA", "war-1", "USA", offered_clauses=[clause]),
+        system._deals(None),
+    )
+    deal_id = pending.item(0, "id")
+    changed.update_table(
+        "regions",
+        changed.get_table("regions").with_columns(
+            pl.when(pl.col("id") == 2)
+            .then(pl.lit("MEX"))
+            .otherwise(pl.col("owner"))
+            .alias("owner"),
+            pl.when(pl.col("id") == 2)
+            .then(pl.lit("MEX"))
+            .otherwise(pl.col("controller"))
+            .alias("controller"),
+        ),
+    )
+    pending = system._respond(
+        changed, ActionRespondPeaceDeal("CAN", deal_id, "CAN", True), pending
+    )
+    result = system._respond(
+        changed, ActionRespondPeaceDeal("GBR", deal_id, "GBR", True), pending
+    )
+    assert result.item(0, "status") == "rejected"
+    assert "not owned by a participant" in changed.journal.command_results[-1]["reason"]
+
+
+def test_background_resolution_and_private_helpers_cover_expiry_and_defaults() -> None:
+    system = AdvancedDiplomacySystem()
+    state = _state()
+    pending = system._submit(
+        state,
+        ActionSubmitPeaceDeal("USA", "war-1", "USA"),
+        system._deals(None),
+    ).with_columns(pl.lit(0).alias("expires_at_minute"))
+    expired = system._expire_pending(state, pending)
+    assert expired.item(0, "status") == "expired"
+    assert any(isinstance(event, EventPeaceDealResolved) for event in state.events)
+
+    missing_war = pending.with_columns(pl.lit("missing-war").alias("war_id"))
+    assert system._evaluate_ai_responses(state, missing_war).equals(missing_war)
+
+    state.globals["ai_controlled_countries"] = ["CAN"]
+    assert system._is_ai_country(state, "CAN")
+    assert not system._is_ai_country(state, "GBR")
+
+    assert system._deals(None).is_empty()
+    assert system._decode_clauses("not-json") == []
+    assert system._tags("usa, CAN") == {"USA", "CAN"}
+    assert system._tags(None) == set()
+
+    no_wars = _state()
+    no_wars.tables.pop("countries_wars")
+    assert system._war(no_wars, "war-1") is None
+    no_id = _state()
+    no_id.update_table("countries_wars", pl.DataFrame({"status": ["active"]}))
+    assert system._war(no_id, "war-1") is None
+
+
+def test_demilitarization_clamps_deployments_and_legacy_ai_offer_is_translated() -> None:
+    system = AdvancedDiplomacySystem()
+    state = _state()
+    state.update_table(
+        "units",
+        pl.DataFrame({"id": ["unit-1"], "owner": ["CAN"], "strength": [120]}),
+    )
+    state.update_table(
+        "unit_deployment_orders",
+        pl.DataFrame({"unit_id": ["unit-1"], "quantity": [150]}),
+    )
+    updates = system._apply_clauses(
+        state,
+        {"id": "deal-1"},
+        [
+            {
+                "type": "demilitarization",
+                "country_id": "CAN",
+                "maximum_strength": 500,
+                "duration_days": 30,
+            }
+        ],
+    )
+    assert updates["units"].item(0, "strength") == 120
+    assert updates["unit_deployment_orders"].item(0, "quantity") == 120
+
+    state = _state()
+    pending = system._submit(
+        state,
+        ActionSubmitPeaceDeal("USA", "war-1", "USA"),
+        system._deals(None),
+    )
+    state.update_table("peace_deals", pending)
+    state.current_actions = [ActionOfferPeace("AI_SYSTEM", "war-1", "USA", "peace")]
+    system.update(state, 0.0)
+    assert state.get_table("peace_deals").item(0, "status") == "pending"
+    assert "already awaiting" in state.journal.command_results[-1]["reason"]
+
+
+def test_system_metadata_and_idle_tick_are_stable() -> None:
+    system = AdvancedDiplomacySystem()
+    assert system.id == "base.advanced_diplomacy"
+    assert system.dependencies == ["base.time", "base.bootstrap"]
+
+    state = _state()
+    system.update(state, 0.0)
+    assert state.get_table("peace_deals").is_empty()
+    assert state.journal.command_results == []

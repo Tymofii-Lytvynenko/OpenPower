@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import polars as pl
 
 from modules.base.schema import ensure_base_tables
 from modules.base.systems.military.military_system import (
+    DEFAULT_MOVE_MINUTES,
     UNIT_SCHEMA,
     MovementDurationPolicy,
     MilitarySystem,
@@ -39,6 +42,15 @@ class MilitaryMovementSpecificationTest(unittest.TestCase):
         self.assertEqual(one_degree, int(360 + 111.1949266 * 0.45))
         self.assertEqual(zero_distance, 360)
         self.assertEqual(antipodal, min(10_080, int(360 + 20_015.0868 * 0.45)))
+
+    def test_missing_region_coordinates_use_the_default_duration(self) -> None:
+        regions = pl.DataFrame(
+            {"id": [1], "latitude": [0.0], "longitude": [0.0]}
+        )
+
+        duration = MovementDurationPolicy().estimate_minutes(regions, 1, 2)
+
+        self.assertEqual(duration, DEFAULT_MOVE_MINUTES)
 
     def test_movement_progress_reaches_exactly_one_at_authoritative_arrival_minute(self) -> None:
         unit = UnitFactory().create("USA-infantry-001", "USA", "infantry", 100, 1, GeoCoordinate(0.0, 0.0), 0)
@@ -338,6 +350,150 @@ class MilitaryMovementSpecificationTest(unittest.TestCase):
 
         manpower = {row["id"]: row["total_core_manpower"] for row in state.get_table("countries").to_dicts()}
         self.assertEqual(manpower, {"USA": 35, "CAN": 40})
+
+    def test_progression_handles_missing_routes_and_optional_tables(self) -> None:
+        progression, _, context = self._progression_context()
+
+        with patch(
+            "modules.base.systems.military.movement_progression.hostile_country_pairs",
+            return_value=[("USA",), ("USA", "CAN")],
+        ):
+            hostiles = progression._hostile_owners_by_country([])
+        self.assertEqual(hostiles, {"USA": {"CAN"}, "CAN": {"USA"}})
+
+        self.assertEqual(
+            progression._movement_route_state(context, {"id": "USA-1"}, 2),
+            (None, [], 0, True),
+        )
+        self.assertIsNone(progression._resolve_next_route_location(context, 2))
+        progression._start_next_route_leg(context, SimpleNamespace(route=None), 1)
+        progression._publish_movement_routes(context)
+
+        row = {"current_region_id": 1, "unit_lifecycle": "deployment_transit", "is_moving": True}
+        progression._block_current_route_leg(
+            context, row, None, GeoCoordinate(0.0, 0.0), domain_allowed=False,
+        )
+        self.assertFalse(row["is_moving"])
+        self.assertEqual(row["unit_lifecycle"], "deployment_blocked")
+
+    def test_naval_landing_requires_a_present_destination_but_accepts_validated_landings(self) -> None:
+        regions = pl.DataFrame({
+            "id": [1], "owner": ["USA"], "latitude": [0.0], "longitude": [1.0],
+        })
+        progression, _, context = self._progression_context(regions)
+        row = {"current_region_id": 1, "unit_lifecycle": "deployment_transit", "is_moving": True}
+        route = {"is_naval_invasion": True}
+        missing_destination = SimpleNamespace(
+            route=route,
+            is_final_leg=True,
+            target_region_id=99,
+            next_geo=GeoCoordinate(0.0, 2.0),
+            previous_geo=GeoCoordinate(0.0, 1.0),
+            row=row,
+        )
+
+        self.assertTrue(progression._block_invalid_naval_landing(context, missing_destination))
+        self.assertEqual(route["status"], "blocked")
+        self.assertEqual(row["unit_lifecycle"], "landing_blocked")
+        self.assertIn("no longer available", route["rejection_reason"])
+
+        valid_landing = SimpleNamespace(
+            route={"is_naval_invasion": True},
+            is_final_leg=True,
+            target_region_id=1,
+            next_geo=GeoCoordinate(0.0, 1.0),
+            previous_geo=GeoCoordinate(0.0, 0.5),
+            row={"current_region_id": 1, "is_moving": True},
+        )
+        with patch.object(progression._naval_invasion_policy, "validate", return_value=(True, "")):
+            self.assertFalse(progression._block_invalid_naval_landing(context, valid_landing))
+
+    def test_next_route_leg_blocks_lost_locations_and_incompatible_domains(self) -> None:
+        progression, _, missing_context = self._progression_context()
+        row = {
+            "id": "USA-1", "current_region_id": 1, "unit_lifecycle": "deployment_transit",
+            "production_order_id": "production-1", "is_moving": True,
+        }
+        missing_route = {
+            "route_region_ids": [1, 99], "route_index": 0, "destination_region_id": 99,
+            "status": "active",
+        }
+        missing_leg = SimpleNamespace(
+            route=missing_route,
+            route_ids=[1, 99],
+            route_index=0,
+            target_geo=GeoCoordinate(0.0, 1.0),
+            row=row,
+        )
+        progression._start_next_route_leg(missing_context, missing_leg, 1)
+        self.assertEqual(missing_route["status"], "blocked")
+        self.assertEqual(row["unit_lifecycle"], "deployment_blocked")
+        self.assertEqual(row["current_region_id"], 0)
+        self.assertIn("no longer has a valid location", missing_route["rejection_reason"])
+
+        regions = pl.DataFrame({
+            "id": [1, 2], "owner": ["USA", "USA"],
+            "latitude": [0.0, 0.0], "longitude": [1.0, 2.0],
+        })
+        progression, _, context = self._progression_context(regions)
+        incompatible_row = {
+            "id": "USA-2", "current_region_id": 0, "unit_lifecycle": "deployment_transit", "is_moving": True,
+        }
+        blocked_route = {
+            "route_region_ids": [1, 2], "route_index": 0, "destination_region_id": 2,
+            "is_naval_invasion": False, "status": "active",
+        }
+        blocked_leg = SimpleNamespace(
+            route=blocked_route,
+            route_ids=[1, 2],
+            route_index=0,
+            owner="USA",
+            target_geo=GeoCoordinate(0.0, 1.0),
+            row=incompatible_row,
+        )
+        with patch.object(progression, "_movement_segment_permissions", return_value=(False, True)):
+            progression._start_next_route_leg(context, blocked_leg, 1)
+        self.assertEqual(blocked_route["status"], "blocked")
+        self.assertIn("incompatible with the unit domain", blocked_route["rejection_reason"])
+        self.assertEqual(incompatible_row["unit_lifecycle"], "deployment_blocked")
+
+    def test_contact_and_numeric_helpers_handle_nonmatching_data(self) -> None:
+        progression, _, _ = self._progression_context()
+        defender = {
+            "id": "CAN-1", "strength": 50, "current_region_id": 2,
+            "latitude": 45.0, "longitude": 45.0, "is_moving": False,
+        }
+
+        self.assertIsNone(
+            progression._hostile_contact_candidate(
+                defender,
+                "CAN-1",
+                GeoCoordinate(0.0, 0.0),
+                GeoCoordinate(0.0, 1.0),
+                10,
+            )
+        )
+        candidate = progression._hostile_contact_candidate(
+            defender,
+            "USA-1",
+            GeoCoordinate(0.0, 0.0),
+            GeoCoordinate(0.0, 1.0),
+            10,
+        )
+
+        self.assertIsNone(candidate)
+        self.assertEqual(progression._row_float({"speed": "invalid"}, "speed", 4.5), 4.5)
+
+    def _progression_context(self, regions: pl.DataFrame | None = None):
+        state = GameState(tables={} if regions is None else {"regions": regions})
+        progression = MilitarySystem()._movement_progression
+        context = progression._build_movement_update_context(
+            state,
+            pl.DataFrame(schema=UNIT_SCHEMA),
+            10,
+            {},
+        )
+        return progression, state, context
 
 
 if __name__ == "__main__":

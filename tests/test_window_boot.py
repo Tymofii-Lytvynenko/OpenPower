@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
 from queue import Queue
 from threading import Event
 from types import SimpleNamespace
 from unittest.mock import Mock, PropertyMock, patch
+
+import polars as pl
 
 from src.client.window import MainWindow
 
@@ -174,3 +177,149 @@ def test_resize_forwards_to_viewport_imgui_settings_and_active_view() -> None:
     window.imgui.resize.assert_called_once_with(1024, 768)
     window.settings.remember_windowed_size.assert_called_once_with(1024, 768)
     current_view.on_resize.assert_called_once_with(1024, 768)
+
+
+def test_constructor_wires_services_and_optional_font_path(tmp_path: Path) -> None:
+    existing_font = tmp_path / "font.ttf"
+    existing_font.write_text("font", encoding="utf-8")
+
+    for font_path in (None, tmp_path / "missing.ttf", existing_font):
+        config = SimpleNamespace(
+            user_data_dir=tmp_path,
+            get_asset_path=Mock(return_value=font_path),
+        )
+        settings = Mock()
+        window = MainWindow.__new__(MainWindow)
+
+        with (
+            patch("arcade.Window.__init__") as base_init,
+            patch.object(MainWindow, "switch_to") as switch_to,
+            patch.object(MainWindow, "set_minimum_size") as set_minimum_size,
+            patch("src.client.window.GameSettingsService.from_path", return_value=settings) as from_path,
+            patch("src.client.window.ImGuiService") as imgui_service,
+            patch("src.client.window.NavigationService") as navigation_service,
+        ):
+            MainWindow.__init__(window, config, Mock())
+
+        base_init.assert_called_once_with(1280, 720, "OpenPower Engine", resizable=True)
+        switch_to.assert_called_once_with()
+        set_minimum_size.assert_called_once_with(800, 600)
+        from_path.assert_called_once_with(tmp_path / "settings.json")
+        settings.apply_display.assert_called_once_with(window)
+        expected_font_path = font_path if font_path == existing_font else None
+        imgui_service.assert_called_once_with(
+            window,
+            font_path=expected_font_path,
+            enable_implot=True,
+            inspection_provider=window._inspection_snapshot,
+        )
+        navigation_service.assert_called_once_with(window)
+        assert window.session is None
+        assert window.shared_renderer is None
+        assert window._boot_thread is None
+
+
+def test_inspection_snapshot_handles_missing_state_and_country_rows() -> None:
+    window = MainWindow.__new__(MainWindow)
+    window.session = None
+    view = SimpleNamespace(player_tag=None)
+
+    with patch.object(MainWindow, "current_view", new_callable=PropertyMock, return_value=view):
+        assert window._inspection_snapshot() == {"view": "SimpleNamespace", "ready": False}
+
+        window.session = SimpleNamespace(
+            state=SimpleNamespace(
+                globals={"tick": 4, "player_tag": "USA"},
+                tables={"countries": pl.DataFrame({"id": ["USA"], "money_reserves": [12.5]})},
+                time=SimpleNamespace(
+                    date_str="1936-01-01",
+                    total_minutes=10,
+                    is_paused=False,
+                    speed_level=2,
+                ),
+                journal=SimpleNamespace(command_results=list(range(25))),
+            ),
+            system_errors=["diagnostic"],
+        )
+        snapshot = window._inspection_snapshot()
+
+    assert snapshot["ready"] is True
+    assert snapshot["country"] == {"id": "USA", "money_reserves": 12.5}
+    assert snapshot["table_rows"] == {"countries": 1}
+    assert snapshot["command_results"] == list(range(5, 25))
+    assert snapshot["system_errors"] == ["diagnostic"]
+
+    window.session.state.globals = {"tick": 1}
+    window.session.state.tables = {}
+    with patch.object(MainWindow, "current_view", new_callable=PropertyMock, return_value=view):
+        snapshot = window._inspection_snapshot()
+    assert snapshot["country"] is None
+
+
+def test_geo_language_sync_ignores_missing_or_non_dict_session_state() -> None:
+    window = _window()
+    window.session = None
+    window._sync_geo_language_to_session()
+
+    window.session = SimpleNamespace(state=None)
+    window._sync_geo_language_to_session()
+
+    globals_object = SimpleNamespace(geo_language_code="old")
+    window.session = SimpleNamespace(state=SimpleNamespace(globals=globals_object))
+    window._sync_geo_language_to_session()
+    assert globals_object.geo_language_code == "old"
+
+    globals_dict = {}
+    window.session = SimpleNamespace(state=SimpleNamespace(globals=globals_dict))
+    window._sync_geo_language_to_session()
+    assert globals_dict == {"geo_language_code": "en"}
+
+
+def test_boot_creation_and_polling_handle_factory_failure_closing_and_empty_queues() -> None:
+    failed_window = _window(Mock(side_effect=RuntimeError("factory failed")))
+    failed_window._create_boot_session()
+    message_type, error = failed_window._boot_result_queue.get_nowait()
+    assert message_type == "ERROR"
+    assert str(error) == "factory failed"
+
+    session = FakeSession()
+    closing_window = _window(Mock(return_value=session))
+    closing_window._boot_closing.set()
+    closing_window._create_boot_session()
+    session.shutdown.assert_called_once_with()
+    assert closing_window._boot_result_queue.empty()
+
+    window = _window()
+    window._boot_closing.set()
+    window._check_server_boot(1 / 60)
+
+    window._boot_closing.clear()
+    with patch("src.client.window.arcade.unschedule"):
+        window._check_server_boot(1 / 60)
+        window.session = FakeSession()
+        window._check_server_boot(1 / 60)
+    window.session.tick.assert_not_called()
+
+
+def test_update_and_close_forward_to_live_session_and_imgui() -> None:
+    window = _window()
+    window.imgui = Mock()
+    session = FakeSession()
+    session.state = SimpleNamespace(globals={})
+    window.session = session
+
+    window.on_update(0.25)
+    session.tick.assert_called_once_with(0.25)
+    assert session.state.globals == {"geo_language_code": "en"}
+
+    with (
+        patch("src.client.window.arcade.unschedule") as unschedule,
+        patch("arcade.Window.on_close") as base_close,
+    ):
+        window.on_close()
+
+    assert window._boot_closing.is_set()
+    unschedule.assert_called_once_with(window._check_server_boot)
+    session.shutdown.assert_called_once_with()
+    window.imgui.shutdown.assert_called_once_with()
+    base_close.assert_called_once_with()

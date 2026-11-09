@@ -8,10 +8,12 @@ from modules.base.systems.military.capability_catalog import (
     DEFAULT_ROLE_PROFILES,
     FIXED_ROLE_CHARACTERISTICS,
     canonical_role,
+    design_capability_error,
     get_role_profile,
     project_capabilities,
     researched_capabilities,
     trained_capabilities,
+    training_bonus,
 )
 
 
@@ -97,6 +99,37 @@ class CapabilityCatalogTest(unittest.TestCase):
         self.assertAlmostEqual(improved["sensors"], base["sensors"] * 1.25)
         self.assertEqual(improved["armor"], base["armor"])
         self.assertEqual(improved["speed"], base["speed"])
+
+    def test_design_error_explains_missing_required_stats_and_weapon_profile(self) -> None:
+        message = design_capability_error("air defense", {})
+
+        self.assertIn("missing required capabilities", message)
+        self.assertIn("complete gun or missile profile", message)
+
+    def test_design_error_reports_missing_weapon_profile_after_required_stats_pass(self) -> None:
+        message = design_capability_error(
+            "air_defense",
+            {"sensors": 1, "speed": 1, "armor": 1},
+        )
+
+        self.assertEqual(
+            message,
+            "The selected design needs a complete gun or missile profile.",
+        )
+
+    def test_invalid_training_level_falls_back_to_recruit(self) -> None:
+        self.assertEqual(training_bonus("unlisted training"), 0.0)
+
+    def test_invalid_capability_values_are_normalized_to_safe_defaults(self) -> None:
+        profile = get_role_profile("tanks")
+        projected = project_capabilities(profile, {"speed": "not-a-number"})
+        base = project_capabilities(profile)
+
+        self.assertEqual(projected["speed"], CAPABILITY_BOUNDS["speed"][0])
+        self.assertEqual(
+            researched_capabilities(base, "not-a-number", {"speed": 0.1}),
+            base,
+        )
 
 
 if __name__ == "__main__":

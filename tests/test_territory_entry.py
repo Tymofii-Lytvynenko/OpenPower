@@ -161,3 +161,95 @@ def test_replay_through_real_engine_preserves_authority_order_and_snapshot_resul
         assert state.tables["units"].row(0, named=True)["is_moving"]
     for table in ("countries_wars", "unit_movement_routes", "units"):
         assert original.tables[table].equals(restored.tables[table])
+
+
+@pytest.mark.parametrize(
+    "latitude",
+    ["invalid", 91.0, float("nan")],
+    ids=["not-numeric", "out-of-range", "not-finite"],
+)
+def test_selected_unit_requires_a_valid_geographic_position(latitude):
+    state = world()
+    state.tables["units"] = state.tables["units"].with_columns(
+        pl.lit(latitude).alias("latitude")
+    )
+
+    owner, reason = validate_territory_entry(state, order(), [])
+
+    assert owner == ""
+    assert "valid geographic position" in reason
+
+
+def test_strategic_units_cannot_start_conventional_territory_entry():
+    state = world()
+    state.tables["units"] = state.tables["units"].with_columns(
+        pl.lit("strategic").alias("unit_domain")
+    )
+
+    owner, reason = validate_territory_entry(state, order(), [])
+
+    assert owner == ""
+    assert "Strategic assets" in reason
+
+
+def test_invalid_target_coordinate_text_is_rejected():
+    owner, reason = validate_territory_entry(
+        world(), order(target_latitude="invalid"), []
+    )
+
+    assert owner == ""
+    assert "destination coordinates" in reason
+
+
+def test_missing_destination_region_is_rejected():
+    owner, reason = validate_territory_entry(
+        world(), order(target_region_id=99), []
+    )
+
+    assert owner == ""
+    assert "no longer available" in reason
+
+
+def test_intermediate_route_region_requires_finite_coordinates():
+    state = world()
+    state.tables["regions"] = pl.concat(
+        [
+            state.tables["regions"],
+            pl.DataFrame(
+                [
+                    dict(
+                        id=3,
+                        owner="UKR",
+                        controller="UKR",
+                        name="Transit",
+                        latitude=float("nan"),
+                        longitude=25.0,
+                        is_water=False,
+                    )
+                ]
+            ),
+        ]
+    )
+    state.tables["region_adjacency"] = pl.DataFrame(
+        [
+            dict(region_id=1, neighbor_region_id=3),
+            dict(region_id=3, neighbor_region_id=2),
+        ]
+    )
+
+    owner, reason = validate_territory_entry(state, order(), [])
+
+    assert owner == ""
+    assert "without valid coordinates" in reason
+
+
+def test_unavailable_unit_lifecycle_rejects_entry():
+    state = world()
+    state.tables["units"] = state.tables["units"].with_columns(
+        pl.lit("moving").alias("unit_lifecycle")
+    )
+
+    owner, reason = validate_territory_entry(state, order(), [])
+
+    assert owner == ""
+    assert "deployed and available" in reason

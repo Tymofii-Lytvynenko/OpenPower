@@ -96,6 +96,12 @@ class TestModApi(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "features must contain ModFeature"):
             mod(features=(object(),))
 
+        with self.assertRaisesRegex(TypeError, "Expected a system class, instance, or factory"):
+            mod(object())
+
+        with self.assertRaisesRegex(TypeError, "schemas must be a TableSchema or an iterable"):
+            feature(schemas=object())
+
 
 if __name__ == "__main__":
     unittest.main()

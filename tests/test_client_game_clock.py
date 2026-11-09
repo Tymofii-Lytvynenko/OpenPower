@@ -5,6 +5,24 @@ from src.shared.state import TimeData
 
 
 class ClientGameClockTest(unittest.TestCase):
+    def test_hard_reset_discards_pending_clock_correction(self) -> None:
+        clock = ClientGameClock()
+        clock.sync(TimeData(total_minutes=100, speed_level=1, is_paused=True))
+        clock.sync(TimeData(total_minutes=102, speed_level=1, is_paused=True))
+        clock.sync(TimeData(total_minutes=1000, speed_level=1, is_paused=True))
+
+        clock.advance(0.25)
+
+        self.assertEqual(clock.display_minutes, 1000.0)
+
+    def test_date_text_is_absent_before_sync_and_formatted_after_sync(self) -> None:
+        clock = ClientGameClock()
+        self.assertIsNone(clock.date_text())
+
+        clock.sync(TimeData(total_minutes=90, speed_level=1, is_paused=True))
+
+        self.assertRegex(clock.date_text(), r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
+
     def test_clock_advances_every_render_frame_between_snapshots(self) -> None:
         clock = ClientGameClock()
         clock.sync(TimeData(total_minutes=100, speed_level=1, is_paused=False))

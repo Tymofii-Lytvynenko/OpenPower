@@ -51,6 +51,25 @@ def test_schedule_ignores_paused_idle_updates():
     assert update_schedule(state, services=_services()) is None
 
 
+def test_schedule_skips_states_without_required_tables():
+    state = _ScheduleState(
+        cells=pl.DataFrame(schema={"status": pl.Utf8}),
+        missions=pl.DataFrame(schema={"status": pl.Utf8}),
+    )
+    state.tables.pop("covert_findings")
+
+    assert update_schedule(state, services=_services()) is None
+
+
+def test_schedule_without_training_completion_data_stays_idle():
+    state = _ScheduleState(
+        cells=pl.DataFrame({"status": ["training"]}),
+        missions=pl.DataFrame(schema={"status": pl.Utf8}),
+    )
+
+    assert update_schedule(state, services=_services()) is None
+
+
 def test_schedule_runs_mission_when_its_execution_boundary_is_due():
     state = _ScheduleState(
         cells=pl.DataFrame(schema={"status": pl.Utf8}),

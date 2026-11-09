@@ -36,6 +36,13 @@ def test_region_map_data_packs_bgr_as_24_bit_id_and_handles_bounds(tmp_path: Pat
     assert not hasattr(map_data, "raw_img")
 
 
+def test_region_map_data_raises_for_a_missing_image(tmp_path: Path) -> None:
+    missing_path = tmp_path / "missing-regions.png"
+
+    with pytest.raises(FileNotFoundError, match="Missing map"):
+        RegionMapData(str(missing_path))
+
+
 def test_region_map_data_lookup_timing_baseline(tmp_path: Path) -> None:
     path = tmp_path / "lookup-regions.png"
     pixels = np.zeros((256, 512, 3), dtype=np.uint8)
@@ -115,6 +122,33 @@ def test_map_indexer_computes_indices_once_then_uses_verified_cache(tmp_path: Pa
     np.testing.assert_array_equal(cached_map, dense_map)
     assert dense_map.shape == region_ids.shape
     assert cache.saved == 1
+
+
+def test_map_indexer_rejects_non_grid_inputs(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="2D region-ID grid"):
+        MapIndexer(MagicMock()).get_indices(tmp_path / "regions.png", np.array([1, 2]))
+
+
+def test_map_indexer_rejects_invalid_cached_array_shapes(tmp_path: Path) -> None:
+    cache_path = tmp_path / "regions_index.npz"
+    invalid_archives = [
+        {
+            "hash": np.asarray("source-hash"),
+            "unique_ids": np.array([[1, 2]]),
+            "dense_map": np.array([[0, 1], [1, 0]]),
+        },
+        {
+            "hash": np.asarray("source-hash"),
+            "unique_ids": np.array([1, 2]),
+            "dense_map": np.array([[0, 1, 1, 0]]),
+        },
+    ]
+
+    for archive in invalid_archives:
+        cache = SimpleNamespace(load_numpy_archive=lambda _path, result=archive: result)
+        indexer = MapIndexer(cache)
+
+        assert indexer._load_from_cache(cache_path, "source-hash", (2, 2)) is None
 
 
 def test_cache_service_archive_is_copied_closed_and_atomically_replaceable(

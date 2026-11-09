@@ -13,7 +13,7 @@ from modules.base.systems.economy.consumption_fast_path import (
 )
 from modules.base.systems.economy.internal_economy_system import InternalEconomySystem
 from modules.base.systems.economy.trade_system import TradeSystem
-from src.shared.economy_meta import RESOURCE_MAPPING
+from src.shared.economy_meta import RESOURCE_MAPPING, get_resource_meta
 from src.shared.numeric import (
     stable_group_sum,
     stable_group_sums,
@@ -22,6 +22,13 @@ from src.shared.numeric import (
 from src.shared.frames import ensure_sorted
 from src.shared.events import EventRealSecond
 from src.shared.state import GameState
+
+
+def test_unknown_resource_metadata_uses_the_unclassified_fallback():
+    assert get_resource_meta("unknown_resource") == {
+        "category": "Unclassified",
+        "unit": "units",
+    }
 
 
 def test_consumption_pool_matches_global_wealth_anchor_and_protects_basic_food_demand():
@@ -1215,6 +1222,11 @@ def test_dense_nonnegative_row_reduction_uses_reproducible_edge_fallback():
     values = np.asarray([[1.25, 2.5, 3.75], [1e16, 1.0, -1e16]])
 
     assert stable_nonnegative_row_totals(values).tolist() == [7.5, 1.0]
+
+
+def test_dense_row_reduction_rejects_non_matrix_inputs():
+    with pytest.raises(ValueError, match="two-dimensional"):
+        stable_nonnegative_row_totals(np.asarray([1.0, 2.0]))
 
 
 def test_ensure_sorted_orders_unsorted_rows_and_preserves_existing_order():

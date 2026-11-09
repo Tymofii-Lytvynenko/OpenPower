@@ -91,13 +91,34 @@ class EmpireMapModeOccupationTests(unittest.TestCase):
         mode = EmpireMapMode()
         mode.set_selected_country("USA")
 
-        self.assertEqual(mode.calculate_colors(state)[1], EmpireMapMode.OCCUPIED)
+        initial_colors = mode.calculate_colors(state)
+        self.assertEqual(initial_colors[1], EmpireMapMode.OCCUPIED)
+        self.assertEqual(mode.calculate_colors(state), initial_colors)
         state.update_table(
             "regions",
             state.get_table("regions").with_columns(pl.lit("CAN").alias("controller")),
         )
 
         self.assertEqual(mode.calculate_colors(state)[1], EmpireMapMode.NEUTRAL)
+
+    def test_display_properties_and_region_schema_fallbacks(self) -> None:
+        mode = EmpireMapMode()
+
+        self.assertEqual(mode.name, "Empire")
+        self.assertEqual(mode.opacity, 0.82)
+        self.assertEqual(mode.calculate_colors(GameState(tables={})), {})
+        self.assertEqual(
+            mode.calculate_colors(GameState(tables={"regions": pl.DataFrame({"id": [1]})})),
+            {},
+        )
+
+        owner_only_state = GameState(
+            tables={"regions": pl.DataFrame({"id": [1], "owner": ["USA"]})}
+        )
+        self.assertEqual(
+            mode.calculate_colors(owner_only_state)[1],
+            EmpireMapMode.NEUTRAL,
+        )
 
     def test_region_without_a_controller_uses_unknown_palette(self) -> None:
         state = GameState(tables={

@@ -55,6 +55,29 @@ def test_autosave_does_not_run_during_game_over_and_keeps_elapsed_time():
     assert len(client.actions) == 1
 
 
+def test_autosave_without_command_identity_is_throttled_until_next_interval():
+    class ClientWithoutCommandId:
+        player_id = "local"
+
+        def __init__(self):
+            self.calls = 0
+
+        def send_action(self, action):
+            self.calls += 1
+            return None
+
+    now = [0.0]
+    settings = Settings()
+    client = ClientWithoutCommandId()
+    scheduler = AutosaveScheduler(settings, client, clock=lambda: now[0])
+
+    scheduler.update([])
+    now[0] = 60.0
+    assert scheduler.update([]) == set()
+    assert scheduler.update([]) == set()
+    assert client.calls == 1
+
+
 def test_autosave_settings_and_counter_survive_restart_and_name_change_resets_counter(tmp_path):
     path = tmp_path / "settings.json"
     service = GameSettingsService.from_path(path)

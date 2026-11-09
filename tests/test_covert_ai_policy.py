@@ -1,12 +1,18 @@
 import polars as pl
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from modules.base.schema import ensure_base_tables
 from modules.base.systems.military.covert_operations_system import CovertOperationsSystem
 from modules.base.systems.world.ai_system import AISystem
+import modules.base.systems.world.ai.covert_policy as covert_policy_module
 from modules.base.systems.world.ai.covert_policy import CovertOperationsPolicy
 from src.core.ai_framework import AITableContext
-from src.shared.actions import ActionCreateCovertCell, ActionStartCovertMission
+from src.shared.actions import (
+    ActionCreateCovertCell,
+    ActionStartCovertMission,
+    ActionTrainCovertCell,
+)
 from src.shared.state import GameState
 
 
@@ -136,3 +142,176 @@ def test_relationship_snapshot_is_not_indexed_when_cell_creation_is_unaffordable
 
     assert candidates == []
     index.assert_not_called()
+
+
+def _ai_context(tables, globals_=None) -> AITableContext:
+    return AITableContext(
+        tables=tables,
+        day_ordinal=0,
+        total_minutes=0,
+        date_text="0001-01-01",
+        player_tag="PLAYER",
+        globals=globals_ or {},
+    )
+
+
+def test_candidate_builder_returns_empty_for_unscheduled_or_incomplete_snapshots(monkeypatch):
+    policy = CovertOperationsPolicy()
+    monkeypatch.setattr(
+        covert_policy_module,
+        "country_frame",
+        lambda *_args: pl.DataFrame(schema={"country_id": pl.Utf8}).lazy(),
+    )
+    assert policy.build_candidates(_ai_context({})).collect().is_empty()
+
+    monkeypatch.setattr(
+        covert_policy_module,
+        "country_frame",
+        lambda *_args: pl.DataFrame({"country_id": ["AI"]}).lazy(),
+    )
+    base = _state()
+    incomplete = dict(base.tables)
+    incomplete.pop("regions")
+    assert policy.build_candidates(_ai_context(incomplete)).collect().is_empty()
+
+    missing_country_id = {
+        "countries": pl.DataFrame({"name": ["AI"]}),
+        "regions": base.get_table("regions"),
+        "covert_cells": base.get_table("covert_cells"),
+        "covert_missions": base.get_table("covert_missions"),
+    }
+    assert policy.build_candidates(_ai_context(missing_country_id)).collect().is_empty()
+
+
+def test_active_cell_and_mission_indexes_ignore_unknown_schemas():
+    cells = CovertOperationsPolicy._active_cell_frame(
+        pl.DataFrame({"unexpected": [1]}), ["AI"]
+    )
+    missions = CovertOperationsPolicy._active_mission_frame(
+        pl.DataFrame({"unexpected": [1]})
+    )
+
+    assert cells.columns == ["cell_id", "country_id"]
+    assert missions.columns == ["active_cell_id"]
+
+
+def test_creation_targets_excludes_allies_and_resolves_treaty_frames():
+    policy = CovertOperationsPolicy()
+    owners = pl.DataFrame({"country_id": ["AI"]})
+    countries = pl.DataFrame({"id": ["AI", "PLAYER", "OTHER"]})
+    owned_regions = pl.DataFrame({"country_id": ["AI", "PLAYER", "OTHER"]})
+
+    targets = policy._creation_targets(
+        owners,
+        countries,
+        owned_regions,
+        {("AI", "PLAYER"), ("PLAYER", "AI")},
+        {("AI", "OTHER"): [-10.0]},
+    )
+    assert targets.to_dicts() == [{"country_id": "AI", "target_country_id": "OTHER"}]
+    assert policy._allied_pairs_from_frame(pl.DataFrame({"status": ["active"]})) == set()
+    assert policy._allied_pairs_from_frame(
+        pl.DataFrame(
+            {
+                "status": ["ACTIVE", "expired"],
+                "treaty_type": ["ALLIANCE", "alliance"],
+                "members": ['["AI", "PLAYER"]', '["AI", "OTHER"]'],
+            }
+        )
+    ) == {("AI", "PLAYER"), ("PLAYER", "AI")}
+
+
+def test_action_resolution_covers_training_and_unknown_actions():
+    policy = CovertOperationsPolicy()
+
+    action = policy.resolve_action(
+        {"country_id": "AI", "action_kind": "train_cell", "cell_id": "cell-1", "training_points": 0}
+    )
+
+    assert action == ActionTrainCovertCell("ai_system", "cell-1", 1.0)
+    assert policy.resolve_action({"country_id": "AI", "action_kind": "other"}) is None
+
+
+def test_cell_actions_skip_blocked_cells_before_training_or_starting_missions(monkeypatch):
+    policy = CovertOperationsPolicy()
+    monkeypatch.setattr(
+        covert_policy_module,
+        "skill_profile",
+        lambda skill: SimpleNamespace(max_mission_risk=0.0 if skill == "Low" else 1.0),
+    )
+
+    assert policy._cell_action(
+        "AI", 0.0, [{"id": "recruit", "status": "active", "skill_level": "Recruit"}],
+        set(), 100.0, 10.0, 2.0, 0.2,
+    ) is None
+
+    rows = [
+        {"id": "", "status": "active"},
+        {"id": "retired", "status": "retired"},
+        {"id": "busy", "status": "active", "skill_level": "Regular"},
+        {"id": "low-risk", "status": "active", "skill_level": "Low"},
+        {"id": "no-target", "status": "active", "skill_level": "Regular"},
+        {
+            "id": "wrong-location", "status": "active", "skill_level": "Regular",
+            "target_country_id": "PLAYER", "location_country_id": "OTHER",
+        },
+        {
+            "id": "no-comms", "status": "active", "skill_level": "Regular",
+            "target_country_id": "PLAYER", "location_country_id": "PLAYER",
+            "communications_ready": False,
+        },
+        {
+            "id": "assigned", "status": "active", "skill_level": "Regular",
+            "target_country_id": "PLAYER", "location_country_id": "PLAYER",
+            "communications_ready": True, "assignment": "security",
+        },
+        {
+            "id": "mission", "status": "active", "skill_level": "Regular",
+            "target_country_id": "PLAYER", "location_country_id": "PLAYER",
+            "communications_ready": True, "assignment": "espionage",
+        },
+    ]
+    mission = policy._cell_action("AI", 10.0, rows, {"busy"}, 100.0, 10.0, 2.0, 0.2)
+    assert mission["action_kind"] == "start_mission"
+    assert mission["cell_id"] == "mission"
+
+    training = policy._cell_action(
+        "AI", 10.0, [{"id": "recruit", "status": "idle", "skill_level": "Recruit"}],
+        set(), 100.0, 10.0, 2.0, 0.2,
+    )
+    assert training["action_kind"] == "train_cell"
+    assert training["training_points"] == 100.0
+
+
+def test_target_selection_and_alliance_members_are_normalized_safely():
+    policy = CovertOperationsPolicy()
+    countries = [
+        {"id": ""},
+        {"id": "AI"},
+        {"id": "ALLY"},
+        {"id": "UNOWNED"},
+        {"id": "OTHER"},
+    ]
+    relations = {("AI", "OTHER"): [10.0], ("OTHER", "AI"): [20.0]}
+
+    assert policy._choose_target(
+        "AI", countries, relations, {("AI", "ALLY")}, {"AI", "ALLY", "OTHER"}
+    ) == "OTHER"
+    assert policy._choose_target("AI", countries, {}, set(), {"AI"}) == ""
+
+    pairs = policy._allied_pairs(
+        [
+            {"status": "expired", "treaty_type": "alliance", "members": ["A", "B"]},
+            {"status": "active", "treaty_type": "trade", "members": ["A", "C"]},
+            {"treaty_type": "alliance", "members": '["b", "A", "", "A"]'},
+            {"status": "active", "treaty_type": "alliance", "members": "{bad"},
+            {"status": "active", "treaty_type": "alliance", "members": {"A": "B"}},
+            {"status": "active", "treaty_type": "alliance", "members": ["solo", ""]},
+        ]
+    )
+    assert pairs == {("A", "B"), ("B", "A")}
+
+
+def test_policy_numeric_fallbacks_reject_nonfinite_inputs():
+    assert CovertOperationsPolicy._finite("invalid", 7.0) == 7.0
+    assert CovertOperationsPolicy._finite("inf", 7.0) == 7.0

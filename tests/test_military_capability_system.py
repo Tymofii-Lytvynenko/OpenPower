@@ -440,6 +440,170 @@ class MilitaryCapabilitySystemTest(unittest.TestCase):
         self.assertIsNone(quote["required_days"])
         self.assertIn("facility", quote["reason"])
 
+    def test_training_plan_rejects_unavailable_invalid_active_and_battle_units(self) -> None:
+        state = self._state()
+        system = MilitaryCapabilitySystem()
+        unit = state.get_table("units").to_dicts()[0]
+        countries = {"USA": state.get_table("countries").to_dicts()[0]}
+
+        _, reason = system._training_plan(
+            state,
+            {},
+            countries,
+            [],
+            [],
+            ActionTrainUnit("player", "USA", "missing-unit", "Regular"),
+        )
+        self.assertEqual(reason, "The unit or owning country is unavailable.")
+
+        _, reason = system._training_plan(
+            state,
+            {"USA-1": unit},
+            {},
+            [],
+            [],
+            ActionTrainUnit("player", "USA", "USA-1", "Regular"),
+        )
+        self.assertEqual(reason, "The unit or owning country is unavailable.")
+
+        _, reason = system._training_plan(
+            state,
+            {"USA-1": unit},
+            countries,
+            [],
+            [],
+            ActionTrainUnit("player", "USA", "USA-1", "Recruit"),
+        )
+        self.assertEqual(reason, "Training must advance to a supported higher level.")
+
+        _, reason = system._training_plan(
+            state,
+            {"USA-1": unit},
+            countries,
+            [{"unit_id": "USA-1", "status": "active"}],
+            [],
+            ActionTrainUnit("player", "USA", "USA-1", "Regular"),
+        )
+        self.assertEqual(reason, "The unit already has an active training order.")
+
+        state.update_table(
+            "battle_units",
+            pl.DataFrame([{"unit_id": "USA-1"}], schema=state.get_table("battle_units").schema, strict=False),
+        )
+        _, reason = system._training_plan(
+            state,
+            {"USA-1": unit},
+            countries,
+            [],
+            [],
+            ActionTrainUnit("player", "USA", "USA-1", "Regular"),
+        )
+        self.assertEqual(reason, "A participating battle force cannot begin training.")
+
+    def test_training_action_rejections_cover_missing_authority_and_orders(self) -> None:
+        state = self._state()
+        state.current_actions = [
+            ActionCancelUnitTraining("unauthorized-player", "USA-1"),
+            ActionCancelUnitTraining("player", "USA-1"),
+            ActionSetUnitTrainingPaused("unauthorized-player", "USA-1", True),
+            ActionSetUnitTrainingPaused("player", "USA-1", True),
+        ]
+
+        MilitaryCapabilitySystem().update(state, 0.0)
+
+        results = state.journal.command_results
+        self.assertEqual(len(results), 4)
+        self.assertTrue(all(result["status"] == "rejected" for result in results))
+
+    def test_training_helpers_skip_unmatched_orders_and_resolve_design_domain(self) -> None:
+        state = self._state()
+        system = MilitaryCapabilitySystem()
+        unit = state.get_table("units").to_dicts()[0]
+
+        self.assertFalse(system._cancel_training(state, {}, [], "USA-1"))
+        self.assertFalse(
+            system._cancel_training(
+                state,
+                {"USA-1": unit},
+                [
+                    {"unit_id": "other-unit", "status": "active"},
+                    {"unit_id": "USA-1", "status": "completed"},
+                ],
+                "USA-1",
+            )
+        )
+
+        paused_orders = [
+            {"unit_id": "other-unit", "status": "active"},
+            {"unit_id": "USA-1", "status": "paused"},
+        ]
+        self.assertTrue(system._set_training_paused(paused_orders, "USA-1", True, 10))
+        self.assertFalse(system._set_training_paused([], "USA-1", True, 10))
+
+        unit["design_id"] = "air-design"
+        selected, reason = system._select_training_facility(
+            state,
+            unit,
+            "USA",
+            [{
+                "id": "air-site", "country_id": "USA", "region_id": 1,
+                "supported_domains": ["air"], "capacity": 1, "instructor_count": 1, "enabled": True,
+            }],
+            [],
+            designs=pl.DataFrame([{"id": "air-design", "domain": "air"}]),
+        )
+        self.assertEqual(reason, "")
+        self.assertEqual(selected["id"], "air-site")
+
+    def test_advance_training_blocks_missing_units_and_full_facility_slots(self) -> None:
+        state = self._state()
+        system = MilitaryCapabilitySystem()
+        missing_unit_order = {
+            "id": "missing-unit-order", "unit_id": "missing-unit", "country_id": "USA",
+            "facility_id": "site-usa-1", "training_location_region_id": 1, "status": "active",
+        }
+        system._advance_training(state, {}, [missing_unit_order], [], 1.0)
+        self.assertEqual(missing_unit_order["status"], "blocked")
+        self.assertEqual(missing_unit_order["last_event"], "blocked")
+
+        unit = state.get_table("units").to_dicts()[0]
+        second_unit = {**unit, "id": "USA-2"}
+        orders = [
+            {
+                "id": f"order-{unit_id}", "unit_id": unit_id, "country_id": "USA",
+                "facility_id": "site-usa-1", "training_location_region_id": 1,
+                "status": "active", "required_days": 30.0, "progress": 0.0,
+            }
+            for unit_id in ("USA-1", "USA-2")
+        ]
+        facility = state.get_table("unit_training_facilities").to_dicts()[0]
+        system._advance_training(state, {"USA-1": unit, "USA-2": second_unit}, orders, [facility], 1.0)
+
+        self.assertEqual(orders[0]["status"], "active")
+        self.assertEqual(orders[1]["status"], "paused")
+        self.assertIn("capacity", orders[1]["blocking_reason"])
+
+    def test_capability_helpers_cover_defaults_decoding_and_coercion(self) -> None:
+        system = MilitaryCapabilitySystem()
+        frozen = system._freeze_cache_value({"items": [1, 2], "tags": {"beta", "alpha"}})
+        self.assertEqual(frozen, (("items", (1, 2)), ("tags", ("alpha", "beta"))))
+
+        unit = system._ensure_unit_columns(pl.DataFrame({"id": ["USA-1"]}))
+        self.assertEqual(unit["training_level"][0], "Recruit")
+        self.assertEqual(unit["unit_lifecycle"][0], "available")
+
+        ensured = system._ensure_table(
+            pl.DataFrame({"id": ["site-1"]}),
+            {"id": pl.Utf8, "capacity": pl.Int32, "supported_domains": pl.List(pl.Utf8)},
+        )
+        self.assertEqual(ensured["capacity"][0], 0)
+        self.assertEqual(ensured["supported_domains"].to_list(), [[]])
+
+        self.assertEqual(system._decode_mapping("{invalid"), {})
+        self.assertEqual(system._decode_list("[invalid"), [])
+        self.assertEqual(system._integer("not-an-integer"), 0)
+        self.assertEqual(system._number("not-a-number"), 0.0)
+
     def _state(self) -> GameState:
         unit = UnitFactory().create("USA-1", "USA", "army", 100, 1, GeoCoordinate(10.0, 20.0), 0)
         unit["readiness_status"] = "ready"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from queue import Empty, Queue
 from threading import Event
 from types import SimpleNamespace
@@ -11,6 +12,7 @@ import src.client.tasks.session_startup as session_startup
 from src.client.tasks.session_startup import (
     TaskCancelledError,
     create_session_until_ready,
+    shutdown_session,
     wait_for_initial_state,
 )
 
@@ -32,6 +34,16 @@ class FakeSession:
 
     def save_map_changes(self):
         pass
+
+
+def test_shutdown_session_logs_and_suppresses_cleanup_errors(caplog) -> None:
+    session = Mock()
+    session.shutdown.side_effect = RuntimeError("shutdown failed")
+
+    with caplog.at_level(logging.ERROR):
+        shutdown_session(session)
+
+    assert "Failed to shut down a client session during cleanup" in caplog.text
 
 
 def test_session_startup_reports_progress_and_returns_on_ready() -> None:

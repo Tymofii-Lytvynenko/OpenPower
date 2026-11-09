@@ -4,6 +4,35 @@ from src.client.ui.components.shared.gml_value_repeat import GMLValueRepeat, GML
 
 
 class GMLValueRepeatTests(unittest.TestCase):
+    def test_click_without_hold_applies_one_change_and_resets_state(self):
+        repeat = GMLValueRepeat()
+
+        value, changed = repeat.advance(
+            4,
+            active=False,
+            clicked=True,
+            direction=1,
+            now=0.0,
+            minimum=0,
+            maximum=10,
+        )
+
+        self.assertEqual((value, changed), (5, True))
+        self.assertFalse(repeat.active)
+        self.assertEqual(repeat.next_repeat_at, 0.0)
+
+    def test_invalid_direction_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "direction must be -1 or 1"):
+            GMLValueRepeat().advance(
+                4,
+                active=False,
+                clicked=False,
+                direction=0,
+                now=0.0,
+                minimum=0,
+                maximum=10,
+            )
+
     def test_arrow_pair_keeps_independent_timers_and_resets_both(self):
         pair = GMLValueRepeatPair()
         value, _ = pair["up"].advance(

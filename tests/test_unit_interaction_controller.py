@@ -8,7 +8,12 @@ import arcade
 from src.client.controllers.unit_interaction_controller import UnitInteractionController
 from src.client.renderers.unit_projection import ProjectedUnit
 from src.client.views.game_view import GameView
-from src.shared.actions import ActionAttackUnit, ActionDispatchUnitDeployment, ActionMoveUnit
+from src.shared.actions import (
+    ActionAttackUnit,
+    ActionDispatchUnitDeployment,
+    ActionMoveUnit,
+    ActionSetUnitReadiness,
+)
 
 
 def _unit(unit_id: str, screen_x: float, screen_y: float, owner: str = "AAA") -> ProjectedUnit:
@@ -49,6 +54,11 @@ class _MapRenderer:
 
     def get_geo_at_screen_pos(self, x: float, y: float) -> SimpleNamespace:
         return SimpleNamespace(latitude=12.5, longitude=-34.25)
+
+
+class _MapRendererWithoutGeo(_MapRenderer):
+    def get_geo_at_screen_pos(self, x: float, y: float) -> None:
+        return None
 
 
 class _NetworkClient:
@@ -340,3 +350,159 @@ def test_reserve_deployment_drag_dispatches_only_for_a_valid_map_drop() -> None:
                 for unit_id in ("AAA-1", "AAA-2")[:expected_count]
             ]
             assert view._deployment_drag_unit_ids == ()
+
+
+def test_order_targeting_and_move_callback_handle_empty_and_rejected_requests() -> None:
+    unit = _unit("AAA-1", 50.0, 60.0)
+    renderer = _UnitRenderer([unit])
+    network = _NetworkClient()
+    requests = []
+    outcomes = iter((False, True))
+    map_renderer = _MapRenderer()
+    controller = UnitInteractionController(
+        renderer,
+        map_renderer,
+        network,
+        on_move_requested=lambda *args: (requests.append(args), next(outcomes))[1],
+    )
+
+    assert controller.drag_preview is None
+    assert not controller.has_selection()
+    assert not controller.begin_move_order_targeting()
+    assert not controller.begin_attack_move_targeting()
+    assert not controller.cancel_order_targeting()
+    assert not controller.resolve_order_target_click(100.0, 100.0)
+    assert controller.get_unit_at(50.0, 60.0) is unit
+    assert controller.get_unit_by_id("AAA-1") is unit
+    assert not controller.select_unit_by_id("missing")
+    assert not controller.move_selected_units_to_screen_pos(100.0, 100.0)
+
+    assert controller.select_unit_by_id("AAA-1")
+    assert controller.has_selection()
+    assert not controller.move_selected_units_to_screen_pos(100.0, 100.0)
+    assert controller.move_selected_units_to_screen_pos(100.0, 100.0)
+    assert len(requests) == 2
+    assert network.actions == []
+
+
+def test_hover_and_mouse_events_ignore_invalid_buttons_and_empty_space() -> None:
+    controller = UnitInteractionController(
+        _UnitRenderer([_unit("AAA-1", 50.0, 60.0)]),
+        _MapRenderer(),
+        _NetworkClient(),
+    )
+
+    assert controller.drag_preview is None
+    assert not controller.on_mouse_drag(80.0, 90.0, 0)
+    assert not controller.on_mouse_release(80.0, 90.0, arcade.MOUSE_BUTTON_LEFT)
+    assert not controller.on_mouse_release(80.0, 90.0, arcade.MOUSE_BUTTON_RIGHT)
+    controller.on_mouse_motion(50.0, 60.0)
+    assert controller.hovered_unit_id == "AAA-1"
+    assert not controller.on_mouse_press(50.0, 60.0, arcade.MOUSE_BUTTON_RIGHT)
+    assert not controller.on_mouse_press(500.0, 500.0, arcade.MOUSE_BUTTON_LEFT)
+    assert controller.hovered_unit_id is None
+
+    assert controller.on_mouse_press(50.0, 60.0, arcade.MOUSE_BUTTON_LEFT)
+    controller.on_mouse_motion(100.0, 110.0)
+    assert controller.hovered_unit_id == "AAA-1"
+    assert not controller.on_mouse_drag(100.0, 110.0, arcade.MOUSE_BUTTON_RIGHT)
+    assert not controller.on_mouse_release(100.0, 110.0, arcade.MOUSE_BUTTON_RIGHT)
+    assert controller.on_mouse_release(50.0, 60.0, arcade.MOUSE_BUTTON_LEFT)
+
+
+def test_double_click_invokes_the_optional_unit_callback() -> None:
+    callbacks = []
+    controller = UnitInteractionController(
+        _UnitRenderer([_unit("AAA-1", 50.0, 60.0)]),
+        _MapRenderer(),
+        _NetworkClient(),
+        on_unit_double_click=callbacks.append,
+    )
+
+    with patch(
+        "src.client.controllers.unit_interaction_controller.perf_counter",
+        side_effect=(1.0, 1.1),
+    ):
+        for _ in range(2):
+            assert controller.on_mouse_press(50.0, 60.0, arcade.MOUSE_BUTTON_LEFT)
+            assert controller.on_mouse_release(50.0, 60.0, arcade.MOUSE_BUTTON_LEFT)
+
+    assert callbacks == ["AAA-1"]
+
+
+def test_focus_and_box_selection_handle_missing_units_and_empty_results() -> None:
+    first = _unit("AAA-1", 40.0, 40.0)
+    second = _unit("AAA-2", 80.0, 80.0)
+    renderer = _UnitRenderer([first, second])
+    controller = UnitInteractionController(renderer, _MapRenderer(), _NetworkClient())
+
+    assert not controller.focus_context_unit("missing")
+    assert controller.select_units_in_rect(20.0, 20.0, 100.0, 100.0)
+    assert controller.focus_context_unit("AAA-2")
+    assert controller.selected_unit_ids == {"AAA-1", "AAA-2"}
+    renderer.billboards = [first]
+    assert not controller.focus_context_unit("AAA-2")
+    assert controller.focus_context_unit("AAA-1")
+
+    controller.selected_unit_id = "AAA-2"
+    assert controller.select_units_in_rect(35.0, 35.0, 45.0, 45.0)
+    assert controller.selected_unit_ids == {"AAA-1"}
+    assert controller.selected_unit_id == "AAA-1"
+    renderer.billboards = []
+    assert not controller.select_units_in_rect(0.0, 0.0, 100.0, 100.0)
+    assert not controller.has_selection()
+
+
+def test_attack_readiness_and_invalid_drag_drop_paths() -> None:
+    units = [_unit("AAA-1", 50.0, 60.0), _unit("AAA-2", 100.0, 110.0)]
+    network = _NetworkClient()
+    controller = UnitInteractionController(_UnitRenderer(units), _MapRenderer(), network)
+
+    assert not controller.attack_selected_units("missing")
+    assert controller.select_unit_by_id("AAA-1")
+    assert not controller.attack_selected_units("AAA-2")
+    controller.clear_selection()
+    assert not controller.set_selected_units_readiness("fortified")
+    controller.selected_unit_ids = {"AAA-2", "AAA-1"}
+    assert controller.set_selected_units_readiness("fortified")
+    assert network.actions == [
+        ActionSetUnitReadiness(
+            player_id="player-1", unit_id=unit_id, target_status="fortified"
+        )
+        for unit_id in ("AAA-1", "AAA-2")
+    ]
+
+    for map_renderer in (_MapRenderer(), _MapRendererWithoutGeo()):
+        if isinstance(map_renderer, _MapRendererWithoutGeo):
+            map_renderer.target_region_id = 9
+        else:
+            map_renderer.target_region_id = 0
+        drop_controller = UnitInteractionController(
+            _UnitRenderer([_unit("AAA-1", 50.0, 60.0)]),
+            map_renderer,
+            _NetworkClient(),
+        )
+        if isinstance(map_renderer, _MapRendererWithoutGeo):
+            assert drop_controller.select_unit_by_id("AAA-1")
+            assert not drop_controller.move_selected_units_to_screen_pos(100.0, 100.0)
+        assert drop_controller.on_mouse_press(50.0, 60.0, arcade.MOUSE_BUTTON_LEFT)
+        assert drop_controller.on_mouse_release(100.0, 100.0, arcade.MOUSE_BUTTON_LEFT)
+
+
+def test_dragging_cancels_a_pending_control_deselect_and_moves_the_selection() -> None:
+    renderer = _UnitRenderer([
+        _unit("AAA-1", 50.0, 60.0),
+        _unit("AAA-2", 100.0, 110.0),
+    ])
+    network = _NetworkClient()
+    controller = UnitInteractionController(renderer, _MapRenderer(), network)
+    assert controller.select_units_in_rect(0.0, 0.0, 150.0, 150.0)
+
+    assert controller.on_mouse_press(
+        100.0, 110.0, arcade.MOUSE_BUTTON_LEFT, arcade.key.MOD_CTRL
+    )
+    assert controller.on_mouse_drag(160.0, 180.0, arcade.MOUSE_BUTTON_LEFT)
+    assert controller.on_mouse_release(160.0, 180.0, arcade.MOUSE_BUTTON_LEFT)
+
+    assert controller.selected_unit_ids == {"AAA-1", "AAA-2"}
+    assert [action.unit_id for action in network.actions] == ["AAA-1", "AAA-2"]

@@ -80,6 +80,8 @@ def migrate_tactical_combat_state(state: GameState) -> None:
         units = units.with_columns(
             pl.col("readiness_status")
             .cast(pl.Utf8)
+            # Polars skips null values in map_elements by default.
+            .fill_null("")
             .str.to_lowercase()
             .map_elements(_normalize_status, return_dtype=pl.Utf8)
             .alias("readiness_status"),

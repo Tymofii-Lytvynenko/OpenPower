@@ -30,6 +30,26 @@ def test_public_projection_contains_only_category_totals_and_valid_zeroes():
     assert observed_category_counts(state, battle, "B")["I"] == 40
 
 
+def test_duplicate_participants_mark_counts_incomplete_without_double_counting():
+    battle, units, members = sample()
+    members.append(dict(members[0]))
+
+    frame = public_battle_counts([battle], members, units)
+    attacker_counts = frame.filter(pl.col("side") == "A")
+
+    assert not attacker_counts["complete"].any()
+    assert (
+        attacker_counts.filter(pl.col("category") == "G")["unit_quantity"].item()
+        == 10
+    )
+
+
+def test_observed_counts_are_unavailable_when_the_table_is_missing():
+    state = SimpleNamespace(tables={})
+
+    assert observed_category_counts(state, {"id": "observed"}, "A") is None
+
+
 def test_incomplete_unknown_and_stale_counts_are_not_exposed_as_zeroes():
     battle, units, members = sample()
     for broken in (

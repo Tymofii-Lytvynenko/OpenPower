@@ -198,7 +198,7 @@ class PeaceDealPolicy:
                     match = treaties.filter(pl.col("id") == str(clause.get("treaty_id") or ""))
                     if not match.is_empty():
                         treaty_type = str(match.item(0, "type") or "").strip().lower()
-                        members = self._country_tags(match.item(0, "members"))
+                        members = self._country_tags(match.row(0, named=True).get("members"))
                         if responder in members and treaty_type != "alliance":
                             utility += 0.03
                         elif responder in members:

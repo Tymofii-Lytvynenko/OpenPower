@@ -27,3 +27,13 @@ def test_war_index_ignores_missing_or_one_sided_wars():
     assert WarIndex.from_table(None).active_battle_for_region({"USA", "FRA"}) is None
     wars = pl.DataFrame([{"id": "war-a", "side_a": "USA", "side_b": "", "status": "active"}])
     assert not WarIndex.from_table(wars).is_hostile("USA", "FRA")
+
+
+def test_war_index_handles_empty_same_country_and_unrecognized_side_values():
+    index = WarIndex.from_table(None)
+
+    assert not index.is_hostile(None, "FRA")
+    assert not index.is_hostile("USA", "USA")
+    assert WarIndex._normalize_side(None) == set()
+    assert WarIndex._normalize_side(("usa", " can ")) == {"USA", "CAN"}
+    assert WarIndex._normalize_side({"USA": "CAN"}) == set()

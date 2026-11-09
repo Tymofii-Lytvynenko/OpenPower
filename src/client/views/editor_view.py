@@ -1,7 +1,5 @@
 import arcade
 from src.shared.config import GameConfig
-from src.client.services.imgui_service import ImGuiService
-from src.client.ui.core.theme import GAMETHEME
 from src.client.views.base_view import BaseImGuiView
 from src.client.renderers.map_renderer import MapRenderer
 from src.client.ui.layouts.editor_layout import EditorLayout
@@ -15,7 +13,7 @@ class EditorView(BaseImGuiView):
         super().__init__()
         
         self.net = context.net_client
-        self.imgui: ImGuiService = ImGuiService(self.window, enable_implot=False)
+        # BaseImGuiView exposes the window-owned ImGui service as a read-only property.
         
         # 1. Camera
         self.cam_ctrl = CameraController()

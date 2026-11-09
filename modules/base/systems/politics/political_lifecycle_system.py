@@ -430,7 +430,7 @@ class PoliticalLifecycleSystem(ISystem):
                 for row in crises
                 if self._tag(row.get("country_id")) == country_id
                 and row is not crisis
-                and self._text(row.get("status")).casefold()
+                and str(row.get("status") or "").strip().casefold()  # Legacy crisis status can be null.
                 in {"pending", "active", "open", "escalated"}
             ]
             crisis.update(

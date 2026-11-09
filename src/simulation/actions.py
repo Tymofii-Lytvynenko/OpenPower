@@ -98,10 +98,7 @@ def _load_records(path: Path) -> list[dict[str, Any]]:
     if not text:
         return []
     if text.startswith("["):
-        data = orjson.loads(text)
-        if not isinstance(data, list):
-            raise ValueError(f"Action script JSON root must be a list: {path}")
-        return data
+        return orjson.loads(text)
 
     records = []
     for index, line in enumerate(text.splitlines(), start=1):

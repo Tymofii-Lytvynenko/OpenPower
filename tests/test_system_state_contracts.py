@@ -1,8 +1,14 @@
 import unittest
+from types import SimpleNamespace
 
 from src.shared.system_interfaces import ICheckpointedSystem, ISystem, SystemAccess
 from src.engine.simulator import Engine
-from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_CHECKPOINT
+from src.shared.system_state import (
+    SYSTEM_STATE_CACHE,
+    SYSTEM_STATE_CHECKPOINT,
+    runtime_state_contract,
+    validate_runtime_state_contract,
+)
 from src.shared.state import GameState
 
 
@@ -71,6 +77,21 @@ class CounterCheckpointSystem(ISystem, ICheckpointedSystem):
         self.counter = int(data.get("counter", 0))
 
 
+class InvalidCheckpointPayloadSystem(CounterCheckpointSystem):
+    def export_persistent_state(self):
+        return [self.counter]
+
+
+class MissingCheckpointFieldsSystem(CounterCheckpointSystem):
+    def export_persistent_state(self) -> dict[str, int]:
+        return {}
+
+
+class UnexpectedCheckpointFieldsSystem(CounterCheckpointSystem):
+    def export_persistent_state(self) -> dict[str, int]:
+        return {"counter": self.counter, "extra": 1}
+
+
 class LateRuntimeStateSystem(ISystem):
     access = SystemAccess()
     runtime_state_contract = {
@@ -94,6 +115,36 @@ class LateRuntimeStateSystem(ISystem):
 
 
 class TestSystemStateContracts(unittest.TestCase):
+    def test_runtime_state_contract_handles_missing_and_invalid_declarations(self):
+        self.assertEqual(runtime_state_contract(SimpleNamespace(runtime_state_contract=None)), {})
+        with self.assertRaisesRegex(TypeError, "must be a mapping"):
+            runtime_state_contract(SimpleNamespace(runtime_state_contract="checkpoint"))
+        with self.assertRaisesRegex(RuntimeError, "invalid runtime state policies"):
+            runtime_state_contract(SimpleNamespace(runtime_state_contract={"buffer": "unknown"}))
+
+    def test_runtime_state_validation_supports_slotted_systems(self):
+        class SlottedCacheSystem:
+            __slots__ = ("cache", "callback", "not_initialized")
+            runtime_state_contract = {
+                "cache": SYSTEM_STATE_CACHE,
+                "callback": SYSTEM_STATE_CACHE,
+                "not_initialized": SYSTEM_STATE_CACHE,
+            }
+
+            def __init__(self):
+                self.cache = []
+                self.callback = lambda: None
+
+        validate_runtime_state_contract(SlottedCacheSystem())
+
+    def test_checkpoint_validation_checks_export_type_and_exact_keys(self):
+        with self.assertRaisesRegex(TypeError, "must return a dict"):
+            validate_runtime_state_contract(InvalidCheckpointPayloadSystem())
+        with self.assertRaisesRegex(RuntimeError, "missing exported keys"):
+            validate_runtime_state_contract(MissingCheckpointFieldsSystem())
+        with self.assertRaisesRegex(RuntimeError, "unexpected exported keys"):
+            validate_runtime_state_contract(UnexpectedCheckpointFieldsSystem())
+
     def test_engine_rejects_undeclared_runtime_state(self):
         engine = Engine(dev_mode=False)
 

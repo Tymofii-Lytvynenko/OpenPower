@@ -11,6 +11,7 @@ from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.components.hud.panel_manager import PanelManager
 from src.client.ui.layouts.game_panel_registry import build_game_panel_specs
 from src.shared.state import GameState
+import src.client.ui.panels.politics.political_overview_presenter as political_overview_presenter_module
 import src.client.ui.panels.politics.political_overview_panel as political_overview_panel_module
 
 
@@ -181,6 +182,177 @@ def test_political_overview_explains_when_configured_override_is_unavailable() -
     assert "crisis" in overview.election_override_options[0].unavailable_reason.lower()
 
 
+def test_election_override_validation_reports_configuration_and_timing_reasons() -> None:
+    cases = (
+        (
+            "duplicate type",
+            [_override_rule(), _override_rule()],
+            {},
+            {},
+            None,
+            None,
+            "Multiple rules define",
+        ),
+        (
+            "invalid duration bounds",
+            [_override_rule(minimum_duration_days=5, maximum_duration_days=2)],
+            {},
+            {},
+            None,
+            None,
+            "duration bounds are invalid",
+        ),
+        (
+            "not electoral",
+            [_override_rule()],
+            {"election_eligible": False},
+            {},
+            None,
+            None,
+            "does not hold scheduled elections",
+        ),
+        (
+            "no scheduled election",
+            [_override_rule()],
+            {},
+            {},
+            0,
+            None,
+            "There is no scheduled election",
+        ),
+        (
+            "invalid cost",
+            [_override_rule(cost="invalid")],
+            {},
+            {},
+            None,
+            None,
+            "override cost is invalid",
+        ),
+        (
+            "insufficient funds",
+            [_override_rule(cost=101.0)],
+            {},
+            {"money_reserves": 100.0},
+            None,
+            None,
+            "lacks funds",
+        ),
+        (
+            "invalid cooldown",
+            [_override_rule(cooldown_days="invalid")],
+            {},
+            {},
+            None,
+            None,
+            "cooldown is invalid",
+        ),
+        (
+            "active cooldown",
+            [_override_rule(cooldown_days=10)],
+            {},
+            {},
+            None,
+            [{"id": "override-1", "country_id": "AAA", "event_type": "election_override_applied", "game_minute": 900}],
+            "still in cooldown",
+        ),
+        (
+            "accelerate violates notice",
+            [_override_rule("accelerate", minimum_notice_days=4)],
+            {},
+            {},
+            None,
+            None,
+            "legal date bounds",
+        ),
+        (
+            "suspension cannot change date",
+            [_override_rule("suspend", minimum_duration_days=1, maximum_duration_days=4, default_duration_days=4)],
+            {},
+            {},
+            None,
+            None,
+            "would not change the election date",
+        ),
+        (
+            "missing succession party",
+            [_override_rule("succession")],
+            {"succession_party_id": "missing"},
+            {},
+            None,
+            None,
+            "succession party is unavailable",
+        ),
+    )
+
+    for name, rules, government, country, scheduled_at, history, expected_reason in cases:
+        state = _overview_with_rules(
+            rules,
+            government_updates=government,
+            country_updates=country,
+            scheduled_at_minute=scheduled_at,
+            history_rows=history,
+        )
+        option_type = rules[0]["type"]
+        option = next(
+            row
+            for row in PoliticalOverviewPresenter().build(state, "AAA").election_override_options
+            if row.override_type == option_type
+        )
+        assert option.available is False, name
+        assert expected_reason.lower() in option.unavailable_reason.lower(), name
+
+
+def test_election_override_duration_defaults_and_numeric_parsers_are_safe() -> None:
+    state = _overview_with_rules(
+        [
+            _override_rule(
+                minimum_duration_days="invalid",
+                maximum_duration_days="invalid",
+                approval_delta="invalid",
+                stability_delta=None,
+            ),
+            _override_rule(
+                "suspend",
+                minimum_duration_days=2,
+                maximum_duration_days=10,
+                default_duration_days="invalid",
+            ),
+        ]
+    )
+    options = {
+        option.override_type: option
+        for option in PoliticalOverviewPresenter().build(state, "AAA").election_override_options
+    }
+    postpone = options["postpone"]
+    assert (postpone.minimum_duration_days, postpone.maximum_duration_days) == (1, 0)
+    assert postpone.default_duration_days == 1
+    assert postpone.approval_delta == 0.0
+    assert postpone.stability_delta == 0.0
+    suspend = options["suspend"]
+    assert suspend.default_duration_days == 5
+
+    helpers = political_overview_presenter_module
+    assert helpers._as_percent("invalid") is None
+    assert helpers._as_percent(float("inf")) is None
+    assert helpers._optional_positive_int("invalid") is None
+    assert helpers._optional_positive_int(0) is None
+    assert helpers._read_bool(True) is True
+    assert helpers._read_bool(1) is True
+    assert helpers._read_bool("yes") is True
+    assert helpers._read_bool("no") is False
+    assert helpers._read_bool("unknown") is None
+    assert helpers._decode_object_list([{"type": "postpone"}, "ignored"]) == [{"type": "postpone"}]
+    assert helpers._decode_object_list("invalid json") == []
+    assert helpers._decode_object_list("null") == []
+    assert helpers._finite_number("invalid") is None
+    assert helpers._finite_number(float("inf")) is None
+    assert helpers._bounded_integer("invalid", 1, 10) is None
+    assert helpers._bounded_integer(True, 0, 10) is None
+    assert helpers._bounded_integer(1.5, 0, 10) is None
+    assert helpers._bounded_integer(11, 0, 10) is None
+
+
 def test_political_overview_panel_dispatches_override_intent_without_mutating_state(monkeypatch) -> None:
     state = _election_overview_state()
     overview = PoliticalOverviewPresenter().build(state, "AAA")
@@ -313,4 +485,52 @@ def _election_overview_state(*, crisis_status: str = "none") -> GameState:
         }
     )
     state.time.total_minutes = 1_000
+    return state
+
+
+def _override_rule(override_type: str = "postpone", **overrides: object) -> dict[str, object]:
+    rule: dict[str, object] = {
+        "type": override_type,
+        "minimum_duration_days": 2,
+        "maximum_duration_days": 20,
+        "default_duration_days": 4,
+        "cost": 12.5,
+        "cooldown_days": 10,
+        "approval_delta": -3.0,
+        "stability_delta": -2.0,
+    }
+    rule.update(overrides)
+    return rule
+
+
+def _overview_with_rules(
+    rules: list[dict[str, object]],
+    *,
+    government_updates: dict[str, object] | None = None,
+    country_updates: dict[str, object] | None = None,
+    scheduled_at_minute: int | None = None,
+    history_rows: list[dict[str, object]] | None = None,
+) -> GameState:
+    state = _election_overview_state()
+    form_rules = state.get_table("government_form_rules").to_dicts()
+    form_rules[0]["election_overrides_json"] = json.dumps(rules)
+    state.update_table("government_form_rules", pl.DataFrame(form_rules))
+
+    for table_name, updates in (
+        ("country_governments", government_updates),
+        ("countries", country_updates),
+    ):
+        if updates:
+            rows = state.get_table(table_name).to_dicts()
+            rows[0].update(updates)
+            state.update_table(table_name, pl.DataFrame(rows))
+
+    if scheduled_at_minute is not None:
+        elections = state.get_table("political_elections").to_dicts()
+        for row in elections:
+            if row["status"] == "scheduled":
+                row["scheduled_at_minute"] = scheduled_at_minute
+        state.update_table("political_elections", pl.DataFrame(elections))
+    if history_rows is not None:
+        state.update_table("political_history", pl.DataFrame(history_rows))
     return state

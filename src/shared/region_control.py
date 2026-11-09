@@ -5,6 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 
+# _tag normalizes occupation statuses to uppercase before this filter runs.
+_INACTIVE_OCCUPATION_STATUSES = frozenset({"ENDED", "CANCELLED", "INACTIVE"})
+
+
 def region_controlled_by_country(state: Any, region: dict[str, Any], country_id: str) -> bool:
     country = _tag(country_id)
     controller = _tag(region.get("controller"))
@@ -18,7 +22,7 @@ def region_controlled_by_country(state: Any, region: dict[str, Any], country_id:
             if (
                 _integer(occupation.get("region_id")) == region_id
                 and _tag(occupation.get("controller_country_id")) == country
-                and _tag(occupation.get("occupation_status")) not in {"ended", "cancelled", "inactive"}
+                and _tag(occupation.get("occupation_status")) not in _INACTIVE_OCCUPATION_STATUSES
             ):
                 return True
     return _tag(region.get("owner")) == country
@@ -52,7 +56,7 @@ def country_region_control_proportion(
             if (
                 _tag(occupation.get("controller_country_id")) == controller
                 and _tag(occupation.get("occupation_status"))
-                not in {"ended", "cancelled", "inactive"}
+                not in _INACTIVE_OCCUPATION_STATUSES
             ):
                 active_occupations.add(_integer(occupation.get("region_id")))
 

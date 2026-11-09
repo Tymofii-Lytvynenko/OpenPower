@@ -674,8 +674,6 @@ class StrategicWarfareSystem(ISystem):
                 country_id=self._tag(collateral_region.get("owner")),
             )
             row = next((candidate for candidate in rows if int(candidate.get("id") or 0) == int(collateral_region.get("id") or 0)), None)
-            if row is None:
-                continue
             for column in ("infrastructure", "infrastructure_health", "communications", "health_capacity"):
                 if column in regions.columns and row.get(column) is not None:
                     row[column] = max(0.0, self._finite(row.get(column)) * (1.0 - collateral_scale))

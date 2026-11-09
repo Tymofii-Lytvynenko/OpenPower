@@ -59,6 +59,16 @@ def test_extended_selection_replaces_toggles_and_selects_contiguous_ranges():
     assert selection.reconcile("UKR", [dict(id=value) for value in rows], [])[0] is None
 
 
+def test_extended_selection_can_merge_a_range_containing_an_unlisted_cell():
+    selection = CovertSelection()
+    rows = ["first", "second", "third"]
+    selection.select_extended("first", rows)
+
+    selection.select_extended("outside", rows, ctrl=True, shift=True)
+
+    assert selection.selected_cell_ids == ("first", "second", "third", "outside")
+
+
 def test_ready_dispatch_is_private_current_and_disappears_after_execution():
     cells, missions = roster()
     state = SimpleNamespace(tables=dict(covert_cells=pl.DataFrame(cells), covert_missions=pl.DataFrame(missions)))

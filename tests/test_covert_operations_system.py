@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -872,6 +873,172 @@ class CovertOperationsSystemTest(unittest.TestCase):
         self.assertFalse(no_guard)
         self.assertEqual(in_transit, no_guard)
         self.assertTrue(active)
+
+    def test_execution_and_preparation_revalidate_stale_mission_participants(self) -> None:
+        state = self._state()
+        system = CovertOperationsSystem()
+        batch = SimpleNamespace(
+            cell_by_id={},
+            country_by_id={"CAN": {"id": "CAN"}},
+            inventory=SimpleNamespace(missions=[]),
+        )
+        mission = {
+            "id": "missing-cell",
+            "cell_id": "missing",
+            "target_country_id": "CAN",
+            "status": "executing",
+            "resolves_at_minute": 0,
+        }
+        batch.inventory.missions.append(mission)
+        system._advance_missions(state, batch, 0)
+        self.assertEqual(mission["status"], "cancelled")
+        self.assertIn("invalid at execution", mission["result"])
+
+        state.update_table("regions", pl.DataFrame({"id": [1], "owner": ["USA"]}))
+        cell = {"id": "cell", "status": "active"}
+        target_mission = {"cell_id": "cell", "target_country_id": "CAN"}
+        participants = system._execution_participants(
+            state,
+            SimpleNamespace(cell_by_id={"cell": cell}, country_by_id={"CAN": {"id": "CAN"}}),
+            target_mission,
+            5,
+        )
+        self.assertIsNone(participants)
+        self.assertEqual(target_mission["result"], "Target access or ownership is no longer valid.")
+        self.assertFalse(system._has_target_region(pl.DataFrame({"region_id": [1]}), "CAN"))
+
+        state.tables.pop("messages", None)
+        preparing = {
+            "id": "captured-cell",
+            "cell_id": "captured",
+            "target_country_id": "CAN",
+            "status": "preparation",
+        }
+        captured = {"id": "captured", "status": "captured"}
+        system._advance_mission_preparation(
+            state, preparing, {"captured": captured}, {"CAN": {"id": "CAN"}}, 10
+        )
+        self.assertEqual(preparing["status"], "cancelled")
+        self.assertEqual(preparing["result"], "captured")
+        self.assertTrue(preparing["discovered_by_target"])
+
+    def test_cell_quotes_and_creation_reject_unavailable_inputs(self) -> None:
+        state = self._state()
+        system = CovertOperationsSystem()
+
+        invalid_level = system.quote_cell_creation(state, "USA", "CAN", "Legend")
+        self.assertEqual(invalid_level.rejection_reason, "Invalid training level.")
+        unknown_country = system.quote_cell_creation(state, "USA", "MEX")
+        self.assertEqual(unknown_country.rejection_reason, "Country is unavailable.")
+
+        state.tables.pop("regions", None)
+        missing_region = system.quote_cell_creation(state, "USA", "CAN")
+        self.assertIn("deployment region is unavailable", missing_region.rejection_reason)
+
+        state = self._state()
+        state.current_actions = [ActionCreateCovertCell("USA", "USA", "MEX", "Unknown target")]
+        system.update(state, 0.0)
+        self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+        self.assertEqual(state.journal.command_results[-1]["reason"], "The target country does not exist.")
+
+    def test_training_rejection_edges_and_legacy_upkeep_recalculation(self) -> None:
+        state = self._state()
+        system = CovertOperationsSystem()
+        countries = state.get_table("countries").to_dicts()
+
+        system._train_cell(state, [], countries, ActionTrainCovertCell("USA", "missing", 10))
+        self.assertIn("cell is missing", state.journal.command_results[-1]["reason"])
+
+        cell = {"id": "cell", "country_id": "USA", "status": "active", "skill_level": "Mystery"}
+        system._train_cell(state, [cell], countries, ActionTrainCovertCell("USA", "cell", 10))
+        self.assertIn("maximum skill", state.journal.command_results[-1]["reason"])
+
+        cell["skill_level"] = "Recruit"
+        system._train_cell(state, [cell], countries, ActionTrainCovertCell("USA", "cell", 0))
+        self.assertIn("positive number", state.journal.command_results[-1]["reason"])
+
+        countries[0]["money_reserves"] = 0.0
+        system._train_cell(state, [cell], countries, ActionTrainCovertCell("USA", "cell", 100))
+        self.assertIn("cannot fund", state.journal.command_results[-1]["reason"])
+
+        legacy_cell = {
+            "skill_level": "Recruit",
+            "training_target": "Regular",
+            "upkeep": 0.5,
+            "base_upkeep": 0.0,
+        }
+        system._complete_training(legacy_cell)
+        self.assertGreater(legacy_cell["base_upkeep"], 0.0)
+        self.assertEqual(legacy_cell["skill_level"], "Regular")
+
+    def test_covert_helpers_return_safe_results_for_incomplete_tables(self) -> None:
+        state = self._state()
+        system = CovertOperationsSystem()
+        self.assertEqual(system._table_value_by_key(None, "id", "USA", "value", 7), 7)
+
+        units = pl.DataFrame({"id": ["tank-1"], "owner": ["CAN"], "strength": [100], "design_id": ["tank"]})
+        self.assertTrue(system._sabotage_unit_candidates(state, units, "CAN", "unsupported").is_empty())
+        state.tables.pop("unit_designs", None)
+        self.assertTrue(system._sabotage_unit_candidates(state, units, "CAN", "ground").is_empty())
+        domain_units = units.drop("design_id").with_columns(pl.lit(" LAND ").alias("domain"))
+        self.assertEqual(
+            system._sabotage_unit_candidates(state, domain_units, "CAN", "ground")["id"].to_list(),
+            ["tank-1"],
+        )
+
+        state.tables.pop("regions", None)
+        self.assertEqual(system._country_population(state, "CAN"), 0.0)
+        state.update_table("regions", pl.DataFrame({"owner": ["CAN"]}))
+        self.assertEqual(system._country_population(state, "CAN"), 0.0)
+        state.tables.pop("messages", None)
+        system._publish_messages(state, {}, "failure", False, False)
+
+        relations = [{"source": "USA", "target": "CAN", "value": 95.0}]
+        system._adjust_relations(relations, "", "CAN", 20.0)
+        self.assertEqual(relations[0]["value"], 95.0)
+        system._adjust_relations(relations, "USA", "CAN", 20.0)
+        self.assertEqual(relations[0]["value"], 100.0)
+
+    def test_update_persists_government_and_relation_changes_from_mission_effects(self) -> None:
+        state, system, _mission_id, _cell_id = self._ready_mission()
+        state.tables["country_governments"] = pl.DataFrame(
+            schema={"country_id": pl.Utf8, "capital_region_id": pl.Int64}
+        )
+        state.tables["countries_relations"] = pl.DataFrame(
+            schema={"source": pl.Utf8, "target": pl.Utf8, "value": pl.Float64}
+        )
+        now = state.time.total_minutes + 1
+        state.time.total_minutes = now
+        state.update_table(
+            "covert_missions",
+            state.get_table("covert_missions").with_columns(
+                pl.lit("executing").alias("status"),
+                pl.lit(now).cast(pl.Int64).alias("resolves_at_minute"),
+            ),
+        )
+        state.update_table(
+            "covert_cells",
+            state.get_table("covert_cells").with_columns(pl.lit("active").alias("status")),
+        )
+
+        def apply_effect(_state, _mission, _target, _output, governments, relations, *_args, **_kwargs):
+            government = {name: None for name in state.get_table("country_governments").columns}
+            government.update(country_id="USA", capital_region_id=1)
+            governments.append(government)
+            relation = {name: None for name in state.get_table("countries_relations").columns}
+            relation.update(source="USA", target="CAN", value=10.0)
+            relations.append(relation)
+
+        with (
+            patch.object(system, "_resolve", return_value=("success", False, False, 0.8, {})),
+            patch.object(system, "_apply_mission_effect", side_effect=apply_effect),
+        ):
+            state.current_actions = []
+            system.update(state, 0.0)
+
+        self.assertEqual(state.get_table("country_governments").height, 1)
+        self.assertEqual(state.get_table("countries_relations").height, 1)
+        self.assertEqual(state.get_table("countries_relations")["value"][0], 10.0)
 
 
 if __name__ == "__main__":

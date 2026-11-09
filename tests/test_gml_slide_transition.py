@@ -4,6 +4,12 @@ from src.client.ui.components.shared.gml_slide_transition import GMLSlideTransit
 
 
 class GMLSlideTransitionTests(unittest.TestCase):
+    def test_rejects_negative_delay_and_nonpositive_duration(self):
+        for options in ({"delay": -0.1}, {"duration": 0.0}):
+            with self.subTest(options=options):
+                with self.assertRaises(ValueError):
+                    GMLSlideTransition().begin(36.0, 10.0, **options)
+
     def test_source_delay_and_linear_motion(self):
         slide = GMLSlideTransition(577.0, 577.0, 577.0)
         slide.begin(36.0, 10.0)

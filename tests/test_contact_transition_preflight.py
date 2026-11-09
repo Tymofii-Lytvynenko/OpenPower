@@ -23,8 +23,11 @@ class _ReadinessTransitions:
 
 
 class _UnitOrderWorkflow:
+    def __init__(self, transitioning: bool = False) -> None:
+        self.transitioning = transitioning
+
     def unit_is_transitioning(self, _state: GameState, _unit_id: str) -> bool:
-        return False
+        return self.transitioning
 
 
 class _UnitMovement:
@@ -55,12 +58,12 @@ def _unit(unit_id: str, owner: str) -> dict:
     }
 
 
-def _setup():
+def _setup(*, transitioning: bool = False):
     readiness = _ReadinessTransitions()
     movement = _UnitMovement()
     service = MilitaryContactTransitionPreflight(
         readiness_transitions=readiness,
-        unit_order_workflow=_UnitOrderWorkflow(),
+        unit_order_workflow=_UnitOrderWorkflow(transitioning),
         unit_movement=movement,
         hostility_policy=lambda _rows: {frozenset(("USA", "CAN"))},
     )
@@ -119,3 +122,59 @@ def test_predicted_movement_contact_uses_current_and_next_segment_positions():
         ("CAN-1", "combat_contact"),
         ("USA-1", "combat_contact"),
     ]
+
+
+def test_non_hostile_units_are_skipped_before_contact_processing():
+    service, state, readiness, _movement = _setup()
+
+    service.process(state, pl.DataFrame([_unit("MEX-1", "MEX")]))
+
+    assert readiness.cancellations == []
+
+
+def test_attacking_unit_in_transition_cannot_start_contact():
+    service, state, readiness, _movement = _setup(transitioning=True)
+    units = pl.DataFrame([_unit("USA-1", "USA"), _unit("CAN-1", "CAN")])
+    state.current_actions = [ActionAttackUnit("USA", "USA-1", "CAN-1")]
+
+    service.process(state, units)
+
+    assert readiness.cancellations == []
+
+
+def test_moving_unit_without_hostile_candidates_does_not_query_movement():
+    service, state, readiness, movement = _setup()
+    moving_unit = _unit("USA-1", "USA")
+    moving_unit["is_moving"] = True
+
+    service.process(state, pl.DataFrame([moving_unit]))
+
+    assert movement.calls == []
+    assert readiness.cancellations == []
+
+
+def test_hostile_attack_rejects_same_unit_and_inactive_strength():
+    service, _state, _readiness, _movement = _setup()
+    attacker = _unit("USA-1", "USA")
+    defender = _unit("CAN-1", "CAN")
+    hostile_pairs = {frozenset(("USA", "CAN"))}
+
+    assert not service.valid_hostile_attack(attacker, attacker, hostile_pairs)
+
+    attacker["strength"] = 0
+    assert not service.valid_hostile_attack(attacker, defender, hostile_pairs)
+
+    attacker["strength"] = 100
+    defender["strength"] = 0
+    assert not service.valid_hostile_attack(attacker, defender, hostile_pairs)
+
+
+def test_movement_coordinates_fall_back_and_invalid_numbers_become_zero():
+    service, _state, _readiness, _movement = _setup()
+    row = {"latitude": 12.5, "longitude": -35.0}
+
+    assert service._movement_segment(row, 60) == (
+        GeoCoordinate(12.5, -35.0),
+        GeoCoordinate(12.5, -35.0),
+    )
+    assert service._row_float({"latitude": "invalid"}, "latitude") == 0.0

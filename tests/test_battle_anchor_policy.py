@@ -3,7 +3,10 @@ import unittest
 import polars as pl
 
 from modules.base.systems.military.battle_anchor_policy import (
+    anchor_from_row,
     build_contact_anchor,
+    is_valid_anchor_source,
+    normalize_longitude,
     resolve_battle_anchor,
 )
 from src.server.state_migrations import migrate_tactical_combat_state, validate_tactical_combat_state
@@ -95,6 +98,34 @@ class BattleAnchorPolicyTest(unittest.TestCase):
         )
         migrate_tactical_combat_state(state)
         self.assertIn("battles.invalid_anchor_source:battle-1", validate_tactical_combat_state(state))
+
+    def test_anchor_helpers_validate_sources_and_preserve_valid_coordinates(self) -> None:
+        self.assertTrue(is_valid_anchor_source(" Contact "))
+        self.assertFalse(is_valid_anchor_source("invented"))
+        self.assertEqual(normalize_longitude(-181.0), 179.0)
+        self.assertEqual(
+            anchor_from_row(
+                {
+                    "anchor_latitude": 12.0,
+                    "anchor_longitude": -20.0,
+                    "anchor_source": "invented",
+                }
+            ).source,
+            "contact",
+        )
+        self.assertIsNone(
+            anchor_from_row({"anchor_latitude": 91.0, "anchor_longitude": 0.0})
+        )
+
+    def test_antipodal_contact_coordinates_have_no_stable_anchor(self) -> None:
+        anchor = build_contact_anchor(
+            [
+                {"id": "west", "latitude": 0.0, "longitude": 0.0},
+                {"id": "east", "latitude": 0.0, "longitude": 180.0},
+            ]
+        )
+
+        self.assertIsNone(anchor)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,14 @@ from modules.base.systems.world.ai.political_policy import (
     PoliticalCrisisPolicy,
     PoliticalElectionPolicy,
     PoliticalLawPolicy,
+    _bounded_int,
+    _effect_totals,
+    _is_ai_country,
+    _json_object,
+    _json_records,
+    _law_value_utility,
+    _percent,
+    _string_list,
 )
 from modules.base.systems.world.ai_system import AISystem
 from src.shared.actions import (
@@ -105,6 +113,313 @@ def test_political_policies_do_not_issue_commands_for_human_controlled_country()
     assert law_actions["country_id"].to_list() == ["AAA"]
     assert "HUM" not in law_actions["country_id"].to_list()
     assert PoliticalCrisisPolicy().resolve_action({"action_kind": "unknown"}) is None
+
+
+def test_political_policies_and_resolvers_fail_closed_for_missing_data() -> None:
+    context = AITableContext(
+        tables={},
+        day_ordinal=7,
+        total_minutes=5_000,
+        date_text="2001-01-08",
+        player_tag="HUM",
+        globals={},
+    )
+    for policy in (PoliticalLawPolicy(), PoliticalElectionPolicy(), PoliticalCrisisPolicy()):
+        assert policy.build_candidates(context).collect().is_empty()
+
+    assert PoliticalLawPolicy().resolve_action({"action_kind": "other"}) is None
+    assert PoliticalLawPolicy().resolve_action({"action_kind": "law_change"}) is None
+    assert PoliticalElectionPolicy().resolve_action({"action_kind": "other"}) is None
+    assert PoliticalElectionPolicy().resolve_action(
+        {"action_kind": "election_override", "country_tag": "", "override_type": "postpone"}
+    ) is None
+    assert PoliticalCrisisPolicy().resolve_action(
+        {"action_kind": "resolve_crisis", "country_tag": "AAA", "crisis_id": "", "path_id": "path"}
+    ) is None
+
+
+def test_political_policy_parsers_and_utility_cover_malformed_and_domain_values() -> None:
+    assert _json_records("not-json") == []
+    assert _json_records('{"rules":[{"type":"postpone"}, null]}') == [{"type": "postpone"}]
+    assert _json_object("not-json") == {}
+    assert _json_object("[]") == {}
+    assert _string_list("not-json") == []
+    assert _string_list('{"value":"not a list"}') == []
+    assert _percent(0.75, 50.0) == 75.0
+    assert _bounded_int("invalid", 1, 36, 7) == 7
+    assert _effect_totals(None) == {}
+    assert _effect_totals(
+        [None, {"domain": "", "effect": "ignored", "value": 4.0},
+         {"domain": "rights", "effect": "public_rights", "value": 0.2}]
+    ) == {("rights", "public_rights"): 0.2}
+
+    score, reason = _law_value_utility(
+        {
+            "effects_by_value_json": json.dumps(
+                {
+                    "current": [
+                        {"domain": "rights", "effect": "public_rights", "value": 0.2},
+                        {"domain": "stability", "effect": "stability_modifier", "value": 0.0},
+                        {"domain": "economy", "effect": "tax_efficiency", "value": 0.0},
+                    ],
+                    "target": [
+                        {"domain": "rights", "effect": "public_rights", "value": 0.2},
+                        {"domain": "stability", "effect": "stability_modifier", "value": 0.3},
+                        {"domain": "economy", "effect": "tax_efficiency", "value": 0.5},
+                    ],
+                }
+            )
+        },
+        "current",
+        "target",
+        approval=50.0,
+        stability=50.0,
+    )
+    assert score > 0.0
+    assert reason == "economic_resilience"
+
+
+def test_election_policy_covers_acceleration_and_rejected_override_rules() -> None:
+    state = _state()
+    state.update_table(
+        "countries",
+        state.get_table("countries").with_columns(
+            pl.when(pl.col("id") == "AAA").then(pl.lit(80.0)).otherwise(pl.col("gvt_approval")).alias("gvt_approval"),
+            pl.when(pl.col("id") == "AAA").then(pl.lit(80.0)).otherwise(pl.col("gvt_stability")).alias("gvt_stability"),
+        ),
+    )
+    state.update_table(
+        "government_form_rules",
+        state.get_table("government_form_rules").with_columns(
+            pl.when(pl.col("government_form_id") == "multi-party democracy")
+            .then(pl.lit(json.dumps([{"type": "accelerate", "minimum_duration_days": 5, "maximum_duration_days": 30, "cost": 0.0, "cooldown_days": 0}])))
+            .otherwise(pl.col("election_overrides_json"))
+            .alias("election_overrides_json")
+        ),
+    )
+    state.update_table(
+        "political_history",
+        pl.DataFrame({"country_id": ["AAA"], "event_type": ["election_override_applied"], "game_minute": [1_000]}),
+    )
+    accelerated = PoliticalElectionPolicy().build_candidates(_context(state)).collect()
+    assert accelerated.filter(pl.col("country_id") == "AAA")["override_type"].to_list() == ["accelerate"]
+
+    skipped = _state()
+    skipped.update_table(
+        "countries",
+        skipped.get_table("countries").with_columns(
+            pl.when(pl.col("id") == "AAA").then(pl.lit(80.0)).otherwise(pl.col("gvt_approval")).alias("gvt_approval"),
+            pl.when(pl.col("id") == "AAA").then(pl.lit(60.0)).otherwise(pl.col("gvt_stability")).alias("gvt_stability"),
+        ),
+    )
+    skipped.update_table(
+        "government_form_rules",
+        skipped.get_table("government_form_rules").with_columns(
+            pl.when(pl.col("government_form_id") == "multi-party democracy")
+            .then(pl.lit(json.dumps([{"type": "postpone"}, {"type": "accelerate"}, {"type": "succession"}, {"type": "future"}])))
+            .otherwise(pl.col("election_overrides_json"))
+            .alias("election_overrides_json")
+        ),
+    )
+    assert PoliticalElectionPolicy().build_candidates(_context(skipped)).collect().is_empty()
+
+
+def test_crisis_policy_skips_paths_for_unconfigured_crisis_types() -> None:
+    state = _state(include_crisis=True)
+    state.update_table(
+        "political_crises",
+        state.get_table("political_crises").with_columns(pl.lit("unconfigured_crisis").alias("crisis_type")),
+    )
+
+    assert PoliticalCrisisPolicy().build_candidates(_context(state)).collect().is_empty()
+
+
+def test_ai_country_policy_respects_empty_tags_and_explicit_control_sets() -> None:
+    context = _context(_state())
+    assert not _is_ai_country(context, "")
+
+    controlled = AITableContext(
+        tables=context.tables,
+        day_ordinal=context.day_ordinal,
+        total_minutes=context.total_minutes,
+        date_text=context.date_text,
+        player_tag=context.player_tag,
+        globals={"ai_controlled_countries": ["AAA"]},
+    )
+    assert _is_ai_country(controlled, "AAA")
+    assert not _is_ai_country(controlled, "BBB")
+
+    mapped = AITableContext(
+        tables=context.tables,
+        day_ordinal=context.day_ordinal,
+        total_minutes=context.total_minutes,
+        date_text=context.date_text,
+        player_tag=context.player_tag,
+        globals={"player_country_map": {"ai-player": "AAA"}},
+    )
+    assert not _is_ai_country(mapped, "AAA")
+
+
+def test_law_policy_skips_crisis_pending_unmapped_and_non_improving_changes() -> None:
+    crisis = _state(include_crisis=True)
+    assert PoliticalLawPolicy().build_candidates(_context(crisis)).collect().is_empty()
+
+    unmapped = _state()
+    unmapped.update_table(
+        "country_governments",
+        unmapped.get_table("country_governments").with_columns(
+            pl.when(pl.col("country_id") == "AAA")
+            .then(pl.lit("missing form"))
+            .otherwise(pl.col("government_form_id"))
+            .alias("government_form_id")
+        ),
+    )
+    assert PoliticalLawPolicy().build_candidates(_context(unmapped)).collect().is_empty()
+
+    pending = _state()
+    pending.update_table(
+        "law_transitions",
+        pl.DataFrame(
+            {"country_id": ["AAA"], "law_id": ["civil_rights"], "status": ["scheduled"]}
+        ),
+    )
+    assert PoliticalLawPolicy().build_candidates(_context(pending)).collect().is_empty()
+
+    disallowed = _state()
+    disallowed.update_table(
+        "government_form_rules",
+        disallowed.get_table("government_form_rules").with_columns(
+            pl.when(pl.col("government_form_id") == "multi-party democracy")
+            .then(pl.lit("[]"))
+            .otherwise(pl.col("law_permissions_json"))
+            .alias("law_permissions_json")
+        ),
+    )
+    assert PoliticalLawPolicy().build_candidates(_context(disallowed)).collect().is_empty()
+
+    non_improving = _state()
+    identical_effects = json.dumps(
+        {
+            "Restricted": [{"domain": "rights", "effect": "public_rights", "value": 0.2}],
+            "Protected": [{"domain": "rights", "effect": "public_rights", "value": 0.2}],
+        }
+    )
+    non_improving.update_table(
+        "country_laws",
+        non_improving.get_table("country_laws").with_columns(
+            pl.lit(identical_effects).alias("effects_by_value_json")
+        ),
+    )
+    assert PoliticalLawPolicy().build_candidates(_context(non_improving)).collect().is_empty()
+
+
+def test_election_policy_skips_ineligible_governments_and_invalid_dates_then_accepts_succession() -> None:
+    ineligible = _state(include_override=True)
+    ineligible.update_table(
+        "country_governments",
+        ineligible.get_table("country_governments").with_columns(
+            pl.when(pl.col("country_id") == "AAA")
+            .then(pl.lit(False))
+            .otherwise(pl.col("election_eligible"))
+            .alias("election_eligible")
+        ),
+    )
+    assert PoliticalElectionPolicy().build_candidates(_context(ineligible)).collect().is_empty()
+
+    missing_form = _state(include_override=True)
+    missing_form.update_table(
+        "country_governments",
+        missing_form.get_table("country_governments").with_columns(
+            pl.when(pl.col("country_id") == "AAA")
+            .then(pl.lit("missing form"))
+            .otherwise(pl.col("government_form_id"))
+            .alias("government_form_id")
+        ),
+    )
+    assert PoliticalElectionPolicy().build_candidates(_context(missing_form)).collect().is_empty()
+
+    invalid_acceleration = _state()
+    invalid_acceleration.update_table(
+        "countries",
+        invalid_acceleration.get_table("countries").with_columns(
+            pl.when(pl.col("id") == "AAA").then(pl.lit(80.0)).otherwise(pl.col("gvt_approval")).alias("gvt_approval"),
+            pl.when(pl.col("id") == "AAA").then(pl.lit(80.0)).otherwise(pl.col("gvt_stability")).alias("gvt_stability"),
+        ),
+    )
+    invalid_acceleration.update_table(
+        "political_elections",
+        invalid_acceleration.get_table("political_elections").with_columns(
+            pl.when(pl.col("country_id") == "AAA")
+            .then(pl.lit(6_000))
+            .otherwise(pl.col("scheduled_at_minute"))
+            .alias("scheduled_at_minute")
+        ),
+    )
+    invalid_acceleration.update_table(
+        "government_form_rules",
+        invalid_acceleration.get_table("government_form_rules").with_columns(
+            pl.when(pl.col("government_form_id") == "multi-party democracy")
+            .then(pl.lit(json.dumps([{"type": "accelerate", "minimum_duration_days": 5, "maximum_duration_days": 30}])))
+            .otherwise(pl.col("election_overrides_json"))
+            .alias("election_overrides_json")
+        ),
+    )
+    assert PoliticalElectionPolicy().build_candidates(_context(invalid_acceleration)).collect().is_empty()
+
+    succession = _state()
+    succession.update_table(
+        "political_parties",
+        succession.get_table("political_parties").with_columns(
+            pl.when(pl.col("party_id") == "alpha")
+            .then(pl.lit(False))
+            .otherwise(pl.col("eligible"))
+            .alias("eligible")
+        ),
+    )
+    succession.update_table(
+        "government_form_rules",
+        succession.get_table("government_form_rules").with_columns(
+            pl.when(pl.col("government_form_id") == "multi-party democracy")
+            .then(pl.lit(json.dumps([{"type": "succession", "minimum_duration_days": 5, "maximum_duration_days": 30}])))
+            .otherwise(pl.col("election_overrides_json"))
+            .alias("election_overrides_json")
+        ),
+    )
+    candidates = PoliticalElectionPolicy().build_candidates(_context(succession)).collect()
+    assert candidates.filter(pl.col("country_id") == "AAA")["override_type"].to_list() == ["succession"]
+
+
+def test_crisis_policy_skips_missing_government_form_and_empty_paths() -> None:
+    missing_government = _state(include_crisis=True)
+    missing_government.update_table(
+        "country_governments",
+        missing_government.get_table("country_governments").filter(pl.col("country_id") != "AAA"),
+    )
+    assert PoliticalCrisisPolicy().build_candidates(_context(missing_government)).collect().is_empty()
+
+    missing_form = _state(include_crisis=True)
+    missing_form.update_table(
+        "country_governments",
+        missing_form.get_table("country_governments").with_columns(
+            pl.when(pl.col("country_id") == "AAA")
+            .then(pl.lit("missing form"))
+            .otherwise(pl.col("government_form_id"))
+            .alias("government_form_id")
+        ),
+    )
+    assert PoliticalCrisisPolicy().build_candidates(_context(missing_form)).collect().is_empty()
+
+    no_paths = _state(include_crisis=True)
+    no_paths.update_table(
+        "government_form_rules",
+        no_paths.get_table("government_form_rules").with_columns(
+            pl.when(pl.col("government_form_id") == "multi-party democracy")
+            .then(pl.lit("[]"))
+            .otherwise(pl.col("regime_change_paths_json"))
+            .alias("regime_change_paths_json")
+        ),
+    )
+    assert PoliticalCrisisPolicy().build_candidates(_context(no_paths)).collect().is_empty()
 
 
 def _context(state: GameState, *, day_ordinal: int = 7) -> AITableContext:

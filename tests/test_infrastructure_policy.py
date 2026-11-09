@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import replace
+from unittest.mock import patch
 
 from modules.base.systems.world.infrastructure_policy import (
     DEFAULT_CATEGORY_POLICIES,
+    InfrastructureCategoryPolicy,
+    _legacy_ratio,
+    _valid_policy,
     aggregate_weighted_values,
     apply_infrastructure_damage,
+    bounded_ratio,
+    build_initial_profiles,
     calculate_infrastructure_capacity,
     configured_category_policies,
     depreciate_infrastructure_condition,
     quote_infrastructure_cost,
+    quote_infrastructure_duration,
     reconstruct_infrastructure_capacity,
 )
 
@@ -37,6 +45,7 @@ class InfrastructurePolicyTest(unittest.TestCase):
                     "construction_minutes_per_level": 10_000,
                     "maintenance_cost_per_level_month": 400,
                     "annual_depreciation": 0.02,
+                    "damage_response": {"flood": 0.4},
                 },
                 "invalid": {"baseline": 0.2},
             }
@@ -44,6 +53,7 @@ class InfrastructurePolicyTest(unittest.TestCase):
 
         self.assertIn("airports", policies)
         self.assertNotIn("invalid", policies)
+        self.assertEqual(policies["airports"].damage_response, {"flood": 0.4})
         self.assertEqual(quote_infrastructure_cost("airports", 0.1, 0.2, policies=policies), 20_000)
 
     def test_capacity_depreciation_and_reconstruction_stay_within_bounds(self):
@@ -79,6 +89,82 @@ class InfrastructurePolicyTest(unittest.TestCase):
         )
         self.assertEqual(repeated, damaged)
         self.assertIsNone(duplicate_record)
+
+    def test_configuration_skips_malformed_new_and_existing_category_overrides(self):
+        defaults = configured_category_policies({" ": {}, "not-a-map": []})
+        self.assertEqual(defaults, DEFAULT_CATEGORY_POLICIES)
+
+        required = {
+            "baseline": 0.1,
+            "maximum": 0.8,
+            "construction_cost_per_level": 200_000.0,
+            "construction_minutes_per_level": 10_000,
+            "maintenance_cost_per_level_month": 400.0,
+            "annual_depreciation": 0.02,
+        }
+        for damage_response in ([], {"": 0.5}):
+            policies = configured_category_policies(
+                {"invalid": {**required, "damage_response": damage_response}}
+            )
+            self.assertNotIn("invalid", policies)
+
+        invalid_existing = configured_category_policies(
+            {"transport": {"damage_response": []}}
+        )
+        self.assertEqual(
+            invalid_existing["transport"], DEFAULT_CATEGORY_POLICIES["transport"]
+        )
+
+    def test_configuration_ignores_dataclass_replace_failures(self):
+        with patch(
+            "modules.base.systems.world.infrastructure_policy.replace",
+            side_effect=ValueError("invalid override"),
+        ):
+            policies = configured_category_policies(
+                {"transport": {"baseline": 0.1}}
+            )
+
+        self.assertEqual(policies["transport"], DEFAULT_CATEGORY_POLICIES["transport"])
+
+    def test_policy_validation_rejects_malformed_numeric_and_response_values(self):
+        default = DEFAULT_CATEGORY_POLICIES["transport"]
+        self.assertFalse(_valid_policy(replace(default, baseline="invalid")))
+        self.assertFalse(_valid_policy(replace(default, damage_response=[])))
+        self.assertFalse(
+            _valid_policy(replace(default, damage_response={"roads": "invalid"}))
+        )
+        self.assertIsNone(_legacy_ratio("invalid"))
+
+    def test_numeric_helpers_and_quote_validation_handle_invalid_inputs(self):
+        self.assertEqual(bounded_ratio("invalid", default=0.25), 0.25)
+        self.assertEqual(bounded_ratio(float("nan"), default=0.25), 0.25)
+        self.assertEqual(calculate_infrastructure_capacity(0.5, 0.5, 0.0), 0.0)
+        self.assertEqual(
+            reconstruct_infrastructure_capacity(
+                0.4, float("inf"), restoration_ceiling=0.9
+            ),
+            0.4,
+        )
+
+        with self.assertRaises(ValueError):
+            quote_infrastructure_cost("unknown", 0.2, 0.5)
+        with self.assertRaisesRegex(ValueError, "finite"):
+            quote_infrastructure_cost("transport", float("nan"), 0.5)
+        with self.assertRaisesRegex(ValueError, "positive"):
+            quote_infrastructure_cost("transport", 0.2, 0.5, regional_scale=0.0)
+        with self.assertRaises(ValueError):
+            quote_infrastructure_duration("unknown", 0.2, 0.5)
+        with self.assertRaisesRegex(ValueError, "finite"):
+            quote_infrastructure_duration("transport", 0.2, float("inf"))
+        with self.assertRaisesRegex(ValueError, "valid range"):
+            quote_infrastructure_duration("transport", 0.5, 0.4)
+
+    def test_initial_profiles_default_missing_legacy_values(self):
+        profiles = build_initial_profiles([{"id": 7}], now_minute=60)
+
+        self.assertEqual(len(profiles), len(DEFAULT_CATEGORY_POLICIES))
+        self.assertTrue(all(profile["condition"] == 1.0 for profile in profiles))
+        self.assertTrue(all(profile["last_change_minute"] == 60 for profile in profiles))
 
 
 if __name__ == "__main__":

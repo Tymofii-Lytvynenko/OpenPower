@@ -33,6 +33,24 @@ def test_missing_technical_map_fails_with_clear_asset_error(tmp_path: Path) -> N
         task.run()
 
 
+def test_editor_map_path_falls_back_to_internal_asset_path(tmp_path: Path) -> None:
+    map_path = tmp_path / "map" / "regions.png"
+    map_path.parent.mkdir()
+    map_path.touch()
+    task = EditorLoadingTask(object(), _config(tmp_path))
+
+    assert task._resolve_map_path() == map_path
+
+
+def test_editor_uses_existing_terrain_asset_path(tmp_path: Path) -> None:
+    terrain_path = tmp_path / "map" / "terrain.png"
+    terrain_path.parent.mkdir()
+    terrain_path.touch()
+    task = EditorLoadingTask(object(), _config(tmp_path))
+
+    assert task._resolve_terrain_path() == terrain_path
+
+
 def test_missing_terrain_is_nonfatal_and_cancellation_after_map_work_is_honored(tmp_path: Path) -> None:
     map_path = tmp_path / "regions" / "regions.png"
     map_path.parent.mkdir()

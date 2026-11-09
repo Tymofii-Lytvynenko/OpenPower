@@ -25,6 +25,15 @@ def test_existing_refusals_are_not_replayed_when_ui_mounts():
     assert not dialog.is_open
 
 
+def test_missing_order_history_does_not_open_a_refusal_notice():
+    dialog = GenericMessageDialog()
+    presenter = UnitOrderFeedback(dialog)
+
+    presenter.update(None, "USA")
+
+    assert not dialog.is_open
+
+
 def test_new_local_movement_refusals_are_aggregated_by_reason_across_order_types():
     dialog = GenericMessageDialog()
     presenter = UnitOrderFeedback(dialog)

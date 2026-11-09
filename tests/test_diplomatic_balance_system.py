@@ -14,6 +14,7 @@ from src.shared.events import (
     EventCoalitionChanged,
     EventNewDay,
     EventOccupationChanged,
+    EventTerritoryOwnershipChanged,
     EventWarExhaustionUpdated,
     EventWarEnded,
     EventWarStarted,
@@ -291,6 +292,14 @@ def test_expired_blockade_contributes_nothing_while_unexpired_blockade_remains()
                     "status": "active",
                     "expires_at_minute": 11,
                 },
+                {
+                    "id": "inactive",
+                    "target_country_id": "AAA",
+                    "blockading_country_id": "CCC",
+                    "blockade_percentage": 80.0,
+                    "status": "ended",
+                    "expires_at_minute": 20,
+                },
             ],
             schema=state.get_table("naval_blockades").schema,
             strict=False,
@@ -396,3 +405,114 @@ def test_defensive_coalition_members_join_a_war_against_its_primary_target():
     war = state.get_table("countries_wars").row(0, named=True)
     assert war["side_a"] == ["AAA"]
     assert war["side_b"] == ["BBB", "CCC"]
+
+
+def test_expansion_pressure_ignores_non_offensive_occupations_and_non_annex_transfers():
+    state = _state()
+    state.events = [
+        EventOccupationChanged(1, "BBB", "AAA", "battle_resolution", 12),
+        EventOccupationChanged(2, "AAA", "AAA", "battle_resolution", 12),
+        EventTerritoryOwnershipChanged(2, "BBB", "AAA", "province_transfer", 12),
+    ]
+
+    DiplomaticBalanceSystem()._update_expansion_pressure(state)
+
+    assert state.get_table("aggressive_expansion_events").is_empty()
+
+
+def test_expansion_event_recording_rejects_self_threats_and_deduplicates_ids():
+    system = DiplomaticBalanceSystem()
+    events = []
+    known_ids = set()
+
+    system._record_expansion_event(events, known_ids, "", "BBB", 1, "test", 0.2, 10)
+    system._record_expansion_event(events, known_ids, "AAA", "AAA", 1, "test", 0.2, 10)
+    system._record_expansion_event(events, known_ids, "AAA", "BBB", 1, "test", 0.2, 10)
+    system._record_expansion_event(events, known_ids, "AAA", "BBB", 1, "test", 0.2, 10)
+
+    assert len(events) == 1
+    assert events[0]["source_country_id"] == "AAA"
+    assert known_ids == {events[0]["id"]}
+
+
+def test_active_coalition_updates_its_threat_score_while_war_pressure_continues():
+    state = _state()
+    pact_frame = state.get_table("coalition_pacts")
+    state.update_table(
+        "coalition_pacts",
+        pl.DataFrame([{
+            "id": "coalition-AAA",
+            "leader_country_id": "CCC",
+            "member_country_ids": ["CCC"],
+            "primary_target_country_id": "AAA",
+            "mutual_defense": True,
+            "threat_score": 0.1,
+            "status": "active",
+            "formed_at_minute": 0,
+            "updated_at_minute": 0,
+            "dissolved_at_minute": 0,
+            "reason": "previous pressure",
+        }], schema=pact_frame.schema, strict=False),
+    )
+
+    DiplomaticBalanceSystem()._update_coalitions(state, {"AAA": 0.4}, 12)
+
+    pact = state.get_table("coalition_pacts").row(0, named=True)
+    assert pact["threat_score"] == pytest.approx(0.4)
+    assert pact["updated_at_minute"] == 12
+    assert any(isinstance(event, EventCoalitionChanged) for event in state.events)
+
+
+def test_set_pact_leaves_identical_pacts_untouched_and_reactivates_changed_pacts():
+    system = DiplomaticBalanceSystem()
+    state = _state()
+    unchanged = {
+        "id": "coalition-AAA",
+        "leader_country_id": "BBB",
+        "member_country_ids": ["BBB", "CCC"],
+        "primary_target_country_id": "AAA",
+        "threat_score": 0.6,
+        "status": "active",
+    }
+    pacts = [unchanged]
+
+    system._set_pact(state, pacts, unchanged, "AAA", ["BBB", "CCC"], 0.6, 10, "same")
+
+    assert state.events == []
+    changed = dict(unchanged, status="dissolved", dissolved_at_minute=9, reason="ended")
+    pacts[0] = changed
+
+    system._set_pact(state, pacts, changed, "AAA", ["BBB", "CCC"], 0.6, 11, "renewed")
+
+    assert changed["status"] == "active"
+    assert changed["dissolved_at_minute"] == 0
+    assert changed["updated_at_minute"] == 11
+    assert changed["reason"] == "renewed"
+    assert len(state.events) == 1 and isinstance(state.events[0], EventCoalitionChanged)
+
+
+def test_missing_war_participant_is_skipped_during_exhaustion_projection():
+    state = _state()
+    wars = state.get_table("countries_wars")
+    war = wars.row(0, named=True)
+    war["side_a"] = ["AAA", "UNKNOWN"]
+    state.update_table(
+        "countries_wars",
+        pl.DataFrame([war], schema=wars.schema, strict=False),
+    )
+
+    DiplomaticBalanceSystem()._update_war_exhaustion(state)
+
+    projected_countries = set(state.get_table("war_exhaustion_states").get_column("country_id"))
+    assert projected_countries == {"AAA", "BBB"}
+
+
+def test_war_duration_normalizes_aware_timestamps_and_tag_parser_handles_other_inputs():
+    system = DiplomaticBalanceSystem()
+
+    aware_days = system._war_days({"created_at": "2001-01-01T00:00:00+03:00"}, 0)
+    naive_days = system._war_days({"created_at": "2001-01-01T00:00:00"}, 0)
+
+    assert aware_days == naive_days
+    assert system._tags("AAA, BBB") == {"AAA", "BBB"}
+    assert system._tags(None) == set()

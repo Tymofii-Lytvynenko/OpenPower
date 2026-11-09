@@ -13,6 +13,56 @@ from src.shared.state import GameState
 
 
 class MilitaryRoutePlannerTest(unittest.TestCase):
+    def test_rejects_missing_endpoints_and_invalid_explicit_waypoints(self) -> None:
+        planner = MilitaryRoutePlanner()
+        can_enter = lambda _region, _final: True
+
+        missing_endpoint = planner.plan(
+            9, 2, [{"id": 2}], None, can_enter
+        )
+        invalid_waypoint = planner.plan(
+            1,
+            2,
+            [{"id": 1}, {"id": 2}],
+            None,
+            can_enter,
+            explicit_waypoints=[9],
+        )
+
+        self.assertFalse(missing_endpoint.is_valid)
+        self.assertIn("source or destination", missing_endpoint.rejection_reason)
+        self.assertFalse(invalid_waypoint.is_valid)
+        self.assertIn("invalid region", invalid_waypoint.rejection_reason)
+
+    def test_prepares_bidirectional_edges_from_embedded_region_adjacency(self) -> None:
+        graph = MilitaryRoutePlanner().prepare(
+            [
+                {"id": 1, "adjacent_region_ids": "[2, 2, 0, 99]"},
+                {"id": 2, "adjacent_region_ids": [3]},
+                {"id": 3, "adjacent_region_ids": [3]},
+            ],
+            None,
+        )
+
+        self.assertEqual(graph.adjacency, {1: {2}, 2: {1, 3}, 3: {2}})
+
+    def test_route_geometry_and_identifier_helpers_handle_fallback_values(self) -> None:
+        planner = MilitaryRoutePlanner()
+
+        self.assertEqual(
+            planner._geographic_cost(
+                {"center_x": 0.0, "center_y": 0.0},
+                {"center_x": 3.0, "center_y": 4.0},
+            ),
+            5.0,
+        )
+        self.assertEqual(planner._geographic_cost({}, {}), 1.0)
+        self.assertEqual(planner._valid_cost("invalid"), 1.0)
+        self.assertEqual(planner._ids("{"), ())
+        self.assertEqual(planner._ids({"region": 2}), ())
+        self.assertEqual(planner._ids(["3", "invalid", 0]), (3,))
+        self.assertEqual(planner._integer("invalid"), 0)
+
     def test_prepared_graph_rechecks_access_and_preserves_cost_tie_breaking(self) -> None:
         regions = [{"id": value} for value in range(1, 5)]
         edges = [

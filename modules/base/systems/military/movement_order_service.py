@@ -110,8 +110,6 @@ class MilitaryMoveOrderService:
             return units
 
         action_by_unit = {action.unit_id: action for action in actions}
-        if not action_by_unit:
-            return units
 
         context = self._build_context(state, units, action_by_unit, capability_speed_by_unit)
         for row in units.to_dicts():

@@ -223,6 +223,70 @@ def test_layout_diagnostics_detect_text_over_disabled_actions():
     assert not analyze_layout(snapshot)
 
 
+def test_layout_diagnostics_cover_clipping_zero_size_overlaps_and_native_ids():
+    snapshot = {
+        "viewport": {"width": 100, "height": 100},
+        "regions": [
+            {
+                "id": "parent",
+                "kind": "window",
+                "visible": True,
+                "rect": {"x": 0, "y": 0, "width": 50, "height": 50},
+            }
+        ],
+        "widgets": [
+            {
+                "id": "zero-size",
+                "type": "button",
+                "visible": True,
+                "interactive": True,
+                "enabled": True,
+                "parent_id": "parent",
+                "imgui_id": 0,
+                "rect": {"x": 55, "y": 55, "width": 0, "height": 0},
+            },
+            {
+                "id": "first",
+                "type": "button",
+                "visible": True,
+                "interactive": True,
+                "enabled": True,
+                "parent_id": "parent",
+                "imgui_id": 7,
+                "rect": {"x": 10, "y": 10, "width": 20, "height": 20},
+            },
+            {
+                "id": "duplicate",
+                "type": "button",
+                "visible": True,
+                "interactive": True,
+                "enabled": True,
+                "parent_id": "parent",
+                "imgui_id": 7,
+                "rect": {"x": 20, "y": 20, "width": 20, "height": 20},
+            },
+            {
+                "id": "unique",
+                "type": "button",
+                "visible": True,
+                "interactive": True,
+                "enabled": True,
+                "parent_id": "parent",
+                "imgui_id": 8,
+                "rect": {"x": 40, "y": 10, "width": 5, "height": 5},
+            },
+        ],
+    }
+
+    findings = analyze_layout(snapshot)
+    codes = {finding["code"] for finding in findings}
+
+    assert {"zero_size_control", "control_partially_clipped", "controls_overlap"} <= codes
+    duplicate = next(finding for finding in findings if finding["code"] == "duplicate_imgui_id")
+    assert duplicate["id"] == "duplicate"
+    assert duplicate["related_id"] == "first"
+
+
 @pytest.mark.parametrize('opened, expected', [(False, ['begin', 'end']), (True, ['begin'])])
 def test_disabled_conditional_container_keeps_scope_only_when_open(facade, monkeypatch, opened, expected):
     calls = []

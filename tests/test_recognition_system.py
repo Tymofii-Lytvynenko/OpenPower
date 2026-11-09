@@ -276,7 +276,117 @@ def test_ai_votes_on_daily_boundary_through_same_roster_rules():
     system = RecognitionSystem()
     system.update(state, 0.0)
     assert state.tables["recognition_votes"].height == 2
-
     state.events = [EventNewDay(day=2, month=1, year=2001)]
     system.update(state, 0.0)
     assert state.tables["recognition_votes"].height == 2
+
+
+def test_missing_tables_regions_and_invalid_voting_windows_use_safe_defaults():
+    system = RecognitionSystem()
+    system.update(GameState(), 0.0)
+    assert system._region(GameState(), 1) is None
+
+    for value in (True, None, 0):
+        state = GameState()
+        state.globals["recognition_voting_window_days"] = value
+        assert system._voting_window_days(state) == DEFAULT_VOTING_WINDOW_DAYS
+
+
+def test_claim_opener_skips_non_annexed_and_uncontrolled_claims():
+    state = _state()
+    claims = state.tables["annexation_claims"].to_dicts()
+    claims[0]["status"] = "pending"
+    claims.append(
+        {
+            "id": "claim-2",
+            "treaty_id": "treaty-2",
+            "region_id": 1,
+            "annexing_country_id": "FORMER",
+            "political_owner_id": "CLAIM",
+            "controller_at_start": "CLAIM",
+            "due_at_minute": 0,
+            "status": "annexed",
+        }
+    )
+    state.update_table(
+        "annexation_claims",
+        pl.DataFrame(claims, schema=state.tables["annexation_claims"].schema),
+    )
+
+    RecognitionSystem().update(state, 0.0)
+
+    assert state.tables["recognition_cases"].is_empty()
+
+
+def test_region_change_and_new_day_skip_terminal_cases():
+    state = _state()
+    system = RecognitionSystem()
+    system.update(state, 0.0)
+    state.update_table(
+        "recognition_cases",
+        state.tables["recognition_cases"].with_columns(pl.lit("rejected").alias("status")),
+    )
+    state.update_table(
+        "regions",
+        state.tables["regions"].with_columns(pl.lit("FORMER").alias("controller")),
+    )
+    state.events = [EventNewDay(day=2, month=1, year=2001)]
+
+    system.update(state, 0.0)
+
+    assert state.tables["recognition_cases"]["status"].to_list() == ["rejected"]
+
+
+def test_vote_rejections_and_duplicate_vote_results_are_recorded():
+    state = _state()
+    system = RecognitionSystem()
+    system.update(state, 0.0)
+    case_id = state.tables["recognition_cases"]["id"][0]
+    valid_vote = ActionCastRecognitionVote("player-a", case_id, "YES_A", "yes")
+
+    state.current_actions = [valid_vote]
+    system.update(state, 0.0)
+    state.current_actions = [valid_vote]
+    system.update(state, 0.0)
+
+    state.update_table(
+        "countries",
+        state.tables["countries"].filter(pl.col("id") != "YES_B"),
+    )
+    state.current_actions = [
+        ActionCastRecognitionVote("player-a", "missing-case", "YES_A", "yes"),
+        ActionCastRecognitionVote("player-a", case_id, "YES_A", "invalid"),
+        ActionCastRecognitionVote("player-a", case_id, "FORMER", "yes"),
+        ActionCastRecognitionVote("player-b", case_id, "YES_B", "yes"),
+    ]
+    system.update(state, 0.0)
+
+    results = state.journal.command_results
+    assert results[-5]["reason"] == "This vote is already recorded."
+    assert [result["reason"] for result in results[-4:]] == [
+        "The recognition case is not open.",
+        "Vote must be yes, no, or abstain.",
+        "This country is not on the case's captured eligible voter roster.",
+        "The voting country is no longer present in the country roster.",
+    ]
+
+
+def test_notification_deduplication_skips_existing_message_and_news_rows():
+    state = GameState()
+    messages = [{"id": "notice:AAA"}]
+    news = [{"id": "notice:news"}]
+
+    changed = RecognitionSystem()._notify(
+        state,
+        messages,
+        news,
+        message_id="notice",
+        headline="Recognition notice",
+        body="Recognition details.",
+        category="diplomacy",
+        country_ids=("AAA",),
+        now=0,
+    )
+
+    assert not changed
+    assert len(messages) == len(news) == 1

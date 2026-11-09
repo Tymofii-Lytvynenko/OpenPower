@@ -2,7 +2,10 @@ from types import SimpleNamespace
 import polars as pl
 
 from src.client.ui.core.panel_context import PanelRenderContext
-from src.client.ui.panels.politics.identity_policy_draft import IdentityPolicyDraft
+from src.client.ui.panels.politics.identity_policy_draft import (
+    IdentityPolicyDraft,
+    recognized,
+)
 from src.client.ui.panels.politics.internal_laws_panel import InternalLawsPanel
 
 
@@ -54,3 +57,30 @@ def test_country_selection_and_aggregate_restrictions():
     draft.select_country("UKR")
     assert draft.pending
     assert draft.prepare(state, PanelRenderContext("UKR", False, net_client=context.net_client))[1]
+
+
+def test_recognition_rejects_unparseable_population_share():
+    assert not recognized({"population_share": "not-a-number", "legal_status": "legal"})
+
+
+def test_restoring_original_status_removes_the_pending_change():
+    rows, draft, _state, _context, _actions = setup()
+
+    assert draft.choose(rows, rows[1], "legal") == ""
+    assert draft.pending
+    assert draft.choose(rows, rows[1], "illegal") == ""
+    assert not draft.pending
+
+
+def test_prepare_rechecks_that_another_group_remains_recognized():
+    rows, draft, state, context, _actions = setup()
+    assert draft.choose(rows, rows[1], "legal") == ""
+    assert draft.choose(rows, rows[0], "illegal") == ""
+
+    rows[1]["population_share"] = "not-a-number"
+    state.tables["country_identity_groups"] = pl.DataFrame(rows, strict=False)
+
+    prepared, reason = draft.prepare(state, context)
+
+    assert prepared == []
+    assert reason == "At least one group of each edited identity type must remain legally recognized."

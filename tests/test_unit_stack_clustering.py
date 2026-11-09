@@ -54,6 +54,14 @@ def test_projected_unit_stacks_carry_combined_strength_and_distinct_owners() -> 
     assert tuple(vertices[6, 2:4]) == (0.5, 0.8)
 
 
+def test_projected_unit_hit_test_includes_edges_and_rejects_outside_points() -> None:
+    unit = _unit("u1", "AAA", 120)
+
+    assert unit.contains(90.0, 93.0)
+    assert not unit.contains(89.9, 100.0)
+    assert not unit.contains(100.0, 107.1)
+
+
 def test_stack_badge_displays_unit_count_and_combined_strength() -> None:
     renderer = UnitRenderer.__new__(UnitRenderer)
     draw_list = Mock()

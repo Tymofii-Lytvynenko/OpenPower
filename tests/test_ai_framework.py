@@ -1,12 +1,14 @@
 import unittest
 from collections.abc import Mapping
 from typing import Any
+from unittest.mock import patch
 
 import polars as pl
 
 from src.core.ai_framework import (
     AITableContext,
     DeclarativeAIFramework,
+    _filter_delegated_scope_candidates,
     scheduled_countries,
 )
 from src.shared.actions import ActionUpdateBudget, GameAction
@@ -105,6 +107,12 @@ class TestDeclarativeAIFramework(unittest.TestCase):
         with self.assertRaises(ValueError):
             framework.register(policy)
 
+        with self.assertRaises(TypeError):
+            framework.register(object())
+        policy.id = " "
+        with self.assertRaises(ValueError):
+            framework.register(policy)
+
     def test_missing_required_table_skips_only_that_policy(self):
         result = DeclarativeAIFramework(_Policy([])).evaluate(
             AITableContext({}, 0, 0, "2001-01-01 00:00")
@@ -124,6 +132,96 @@ class TestDeclarativeAIFramework(unittest.TestCase):
         with self.assertRaises(TypeError):
             DeclarativeAIFramework(_InvalidPolicy([])).evaluate(context)
 
+    def test_evaluation_skips_a_candidate_without_a_registered_resolver(self):
+        class UnregisteredResolverPolicy(_Policy):
+            def build_candidates(self, context: AITableContext) -> pl.LazyFrame:
+                row = {**self.rows[0], "policy_id": "missing_resolver"}
+                return pl.DataFrame([row]).lazy()
+
+        context = AITableContext(
+            {"countries": pl.DataFrame({"id": ["AAA"]})},
+            0,
+            0,
+            "2001-01-01 00:00",
+        )
+        policy = UnregisteredResolverPolicy(
+            [self._row("AAA", "budget", 0.8, "missing-resolver", 1, "test")]
+        )
+
+        result = DeclarativeAIFramework(policy).evaluate(context)
+
+        self.assertEqual(result.decisions.height, 1)
+        self.assertEqual(result.actions, ())
+
+    def test_delegated_scope_filters_unauthorized_domains_and_targets(self):
+        rows = [
+            {
+                **self._row("PLAYER", "diplomacy", 0.9, "outside-target", 1, "blocked"),
+                "policy_id": "diplomacy",
+                "target_country": "MEX",
+                "treaty_id": "",
+            },
+            {
+                **self._row("PLAYER", "economy", 0.8, "outside-domain", 1, "blocked"),
+                "policy_id": "diplomacy",
+                "target_country": "MEX",
+                "treaty_id": "",
+            },
+            {
+                **self._row("PLAYER", "diplomacy", 0.7, "member-target", 1, "allowed"),
+                "policy_id": "diplomacy",
+                "target_country": "CAN",
+                "treaty_id": "",
+            },
+        ]
+        context = AITableContext(
+            tables={},
+            day_ordinal=1,
+            total_minutes=1440,
+            date_text="2001-01-02 00:00",
+            player_tag="PLAYER",
+            delegated_domains={"PLAYER": frozenset({"diplomacy"})},
+            delegated_targets={"PLAYER": frozenset({"CAN"})},
+        )
+
+        filtered = _filter_delegated_scope_candidates(
+            pl.DataFrame(rows).lazy(), context
+        ).collect()
+
+        self.assertEqual(filtered["conflict_key"].to_list(), ["member-target"])
+
+        scoped_rows = [
+            {
+                **self._row("PLAYER", "diplomacy", 0.9, "outside-target", 10, "blocked"),
+                "policy_id": "diplomacy",
+                "target_country": "MEX",
+                "treaty_id": "",
+            },
+            {
+                **self._row("PLAYER", "diplomacy", 0.8, "member-target", 10, "allowed"),
+                "policy_id": "diplomacy",
+                "target_country": "CAN",
+                "treaty_id": "",
+            },
+        ]
+        scoped_context = AITableContext(
+            tables={"countries": pl.DataFrame({"id": ["PLAYER"]})},
+            day_ordinal=1,
+            total_minutes=1440,
+            date_text="2001-01-02 00:00",
+            player_tag="PLAYER",
+            delegated_domains={"PLAYER": frozenset({"diplomacy"})},
+            delegated_targets={"PLAYER": frozenset({"CAN"})},
+        )
+        framework = DeclarativeAIFramework(_ScopedDiplomacyPolicy(scoped_rows))
+        with patch(
+            "src.core.ai_framework._filter_delegated_scope_candidates",
+            side_effect=lambda candidates, _context: candidates,
+        ):
+            evaluation = framework.evaluate(scoped_context)
+
+        self.assertEqual(evaluation.decisions["conflict_key"].to_list(), ["member-target"])
+
     def test_cadence_uses_stable_tag_slots_and_filters_controlled_countries(self):
         countries = pl.DataFrame(
             {
@@ -142,6 +240,14 @@ class TestDeclarativeAIFramework(unittest.TestCase):
         selected = scheduled_countries(countries, context, 2).collect()
 
         self.assertEqual(selected["country_id"].to_list(), ["BBB"])
+
+        missing_ids = scheduled_countries(
+            pl.DataFrame({"name": ["AAA"]}).lazy(),
+            context,
+            1,
+        ).collect()
+        self.assertEqual(missing_ids.columns, ["country_id"])
+        self.assertTrue(missing_ids.is_empty())
 
     def test_delegated_country_is_scheduled_but_only_within_declared_ai_authority(self):
         rows = [

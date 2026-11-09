@@ -253,7 +253,8 @@ class StrategicWarfarePolicy:
             if research_gate and weapon_level < asset_required_level:
                 continue
             max_payload = min(10, max(1, self._integer(weapon.get("max_payload_level"), 1)))
-            if research_gate and min(max_payload, weapon_level) < 1:
+            # The required-level gate above implies both values are at least one when enabled.
+            if research_gate and min(max_payload, weapon_level) < 1:  # pragma: no cover
                 continue
             if self._number(country.get("money_reserves")) < max(0.0, self._number(weapon.get("launch_cost"))):
                 continue

@@ -154,6 +154,59 @@ def test_demographics_panel_retains_its_standalone_constructor():
     assert not panel.open_social_programs()
 
 
+def test_presenter_revision_fallback_and_bounded_cache_eviction():
+    frame = pl.DataFrame({"id": [1]})
+    state = SimpleNamespace(tables={"regions": frame})
+
+    assert MigrationPresenter._revision_key(state, ("regions", "countries")) == (
+        ("regions", id(frame)),
+        ("countries", id(None)),
+    )
+
+    cache = {index: index for index in range(64)}
+    assert MigrationPresenter._remember(cache, 64, "new") == "new"
+    assert len(cache) == 64
+    assert 0 not in cache
+    assert cache[64] == "new"
+
+
+def test_country_summary_handles_cache_hits_and_missing_country_data():
+    presenter = MigrationPresenter()
+    state = _state()
+    summary = presenter.present_country(state, "AAA")
+
+    assert summary is not None
+    assert presenter.present_country(state, "aaa") is summary
+    assert presenter.present_country(GameState(), "AAA") is None
+    assert presenter.present_country(_state(), "MISSING") is None
+
+
+def test_region_summary_handles_cache_hits_and_missing_regions():
+    presenter = MigrationPresenter()
+    state = _state()
+    summary = presenter.present_region(state, 2)
+
+    assert summary is not None
+    assert presenter.present_region(state, 2) is summary
+    region_without_capacity = presenter.present_region(state, 4)
+    assert region_without_capacity is not None
+    assert region_without_capacity.capacity_pressure is None
+    assert presenter.present_region(GameState(), 2) is None
+    assert presenter.present_region(_state(), 999) is None
+
+
+def test_presenter_helpers_use_safe_defaults_for_missing_or_invalid_values():
+    presenter = MigrationPresenter()
+
+    assert presenter._country_flows(pl.DataFrame({"owner": ["AAA"]}), "AAA") == []
+    assert presenter._find_row(None, "country_id", "AAA") is None
+    assert presenter._reason_label("new_reason_code") == "New reason code"
+    assert presenter._reason_label("") == "Unspecified"
+    assert presenter._integer("not an integer") == 0
+    assert presenter._bounded("not a number", 0.0, 1.0, 0.25) == 0.25
+    assert presenter._bounded(float("nan"), 0.0, 1.0, 0.25) == 0.25
+
+
 def test_migration_panel_edits_and_dispatches_all_policy_controls():
     state = _state()
     summary = MigrationPresenter().present_country(state, "AAA")

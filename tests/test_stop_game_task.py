@@ -4,8 +4,11 @@ from queue import Queue
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
 from src.client.services.navigation_service import NavigationService
 from src.client.tasks.stop_game_task import StopGameTask
+from src.client.tasks.session_startup import TaskCancelledError
 
 
 class _Session:
@@ -45,6 +48,82 @@ def test_stop_game_replaces_campaign_session_with_clean_menu_session() -> None:
     assert window.session is None
     assert created_with == [(config, {"save_name": None, "player_tag": None})]
     assert task.progress == 1.0
+
+
+def test_cancelling_before_run_finishes_task_without_a_session() -> None:
+    task = StopGameTask(SimpleNamespace(session_factory=lambda *_a, **_k: None), object())
+    task.cancel()
+
+    with pytest.raises(TaskCancelledError, match="cancelled"):
+        task.run()
+
+    assert task._finished.is_set()
+    assert task._session_released
+
+
+def test_cancelling_after_run_releases_the_session_once() -> None:
+    session = _Session()
+    task = StopGameTask(
+        SimpleNamespace(session=None, session_factory=lambda *_a, **_k: session),
+        object(),
+    )
+
+    assert task.run() is session
+    task.cancel()
+    task.cancel()
+
+    assert session.shutdown_calls == 1
+    assert task._session is None
+
+
+def test_run_releases_created_session_when_initial_state_wait_fails() -> None:
+    session = _Session()
+    task = StopGameTask(
+        SimpleNamespace(session=None, session_factory=lambda *_a, **_k: session),
+        object(),
+    )
+
+    with patch(
+        "src.client.tasks.stop_game_task.wait_for_initial_state",
+        side_effect=RuntimeError("snapshot failed"),
+    ), pytest.raises(RuntimeError, match="snapshot failed"):
+        task.run()
+
+    assert session.shutdown_calls == 1
+    assert task._session_released
+
+
+def test_cancel_during_wait_keeps_cleanup_idempotent() -> None:
+    session = _Session()
+    task = StopGameTask(
+        SimpleNamespace(session=None, session_factory=lambda *_a, **_k: session),
+        object(),
+    )
+
+    def cancel_while_waiting(_session, *, cancel_event):
+        task.cancel()
+        raise TaskCancelledError("Operation was cancelled.")
+
+    with patch(
+        "src.client.tasks.stop_game_task.wait_for_initial_state",
+        side_effect=cancel_while_waiting,
+    ), pytest.raises(TaskCancelledError, match="cancelled"):
+        task.run()
+
+    assert session.shutdown_calls == 1
+    assert task._session_released
+
+
+def test_progress_callback_clamps_values_to_the_startup_range() -> None:
+    task = StopGameTask(SimpleNamespace(), object())
+
+    task._report_progress(-1.0, "waiting")
+    assert task.progress == 0.2
+    assert task.status_text == "Server: waiting"
+
+    task._report_progress(2.0, "ready")
+    assert task.progress == pytest.approx(0.85)
+    assert task.status_text == "Server: ready"
 
 
 def test_navigation_returns_to_main_menu_after_stop_task_completes() -> None:

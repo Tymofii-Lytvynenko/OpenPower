@@ -56,6 +56,39 @@ def test_main_bar_sphere_metrics_clamp_country_values_and_report_empty_force():
     assert metrics["frmMeterEconomic"].value == 0.0
 
 
+def test_main_bar_sphere_metrics_handle_missing_country_and_unit_columns():
+    state = SimpleNamespace(
+        tables={
+            "countries": pl.DataFrame({"country": ["AAA"]}),
+            "units": pl.DataFrame({"owner": ["AAA"]}),
+        }
+    )
+
+    metrics = main_bar_sphere_metrics(state, "AAA")
+
+    assert metrics["frmMeterPolitic"].value is None
+    assert metrics["frmMeterMilitary"].value is None
+    assert metrics["frmMeterEconomic"].value is None
+
+
+def test_main_bar_sphere_metrics_hide_non_finite_country_values():
+    state = SimpleNamespace(
+        tables={
+            "countries": pl.DataFrame(
+                {"id": ["AAA"], "gvt_approval": [float("nan")], "economic_health": [float("inf")]}
+            ),
+            "units": pl.DataFrame(
+                {"owner": ["AAA"], "readiness_status": ["ready"]}
+            ),
+        }
+    )
+
+    metrics = main_bar_sphere_metrics(state, "AAA")
+
+    assert metrics["frmMeterPolitic"].value is None
+    assert metrics["frmMeterEconomic"].value is None
+
+
 def test_segmented_meter_draws_the_nine_source_child_frames_in_order():
     layout = get_gml_layout("Main_Bar")
     session = GMLLayoutSession(layout, (100.0, 200.0), (layout.width, layout.height))

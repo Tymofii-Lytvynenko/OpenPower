@@ -35,6 +35,16 @@ def test_foreign_or_unknown_composition_is_not_invented_from_snapshot_rows():
     assert selected_unit_composition(world(), "removed", "UKR") is None
 
 
+def test_missing_selection_and_uncontrolled_region_have_no_composition_details():
+    state = world()
+    assert selected_unit_composition(state, None, "UKR") is None
+
+    state.tables["regions"] = pl.DataFrame(
+        [dict(id=2, name="Unknown", owner="", controller="")]
+    )
+    assert region_control(state, 2) is None
+
+
 def test_region_political_owner_and_military_controller_are_separate():
     result = region_control(world(), 1)
     assert (result.political_tag, result.military_tag) == ("UKR", "POL")

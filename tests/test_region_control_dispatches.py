@@ -74,6 +74,7 @@ def test_unrelated_invalid_and_foreign_events_do_not_create_dispatches():
         _event("foreign", 2, "POL", "FRA"),
         _event("bad-region", 0, "POL", "UKR"),
         _event("bad-type", "not-an-id", "POL", "UKR"),
+        _event("boolean-region", True, "POL", "UKR"),
         {"event_id": "other", "event_type": "EventBattleEnded", "payload": {}},
     ])
 

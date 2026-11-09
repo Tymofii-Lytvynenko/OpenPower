@@ -2,7 +2,9 @@ import dataclasses
 import json
 import shutil
 import unittest
+from collections import Counter
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 import polars as pl
@@ -12,7 +14,13 @@ from src.server.io.data_load_manager import DataLoader
 from src.server.io.save_loader import SaveStateLoader
 from src.server.io.save_writer import SaveWriter
 from src.server.session import GameSession
-from src.shared.actions import ActionBuildUnit, ActionCreateTreaty, ActionSaveGame, ActionUpdateBudget
+from src.shared.actions import (
+    ActionBuildUnit,
+    ActionCreateTreaty,
+    ActionSaveGame,
+    ActionSetGameSpeed,
+    ActionUpdateBudget,
+)
 from src.shared.config import GameConfig
 from src.shared.events import EventSystemError
 from src.shared.state import GameState, persistent_state_field_names
@@ -178,6 +186,63 @@ class TestHeadlessSimulationRunner(unittest.TestCase):
         self.assertEqual(len(timeline_lines), 3)
         final_report = json.loads(report.final_report_path.read_text(encoding="utf-8"))
         self.assertEqual(final_report["final_snapshot"]["player"]["tag"], "UKR")
+
+    def test_config_uses_default_output_path_and_collects_failure_reasons(self):
+        config = SimulationRunConfig(
+            project_root=Path("project"),
+            run_id="coverage-run",
+            fail_on_system_errors=True,
+            fail_on_error_diagnostics=True,
+        )
+        runner = HeadlessSimulationRunner(config)
+
+        self.assertEqual(
+            config.resolved_output_dir,
+            (Path("project") / "user_data" / "simulations" / "coverage-run").resolve(),
+        )
+        self.assertEqual(
+            runner._failure_reasons(Counter({"error:system_error": 1, "error": 2})),
+            [
+                "At least one simulation system raised an error.",
+                "Diagnostics reported at least one error.",
+            ],
+        )
+
+    def test_runner_handles_script_actions_mod_dedup_and_checkpoint_exports(self):
+        config = SimulationRunConfig(
+            project_root=PROJECT_ROOT,
+            active_mods=("base", "base"),
+            player_tag="UKR",
+            output_dir=self.output_dir,
+            action_script_path=self.output_dir / "actions.json",
+            days=1,
+            snapshot_interval_days=1,
+            diagnostics_interval_days=2,
+            export_checkpoint_tables=True,
+            export_final_tables=True,
+            fail_on_system_errors=False,
+        )
+
+        class Script:
+            def __init__(self):
+                self.days = []
+
+            def actions_for(self, *, day, tick, minute):
+                self.days.append((day, tick, minute))
+                return [ActionSetGameSpeed("simulation", 5)]
+
+        script = Script()
+        with patch(
+            "src.simulation.runner.ActionScript.from_path",
+            return_value=script,
+        ) as load_script:
+            report = HeadlessSimulationRunner(config).run()
+
+        load_script.assert_called_once()
+        self.assertEqual(len(script.days), 1)
+        self.assertEqual(script.days[0][0], 1)
+        self.assertEqual(len(report.table_exports), 2)
+        self.assertEqual(len(report.snapshots_written), 3)
 
 
 if __name__ == "__main__":

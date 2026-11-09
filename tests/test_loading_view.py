@@ -108,3 +108,89 @@ def test_hiding_finished_view_cancels_unclaimed_result_before_transition() -> No
 
     task.cancel.assert_called_once_with()
     on_success.assert_not_called()
+
+
+def test_worker_stores_the_task_result_and_marks_completion() -> None:
+    task = SimpleNamespace(run=Mock(return_value="ready"), progress=0.0, status_text="Loading")
+    view = _make_view(task, Mock())
+
+    view._worker()
+
+    assert view.result == "ready"
+    assert view.error is None
+    assert view.is_finished is True
+
+
+def test_worker_captures_task_errors_and_marks_completion() -> None:
+    error = RuntimeError("load failed")
+    task = SimpleNamespace(run=Mock(side_effect=error), progress=0.0, status_text="Loading")
+    view = _make_view(task, Mock())
+
+    view._worker()
+
+    assert view.result is None
+    assert view.error is error
+    assert view.is_finished is True
+
+
+def test_resize_forwards_window_dimensions_to_imgui() -> None:
+    view = _make_view(SimpleNamespace(progress=0.0, status_text="Loading"), Mock())
+    view.window.imgui.resize = Mock()
+
+    view.on_resize(1280, 720)
+
+    view.window.imgui.resize.assert_called_once_with(1280, 720)
+
+
+def _make_drawable_view() -> LoadingView:
+    view = _make_view(SimpleNamespace(progress=0.5, status_text="Loading"), Mock())
+    view.window.get_size = Mock(return_value=(800, 600))
+    view.window.use = Mock()
+    view.window.setup = Mock()
+    view.window.imgui.new_frame = Mock()
+    view.window.imgui.render = Mock()
+    view.ui.setup_frame = Mock()
+    view.status_panel.render = Mock()
+    view.clear = Mock()
+    return view
+
+
+def test_draw_renders_loading_ui_when_no_shared_renderer_is_available() -> None:
+    view = _make_drawable_view()
+
+    view.on_draw()
+
+    view.clear.assert_called_once_with()
+    view.window.use.assert_called_once_with()
+    view.window.imgui.new_frame.assert_called_once_with()
+    view.ui.setup_frame.assert_called_once_with()
+    view.status_panel.render.assert_called_once_with(
+        view.ui,
+        view.task,
+        view.error,
+        (800, 600),
+        on_return=view.window.setup,
+    )
+    view.window.imgui.render.assert_called_once_with()
+
+
+def test_draw_resets_graphics_state_before_drawing_shared_globe() -> None:
+    view = _make_drawable_view()
+    renderer = SimpleNamespace(draw=Mock())
+    context = SimpleNamespace(
+        scissor=(1, 2, 3, 4),
+        viewport=None,
+        DEPTH_TEST=1,
+        BLEND=2,
+        enable_only=Mock(),
+    )
+    view.window.shared_renderer = renderer
+    view.window.ctx = context
+
+    view.on_draw()
+
+    assert context.scissor is None
+    assert context.viewport == (0, 0, 800, 600)
+    context.enable_only.assert_called_once_with(context.DEPTH_TEST, context.BLEND)
+    renderer.draw.assert_called_once_with()
+    view.window.use.assert_called_once_with()

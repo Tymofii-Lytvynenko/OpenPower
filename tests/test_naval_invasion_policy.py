@@ -98,6 +98,37 @@ class NavalInvasionPolicyTest(unittest.TestCase):
         self.assertEqual(route["status"], "blocked")
         self.assertIn("capital ship", route["rejection_reason"].lower())
 
+    def test_landing_requires_a_different_target_country(self) -> None:
+        valid, reason = NavalInvasionPolicy().validate(
+            GameState(tables={}),
+            {"owner": "USA", "unit_type": "infantry"},
+            {"owner": "USA"},
+            [],
+            (0.0, 0.0),
+        )
+
+        self.assertFalse(valid)
+        self.assertIn("another country", reason)
+
+    def test_configured_capital_ship_type_and_type_based_domain_are_supported(self) -> None:
+        state = GameState(tables={})
+        state.globals["naval_capital_ship_types"] = ["battleships"]
+        invading = {"owner": "USA", "unit_type": "infantry", "strength": 100}
+        target = {"owner": "CAN", "latitude": 0.0, "longitude": 0.0}
+        escort = {
+            "owner": "USA",
+            "unit_type": "battleships",
+            "strength": 1,
+            "latitude": 0.0,
+            "longitude": 0.0,
+        }
+
+        valid, reason = NavalInvasionPolicy().validate(
+            state, invading, target, [invading, escort], (0.0, 0.0)
+        )
+
+        self.assertTrue(valid, reason)
+
 
 if __name__ == "__main__":
     unittest.main()

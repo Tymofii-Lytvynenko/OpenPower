@@ -89,3 +89,48 @@ def test_nonstandard_or_unsafe_population_values_request_polars_fallback() -> No
             life_expectancies=life_expectancy,
             economic_health=economic_health,
         ) is None
+
+
+def test_missing_population_cohort_column_requests_polars_fallback() -> None:
+    regions = pl.DataFrame({"pop_14": [10], "pop_15_64": [20]})
+
+    assert calculate_population_growth(
+        regions,
+        days_passed=1.0,
+        fertility_rates=pl.Series([2.0], dtype=pl.Float64),
+        life_expectancies=pl.Series([67.0], dtype=pl.Float64),
+        economic_health=pl.Series([1.0], dtype=pl.Float64),
+    ) is None
+
+
+def test_unsupported_health_capacity_dtype_requests_polars_fallback() -> None:
+    regions = pl.DataFrame(
+        {
+            "pop_14": [10],
+            "pop_15_64": [20],
+            "pop_65": [5],
+            "health_capacity": ["unknown"],
+        }
+    )
+
+    assert calculate_population_growth(
+        regions,
+        days_passed=1.0,
+        fertility_rates=pl.Series([2.0], dtype=pl.Float64),
+        life_expectancies=pl.Series([67.0], dtype=pl.Float64),
+        economic_health=pl.Series([1.0], dtype=pl.Float64),
+    ) is None
+
+
+def test_parameter_array_length_mismatch_requests_polars_fallback() -> None:
+    regions = pl.DataFrame(
+        {"pop_14": [10, 20], "pop_15_64": [20, 30], "pop_65": [5, 10]}
+    )
+
+    assert calculate_population_growth(
+        regions,
+        days_passed=1.0,
+        fertility_rates=pl.Series([2.0], dtype=pl.Float64),
+        life_expectancies=pl.Series([67.0, 68.0], dtype=pl.Float64),
+        economic_health=pl.Series([1.0, 1.0], dtype=pl.Float64),
+    ) is None

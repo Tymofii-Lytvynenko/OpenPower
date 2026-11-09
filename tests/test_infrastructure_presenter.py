@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
+
+import polars as pl
 
 from modules.base.schema import ensure_base_tables
 from modules.base.systems.world.infrastructure_system import InfrastructureSystem
@@ -13,6 +16,31 @@ from tests.test_regional_infrastructure_fixtures import build_infrastructure_sta
 
 
 class InfrastructurePresenterTest(unittest.TestCase):
+    def test_region_summary_cache_hits_and_evicts_oldest_entry(self):
+        presenter = InfrastructurePresenter()
+        state = SimpleNamespace(tables={})
+
+        first = presenter.build_region_summary(state, 1)
+        self.assertIs(presenter.build_region_summary(state, 1), first)
+
+        for region_id in range(2, 66):
+            presenter.build_region_summary(state, region_id)
+
+        self.assertEqual(len(presenter._region_cache), 64)
+
+    def test_lookup_helpers_and_ratio_handle_missing_or_non_finite_data(self):
+        self.assertEqual(InfrastructurePresenter._find_row(None, "id", 1), {})
+        self.assertEqual(
+            InfrastructurePresenter._find_row(pl.DataFrame({"name": ["AAA"]}), "id", 1),
+            {},
+        )
+        self.assertEqual(InfrastructurePresenter._rows_for_region(None, 1), [])
+        self.assertEqual(
+            InfrastructurePresenter._rows_for_region(pl.DataFrame({"region": [1]}), 1),
+            [],
+        )
+        self.assertEqual(InfrastructurePresenter._ratio(float("nan"), 0.4), 0.4)
+
     def test_selected_region_panel_is_registered_in_the_existing_hud(self):
         specs = build_game_panel_specs(PanelManager())
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -339,6 +340,51 @@ class TestGameSettingsRepositoryCompatibility(unittest.TestCase):
 
         self.assertEqual(settings, GameSettings())
 
+    def test_non_object_and_invalid_numeric_payloads_use_defaults(self):
+        path = self.temp_root / "settings.json"
+        path.write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")
+        repo = GameSettingsRepository(path)
+        self.assertEqual(repo.load(), GameSettings())
+
+        path.write_text(
+            json.dumps({"windowed_width": "wide", "autosave_interval_minutes": None}),
+            encoding="utf-8",
+        )
+        settings = repo.load()
+        self.assertEqual(settings.windowed_width, GameSettings().windowed_width)
+        self.assertEqual(settings.autosave_interval_minutes, GameSettings().autosave_interval_minutes)
+
+    def test_path_factory_and_remaining_service_fallbacks(self):
+        missing_path = self.temp_root / "missing-settings.json"
+        self.assertEqual(GameSettingsRepository(missing_path).load(), GameSettings())
+
+        path = self.temp_root / "settings.json"
+        path.write_text(json.dumps({"language_code": "unsupported"}), encoding="utf-8")
+        service = GameSettingsService.from_path(path, FakeDisplayCatalog(build_catalog()))
+        self.assertEqual(service.settings.language_code, "en")
+        self.assertEqual(service.selected_fullscreen_screen_index, 0)
+
+        service.set_language_by_index(-1)
+        service.set_geo_language_by_index(len(service.geo_language_options))
+        service.set_language_by_index(1)
+        geo_index = next(
+            index
+            for index, option in enumerate(service.geo_language_options)
+            if option.code != service.settings.geo_language_code
+        )
+        service.set_geo_language_by_index(geo_index)
+        self.assertEqual(service.selected_language_index, 1)
+        self.assertEqual(service.selected_language.code, "uk")
+        self.assertEqual(service.selected_geo_language_index, geo_index)
+        self.assertEqual(service.selected_geo_language.code, service.geo_language_options[geo_index].code)
+
+        service.set_autosave_counter(42)
+        service.set_autosave_counter(42)
+        self.assertEqual(service.settings.autosave_counter, 42)
+
+        service.toggle_fullscreen(FakeWindow())
+        self.assertTrue(service.settings.fullscreen)
+
     def test_clamps_invalid_fullscreen_values(self):
         path = self.temp_root / "settings.json"
         path.write_text(
@@ -370,6 +416,79 @@ class TestGameSettingsRepositoryCompatibility(unittest.TestCase):
 class TestGameSettingsServiceDisplayFlow(unittest.TestCase):
     def setUp(self):
         self.catalog = FakeDisplayCatalog(build_catalog())
+
+    def test_empty_display_catalog_and_unknown_selected_languages_are_safe(self):
+        service = GameSettingsService(RecordingRepository(GameSettings()), FakeDisplayCatalog(()))
+        self.assertEqual(service.language_options, GameSettingsService.LANGUAGE_OPTIONS)
+        self.assertEqual(service.geo_language_options, GameSettingsService.GEO_LANGUAGE_OPTIONS)
+        self.assertEqual(service.fullscreen_screen_options(), ())
+        self.assertEqual(service.fullscreen_mode_options(), ())
+        self.assertEqual(service.selected_fullscreen_mode_index(), 0)
+
+        service._settings = replace(
+            service.settings,
+            language_code="unknown-language",
+            geo_language_code="unknown-region",
+            fullscreen=True,
+        )
+        self.assertEqual(service.selected_language_index, 0)
+        self.assertEqual(service.selected_language.code, "en")
+        self.assertEqual(service.selected_geo_language_index, 0)
+        self.assertEqual(service.selected_geo_language.code, service.geo_language_options[0].code)
+        service.apply_display(FakeWindow())
+        self.assertEqual(service._read_window_size(object()), (1280, 720))
+
+        with patch("src.client.services.game_settings_service.choose_best_mode", return_value=None):
+            regular_service = GameSettingsService(RecordingRepository(GameSettings()), self.catalog)
+            self.assertEqual(regular_service.selected_fullscreen_mode_index(), 0)
+
+    def test_display_without_modes_and_safe_fullscreen_fallback(self):
+        catalog = FakeDisplayCatalog((make_screen(0, 1920, 1080, []),))
+        service = GameSettingsService(
+            RecordingRepository(GameSettings(fullscreen=True)),
+            catalog,
+        )
+        self.assertEqual(service.settings.fullscreen_screen_index, 0)
+        self.assertEqual(service.fullscreen_mode_options(), ())
+        service.set_fullscreen_mode_by_index(0)
+
+        window = FakeWindow(1280, 720, fullscreen=False)
+        service.apply_display(window)
+
+        self.assertEqual(len(window.set_fullscreen_calls), 1)
+        self.assertEqual(window.set_fullscreen_calls[0]["screen"].name, "screen-0")
+        self.assertIsNone(window.set_fullscreen_calls[0]["mode"])
+
+    def test_settings_mutators_persist_and_apply_only_changed_values(self):
+        repository = RecordingRepository(GameSettings())
+        service = GameSettingsService(repository, self.catalog)
+        window = FakeWindow()
+
+        service.set_language_by_index(1)
+        geo_index = next(
+            index
+            for index, option in enumerate(service.geo_language_options)
+            if option.code != service.settings.geo_language_code
+        )
+        service.set_geo_language_by_index(geo_index)
+        service.set_windowed_resolution(1600, 900, window)
+        service.set_reduce_motion(True)
+        service.set_reduce_motion(True)
+        service.apply_options(service.settings)
+        service.set_advisor_preferences({"unsupported_preference": True})
+
+        self.assertEqual(service.settings.language_code, "uk")
+        self.assertTrue(service.settings.reduce_motion)
+        self.assertEqual(window.get_size(), (1600, 900))
+        self.assertGreaterEqual(len(repository.saved_settings), 3)
+
+        service.apply_options(replace(service.settings, windowed_width=1920), window)
+        self.assertEqual(window.get_size(), (1920, 900))
+
+        service.set_fullscreen(True, window)
+        saves_before_resize = len(repository.saved_settings)
+        service.remember_windowed_size(1024, 768)
+        self.assertEqual(len(repository.saved_settings), saves_before_resize)
 
     def test_apply_display_restores_windowed_resolution_on_startup(self):
         repository = RecordingRepository(
@@ -655,6 +774,108 @@ class TestGameSettingsContentWiring(unittest.TestCase):
                 ("geo_language", 1),
             ],
         )
+
+
+class TestGameSettingsContentStateCoverage(unittest.TestCase):
+    def setUp(self):
+        self.window = FakeWindow(1600, 900, fullscreen=False)
+
+    def test_staged_settings_session_validation_and_apply(self):
+        service = DummySettingsService(language_index=1, geo_language_index=1)
+        service.apply_options = MagicMock()
+        self.window.session = SimpleNamespace(state=SimpleNamespace(globals={}))
+
+        regular = GameSettingsContent(service, self.window)
+        self.assertEqual(regular.options, service.settings)
+        self.assertEqual(regular.autosave_validation_error, "")
+        regular.update_options(windowed_width=1920)
+        service.apply_options.assert_called_once()
+
+        staged = GameSettingsContent(service, self.window, staged=True)
+        original_language = staged.options.language_code
+        staged.update_options(language_code="en")
+        staged.discard()
+        self.assertEqual(staged.options.language_code, original_language)
+
+        staged.update_options(autosave_enabled=True, autosave_name="../unsafe")
+        self.assertTrue(staged.autosave_validation_error)
+        self.assertFalse(staged.apply())
+
+        staged.update_options(autosave_name="Campaign", geo_language_code="de")
+        self.assertTrue(staged.apply())
+        self.assertEqual(service.apply_options.call_count, 2)
+        self.assertEqual(
+            self.window.session.state.globals["geo_language_code"],
+            service.settings.geo_language_code,
+        )
+
+        uninitialized = GameSettingsContent(None, self.window, staged=True)
+        self.assertIsNone(uninitialized.apply())
+
+    def test_staged_display_and_language_controls_update_the_draft(self):
+        service = DummySettingsService(language_index=1, geo_language_index=1)
+        content = GameSettingsContent(service, self.window, staged=True)
+
+        checkbox = MagicMock(side_effect=[(True, True), (True, True)])
+        combo = MagicMock(side_effect=[(True, 0), (True, 1), (True, 0), (True, 2)])
+        with patch.object(settings_content_module.Prims, "header", return_value=None), patch.multiple(
+            settings_content_module.imgui,
+            checkbox=checkbox,
+            input_int2=MagicMock(return_value=(True, [640, 480])),
+            combo=combo,
+            dummy=MagicMock(),
+            same_line=MagicMock(),
+            text=MagicMock(),
+            text_disabled=MagicMock(),
+            text_colored=MagicMock(),
+            align_text_to_frame_padding=MagicMock(),
+            set_next_item_width=MagicMock(),
+            get_content_region_avail=MagicMock(return_value=SimpleNamespace(x=320)),
+        ):
+            content._render_display_section()
+            content._render_language_section()
+
+        self.assertTrue(content.options.fullscreen)
+        self.assertTrue(content.options.reduce_motion)
+        self.assertEqual((content.options.windowed_width, content.options.windowed_height), (800, 600))
+        self.assertEqual(content.options.fullscreen_screen_index, 0)
+        self.assertEqual((content.options.fullscreen_mode_width, content.options.fullscreen_mode_height), (1600, 900))
+        self.assertEqual(content.options.language_code, "en")
+        self.assertEqual(content.options.geo_language_code, "de")
+
+    def test_display_rows_show_empty_states_when_no_screens_or_modes_exist(self):
+        service = DummySettingsService()
+        service.fullscreen_screen_options = lambda: ()
+        service.fullscreen_mode_options = lambda screen_index=None: ()
+        content = GameSettingsContent(service, self.window)
+        text_disabled = MagicMock()
+
+        with patch.object(settings_content_module.imgui, "text_disabled", text_disabled):
+            content._render_fullscreen_screen_row()
+            content._render_fullscreen_mode_row()
+
+        self.assertEqual(text_disabled.call_count, 2)
+
+    def test_reduce_motion_change_uses_optional_immediate_setter(self):
+        service = DummySettingsService()
+        service.set_reduce_motion = MagicMock()
+        content = GameSettingsContent(service, self.window)
+
+        with patch.object(settings_content_module.Prims, "header", return_value=None), patch.multiple(
+            settings_content_module.imgui,
+            checkbox=MagicMock(side_effect=[(False, False), (True, True)]),
+            input_int2=MagicMock(return_value=(False, [1600, 900])),
+            combo=MagicMock(return_value=(False, 0)),
+            dummy=MagicMock(),
+            same_line=MagicMock(),
+            text_disabled=MagicMock(),
+            text_colored=MagicMock(),
+            set_next_item_width=MagicMock(),
+            get_content_region_avail=MagicMock(return_value=SimpleNamespace(x=320)),
+        ):
+            content._render_display_section()
+
+        service.set_reduce_motion.assert_called_once_with(True)
 
 
 if __name__ == "__main__":

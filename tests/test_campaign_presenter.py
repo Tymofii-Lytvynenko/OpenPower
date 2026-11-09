@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+
 import polars as pl
+import pytest
 
 from src.client.ui.panels.service.campaign_presenter import CampaignPresenter
 from src.client.ui.components.shared.game_over_dialog import GameOverDialog
@@ -125,3 +128,56 @@ def test_game_over_query_matches_terminal_outcome_and_sandbox_continuation():
     assert dialog.is_game_over(state, "usa") is True
     assert dialog.is_game_over(state, "CAN") is False
     assert dialog.is_game_over(state, "MEX") is False
+
+
+@pytest.mark.parametrize(
+    ("action_type", "fields", "expected"),
+    [
+        ("ActionUpdateBudget", {}, "update budget allocations"),
+        ("ActionChangeEconomicPolicy", {"policy_name": "tax_rate"}, "change tax rate"),
+        ("ActionChangeEconomicPolicy", {}, "change economic policy"),
+        ("ActionRequestDebtContract", {}, "request a debt contract"),
+        ("ActionResolveDebtContract", {}, "accept a debt contract"),
+        ("ActionChangePoliticalLaw", {"law_id": "term_limits"}, "change term limits"),
+        ("ActionChangePoliticalLaw", {}, "change a political law"),
+        ("ActionSetElectionOverride", {}, "set an election override"),
+        ("ActionResolvePoliticalCrisis", {}, "resolve a political crisis"),
+        ("ActionBuildUnit", {"count": 2, "unit_type": "tank"}, "build 2 tank(s)"),
+        ("ActionQueueUnitProduction", {}, "queue unit production"),
+        ("ActionBuyMarketUnit", {}, "buy a listed unit"),
+        ("ActionTrainUnit", {"target_level": "Veteran"}, "train unit to Veteran"),
+        ("ActionTrainUnit", {}, "train unit to the selected level"),
+        ("UnknownAction", {}, ""),
+    ],
+)
+def test_recommendation_action_labels_cover_supported_action_types(action_type, fields, expected):
+    recommendation = {
+        "optional_action_json": json.dumps({"type": action_type, "fields": fields}),
+    }
+
+    assert CampaignPresenter.recommendation_action_label(recommendation) == expected
+
+
+@pytest.mark.parametrize("raw", [None, 7, "", "  "])
+def test_recommendation_payload_rejects_missing_or_blank_json(raw):
+    assert CampaignPresenter._recommendation_payload({"optional_action_json": raw}) is None
+
+
+@pytest.mark.parametrize("raw", ["{invalid", "[]", '{"fields": []}', '{"type": "x", "fields": null}'])
+def test_recommendation_payload_rejects_invalid_json_shapes(raw):
+    assert CampaignPresenter._recommendation_payload({"optional_action_json": raw}) is None
+
+
+def test_recommendation_payload_defaults_missing_action_type():
+    assert CampaignPresenter._recommendation_payload({
+        "optional_action_json": '{"fields": {"value": 1}}',
+    }) == ("", {"value": 1})
+
+
+@pytest.mark.parametrize("evidence", ["{invalid", "{}", []])
+def test_latest_evidence_rejects_invalid_json_and_shapes(evidence):
+    assert CampaignPresenter.latest_evidence({"evidence_json": evidence}) is None
+
+
+def test_recommendation_action_label_is_empty_for_invalid_payload():
+    assert CampaignPresenter.recommendation_action_label({"optional_action_json": "{invalid"}) == ""

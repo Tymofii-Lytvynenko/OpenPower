@@ -126,3 +126,73 @@ def test_ai_policy_command_uses_authoritative_migration_action_path():
         "NPC", "PLAYER", human_policies["NPC"], human_policies["PLAYER"]
     )
     assert ai_route == human_route
+
+
+def test_policy_returns_no_candidates_without_migration_table():
+    context = _context()
+    context.tables.pop("migration_policies")
+
+    candidates = MigrationPolicy().build_candidates(context).collect()
+
+    assert candidates.is_empty()
+
+
+def test_policy_returns_no_candidates_for_incomplete_policy_schema():
+    context = _context()
+    context.tables["migration_policies"] = pl.DataFrame({"country_id": ["NPC"]})
+
+    candidates = MigrationPolicy().build_candidates(context).collect()
+
+    assert candidates.is_empty()
+
+
+def test_policy_defaults_optional_columns_when_signals_are_absent():
+    context = _context()
+    context.tables["migration_policies"] = pl.DataFrame(
+        {
+            "country_id": ["NPC", "PLAYER"],
+            "migration_policy": ["open", "open"],
+            "border_policy": ["open", "open"],
+        }
+    )
+    context.tables.pop("migration_signals")
+
+    selected = MigrationPolicy().build_candidates(context).collect().row(0, named=True)
+
+    assert selected["country_id"] == "NPC"
+    assert selected["asylum_rate"] == 0.25
+    assert selected["entry_rate"] == 0.7
+    assert abs(selected["exit_rate"] - 0.66) < 1e-9
+
+
+def test_policy_uses_empty_signals_when_signal_table_has_no_country_id():
+    context = _context()
+    context.tables["migration_signals"] = pl.DataFrame({"service_pressure": [0.95]})
+
+    selected = MigrationPolicy().build_candidates(context).collect().row(0, named=True)
+
+    assert selected["country_id"] == "NPC"
+    assert selected["migration_policy"] == "open"
+
+
+def test_resolve_action_rejects_unknown_kinds_and_missing_country_ids():
+    policy = MigrationPolicy()
+
+    assert policy.resolve_action({"action_kind": "unrelated"}) is None
+    assert policy.resolve_action({"action_kind": "update_migration_policy"}) is None
+
+
+def test_resolve_action_defaults_non_finite_rates():
+    action = MigrationPolicy().resolve_action(
+        {
+            "action_kind": "update_migration_policy",
+            "country_id": " npc ",
+            "entry_rate": float("nan"),
+            "exit_rate": float("inf"),
+        }
+    )
+
+    assert isinstance(action, ActionUpdateMigrationPolicy)
+    assert action.country_tag == "NPC"
+    assert action.entry_rate == 0.5
+    assert action.exit_rate == 0.5

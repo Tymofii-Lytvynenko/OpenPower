@@ -21,3 +21,11 @@ def test_missing_profile_metrics_use_openpower_model_defaults() -> None:
     assert by_country["UKR"].military_rank == 4
     assert by_country["DEU"].economic_rank == 1
     assert by_country["MEX"].political_rank == 4
+
+
+def test_empty_or_invalid_country_rows_return_no_profile_candidates() -> None:
+    assert suggest_country_profiles(
+        [{}, {"id": "  "}],
+        desired_values={},
+        enabled_metrics={},
+    ) == []
