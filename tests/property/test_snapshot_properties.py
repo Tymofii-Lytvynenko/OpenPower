@@ -6,6 +6,7 @@ from hypothesis import given, strategies as st
 
 from src.shared.snapshots import SnapshotProtocolError, StateSnapshotDecoder, StateSnapshotEncoder
 from src.shared.state import GameState
+from src.simulation.fingerprint import state_fingerprint
 from tests.property.strategies.tables import valid_tables
 
 
@@ -13,18 +14,25 @@ from tests.property.strategies.tables import valid_tables
 def test_full_acknowledged_deltas_and_history_append(frame, updates, history):
     state = GameState(tables={'sample': frame, 'history_snapshots': pl.DataFrame({'value': history}, schema={'value': pl.Int64})})
     state.globals['nested'] = {'values': [1]}
+    state.system_state['system'] = {'nested': [1]}
     encoder, decoder = StateSnapshotEncoder(), StateSnapshotDecoder()
     packet = encoder.encode(state)
     published = decoder.decode(packet)
+    assert state_fingerprint(published) == state_fingerprint(state)
     encoder.acknowledge(packet['sequence'])
-    for value in updates:
+    for index, value in enumerate(updates):
         state.update_table('sample', pl.DataFrame({'value': [value]}))
         state.update_table('history_snapshots', pl.concat([state.tables['history_snapshots'], pl.DataFrame({'value': [value]}, schema={'value': pl.Int64})]))
         state.globals['nested']['values'].append(value)
+        state.system_state['system']['nested'].append(value)
+        state.time.total_minutes += 1
+        state.journal.domain_events.append({'event_id': f'e{index}', 'payload': {'value': value}})
+        state.journal.command_results.append({'command_id': f'c{index}', 'value': value})
         packet = encoder.encode(state)
         decoded = decoder.decode(packet)
         assert all(decoded.tables[name].equals(table) for name, table in state.tables.items())
         assert decoded.globals == state.globals
+        assert state_fingerprint(decoded) == state_fingerprint(state)
         encoder.acknowledge(packet['sequence'])
     assert published.globals['nested']['values'] == [1]
     state.remove_table('sample')
