@@ -103,3 +103,18 @@ def test_invalid_envelopes_are_rejected(case):
     result = pipeline.prepare(GameState(), 0)
     assert not result.ready
     assert [item.code for item in result.rejected] == [expected]
+
+@given(st.sampled_from((float('nan'), float('inf'), float('-inf'))))
+def test_nonfinite_action_is_rejected_and_consumes_transport_sequence(value):
+    from src.server.command_policy import validate_finite_payload
+    from src.shared.actions import ActionSetTax
+    from src.shared.commands import CommandEnvelope
+
+    pipeline = CommandPipeline(validators=(validate_finite_payload,))
+    pipeline.submit(CommandEnvelope('bad', 'player', 1, ActionSetTax('player', 'AAA', value)))
+    result = pipeline.prepare(GameState(), 0)
+    assert not result.ready
+    assert [item.code for item in result.rejected] == ['validation_error']
+    followup = command('next', 'player', 2)
+    pipeline.submit(followup)
+    assert pipeline.prepare(GameState(), 0).ready == (followup,)
