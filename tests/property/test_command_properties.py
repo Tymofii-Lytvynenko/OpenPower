@@ -83,3 +83,23 @@ class CommandMachine(RuleBasedStateMachine):
 
 
 TestCommandMachine = CommandMachine.TestCase
+
+from hypothesis import given
+from tests.property.strategies.commands import invalid_envelopes, valid_envelopes
+
+
+@given(valid_envelopes())
+def test_valid_envelopes_are_ready_at_expected_sequence(envelope):
+    pipeline = CommandPipeline(initial_sequences={envelope.actor_id: envelope.sequence - 1})
+    pipeline.submit(envelope)
+    assert pipeline.prepare(GameState(), 0).ready == (envelope,)
+
+
+@given(invalid_envelopes())
+def test_invalid_envelopes_are_rejected(case):
+    envelope, expected = case
+    pipeline = CommandPipeline()
+    pipeline.submit(envelope)
+    result = pipeline.prepare(GameState(), 0)
+    assert not result.ready
+    assert [item.code for item in result.rejected] == [expected]

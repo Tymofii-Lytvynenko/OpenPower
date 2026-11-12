@@ -37,3 +37,15 @@ def test_incompatible_cast_and_conflicting_schema_rejected(text):
         registry.normalize('sample', pl.DataFrame({'id': [text], 'value': [1]}))
     with pytest.raises(RuntimeError, match='conflict'):
         registry.register(TableSchema('sample', {'id': ColumnSpec(pl.String)}))
+
+from tests.property.strategies.tables import duplicate_key_tables, null_key_tables, tables_with_extras, wrong_type_tables
+
+
+@given(duplicate_key_tables(), null_key_tables(), tables_with_extras(), wrong_type_tables())
+def test_generated_schema_faults_are_distinguished(duplicate, null_key, extra, wrong):
+    registry = WorldSchemaRegistry([TABLE_SCHEMA])
+    issues = lambda frame: {issue.code for issue in registry.validate_state(GameState(tables={'sample': frame}))}
+    assert 'duplicate_key' in issues(duplicate)
+    assert 'null_key' in issues(null_key)
+    assert registry.normalize('sample', extra).equals(extra)
+    assert 'wrong_dtype' in issues(wrong)
