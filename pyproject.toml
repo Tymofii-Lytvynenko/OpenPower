@@ -40,7 +40,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pyinstrument",
-    "hypothesis>=6.0,<7",
+    "hypothesis>=6.168.5,<7",
     "pytest>=8.3",
     "pytest-cov>=6.0",
 ]
@@ -65,7 +65,7 @@ extraPaths = ["."]
 
 [dependency-groups]
 dev = [
-    "hypothesis>=6.0,<7",
+    "hypothesis>=6.168.5,<7",
     "pytest>=8.3",
     "pytest-cov>=6.0",
 ]

@@ -1093,7 +1093,7 @@ dev = [
 requires-dist = [
     { name = "arcade" },
     { name = "geopandas" },
-    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0,<7" },
+    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.168.5,<7" },
     { name = "imgui-bundle" },
     { name = "numpy" },
     { name = "opencv-python" },
@@ -1113,7 +1113,7 @@ provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "hypothesis", specifier = ">=6.0,<7" },
+    { name = "hypothesis", specifier = ">=6.168.5,<7" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-cov", specifier = ">=6.0" },
 ]
