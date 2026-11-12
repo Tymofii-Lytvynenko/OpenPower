@@ -17,6 +17,9 @@ EXPECTED_SRC_PACKAGES = frozenset(
     {"client", "core", "engine", "modding", "server", "shared", "simulation"}
 )
 EXPECTED_IMPORT_LINTER_ROOTS = frozenset({"src", "modules"})
+ALLOWED_IMPORT_LINTER_OPTIONS = frozenset(
+    {"root_packages", "exclude_type_checking_imports", "contracts"}
+)
 REQUIRED_FORBIDDEN_CONTRACTS = {
     "shared-is-leaf": frozenset(
         {"src.core", "src.engine", "src.server", "src.client", "src.simulation", "src.modding", "modules"}
@@ -62,6 +65,33 @@ REQUIRED_PROTECTED_CONTRACT = {
         {"src.engine", "src.server.session", "src.simulation.ui_testing.fixtures"}
     ),
 }
+REQUIRED_CONTRACT_OPTIONS = {
+    **{
+        contract_id: frozenset({"id", "name", "type", "source_modules", "forbidden_modules"})
+        for contract_id in REQUIRED_FORBIDDEN_CONTRACTS
+    },
+    **{
+        contract_id: frozenset({"id", "name", "type", "layers"})
+        for contract_id in REQUIRED_LAYER_CONTRACTS
+    },
+    **{
+        contract_id: frozenset({"id", "name", "type", "modules"})
+        for contract_id in REQUIRED_INDEPENDENCE_CONTRACTS
+    },
+    REQUIRED_PROTECTED_CONTRACT["id"]: frozenset(
+        {"id", "name", "type", "protected_modules", "allowed_importers"}
+    ),
+}
+CONTRACT_SUPPRESSION_OPTIONS = frozenset(
+    {
+        "ignore_imports",
+        "allow_indirect_imports",
+        "as_packages",
+        "containers",
+        "skip_descendants",
+        "exhaustive_ignores",
+    }
+)
 ALLOWED_DYNAMIC_IMPORTS = {
     "src.engine.mod_manager": ("load_runtime", "modules.", ".registration", "package_name"),
     "src.modding.client_extensions": (
@@ -172,6 +202,25 @@ def _coverage_findings(root: Path, config: dict, source_files: list[Path]) -> li
         findings.append(Finding(src_root, 1, f"Package(s) have no Python modules in the analyzed graph: {', '.join(empty_packages)}."))
 
     import_linter = config.get("tool", {}).get("importlinter", {})
+    if not isinstance(import_linter, dict):
+        findings.append(
+            Finding(
+                root / "pyproject.toml",
+                1,
+                "Import Linter configuration must be a table.",
+            )
+        )
+        import_linter = {}
+    unexpected_root_options = sorted(set(import_linter) - ALLOWED_IMPORT_LINTER_OPTIONS)
+    if unexpected_root_options:
+        findings.append(
+            Finding(
+                root / "pyproject.toml",
+                1,
+                "Unsupported Import Linter root option(s): "
+                f"{', '.join(unexpected_root_options)}; architecture graph settings are fixed.",
+            )
+        )
     configured_roots = frozenset(import_linter.get("root_packages", ()))
     if configured_roots != EXPECTED_IMPORT_LINTER_ROOTS:
         findings.append(
@@ -193,11 +242,81 @@ def _coverage_findings(root: Path, config: dict, source_files: list[Path]) -> li
         )
 
     contracts = import_linter.get("contracts", ())
-    contracts_by_id = {
-        contract.get("id"): contract
-        for contract in contracts
-        if isinstance(contract, dict) and contract.get("id")
-    }
+    if not isinstance(contracts, list):
+        findings.append(
+            Finding(
+                root / "pyproject.toml",
+                1,
+                "Import Linter contracts must be an array of contract tables.",
+            )
+        )
+        contracts = []
+
+    contracts_by_id = {}
+    for index, contract in enumerate(contracts):
+        if not isinstance(contract, dict):
+            findings.append(
+                Finding(
+                    root / "pyproject.toml",
+                    1,
+                    f"Import Linter contract at index {index} must be a table.",
+                )
+            )
+            continue
+        contract_id = contract.get("id")
+        if not isinstance(contract_id, str) or not contract_id:
+            findings.append(
+                Finding(
+                    root / "pyproject.toml",
+                    1,
+                    f"Import Linter contract at index {index} must have a string id.",
+                )
+            )
+            continue
+        if contract_id in contracts_by_id:
+            findings.append(
+                Finding(
+                    root / "pyproject.toml",
+                    1,
+                    f"Duplicate Import Linter contract id '{contract_id}'.",
+                )
+            )
+            continue
+        contracts_by_id[contract_id] = contract
+
+        allowed_options = REQUIRED_CONTRACT_OPTIONS.get(contract_id)
+        if allowed_options is not None:
+            unsupported_options = sorted(set(contract) - allowed_options)
+            if unsupported_options:
+                findings.append(
+                    Finding(
+                        root / "pyproject.toml",
+                        1,
+                        f"Contract '{contract_id}' uses unsupported option(s): "
+                        f"{', '.join(unsupported_options)}; critical contract semantics are fixed.",
+                    )
+                )
+        else:
+            unsafe_options = sorted(
+                option
+                for option in CONTRACT_SUPPRESSION_OPTIONS
+                if option in contract
+                and (
+                    option == "ignore_imports"
+                    or (option == "allow_indirect_imports" and contract[option] is True)
+                    or (option == "as_packages" and contract[option] is False)
+                    or (option in {"containers", "skip_descendants", "exhaustive_ignores"} and bool(contract[option]))
+                )
+            )
+            if unsafe_options:
+                findings.append(
+                    Finding(
+                        root / "pyproject.toml",
+                        1,
+                        f"Contract '{contract_id}' uses unsupported weakening option(s): "
+                        f"{', '.join(unsafe_options)}.",
+                    )
+                )
     required_ids = (
         set(REQUIRED_FORBIDDEN_CONTRACTS)
         | set(REQUIRED_LAYER_CONTRACTS)

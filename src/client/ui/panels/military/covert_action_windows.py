@@ -124,7 +124,7 @@ class CovertActionWindows:
         if self._covert_operations is None:
             factory = contribution_for(
                 state,
-                ClientPresentationKeys.COVERT_OPERATIONS_FACTORY,
+                ClientPresentationKeys.COVERT_CREATION_QUOTE_SERVICE_FACTORY,
             )
             self._covert_operations = factory()
         skill_levels = contribution_for(

@@ -6,9 +6,19 @@ from types import SimpleNamespace
 import pytest
 
 import src.modding.client_extensions as extensions
+from modules.base.client_presentation import (
+    CovertCreationQuoteService,
+    TreatyEligibilityQueryService,
+    contribute_client_presentation,
+)
+from modules.base.systems.military.covert_operations_system import (
+    CovertOperationsSystem,
+)
+from modules.base.systems.world.treaty_diplomacy import DiplomacySystem
 from src.shared.mod_api import (
     CLIENT_PRESENTATION_API_VERSION,
     ClientPresentationContribution,
+    ClientPresentationKeys,
 )
 
 
@@ -93,3 +103,16 @@ def test_modules_without_optional_presentation_extension_are_ignored(monkeypatch
     )
 
     assert extensions.load_client_presentation(_config(tmp_path, [manifest])) == {}
+
+
+def test_base_extension_exposes_narrow_queries_instead_of_simulation_systems():
+    values = contribute_client_presentation().values
+    covert_service = values[ClientPresentationKeys.COVERT_CREATION_QUOTE_SERVICE_FACTORY]()
+    treaty_service = values[ClientPresentationKeys.TREATY_ELIGIBILITY_QUERY_SERVICE_FACTORY]()
+
+    assert isinstance(covert_service, CovertCreationQuoteService)
+    assert isinstance(treaty_service, TreatyEligibilityQueryService)
+    assert not isinstance(covert_service, CovertOperationsSystem)
+    assert not isinstance(treaty_service, DiplomacySystem)
+    assert not hasattr(covert_service, "update")
+    assert not hasattr(treaty_service, "update")

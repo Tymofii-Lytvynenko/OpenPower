@@ -126,7 +126,7 @@ class LiveTreatiesPanel:
         if self._diplomacy is None:
             factory = contribution_for(
                 state,
-                ClientPresentationKeys.DIPLOMACY_SYSTEM_FACTORY,
+                ClientPresentationKeys.TREATY_ELIGIBILITY_QUERY_SERVICE_FACTORY,
             )
             self._diplomacy = factory()
         self._resolve_participant_update(state, context)

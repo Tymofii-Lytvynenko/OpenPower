@@ -86,6 +86,10 @@ cycle. All were removed without a broad contract exception.
   `ClientPresentationContribution`, loaded by the app composition point. The
   Client no longer imports `modules.base`, and rendering receives a read-only
   `ClientGameStateView`; UI-only geography language state is kept separately.
+- Treaty eligibility and covert-creation quotes are exposed through narrow
+  client query services rather than returning simulation system objects.
+  Client table mappings keep an isolated snapshot and clone Polars frames on
+  reads so in-place DataFrame operations cannot mutate authoritative state.
 - Import Linter currently analyzes 539 Python files and 1,958 dependencies. All
   11 configured contracts pass, including namespace roots, `TYPE_CHECKING`
   imports, layer direction, client/server independence, and protected Engine
@@ -95,6 +99,10 @@ cycle. All were removed without a broad contract exception.
   mutation rules, and source-root/package coverage. The baseline manifests had
   no cross-module Python imports or cycles; dedicated negative fixtures exercise
   missing declarations and cycles.
+- Import Linter configuration is checked against an exact allowlist of root and
+  required-contract options. Import exceptions, indirect-import allowances,
+  package-scope weakening, and layer-container exclusions fail the architecture
+  command, including when added to extra contracts.
 - Dynamic loading is allowed only at `ModManager.load_runtime` for module
   registration and `load_client_presentation` for the presentation extension.
   Ruff's protected Engine API rule has only the two narrow audited importer
@@ -139,18 +147,21 @@ Latest local checks on 2026-11-12:
   E4,E9,F821,TID251,TID252`: passed.
 - `uv run python -m ruff check --select E7,I,B <changed Python files>`:
   passed.
-- All changed test files, including the positive and negative architecture
-  fixtures: 540 passed in 23.87 seconds.
-- The isolated architecture suite, rerun after removing temporary test assets:
-  29 passed in 12.00 seconds.
-- The full repository suite passed earlier in this implementation, before the
-  final import-order-only edits to test files: 4,777 passed, 31 skipped, 3
-  deselected, and 304 unittest subtests passed in 218.68 seconds. The changed
-  test files were rerun after those import-order edits and all passed. The full
-  run used a temporary junction to the checkout's ignored local `.codex` test
-  assets because those reference fixtures are absent from the isolated worktree;
-  the junction was removed after verification and is not part of this change.
+- The 32 architecture tests, including negative tests for all three Import
+  Linter suppression options, passed in 13.51 seconds.
+- The full repository suite passed after the follow-up fixes: 4,784 passed, 31
+  skipped, 3 deselected, and 304 unittest subtests passed in 219.32 seconds.
+  This run used a temporary junction to the checkout's ignored local `.codex`
+  test assets because reference fixtures require them; the junction was removed
+  after verification and is not part of this change.
+- `ClientGameStateView` regression tests cover in-place `replace_column`,
+  `insert_column`, `drop_in_place`, and `extend` mutations through returned
+  Polars frames.
+- The Base presentation extension now exports narrow treaty-eligibility and
+  covert-creation quote services. Tests assert that client contributions do not
+  expose `DiplomacySystem` or `CovertOperationsSystem` instances.
 
-The GitHub workflow has been added but has not run on GitHub because this branch
-has not been pushed. Configure `Architecture / validate` as a required check
-after the workflow is available on the repository's default branch.
+The workflow runs on PRs, pushes to `main`, and manual dispatch; pushing a
+feature branch alone does not trigger it. Configure `Architecture / validate`
+as a required status check after the workflow is available on the repository's
+default branch.

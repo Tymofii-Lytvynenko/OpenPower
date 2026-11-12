@@ -19,7 +19,7 @@ class ClientPresentationKeys:
     """Stable contribution keys for optional, client-only mod extensions."""
 
     READINESS_POLICY_FACTORY = "base.military.readiness_policy_factory"
-    COVERT_OPERATIONS_FACTORY = "base.military.covert_operations_factory"
+    COVERT_CREATION_QUOTE_SERVICE_FACTORY = "base.military.covert_creation_quote_service_factory"
     COVERT_SKILL_LEVELS = "base.military.covert_skill_levels"
     DOMESTIC_SECURITY_COVERAGE = "base.military.domestic_security_coverage"
     WEAPONS_TRADE_POLICY_FACTORY = "base.military.weapons_trade_policy_factory"
@@ -30,7 +30,7 @@ class ClientPresentationKeys:
     CANONICAL_ROLE = "base.military.canonical_role"
     INITIAL_PRODUCTION_ETA_DAYS = "base.military.initial_production_eta_days"
     FOREIGN_GOVERNMENT_CHANGE_RESTRICTION = "base.politics.foreign_government_change_restriction"
-    DIPLOMACY_SYSTEM_FACTORY = "base.politics.diplomacy_system_factory"
+    TREATY_ELIGIBILITY_QUERY_SERVICE_FACTORY = "base.politics.treaty_eligibility_query_service_factory"
     COUNTRY_DIPLOMACY_RESTRICTION = "base.politics.country_diplomacy_restriction"
     TREATY_TITLE_RESTRICTION = "base.politics.treaty_title_restriction"
 

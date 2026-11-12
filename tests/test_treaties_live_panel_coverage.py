@@ -58,7 +58,7 @@ class Imgui:
 
 def _panel(**kwargs):
     instance = LiveTreatiesPanel(**kwargs)
-    factory = presentation_values()[ClientPresentationKeys.DIPLOMACY_SYSTEM_FACTORY]
+    factory = presentation_values()[ClientPresentationKeys.TREATY_ELIGIBILITY_QUERY_SERVICE_FACTORY]
     instance._diplomacy = factory()
     return instance
 

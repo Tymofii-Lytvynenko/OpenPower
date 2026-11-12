@@ -93,7 +93,7 @@ def state(*, countries=("UKR", "POL", "USA"), resources=None):
 
 
 def _windows_with_operations():
-    factory = presentation_values()[ClientPresentationKeys.COVERT_OPERATIONS_FACTORY]
+    factory = presentation_values()[ClientPresentationKeys.COVERT_CREATION_QUOTE_SERVICE_FACTORY]
     return covert_ui.CovertActionWindows(covert_operations=factory())
 
 

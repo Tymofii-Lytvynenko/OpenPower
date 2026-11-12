@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from types import MappingProxyType
 from typing import Any
+
+import polars as pl
 
 from src.shared.geo_names import DEFAULT_GEO_LANGUAGE_CODE
 from src.shared.state import GameState
@@ -30,7 +32,34 @@ class _ReadOnlyObjectView:
         raise AttributeError(f"Snapshot data attribute '{name}' is read-only.")
 
 
+class _ReadOnlyTableMapping(Mapping[str, pl.DataFrame]):
+    """Keep a stable table snapshot and return detached Polars handles on reads."""
+
+    __slots__ = ("_tables",)
+
+    def __init__(self, tables: Mapping[str, pl.DataFrame]) -> None:
+        snapshot = {name: frame.clone() for name, frame in tables.items()}
+        object.__setattr__(self, "_tables", MappingProxyType(snapshot))
+
+    def __getitem__(self, name: str) -> pl.DataFrame:
+        return self._tables[name].clone()
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._tables)
+
+    def __len__(self) -> int:
+        return len(self._tables)
+
+    def __contains__(self, name: object) -> bool:
+        return name in self._tables
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError("Client table snapshots are read-only.")
+
+
 def _read_only_value(value: Any) -> Any:
+    if isinstance(value, pl.DataFrame):
+        return value.clone()
     if isinstance(value, Mapping):
         return MappingProxyType({key: _read_only_value(item) for key, item in value.items()})
     if isinstance(value, list):
@@ -76,14 +105,14 @@ class ClientGameStateView:
         object.__setattr__(self, "_state", state)
         object.__setattr__(self, "client_presentation", MappingProxyType(dict(client_presentation)))
         object.__setattr__(self, "presentation_state", presentation_state)
-        object.__setattr__(self, "_tables", MappingProxyType(dict(state.tables)))
+        object.__setattr__(self, "_tables", _ReadOnlyTableMapping(state.tables))
         object.__setattr__(self, "_globals", _read_only_value(state.globals))
 
     def __setattr__(self, name: str, value: object) -> None:
         raise AttributeError(f"Client snapshot attribute '{name}' is read-only.")
 
     @property
-    def tables(self) -> Mapping[str, Any]:
+    def tables(self) -> Mapping[str, pl.DataFrame]:
         return self._tables
 
     @property
@@ -103,7 +132,9 @@ class ClientGameStateView:
         return MappingProxyType(dict(self._state.table_revisions))
 
     def get_table(self, name: str) -> Any:
-        return self._state.get_table(name)
+        if name not in self._tables:
+            raise KeyError(f"Table '{name}' not found in GameState.")
+        return self._tables[name]
 
     def __getattr__(self, name: str) -> Any:
         if name in self._BLOCKED_MUTATORS:
