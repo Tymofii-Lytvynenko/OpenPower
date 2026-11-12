@@ -181,8 +181,10 @@ class StateSnapshotDecoder:
             state = GameState(
                 tables=dict(self.state.tables),
                 journal=JournalState(
-                    domain_events=list(self.state.journal.domain_events),
-                    command_results=list(self.state.journal.command_results),
+                    # Journal records contain nested mutable payloads; shallow copies
+                    # would let a newer snapshot mutate an earlier publication.
+                    domain_events=copy.deepcopy(self.state.journal.domain_events),
+                    command_results=copy.deepcopy(self.state.journal.command_results),
                 ),
             )
             for name, payload in packet["tables"].items():

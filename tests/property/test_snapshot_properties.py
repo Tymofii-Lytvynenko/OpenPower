@@ -50,3 +50,15 @@ def test_invalid_snapshot_version_and_missing_base_rejected(frame):
     delta['base_sequence'] = packet['sequence'] + 10
     with pytest.raises(SnapshotProtocolError):
         decoder.decode(delta)
+
+@given(st.lists(st.integers(-100, 100), max_size=5))
+def test_published_snapshot_journal_records_are_independent(values):
+    state = GameState()
+    state.journal.domain_events.append({'event_id': 'event', 'payload': {'values': values.copy()}})
+    encoder, decoder = StateSnapshotEncoder(), StateSnapshotDecoder()
+    packet = encoder.encode(state)
+    first = decoder.decode(packet)
+    encoder.acknowledge(packet['sequence'])
+    second = decoder.decode(encoder.encode(state))
+    second.journal.domain_events[0]['payload']['values'].append(123)
+    assert first.journal.domain_events[0]['payload']['values'] == values
