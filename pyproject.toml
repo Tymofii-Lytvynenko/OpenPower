@@ -70,3 +70,7 @@ dev = [
     "pytest-cov>=6.0",
 ]
 
+
+[tool.pytest.ini_options]
+addopts = "-m 'not slow'"
+markers = ["slow: integration tests with filesystem or full simulation"]
