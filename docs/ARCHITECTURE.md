@@ -50,3 +50,33 @@ never mutates the authoritative world.
 - The simulation process advances with a fixed wall-clock step. Headless tools
   may use a different explicit fixed step, but must never feed measured execution
   duration into gameplay logic.
+
+## Enforced dependency boundaries
+
+The dependency direction is checked by Import Linter and OpenPower-specific AST
+rules. The roots `src` and `modules` are namespace packages and both are required
+to appear in the checked import graph. Imports under `TYPE_CHECKING` are included.
+
+- Shared depends only on itself and the established data libraries.
+- Core may depend on Shared. Engine may depend on Core and Shared. Server may
+  depend on Engine, Core, and Shared. Client may depend on Core and Shared.
+- Client and Server remain independent. Client rendering uses a read-only
+  snapshot view and cannot update authoritative tables or globals.
+- Gameplay modules may depend on Shared, Core, their own package, and modules
+  explicitly named in their own `mod.toml`. Module dependency cycles fail.
+- Engine, Server, Client, and gameplay modules may not statically depend on
+  simulation or modding tools. The application entry points own composition.
+- Engine's runtime registration loader and the client presentation contribution
+  loader are the only approved dynamic import sites. AST checks recognize their
+  exact loader calls; arbitrary computed imports cannot be proven safe statically.
+
+The single local check is `python -m tools.architecture_check`. It runs
+`lint-imports --no-cache`, checks graph and manifest coverage, and runs the
+OpenPower AST rules. Run the fixture suite with `python -m pytest
+tests/architecture -q`. Ruff uses repository rules from `pyproject.toml`; the
+Architecture workflow blocks correctness and banned-API findings across the
+repository and runs import-order/Bugbear checks on changed Python files.
+
+The separate GitHub Actions check is named `Architecture / validate`. Repository
+branch protection must require that status check in GitHub Settings; workflow
+files cannot enforce branch protection by themselves.

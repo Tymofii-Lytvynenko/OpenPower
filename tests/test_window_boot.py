@@ -23,6 +23,7 @@ class FakeSession:
             self.progress_queue.put(message)
         self.tick = Mock()
         self.state = SimpleNamespace(globals={})
+        self.presentation_state = SimpleNamespace(geo_language_code="en")
         self.shutdown = Mock()
 
 
@@ -265,14 +266,24 @@ def test_geo_language_sync_ignores_missing_or_non_dict_session_state() -> None:
     window._sync_geo_language_to_session()
 
     globals_object = SimpleNamespace(geo_language_code="old")
-    window.session = SimpleNamespace(state=SimpleNamespace(globals=globals_object))
+    presentation_state = SimpleNamespace(geo_language_code="en")
+    window.session = SimpleNamespace(
+        state=SimpleNamespace(globals=globals_object),
+        presentation_state=presentation_state,
+    )
     window._sync_geo_language_to_session()
     assert globals_object.geo_language_code == "old"
+    assert presentation_state.geo_language_code == "en"
 
     globals_dict = {}
-    window.session = SimpleNamespace(state=SimpleNamespace(globals=globals_dict))
+    presentation_state = SimpleNamespace(geo_language_code="en")
+    window.session = SimpleNamespace(
+        state=SimpleNamespace(globals=globals_dict),
+        presentation_state=presentation_state,
+    )
     window._sync_geo_language_to_session()
-    assert globals_dict == {"geo_language_code": "en"}
+    assert globals_dict == {}
+    assert presentation_state.geo_language_code == "en"
 
 
 def test_boot_creation_and_polling_handle_factory_failure_closing_and_empty_queues() -> None:
@@ -305,12 +316,12 @@ def test_update_and_close_forward_to_live_session_and_imgui() -> None:
     window = _window()
     window.imgui = Mock()
     session = FakeSession()
-    session.state = SimpleNamespace(globals={})
     window.session = session
 
     window.on_update(0.25)
     session.tick.assert_called_once_with(0.25)
-    assert session.state.globals == {"geo_language_code": "en"}
+    assert session.state.globals == {}
+    assert session.presentation_state.geo_language_code == "en"
 
     with (
         patch("src.client.window.arcade.unschedule") as unschedule,

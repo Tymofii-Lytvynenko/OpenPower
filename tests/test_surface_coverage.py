@@ -5,8 +5,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.client.ui.testing import surface as surface_module
 from src.shared import config as config_module
+from src.simulation.ui_testing import surface as surface_module
 
 
 @dataclass

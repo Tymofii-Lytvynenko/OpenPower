@@ -110,6 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _handle_ui_list(args) -> int:
     import json
+
     from src.client.ui.testing.catalog import list_surfaces
     print(json.dumps(list_surfaces(), ensure_ascii=False, indent=2))
     return 0
@@ -123,7 +124,8 @@ def _handle_ui_live_smoke(args) -> int:
 
 def _handle_ui_run(args) -> int:
     import json
-    from src.client.ui.testing.surface import run_surface
+
+    from src.simulation.ui_testing.surface import run_surface
     if args.width <= 0 or args.height <= 0:
         raise ValueError("Viewport dimensions must be positive.")
     if not 0 <= args.tolerance <= 1:

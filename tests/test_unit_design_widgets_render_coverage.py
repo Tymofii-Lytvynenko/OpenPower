@@ -2,6 +2,8 @@ from types import SimpleNamespace
 
 import src.client.ui.panels.military.unit_design_widgets as widgets_module
 from src.client.ui.panels.military.unit_design_widgets import render_capability_rows
+from src.shared.mod_api import ClientPresentationKeys
+from tests.test_support.client_presentation import client_state
 
 
 class FakeWidgets:
@@ -36,6 +38,7 @@ def test_read_only_rows_clamp_values_skip_missing_and_show_hover_help(monkeypatc
         ui,
         "frmStats",
         {"gun_range": -10.0, "stealth": 1.5, "armor": None},
+        client_state(),
         test_id_prefix="design.stats",
         visible_keys={"gun_range", "stealth", "armor"},
     )
@@ -68,6 +71,7 @@ def test_editable_rows_choose_precision_and_store_slider_values(monkeypatch):
         ui,
         "frmStats",
         values,
+        client_state(),
         editable=True,
         test_id_prefix="design.editor",
         visible_keys={"gun_range", "stealth"},
@@ -88,7 +92,10 @@ def test_editable_rows_choose_precision_and_store_slider_values(monkeypatch):
 def test_read_only_row_handles_degenerate_capability_bounds(monkeypatch):
     ui = FakeWidgets()
     progress_calls = []
-    monkeypatch.setattr(widgets_module, "CAPABILITY_BOUNDS", {"gun_range": (5.0, 5.0)})
+    state = client_state()
+    state.client_presentation[ClientPresentationKeys.CAPABILITY_BOUNDS] = {
+        "gun_range": (5.0, 5.0),
+    }
     monkeypatch.setattr(
         widgets_module,
         "imgui",
@@ -103,6 +110,7 @@ def test_read_only_row_handles_degenerate_capability_bounds(monkeypatch):
         ui,
         "frmStats",
         {"gun_range": 5.0},
+        state,
         visible_keys={"gun_range"},
     )
 
@@ -113,6 +121,6 @@ def test_rows_without_a_visibility_filter_and_without_values_only_draw_labels(mo
     ui = FakeWidgets()
     monkeypatch.setattr(widgets_module, "imgui", SimpleNamespace())
 
-    render_capability_rows(ui, "frmStats", {})
+    render_capability_rows(ui, "frmStats", {}, client_state())
 
     assert len(ui.text_calls) == len(widgets_module.DESIGN_METRICS)

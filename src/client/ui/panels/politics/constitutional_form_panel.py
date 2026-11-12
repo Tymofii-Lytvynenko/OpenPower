@@ -2,20 +2,23 @@ from __future__ import annotations
 
 from imgui_bundle import icons_fontawesome_6
 
+from src.client.services.client_presentation import contribution_for
 from src.client.ui.components.shared.dirty_close_confirmation import (
     CloseDecision,
     DirtyCloseConfirmation,
     SaveConfirmationPreferences,
 )
 from src.client.ui.components.shared.generic_message_dialog import GenericMessageDialog
-from src.client.ui.components.shared.generic_question_dialog import GenericQuestionDialog
+from src.client.ui.components.shared.generic_question_dialog import (
+    GenericQuestionDialog,
+)
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.panels.politics.presenter import PoliticsPresenter
 from src.client.ui.panels.shared.panel_data import resolve_region_name, safe_text
 from src.shared.actions import ActionSetCountryCapital, ActionSetGovernmentForm
-from modules.base.systems.world.authority_policy import foreign_government_change_restriction
+from src.shared.mod_api import ClientPresentationKeys
 from src.shared.region_control import region_controlled_by_country
 
 # REFERENCE exposes this override only for government types 8 and 9, its two electoral forms.
@@ -371,16 +374,18 @@ class ConstitutionalFormPanel:
             return False
         if context.is_own_country:
             return True
-        return not foreign_government_change_restriction(
-            state, context.net_client.player_id, context.target_tag
-        )
+        return not contribution_for(
+            state,
+            ClientPresentationKeys.FOREIGN_GOVERNMENT_CHANGE_RESTRICTION,
+        )(state, context.net_client.player_id, context.target_tag)
 
     def _foreign_change_tooltip(self, state, context: PanelRenderContext) -> str:
         if context.net_client is None:
             return "Connect to a game session before applying constitutional changes."
-        return foreign_government_change_restriction(
-            state, context.net_client.player_id, context.target_tag
-        )
+        return contribution_for(
+            state,
+            ClientPresentationKeys.FOREIGN_GOVERNMENT_CHANGE_RESTRICTION,
+        )(state, context.net_client.player_id, context.target_tag)
 
     def _has_pending_change(self, state, country: str) -> bool:
         capital_pending = (

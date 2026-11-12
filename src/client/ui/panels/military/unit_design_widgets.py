@@ -4,14 +4,10 @@ from __future__ import annotations
 
 import json
 
-from modules.base.systems.military.capability_catalog import (
-    CAPABILITY_BOUNDS,
-    DEFAULT_ROLE_PROFILES,
-    canonical_role,
-)
-from src.client.ui.core.instrumented_imgui import imgui
+from src.client.services.client_presentation import contribution_for
 from src.client.ui.core.gml_widgets import GMLWidgets
-
+from src.client.ui.core.instrumented_imgui import imgui
+from src.shared.mod_api import ClientPresentationKeys
 
 DESIGN_METRICS = (
     ("gun_range", "Gun range", "GunRange"),
@@ -48,11 +44,13 @@ def saved_capabilities(design: dict | None) -> dict[str, float]:
     return values
 
 
-def capabilities_for_design(design: dict | None) -> dict[str, float]:
+def capabilities_for_design(design: dict | None, state) -> dict[str, float]:
     """Resolve saved design values, falling back only to its configured role."""
     design = design or {}
+    canonical_role = contribution_for(state, ClientPresentationKeys.CANONICAL_ROLE)
+    role_profiles = contribution_for(state, ClientPresentationKeys.DEFAULT_ROLE_PROFILES)
     role = canonical_role(design.get("class_name"))
-    profile = DEFAULT_ROLE_PROFILES.get(role)
+    profile = role_profiles.get(role)
     base = dict(profile.capabilities) if profile is not None else {}
     base.update(saved_capabilities(design))
     return base
@@ -62,12 +60,14 @@ def render_capability_rows(
     ui: GMLWidgets,
     frame_slot: str,
     values: dict[str, float],
+    state,
     *,
     editable: bool = False,
     test_id_prefix: str = "unit_design.capability",
     visible_keys: set[str] | None = None,
 ) -> None:
     """Render OpenPower capabilities into the source label and meter slots."""
+    capability_bounds = contribution_for(state, ClientPresentationKeys.CAPABILITY_BOUNDS)
     for key, label, component in DESIGN_METRICS:
         if visible_keys is not None and key not in visible_keys:
             continue
@@ -78,7 +78,7 @@ def render_capability_rows(
         if value is None:
             continue
 
-        minimum, maximum = CAPABILITY_BOUNDS[key]
+        minimum, maximum = capability_bounds[key]
         if editable:
             display_format = "%.2f" if maximum <= 1.0 else "%.0f"
             _, values[key] = imgui.slider_float(

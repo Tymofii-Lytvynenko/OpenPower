@@ -5,23 +5,33 @@ import math
 
 import polars as pl
 
-from src.client.ui.core.instrumented_imgui import imgui
+from src.client.services.client_presentation import contribution_for
+from src.client.ui.components.shared.generic_message_dialog import GenericMessageDialog
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.gml_widgets import GMLWidgets
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.theme import GAMETHEME
-from src.client.ui.components.shared.generic_message_dialog import GenericMessageDialog
 from src.client.ui.layouts.gml_layout import gml_child_frame
 from src.client.ui.layouts.gml_rows import gml_row
 from src.client.ui.panels.military.covert_action_windows import CovertActionWindows
-from src.client.ui.panels.military.covert_intelligence_window import CovertIntelligenceWindow
+from src.client.ui.panels.military.covert_intelligence_window import (
+    CovertIntelligenceWindow,
+)
 from src.client.ui.panels.military.covert_roster_controls import CovertRosterControls
-from src.client.ui.panels.military.covert_selection import CovertSelection, mission_index
+from src.client.ui.panels.military.covert_selection import (
+    CovertSelection,
+    mission_index,
+)
 from src.client.ui.panels.military.presenter import MilitaryPresenter
-from src.shared.actions import ActionExecuteCovertMission, ActionCancelCovertMission, ActionRetireCovertCell
-from src.shared.covert_mission_options import UNIT_CATEGORY_OPTIONS, resource_label
 from src.client.ui.panels.shared.panel_data import resolve_country_name
-from modules.base.systems.military.covert_policy import domestic_security_coverage
+from src.shared.actions import (
+    ActionCancelCovertMission,
+    ActionExecuteCovertMission,
+    ActionRetireCovertCell,
+)
+from src.shared.covert_mission_options import UNIT_CATEGORY_OPTIONS, resource_label
+from src.shared.mod_api import ClientPresentationKeys
 
 
 class CovertOpsPanel:
@@ -163,7 +173,10 @@ class CovertOpsPanel:
             and str(cell.get("status") or "").strip().lower() == "active"
             and str(cell.get("location_country_id") or "").strip().upper() == country_tag
         )
-        return domestic_security_coverage(security_cell_count, population, state.globals)
+        return contribution_for(
+            state,
+            ClientPresentationKeys.DOMESTIC_SECURITY_COVERAGE,
+        )(security_cell_count, population, state.globals)
 
     @staticmethod
     def _progress(cell, mission):
@@ -195,11 +208,11 @@ class CovertOpsPanel:
         mission_ready = bool(selected_cells) and all(
             row.get("status") in {"active", "idle"}
             and not (mission and mission.get("status") in {"preparation", "ready", "executing", "cleanup"})
-            for row, mission in zip(selected_cells, selected_missions)
+            for row, mission in zip(selected_cells, selected_missions, strict=False)
         )
         execution_ready = bool(selected_cells) and all(
             row.get("status") == "ready" and mission and mission.get("status") == "ready"
-            for row, mission in zip(selected_cells, selected_missions)
+            for row, mission in zip(selected_cells, selected_missions, strict=False)
         )
         cancellation_ready = bool(selected_cells) and all(
             mission and mission.get("status") in {"preparation", "ready"}

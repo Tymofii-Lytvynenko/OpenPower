@@ -4,6 +4,7 @@ import pytest
 
 from src.client.ui.panels.military import unit_market_panel
 from src.client.ui.panels.military.unit_market_panel import UnitMarketPanel
+from tests.test_support.client_presentation import client_state
 
 
 class Table:
@@ -88,11 +89,12 @@ def test_listing_role_uses_design_role_then_listing_type():
     assert UnitMarketPanel._listing_role(
         {"design_id": "D1", "unit_type": "armor"},
         {"D1": {"class_name": "Infantry"}},
+        client_state(),
     ) == "infantry"
     assert UnitMarketPanel._listing_role(
-        {"design_id": "missing", "unit_type": "Heavy Tank"}, {},
+        {"design_id": "missing", "unit_type": "Heavy Tank"}, {}, client_state(),
     ) == "heavy_tank"
-    assert UnitMarketPanel._listing_role({"design_id": "D1"}, {"D1": {}}) == ""
+    assert UnitMarketPanel._listing_role({"design_id": "D1"}, {"D1": {}}, client_state()) == ""
 
 
 @pytest.mark.parametrize(
@@ -184,7 +186,7 @@ def test_scrolled_text_and_capability_skip_missing_slots(monkeypatch):
     session = Session({})
 
     UnitMarketPanel._draw_scrolled_text(session, "missing", "value", "text.id")
-    UnitMarketPanel._draw_scrolled_capability(session, "missing", "armor", 12.0)
+    UnitMarketPanel._draw_scrolled_capability(session, "missing", "armor", 12.0, client_state())
 
     assert fake.positions == []
     assert fake.texts == []
@@ -220,7 +222,7 @@ def test_scrolled_capability_handles_unavailable_speed_and_unknown_values(
     rect = SimpleNamespace(x=10.0, y=20.0, width=80.0, height=12.0)
     session = Session({"meter": rect})
 
-    UnitMarketPanel._draw_scrolled_capability(session, "meter", key, value)
+    UnitMarketPanel._draw_scrolled_capability(session, "meter", key, value, client_state())
 
     assert fake.positions == [(106.0, 214.0)]
     assert fake.progress == [(expected_fraction, (80.0, 12.0), "N/A" if value is None or key == "speed" else "9", f"unit_market.capability.{key}")]

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from src.client.services.client_presentation import contribution_for
+from src.client.ui.components.shared.gml_value_repeat import GMLValueRepeatPair
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.formatting import format_currency
 from src.client.ui.core.gml_widgets import GMLWidgets
@@ -7,12 +9,11 @@ from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.primitives import UIPrimitives
 from src.client.ui.core.theme import GAMETHEME
-from src.client.ui.components.shared.gml_value_repeat import GMLValueRepeatPair
 from src.client.ui.layouts.gml_layout import active_gml_layout, gml_child_frame
 from src.client.ui.layouts.gml_rows import gml_row
+from src.client.ui.panels.military import production_snapshot
 from src.client.ui.panels.military.design_selection import supports_design_details
 from src.client.ui.panels.military.presenter import MilitaryPresenter
-from src.client.ui.panels.military import production_snapshot
 from src.shared.actions import (
     ActionCancelForeignUnitOrder,
     ActionCancelProductionOrder,
@@ -24,12 +25,11 @@ from src.shared.actions import (
     ActionSetProductionPaused,
     ActionSetProductionPriority,
 )
-from modules.base.systems.military.production_policy import (
+from src.shared.military_constants import (
     MAX_PRODUCTION_QUEUE_ORDERS,
     MAX_UNIT_PRODUCTION_QUANTITY,
-    initial_production_eta_days,
 )
-
+from src.shared.mod_api import ClientPresentationKeys
 
 _ROOT = "Unit_Production_Window"
 _GML_TEMPLATE = "Unit_Production_Window"
@@ -316,6 +316,9 @@ class UnitProductionPanel:
         ui: GMLWidgets,
         context: PanelRenderContext,
     ) -> None:
+        initial_production_eta_days = contribution_for(
+            state, ClientPresentationKeys.INITIAL_PRODUCTION_ETA_DAYS,
+        )
         name = str(
             (design or {}).get("display_name")
             or (design or {}).get("name")

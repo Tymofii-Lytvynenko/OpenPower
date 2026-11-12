@@ -26,9 +26,9 @@ If it calculates something, move it to `src/core`. If it holds state at runtime,
 ## 🔗 Relationships
 * **Imports from:**
     * Python Standard Library (`typing`, `dataclasses`, `pathlib`, `datetime`).
-    * `polars` for DataFrame type annotations inside `GameState`.
-    * **ABSOLUTELY NOTHING** from `core`, `client`, `server`, `engine`, or `modules`.
+    * Established shared-data dependencies `polars`, `numpy`, `pycountry`, and `rtoml`.
+    * **ABSOLUTELY NOTHING** from `core`, `client`, `server`, `engine`, `simulation`, `modding`, or `modules`.
 * **Used by:**
     * **EVERYONE:** `client`, `server`, `engine`, `core`, and `modules` all depend on `shared` to speak the same language.
 * **NEVER imports:**
-    * Any other layer. Importing anything else here will cause immediate **Circular Dependency** errors.
+    * Any other OpenPower layer. Import Linter includes imports under `TYPE_CHECKING` when checking this rule.

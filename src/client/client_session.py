@@ -2,16 +2,17 @@
 
 import multiprocessing as mp
 from collections import defaultdict
+from pathlib import Path
 from typing import Optional
 
-from src.core.map_data import RegionMapData
+from src.client.client_state import ClientGameStateView, ClientPresentationState
 from src.client.services.client_game_clock import ClientGameClock
+from src.client.services.snapshot_inbox import SnapshotInbox
 from src.client.services.telemetry_service import TelemetryService
-from pathlib import Path
+from src.core.map_data import RegionMapData
 from src.shared.actions import GameAction
 from src.shared.commands import CommandEnvelope, command_id_for
 from src.shared.events import EventSystemError
-from src.client.services.snapshot_inbox import SnapshotInbox
 from src.shared.state import GameState
 
 
@@ -26,6 +27,7 @@ class ClientSessionProxy:
         process: mp.Process,
         telemetry_queue=None,
         telemetry_output_dir: Path | None = None,
+        client_presentation=None,
     ) -> None:
         self.map_data = map_data
         self.action_queue = action_queue
@@ -34,7 +36,9 @@ class ClientSessionProxy:
         self.snapshot_ack_queue = snapshot_ack_queue
         self.process = process
 
-        self.state: Optional[GameState] = None
+        self._client_presentation = client_presentation or {}
+        self.presentation_state = ClientPresentationState()
+        self.state: Optional[ClientGameStateView] = None
         self.system_errors: list[dict[str, object]] = []
         self._known_system_errors: set[tuple[str, str, int]] = set()
         self._command_sequences: dict[str, int] = defaultdict(int)
@@ -86,8 +90,12 @@ class ClientSessionProxy:
                 self._apply_snapshot(latest)
 
     def _apply_snapshot(self, latest: GameState) -> None:
-        self.state = latest
-        self._display_clock.sync(self.state.time)
+        self.state = ClientGameStateView(
+            latest,
+            self._client_presentation,
+            self.presentation_state,
+        )
+        self._display_clock.sync(latest.time)
         self._hydrate_command_sequences()
         self._capture_system_errors()
 
@@ -122,7 +130,7 @@ class ClientSessionProxy:
                 }
             )
 
-    def get_state_snapshot(self) -> Optional[GameState]:
+    def get_state_snapshot(self) -> Optional[ClientGameStateView]:
         return self.state
 
     def get_display_date_text(self) -> str | None:

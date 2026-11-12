@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from modules.base.systems.military.capability_catalog import DEFAULT_ROLE_PROFILES
+from src.client.services.client_presentation import contribution_for
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.instrumented_imgui import imgui
@@ -14,6 +14,7 @@ from src.client.ui.layouts.gml_layout import active_gml_layout
 from src.client.ui.panels.military.unit_design_widgets import render_capability_rows
 from src.client.ui.panels.military.unit_type_options import unit_type_options_for_roles
 from src.shared.actions import ActionCreateUnitDesign
+from src.shared.mod_api import ClientPresentationKeys
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,21 +35,23 @@ class UnitDesignEditor:
         self._capabilities_by_role: dict[str, dict[str, float]] = {}
         self._pending_submission: _PendingDesignSubmission | None = None
 
-    def open(self, role: str | None = None) -> None:
-        if role in DEFAULT_ROLE_PROFILES:
+    def open(self, role: str | None, state) -> None:
+        role_profiles = contribution_for(state, ClientPresentationKeys.DEFAULT_ROLE_PROFILES)
+        if role in role_profiles:
             self._role = role
         self._name = ""
         self._cost = 0.0
         self._maintenance_cost = 0.0
         self._pending_submission = None
         self._capabilities_by_role = {
-            self._role: dict(DEFAULT_ROLE_PROFILES[self._role].capabilities),
+            self._role: dict(role_profiles[self._role].capabilities),
         }
         self._is_open = True
 
     def render(self, state, context: PanelRenderContext) -> None:
         if not self._is_open:
             return
+        role_profiles = contribution_for(state, ClientPresentationKeys.DEFAULT_ROLE_PROFILES)
         self._reset_after_authoritative_create(state)
         if not self._is_open:
             return
@@ -73,7 +76,7 @@ class UnitDesignEditor:
                 tooltip="Lock the design window position.",
             )
 
-            role_options = unit_type_options_for_roles(DEFAULT_ROLE_PROFILES)
+            role_options = unit_type_options_for_roles(role_profiles, state)
             role_names = [option.role for option in role_options]
             if self._role not in role_names:
                 self._role = role_names[0]
@@ -89,7 +92,7 @@ class UnitDesignEditor:
                 gml_id=ui.path("frmDesignSpecs/frmUnitInfo/cboUnitType"),
             )
             self._role = role_names[role_index]
-            profile = DEFAULT_ROLE_PROFILES[self._role]
+            profile = role_profiles[self._role]
             if self._role != previous_role:
                 self._capabilities_by_role.setdefault(
                     self._role, dict(profile.capabilities),
@@ -133,6 +136,7 @@ class UnitDesignEditor:
                 ui,
                 "frmDesignSpecs/frm1stLvlInner1/frmInner",
                 capabilities,
+                state,
                 editable=True,
                 test_id_prefix="unit_design.create.capability",
             )
@@ -206,12 +210,13 @@ class UnitDesignEditor:
             return
 
         # Keep submitted values until the authoritative design row exists so a rejected save remains editable.
+        role_profiles = contribution_for(state, ClientPresentationKeys.DEFAULT_ROLE_PROFILES)
         self._pending_submission = None
         self._name = ""
         self._cost = 0.0
         self._maintenance_cost = 0.0
         self._capabilities_by_role[self._role] = dict(
-            DEFAULT_ROLE_PROFILES[self._role].capabilities,
+            role_profiles[self._role].capabilities,
         )
         self._is_open = False
 

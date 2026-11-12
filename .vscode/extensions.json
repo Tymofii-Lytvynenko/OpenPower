@@ -1,12 +1,6 @@
 {
     "recommendations": [
-        "tamasfe.even-better-toml",
-        "dtoplak.vscode-glsllint",
-        "moshfeu.diff-merge",
-        "tyriar.luna-paint",
-        "leonkohli.snapsource",
-        "lucien-martijn.parquet-visualizer",
-        "janisdd.vscode-edit-csv",
-        "mechatroner.rainbow-csv",
+        "charliermarsh.ruff",
+        "ms-python.python"
     ]
 }

@@ -12,7 +12,6 @@ from src.shared.migrations import MigrationRegistry, SaveMigration
 from src.shared.schema import ColumnSpec, TableSchema, WorldSchemaRegistry
 from src.shared.state import GameState
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -168,7 +167,7 @@ class TestSchemaModMigrations(unittest.TestCase):
         )
         owners_before = state.get_table("regions")["owner"].to_list()
 
-        migrate_political_state(state)
+        migrate_political_state(state, build_base_schema_registry())
 
         government = state.get_table("country_governments").row(0, named=True)
         crisis = state.get_table("political_crises").row(0, named=True)
@@ -194,7 +193,7 @@ class TestSchemaModMigrations(unittest.TestCase):
         }
         self.assertTrue(political_tables.issubset(build_base_schema_registry().versions()))
         revisions = dict(state.table_revisions)
-        migrate_political_state(state)
+        migrate_political_state(state, build_base_schema_registry())
         self.assertEqual(state.table_revisions, revisions)
 
     def test_base_module_contributes_systems_schemas_and_api_version(self):

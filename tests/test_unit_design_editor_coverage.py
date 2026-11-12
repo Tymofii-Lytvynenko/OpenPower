@@ -4,6 +4,10 @@ from unittest.mock import Mock, call
 
 import src.client.ui.panels.military.unit_design_editor as editor_module
 from src.client.ui.panels.military.unit_design_editor import UnitDesignEditor
+from src.shared.mod_api import ClientPresentationKeys
+from tests.test_support.client_presentation import client_state, presentation_values
+
+DEFAULT_ROLE_PROFILES = presentation_values()[ClientPresentationKeys.DEFAULT_ROLE_PROFILES]
 
 
 def _imgui_mock(monkeypatch):
@@ -24,7 +28,8 @@ def test_open_resets_draft_and_uses_only_known_roles():
     editor._maintenance_cost = 2.0
     editor._pending_submission = object()
 
-    editor.open("unknown-role")
+    state = client_state()
+    editor.open("unknown-role", state)
 
     assert editor._role == "infantry"
     assert editor._name == ""
@@ -32,12 +37,12 @@ def test_open_resets_draft_and_uses_only_known_roles():
     assert editor._maintenance_cost == 0.0
     assert editor._pending_submission is None
     assert editor._capabilities_by_role == {
-        "infantry": dict(editor_module.DEFAULT_ROLE_PROFILES["infantry"].capabilities),
+        "infantry": dict(DEFAULT_ROLE_PROFILES["infantry"].capabilities),
     }
     assert editor._is_open is True
 
-    known_role = next(role for role in editor_module.DEFAULT_ROLE_PROFILES if role != "infantry")
-    editor.open(known_role)
+    known_role = next(role for role in DEFAULT_ROLE_PROFILES if role != "infantry")
+    editor.open(known_role, state)
     assert editor._role == known_role
     assert known_role in editor._capabilities_by_role
 
@@ -47,7 +52,7 @@ def test_render_submits_authoritative_design_and_cancel_closes(monkeypatch):
     imgui.combo.return_value = (True, 1)
     imgui.input_text.return_value = (True, "  Heavy Armor  ")
     imgui.input_float.return_value = (True, 125.0)
-    roles = list(editor_module.DEFAULT_ROLE_PROFILES)
+    roles = list(DEFAULT_ROLE_PROFILES)
     options = [SimpleNamespace(role=role, label=role.title()) for role in roles]
     monkeypatch.setattr(editor_module, "unit_type_options_for_roles", Mock(return_value=options))
     monkeypatch.setattr(editor_module, "render_capability_rows", Mock())
@@ -72,9 +77,9 @@ def test_render_submits_authoritative_design_and_cancel_closes(monkeypatch):
     client = Mock()
     client.player_id = "player-1"
     context = SimpleNamespace(net_client=client, is_own_country=True, target_tag="ukr")
-    state = SimpleNamespace(tables={})
+    state = client_state(tables={})
     editor = UnitDesignEditor()
-    editor.open("invalid")
+    editor.open("invalid", state)
     editor._role = "not-in-the-role-catalog"
 
     editor.render(state, context)
@@ -89,7 +94,7 @@ def test_render_submits_authoritative_design_and_cancel_closes(monkeypatch):
     assert action.display_name == "Heavy Armor"
     assert action.stats["cost"] == 125.0
     assert action.stats["maintenance_cost"] == 0.0
-    assert _draw_model.call_args.args == (ui, editor_module.DEFAULT_ROLE_PROFILES[roles[1]].domain)
+    assert _draw_model.call_args.args == (ui, DEFAULT_ROLE_PROFILES[roles[1]].domain)
     _draw_controls.assert_called_once_with(ui)
     _draw_maintenance.assert_called_once_with(ui)
     assert ui.button.call_args_list[0].kwargs["enabled"] is True
@@ -102,10 +107,10 @@ def test_render_submits_authoritative_design_and_cancel_closes(monkeypatch):
 def test_render_skips_closed_editor_and_disables_submission_outside_own_country(monkeypatch):
     imgui = _imgui_mock(monkeypatch)
     editor = UnitDesignEditor()
-    editor.render(SimpleNamespace(tables={}), SimpleNamespace())
+    editor.render(client_state(tables={}), SimpleNamespace())
     assert imgui.begin.call_count == 0
 
-    editor.open()
+    editor.open(None, client_state())
     imgui.combo.return_value = (False, 0)
     imgui.input_text.return_value = (False, "")
     imgui.input_float.return_value = (False, 0.0)
@@ -125,7 +130,7 @@ def test_render_skips_closed_editor_and_disables_submission_outside_own_country(
 
     monkeypatch.setattr(editor_module.WindowManager, "window", opened_window)
     editor.render(
-        SimpleNamespace(tables={}),
+        client_state(tables={}),
         SimpleNamespace(net_client=Mock(), is_own_country=False, target_tag="USA"),
     )
 
@@ -136,7 +141,7 @@ def test_render_skips_closed_editor_and_disables_submission_outside_own_country(
 
 def test_render_closes_after_authoritative_design_is_observed(monkeypatch):
     editor = UnitDesignEditor()
-    editor.open("infantry")
+    editor.open("infantry", client_state())
     editor._pending_submission = editor_module._PendingDesignSubmission(
         "USA", "Recon", frozenset({"old-id"}),
     )
@@ -148,7 +153,7 @@ def test_render_closes_after_authoritative_design_is_observed(monkeypatch):
     monkeypatch.setattr(editor_module.WindowManager, "window", window)
 
     editor.render(
-        SimpleNamespace(tables={"unit_designs": designs}),
+        client_state(tables={"unit_designs": designs}),
         SimpleNamespace(net_client=None, is_own_country=True, target_tag="USA"),
     )
 
@@ -158,7 +163,7 @@ def test_render_closes_after_authoritative_design_is_observed(monkeypatch):
 
 def test_reset_after_create_waits_for_matching_new_snapshot_row():
     editor = UnitDesignEditor()
-    editor.open("infantry")
+    editor.open("infantry", client_state())
     editor._name = "Recon"
     editor._cost = 100.0
     editor._maintenance_cost = 3.0
@@ -166,8 +171,8 @@ def test_reset_after_create_waits_for_matching_new_snapshot_row():
         "UKR", "Recon", frozenset({"old-id"}),
     )
 
-    editor._reset_after_authoritative_create(SimpleNamespace(tables={}))
-    editor._reset_after_authoritative_create(SimpleNamespace(tables={"unit_designs": SimpleNamespace(
+    editor._reset_after_authoritative_create(client_state(tables={}))
+    editor._reset_after_authoritative_create(client_state(tables={"unit_designs": SimpleNamespace(
         is_empty=Mock(return_value=True), to_dicts=Mock(return_value=[]),
     )}))
     designs = SimpleNamespace(
@@ -177,14 +182,14 @@ def test_reset_after_create_waits_for_matching_new_snapshot_row():
             {"id": "new-id", "country_id": "POL", "display_name": "Recon"},
         ]),
     )
-    editor._reset_after_authoritative_create(SimpleNamespace(tables={"unit_designs": designs}))
+    editor._reset_after_authoritative_create(client_state(tables={"unit_designs": designs}))
 
     assert editor._pending_submission is not None
     assert editor._is_open is True
     designs.to_dicts.return_value.append(
         {"id": "new-id-2", "country_id": " ukr ", "display_name": "Recon"},
     )
-    editor._reset_after_authoritative_create(SimpleNamespace(tables={"unit_designs": designs}))
+    editor._reset_after_authoritative_create(client_state(tables={"unit_designs": designs}))
 
     assert editor._pending_submission is None
     assert editor._name == ""

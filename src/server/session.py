@@ -50,7 +50,7 @@ class GameSession:
         # Repair additive tactical columns before validation and schema capture;
         # otherwise a legacy battle row would be frozen with nullable anchors.
         migrate_tactical_combat_state(self.state)
-        migrate_political_state(self.state)
+        migrate_political_state(self.state, self.schemas)
         migration_issues = validate_tactical_combat_state(self.state)
         if migration_issues:
             raise RuntimeError(

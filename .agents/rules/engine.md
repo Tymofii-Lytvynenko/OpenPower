@@ -26,7 +26,8 @@ The Engine must remain **content-agnostic**. It knows *how* to run a system, but
     * `src/core`: To use `SimulationTimer`, generic Algorithms, and Logging.
 * **Used by:**
     * `src/server`: The Session instantiates and owns the Engine within the background process.
-* **NEVER imports:**
-    * `src/client`: The Engine must run even on a headless server.
-    * `src/server`: `GameState` has been relocated to `src/shared` — no server import is needed.
-    * `modules`: No hard dependencies on specific content (e.g., "base" mod).
+* **NEVER statically imports:**
+    * `src/server`, `src/client`, `src/simulation`, `src/modding`, or `modules`.
+    * `ModManager` may dynamically load only the module registration entry point at the audited composition site. This does not permit static dependencies on gameplay modules.
+
+The engine's default save migration belongs in `src/core`; server-facing compatibility exports must not reverse the dependency direction.

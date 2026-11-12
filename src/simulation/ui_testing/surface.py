@@ -8,10 +8,16 @@ from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.testability import UIRunTelemetry
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.testing.catalog import build_surface
-from src.client.ui.testing.fixtures import (build_test_world, RecordingClient, RecordingNavigation,
-                                          RecordingViewport, TestWindow, test_settings)
 from src.client.ui.testing.harness import UITestScenario, run_imgui_test
 from src.client.ui.testing.journey import action_record, run_steps
+from src.simulation.ui_testing.fixtures import (
+    RecordingClient,
+    RecordingNavigation,
+    RecordingViewport,
+    TestWindow,
+    build_test_world,
+    test_settings,
+)
 
 
 def run_surface(name: str, output: Path, project_root: Path, size=(1920, 1080),
@@ -28,6 +34,7 @@ def run_surface(name: str, output: Path, project_root: Path, size=(1920, 1080),
     window.game_config = GameConfig(project_root)
     if support.get("use_base_region_map"):
         from types import SimpleNamespace
+
         from src.client.ui.testing.country_info_assets import load_compact_region_map
 
         window.session = SimpleNamespace(map_data=load_compact_region_map(project_root))

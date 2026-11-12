@@ -1,5 +1,4 @@
 import unittest
-from unittest.mock import patch
 
 import polars as pl
 
@@ -9,21 +8,14 @@ from src.server.state_migrations import (
     migrate_tactical_combat_state,
     validate_tactical_combat_state,
 )
+from src.shared.schema import WorldSchemaRegistry
 from src.shared.state import GameState
 
 
 class StateMigrationsCoverageTest(unittest.TestCase):
     def test_political_migration_skips_tables_without_registered_schemas(self) -> None:
-        class MissingSchemaRegistry:
-            def get(self, table_name: str) -> None:
-                return None
-
         state = GameState()
-        with patch(
-            "src.server.state_migrations._POLITICAL_SCHEMA_REGISTRY",
-            MissingSchemaRegistry(),
-        ):
-            migrate_political_state(state)
+        migrate_political_state(state, WorldSchemaRegistry())
 
         self.assertEqual(state.tables, {})
 

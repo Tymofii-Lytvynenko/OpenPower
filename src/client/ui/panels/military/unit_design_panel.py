@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import json
 
-from modules.base.systems.military.capability_catalog import (
-    DEFAULT_ROLE_PROFILES,
-    canonical_role,
-)
+from src.client.services.client_presentation import contribution_for
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.instrumented_imgui import imgui
@@ -27,6 +24,7 @@ from src.client.ui.panels.military.unit_design_widgets import (
 )
 from src.client.ui.panels.military.unit_type_options import unit_type_options_for_roles
 from src.client.ui.panels.shared.panel_widgets import draw_required_tables
+from src.shared.mod_api import ClientPresentationKeys
 
 
 class UnitDesignPanel:
@@ -77,6 +75,8 @@ class UnitDesignPanel:
         ui = ui or GMLWidgets("Unit_Design_New")
         if not draw_required_tables(state, ("unit_designs",)):
             return False
+        role_profiles = contribution_for(state, ClientPresentationKeys.DEFAULT_ROLE_PROFILES)
+        canonical_role = contribution_for(state, ClientPresentationKeys.CANONICAL_ROLE)
         designs = self._presenter.designs_for_country(state, context.target_tag)
         all_designs_table = getattr(state, "tables", {}).get("unit_designs")
         all_designs = [] if all_designs_table is None else all_designs_table.to_dicts()
@@ -95,7 +95,7 @@ class UnitDesignPanel:
             self._role = canonical_role(selected_by_id.get("class_name"))
         elif designs:
             self._role = canonical_role(designs[0].get("class_name"))
-        role_options = unit_type_options_for_roles(DEFAULT_ROLE_PROFILES)
+        role_options = unit_type_options_for_roles(role_profiles, state)
         role_names = [option.role for option in role_options]
         if self._role not in role_names:
             self._role = role_names[0]
@@ -166,10 +166,11 @@ class UnitDesignPanel:
         if self._details_tab == "statistics":
             self._render_statistics(
                 ui,
-                capabilities_for_design(selected_design or {"class_name": self._role}),
+                capabilities_for_design(selected_design or {"class_name": self._role}, state),
+                state,
             )
         else:
-            self._render_overview(selected_design, ui)
+            self._render_overview(selected_design, ui, state)
 
         can_create = bool(context.is_own_country and context.net_client is not None)
         if active_gml_layout() is None:
@@ -184,7 +185,7 @@ class UnitDesignPanel:
                 else "Select your own country and connect to create a design.",
             )
         if clicked:
-            self._editor.open(self._role)
+            self._editor.open(self._role, state)
         return True
 
     @staticmethod
@@ -234,6 +235,7 @@ class UnitDesignPanel:
         self,
         ui: GMLWidgets,
         values: dict[str, float],
+        state,
     ) -> None:
         session = active_gml_layout()
         list_slot = "frmInner/tabGroups/Tab2/frmList"
@@ -243,6 +245,7 @@ class UnitDesignPanel:
                 ui,
                 specs_slot,
                 values,
+                state,
                 test_id_prefix="unit_design.statistics",
             )
             return
@@ -286,6 +289,7 @@ class UnitDesignPanel:
                             ui,
                             specs_slot,
                             values,
+                            state,
                             test_id_prefix="unit_design.statistics",
                             visible_keys=visible_keys,
                         )
@@ -355,7 +359,7 @@ class UnitDesignPanel:
             imgui.get_color_u32(GAMETHEME.colors.text_dim),
         )
 
-    def _render_overview(self, design: dict | None, ui: GMLWidgets) -> None:
+    def _render_overview(self, design: dict | None, ui: GMLWidgets, state) -> None:
         session = active_gml_layout()
         rect = ui.rect("frmInner/tabGroups/Tab1/Container1")
         if session is None or rect is None:
@@ -394,7 +398,8 @@ class UnitDesignPanel:
             imgui.text_disabled("Fixed role definition")
 
         role = str(design.get("class_name") or "generic").lower()
-        profile = DEFAULT_ROLE_PROFILES.get(role)
+        role_profiles = contribution_for(state, ClientPresentationKeys.DEFAULT_ROLE_PROFILES)
+        profile = role_profiles.get(role)
         domain = str(design.get("domain") or (profile.domain if profile else "unknown")).title()
         quality = float(design.get("quality") or 0.0) * 100.0
         speed = float(design.get("speed") or 0.0) * 100.0

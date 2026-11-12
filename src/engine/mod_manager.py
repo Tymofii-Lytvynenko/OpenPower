@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass
 from typing import Dict, List
 
-from src.server.io.migrations import CORE_SAVE_MIGRATIONS
+from src.core.save_migrations import CORE_SAVE_MIGRATIONS
 from src.shared.config import GameConfig
 from src.shared.migrations import MigrationRegistry
 from src.shared.mod_api import ENGINE_MOD_API_VERSION, ModContribution, mod

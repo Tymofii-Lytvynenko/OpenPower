@@ -5,11 +5,9 @@ import math
 from dataclasses import dataclass, field
 
 import polars as pl
-from src.core.map.geo import EquirectangularProjection, GeoCoordinate
-from src.shared.strategic_profiles import DEFAULT_DEFENSE, PAYLOAD_PROFILES
-from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
-from modules.base.systems.economy.unit_upkeep import unit_upkeep_by_id
 
+from src.client.services.client_presentation import contribution_for
+from src.client.ui.panels.military.design_selection import supports_design_details
 from src.client.ui.panels.shared.panel_data import (
     as_ratio,
     format_side_names,
@@ -21,8 +19,9 @@ from src.client.ui.panels.shared.panel_data import (
     safe_int,
     safe_text,
 )
-from src.client.ui.panels.military.design_selection import supports_design_details
-
+from src.core.map.geo import EquirectangularProjection, GeoCoordinate
+from src.shared.mod_api import ClientPresentationKeys
+from src.shared.strategic_profiles import DEFAULT_DEFENSE, PAYLOAD_PROFILES
 
 BATTLE_MODE_LABELS = {
     "positional": "Passive",
@@ -213,7 +212,10 @@ class MilitaryPresenter:
             if safe_text(listing.get("status"), "listed").lower() == "listed"
             and safe_int(listing.get("quantity"), 0) > 0
         }
-        upkeep_by_id = unit_upkeep_by_id(state)
+        upkeep_by_id = contribution_for(
+            state,
+            ClientPresentationKeys.UNIT_UPKEEP_BY_ID,
+        )(state)
         for row in self._country_units(state, country_tag):
             owner_tag = safe_text(row.get("owner"), country_tag)
             requested_design_id = safe_text(row.get("design_id"), "")
@@ -1150,7 +1152,10 @@ class MilitaryPresenter:
             str(row.get("country_id") or "").strip().upper()
             for row in profiles.to_dicts() if bool(row.get("accepts_foreign_orders"))
         }
-        trade = WeaponsTradePolicy()
+        trade = contribution_for(
+            state,
+            ClientPresentationKeys.WEAPONS_TRADE_POLICY_FACTORY,
+        )()
         result = []
         for row in designs.to_dicts():
             seller = str(row.get("country_id") or "").strip().upper()
@@ -1203,7 +1208,10 @@ class MilitaryPresenter:
         designs = {} if designs_table is None else {
             str(row.get("id") or ""): row for row in designs_table.to_dicts()
         }
-        trade = WeaponsTradePolicy()
+        trade = contribution_for(
+            state,
+            ClientPresentationKeys.WEAPONS_TRADE_POLICY_FACTORY,
+        )()
         visible = []
         for source in listings.to_dicts():
             if str(source.get("status") or "listed").lower() != "listed" or safe_int(source.get("quantity"), 0) <= 0:

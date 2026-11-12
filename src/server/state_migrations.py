@@ -8,10 +8,8 @@ from typing import Any
 
 import polars as pl
 
-from modules.base.schema import BASE_TABLE_SCHEMAS
-from src.shared.state import GameState
 from src.shared.schema import WorldSchemaRegistry
-
+from src.shared.state import GameState
 
 _READINESS_STATUSES = {"parked", "ready", "fortified"}
 _BATTLE_STATUSES = {"active", "stalemate", "concluded", "inactive"}
@@ -30,18 +28,19 @@ _POLITICAL_TABLE_NAMES = frozenset(
         "political_history",
     }
 )
-_POLITICAL_SCHEMA_REGISTRY = WorldSchemaRegistry(
-    replace(schema, preserve_extra_columns=True)
-    for schema in BASE_TABLE_SCHEMAS
-    if schema.name in _POLITICAL_TABLE_NAMES
-)
-
-
-def migrate_political_state(state: GameState) -> None:
+def migrate_political_state(
+    state: GameState,
+    schema_registry: WorldSchemaRegistry,
+) -> None:
     """Add versioned political table fields to legacy runtime state without reseeding it."""
 
+    political_schemas = WorldSchemaRegistry(
+        replace(schema, preserve_extra_columns=True)
+        for table_name in sorted(_POLITICAL_TABLE_NAMES)
+        if (schema := schema_registry.get(table_name)) is not None
+    )
     for table_name in sorted(_POLITICAL_TABLE_NAMES):
-        schema = _POLITICAL_SCHEMA_REGISTRY.get(table_name)
+        schema = political_schemas.get(table_name)
         if schema is None:
             continue
         current = state.tables.get(table_name)
@@ -49,7 +48,7 @@ def migrate_political_state(state: GameState) -> None:
             current = pl.DataFrame(
                 schema={column: field.dtype for column, field in schema.columns.items()}
             )
-        normalized = _POLITICAL_SCHEMA_REGISTRY.normalize(table_name, current)
+        normalized = political_schemas.normalize(table_name, current)
         if table_name not in state.tables or not normalized.equals(current):
             state.update_table(table_name, normalized)
 

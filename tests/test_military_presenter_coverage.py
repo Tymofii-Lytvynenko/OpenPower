@@ -4,10 +4,15 @@ import polars as pl
 
 from src.client.ui.panels.military import presenter as presenter_module
 from src.client.ui.panels.military.presenter import MilitaryPresenter
+from src.shared.mod_api import ClientPresentationKeys
+from tests.test_support.client_presentation import client_state, presentation_values
 
 
-def state(tables=None, *, globals_=None):
-    return SimpleNamespace(tables=tables or {}, globals=globals_ or {})
+def state(tables=None, *, globals_=None, client_presentation=None):
+    return client_state(
+        tables=tables or {}, globals=globals_ or {},
+        client_presentation=client_presentation,
+    )
 
 
 def test_build_summary_aggregates_all_force_branches_and_supporting_counts():
@@ -55,7 +60,8 @@ def test_branch_and_battle_labels_cover_known_and_unknown_values():
 
 
 def test_unit_rows_cover_lifecycle_readiness_design_and_market_states(monkeypatch):
-    monkeypatch.setattr(presenter_module, "unit_upkeep_by_id", lambda _state: {"U1": 12.5})
+    values = presentation_values()
+    values[ClientPresentationKeys.UNIT_UPKEEP_BY_ID] = lambda _state: {"U1": 12.5}
     game = state({
         "countries": pl.DataFrame({"id": ["USA", "CAN"], "name": ["United States", "Canada"]}),
         "regions": pl.DataFrame({"id": [1], "name": ["Capital"]}),
@@ -91,7 +97,7 @@ def test_unit_rows_cover_lifecycle_readiness_design_and_market_states(monkeypatc
             "unit_id": ["U6"], "status": ["blocked"], "rejection_reason": ["route closed"],
             "route_region_ids": [[1]], "destination_region_id": [1], "is_naval_invasion": [False],
         }),
-    })
+    }, client_presentation=values)
 
     rows = MilitaryPresenter().unit_rows(game, "USA")
     by_id = {row.unit_id: row for row in rows}

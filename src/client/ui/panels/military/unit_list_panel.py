@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from modules.base.systems.military.capability_catalog import canonical_role
+from src.client.services.client_presentation import contribution_for
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.instrumented_imgui import imgui
@@ -21,7 +21,7 @@ from src.client.ui.panels.military.unit_type_options import (
     source_unit_type_label,
 )
 from src.shared.actions import ActionDisbandUnits, ActionListUsedUnit
-
+from src.shared.mod_api import ClientPresentationKeys
 
 _GML_ROOT = "Unit_List_Window_New"
 _GML_LIST = "frmInner/frmList"
@@ -99,19 +99,19 @@ class UnitListPanel:
             if own_country
             else self._foreign_entries(state, country_tag)
         )
-        self._render_type_filter(entries, ui)
+        self._render_type_filter(entries, ui, state)
 
         if not own_country:
             self._render_accuracy(state, country_tag, ui)
 
         self._render_headers(ui, own_country=own_country)
-        entries = self._filtered_entries(entries)
+        entries = self._filtered_entries(entries, state)
         entries = self._sorted_entries(entries)
         max_first = max(0, len(entries) - _VISIBLE_ROWS)
         self._first_visible_row = min(max(0, self._first_visible_row), max_first)
         self._apply_wheel_scroll(ui, max_first)
         self._render_scrollbar(ui, max_first)
-        self._render_rows(entries, own_country, ui)
+        self._render_rows(entries, own_country, ui, state)
         if own_country:
             self._render_actions(state, context, entries, country_tag, ui)
 
@@ -254,7 +254,8 @@ class UnitListPanel:
             ))
         return entries
 
-    def _render_type_filter(self, entries: list[_UnitListEntry], ui: GMLWidgets) -> None:
+    def _render_type_filter(self, entries: list[_UnitListEntry], ui: GMLWidgets, state) -> None:
+        canonical_role = contribution_for(state, ClientPresentationKeys.CANONICAL_ROLE)
         label_slot = f"{_GML_LIST}/lblUnitType"
         combo_slot = f"{_GML_LIST}/cboUnitType"
         ui.text(label_slot, "UNIT TYPE", test_id="unit_list.filter.label")
@@ -420,7 +421,8 @@ class UnitListPanel:
             self._sort_ascending = True
         self._first_visible_row = 0
 
-    def _filtered_entries(self, entries: list[_UnitListEntry]) -> list[_UnitListEntry]:
+    def _filtered_entries(self, entries: list[_UnitListEntry], state) -> list[_UnitListEntry]:
+        canonical_role = contribution_for(state, ClientPresentationKeys.CANONICAL_ROLE)
         if self._filter_type == "All":
             return entries
         selected_role = _UNIT_TYPE_ROLE_BY_LABEL.get(self._filter_type)
@@ -503,7 +505,7 @@ class UnitListPanel:
         )
 
     def _render_rows(self, entries: list[_UnitListEntry], own_country: bool,
-                     ui: GMLWidgets) -> None:
+                     ui: GMLWidgets, state) -> None:
         visible_entries = entries[self._first_visible_row:self._first_visible_row + _VISIBLE_ROWS]
         if not visible_entries:
             message = (
@@ -582,7 +584,7 @@ class UnitListPanel:
 
             if selected:
                 self._draw_row_selection(ui, frame_slot)
-            self._render_entry(entry, row_index + 1, selected, ui)
+            self._render_entry(entry, row_index + 1, selected, ui, state)
 
     @staticmethod
     def _draw_row_selection(ui: GMLWidgets, slot: str) -> None:
@@ -599,11 +601,11 @@ class UnitListPanel:
         )
 
     def _render_entry(self, entry: _UnitListEntry, row_number: int, selected: bool,
-                      ui: GMLWidgets) -> None:
+                      ui: GMLWidgets, state) -> None:
         row_slot = f"{_GML_ROWS}/frm{row_number}"
         color = GAMETHEME.colors.text_main
         ui.text(
-            f"{row_slot}/txtType", source_unit_type_label(entry.unit_type),
+            f"{row_slot}/txtType", source_unit_type_label(entry.unit_type, state),
             color=color, tooltip=entry.tooltip,
             test_id=f"unit_list.row.type.{entry.unit_id or row_number}",
         )

@@ -1,0 +1,56 @@
+name: Architecture
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e '.[dev]'
+      - name: Check Python correctness and architecture APIs
+        run: python -m ruff check --select E4,E9,F821,TID251,TID252 src modules main.py
+      - name: Check changed files for import order and practical bugbear rules
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          base = os.environ["BASE_SHA"]
+          if set(base) == {"0"} or base == os.environ["GITHUB_SHA"]:
+              base = "HEAD^"
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", f"{base}...HEAD"],
+              text=True,
+          )
+          files = [
+              path for path in changed.splitlines()
+              if path.endswith(".py") and Path(path).is_file()
+          ]
+          if files:
+              raise SystemExit(subprocess.run([
+                  sys.executable, "-m", "ruff", "check", "--select", "E7,I,B", *files
+              ], check=False).returncode)
+          PY
+      - name: Validate Import Linter and OpenPower AST contracts
+        run: python -m tools.architecture_check
+      - name: Verify architecture negative and positive fixtures
+        run: python -m pytest tests/architecture -q

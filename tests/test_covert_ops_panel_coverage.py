@@ -6,7 +6,13 @@ import polars as pl
 
 from src.client.ui.panels.military import covert_ops_panel as panel_module
 from src.client.ui.panels.military.covert_ops_panel import CovertOpsPanel
-from src.shared.actions import ActionCancelCovertMission, ActionExecuteCovertMission, ActionRetireCovertCell
+from src.shared.actions import (
+    ActionCancelCovertMission,
+    ActionExecuteCovertMission,
+    ActionRetireCovertCell,
+)
+from src.shared.mod_api import ClientPresentationKeys
+from tests.test_support.client_presentation import client_state, presentation_values
 
 
 class FakeUI:
@@ -114,7 +120,7 @@ def state_with(*, regions=None, countries=None):
         tables["regions"] = pl.DataFrame(regions)
     if countries is not None:
         tables["countries"] = pl.DataFrame(countries)
-    return SimpleNamespace(tables=tables, globals={})
+    return client_state(tables=tables, globals={})
 
 
 def test_render_respects_closed_window_and_composes_child_dialogs_when_open(monkeypatch):
@@ -259,8 +265,13 @@ def test_protection_coverage_returns_unknown_for_missing_population_data(monkeyp
 
 def test_protection_coverage_counts_only_active_domestic_security_cells(monkeypatch):
     coverage = Mock(return_value=0.62)
-    monkeypatch.setattr(panel_module, "domestic_security_coverage", coverage)
-    state = state_with(regions={"owner": [" ukr ", "UKR", "POL"], "population": [1000, 2000, 5000]})
+    values = presentation_values()
+    values[ClientPresentationKeys.DOMESTIC_SECURITY_COVERAGE] = coverage
+    state = client_state(
+        client_presentation=values,
+        tables={"regions": pl.DataFrame({"owner": [" ukr ", "UKR", "POL"], "population": [1000, 2000, 5000]})},
+        globals={},
+    )
     cells = [
         cell(assignment="domestic_security", status="active", location_country_id="UKR"),
         cell(assignment="domestic_security", status="idle", location_country_id="UKR"),

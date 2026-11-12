@@ -6,8 +6,8 @@ from pathlib import Path
 
 import polars as pl
 
-from src.shared.state import GameState
 from src.client.services.game_settings_service import GameSettings, GameSettingsService
+from src.shared.state import GameState
 
 
 class RecordingClient:
@@ -70,7 +70,10 @@ class MemorySettingsRepository:
 
 class TestDisplayCatalog:
     def list_screens(self):
-        from src.client.services.display_modes import DisplayScreenOption, DisplayModeOption
+        from src.client.services.display_modes import (
+            DisplayModeOption,
+            DisplayScreenOption,
+        )
         modes = tuple(DisplayModeOption(w, h, 60, f"{w}×{h} @ 60 Hz", None)
                       for w, h in ((1280, 720), (1920, 1080)))
         return (DisplayScreenOption(0, "UI test display", 1920, 1080, modes, None),)
@@ -173,7 +176,9 @@ def build_test_world(project_root: Path, fixture: dict | None = None) -> GameSta
         support = fixture.get("test_support", {})
         source_tags = support.get("country_info_regions_from_base_data")
         if source_tags:
-            from src.client.ui.testing.country_info_assets import load_country_info_regions
+            from src.client.ui.testing.country_info_assets import (
+                load_country_info_regions,
+            )
 
             state.update_table("regions", load_country_info_regions(project_root, source_tags))
     return state

@@ -8,6 +8,7 @@ from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.panels.military import unit_design_panel as panel_module
 from src.client.ui.panels.military.design_selection import UnitDesignSelection
 from src.client.ui.panels.military.unit_design_panel import UnitDesignPanel
+from tests.test_support.client_presentation import client_state
 
 
 def make_context(*, own=False, client=None):
@@ -80,14 +81,13 @@ def make_panel_for_content(
     )
     monkeypatch.setattr(panel_module, "imgui", imgui)
     monkeypatch.setattr(panel_module, "draw_required_tables", lambda *_args: True)
-    monkeypatch.setattr(panel_module, "unit_type_options_for_roles", lambda _roles: options)
-    monkeypatch.setattr(panel_module, "canonical_role", lambda value: str(value or "").strip().lower())
-    monkeypatch.setattr(panel_module, "capabilities_for_design", lambda _design: {"attack": 1.0})
+    monkeypatch.setattr(panel_module, "unit_type_options_for_roles", lambda _roles, _state: options)
+    monkeypatch.setattr(panel_module, "capabilities_for_design", lambda _design, _state: {"attack": 1.0})
     monkeypatch.setattr(panel_module, "active_gml_layout", lambda: layout)
     tables = {}
     if all_designs is not None:
         tables["unit_designs"] = SimpleNamespace(to_dicts=lambda: list(all_designs))
-    state = SimpleNamespace(tables=tables)
+    state = client_state(tables=tables)
     return panel, state, make_context(own=True, client=object()), ui, imgui
 
 
@@ -153,7 +153,7 @@ def test_render_content_returns_when_required_design_table_is_missing(monkeypatc
     panel = UnitDesignPanel()
     monkeypatch.setattr(panel_module, "draw_required_tables", lambda *_args: False)
 
-    assert not panel._render_content(SimpleNamespace(tables={}), make_context())
+    assert not panel._render_content(client_state(tables={}), make_context())
 
 
 def test_render_content_selects_saved_design_and_opens_editor_from_flow_layout(monkeypatch):
@@ -173,8 +173,8 @@ def test_render_content_selects_saved_design_and_opens_editor_from_flow_layout(m
 
     assert panel._selection.design_id == "inf-2"
     assert panel._role == "infantry"
-    panel._render_overview.assert_called_once_with(designs[1], ui)
-    panel._editor.open.assert_called_once_with("infantry")
+    panel._render_overview.assert_called_once_with(designs[1], ui, state)
+    panel._editor.open.assert_called_once_with("infantry", state)
     assert imgui.begin_disabled.call_args.args == (False,)
     assert imgui.button.call_args.kwargs["test_id"] == "unit_design.create.open"
     assert imgui.text_wrapped.called
@@ -194,7 +194,7 @@ def test_render_content_recovers_selected_design_from_global_catalog(monkeypatch
 
     panel._presenter.designs_for_country.assert_called_once_with(state, "UKR")
     assert panel._role == "tanks"
-    panel._render_overview.assert_called_once_with(design, ui)
+    panel._render_overview.assert_called_once_with(design, ui, state)
 
 
 def test_render_content_falls_back_to_first_design_and_statistics_tab(monkeypatch):
@@ -209,7 +209,7 @@ def test_render_content_falls_back_to_first_design_and_statistics_tab(monkeypatc
     assert panel._render_content(state, context, ui)
 
     assert panel._role == "infantry"
-    panel._render_statistics.assert_called_once_with(ui, {"attack": 1.0})
+    panel._render_statistics.assert_called_once_with(ui, {"attack": 1.0}, state)
     assert panel._selection.design_id == "missing-id"
 
 
@@ -227,7 +227,7 @@ def test_render_content_handles_unknown_role_and_no_saved_designs(monkeypatch):
 
     assert panel._role == "infantry"
     assert imgui.combo.call_args_list[1].args[2] == ["No saved designs"]
-    panel._render_overview.assert_called_once_with(None, ui)
+    panel._render_overview.assert_called_once_with(None, ui, state)
     ui.text.assert_any_call("frmInner/frmUnitInfo1/txtCost", "—")
     assert ui.button.call_args.kwargs["enabled"] is False
 
@@ -244,12 +244,15 @@ def test_render_content_uses_source_button_when_design_creation_is_unavailable(m
     monkeypatch.setattr(
         panel_module,
         "unit_type_options_for_roles",
-        lambda _roles: (SimpleNamespace(role="infantry", label="Infantry"),),
+        lambda _roles, _state: (SimpleNamespace(role="infantry", label="Infantry"),),
     )
-    monkeypatch.setattr(panel_module, "canonical_role", lambda value: str(value or "").strip().lower())
+    monkeypatch.setattr(panel_module, "contribution_for", lambda _state, key: {
+        "base.military.default_role_profiles": {"infantry": SimpleNamespace(domain="ground")},
+        "base.military.canonical_role": lambda value: str(value or "").strip().lower(),
+    }[key])
     monkeypatch.setattr(panel_module, "active_gml_layout", lambda: None)
 
-    panel._render_content(SimpleNamespace(tables={}), make_context(own=False), ui)
+    panel._render_content(client_state(tables={}), make_context(own=False), ui)
 
     assert imgui.begin_disabled.call_args_list == [call(True), call(True)]
     assert imgui.end_disabled.call_count == 2
@@ -324,12 +327,14 @@ def test_render_statistics_falls_back_to_flow_rows_without_layout(monkeypatch):
     monkeypatch.setattr(panel_module, "active_gml_layout", lambda: None)
     monkeypatch.setattr(panel_module, "render_capability_rows", render_rows)
 
-    panel._render_statistics(ui, {"attack": 1.0})
+    state = client_state()
+    panel._render_statistics(ui, {"attack": 1.0}, state)
 
     render_rows.assert_called_once_with(
         ui,
         "frmInner/tabGroups/Tab2/frmList/frmSpecs",
         {"attack": 1.0},
+        state,
         test_id_prefix="unit_design.statistics",
     )
 
@@ -363,7 +368,8 @@ def test_render_statistics_with_layout_handles_missing_rect_and_child_frame(
     monkeypatch.setattr(panel_module, "use_gml_layout", lambda _session: nullcontext())
     monkeypatch.setattr(panel_module, "imgui", make_imgui())
 
-    panel._render_statistics(ui, {"key0": 1.0})
+    panel_state = client_state()
+    panel._render_statistics(ui, {"key0": 1.0}, panel_state)
 
     if list_rect is None:
         rows.assert_not_called()
@@ -374,6 +380,7 @@ def test_render_statistics_with_layout_handles_missing_rect_and_child_frame(
             ui,
             "frmInner/tabGroups/Tab2/frmList/frmSpecs",
             {"key0": 1.0},
+            panel_state,
             test_id_prefix="unit_design.statistics",
             visible_keys={f"key{i}" for i in range(9)},
         ) if child_open else rows.assert_not_called()
@@ -454,8 +461,8 @@ def test_render_overview_uses_flow_layout_when_geometry_is_unavailable(monkeypat
     monkeypatch.setattr(panel, "_render_overview_flow", flow)
     ui = make_ui()
 
-    panel._render_overview(None, ui)
-    panel._render_overview({"id": "d1"}, ui)
+    panel._render_overview(None, ui, SimpleNamespace())
+    panel._render_overview({"id": "d1"}, ui, SimpleNamespace())
 
     assert flow.call_args_list == [call(None), call({"id": "d1"})]
 
@@ -468,7 +475,7 @@ def test_render_overview_returns_when_container_rect_is_missing(monkeypatch):
     monkeypatch.setattr(panel_module, "active_gml_layout", lambda: object())
     monkeypatch.setattr(panel, "_render_overview_flow", flow)
 
-    panel._render_overview({"id": "d1"}, ui)
+    panel._render_overview({"id": "d1"}, ui, SimpleNamespace())
 
     flow.assert_called_once_with({"id": "d1"})
 
@@ -482,7 +489,7 @@ def test_render_overview_shows_no_design_guidance_for_empty_selection(monkeypatc
     monkeypatch.setattr(panel_module, "active_gml_layout", lambda: session)
     monkeypatch.setattr(panel_module, "imgui", imgui)
 
-    panel._render_overview(None, ui)
+    panel._render_overview(None, ui, SimpleNamespace())
 
     assert any("3D model preview unavailable" in str(call.args[0]) for call in imgui.text_disabled.call_args_list)
     assert any("No design selected" in str(call.args[0]) for call in imgui.text_disabled.call_args_list)
@@ -498,7 +505,7 @@ def test_render_overview_can_return_to_design_list(monkeypatch):
     monkeypatch.setattr(panel_module, "active_gml_layout", lambda: SimpleNamespace(window_position=(10.0, 20.0)))
     monkeypatch.setattr(panel_module, "imgui", imgui)
 
-    panel._render_overview({"id": "tank-1", "display_name": "Main tank"}, ui)
+    panel._render_overview({"id": "tank-1", "display_name": "Main tank"}, ui, SimpleNamespace())
 
     assert panel._selection.design_id is None
     imgui.text_disabled.assert_any_call("Viewing design: Main tank", test_id="unit_design.detail.selected")
@@ -522,9 +529,7 @@ def test_render_overview_renders_fixed_profile_and_capability_rules(monkeypatch)
     imgui = make_imgui()
     monkeypatch.setattr(panel_module, "active_gml_layout", lambda: SimpleNamespace(window_position=(10.0, 20.0)))
     monkeypatch.setattr(panel_module, "imgui", imgui)
-    monkeypatch.setattr(panel_module, "DEFAULT_ROLE_PROFILES", {"tanks": SimpleNamespace(domain="land")})
-
-    panel._render_overview(design, ui)
+    panel._render_overview(design, ui, client_state())
 
     assert any("Fixed role definition" in str(call.args[0]) for call in imgui.text_disabled.call_args_list)
     assert any("Quality 85%  Speed 60%  Firepower 75%" in str(call.args[0]) for call in imgui.text_disabled.call_args_list)

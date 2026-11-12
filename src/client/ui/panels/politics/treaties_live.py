@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from modules.base.systems.world.treaty_diplomacy import DiplomacySystem
-from modules.base.systems.world.treaty_proposal_policy import (
-    country_diplomacy_restriction,
-)
 from src.client.renderers.flag_renderer import FlagRenderer
+from src.client.services.client_presentation import contribution_for
 from src.client.services.journal_cursor import JournalCursor
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.gml_widgets import GMLWidgets
@@ -41,6 +38,7 @@ from src.shared.actions import (
     ActionRespondTreaty,
     ActionUpdateTreatyParticipants,
 )
+from src.shared.mod_api import ClientPresentationKeys
 from src.shared.treaties import (
     decode_conditions,
     normalize_country_tags,
@@ -87,7 +85,7 @@ class LiveTreatiesPanel:
     def __init__(self, open_editor_cb=None) -> None:
         self._presenter = PoliticsPresenter()
         self._recognition_presenter = RecognitionPresenter()
-        self._diplomacy = DiplomacySystem()
+        self._diplomacy = None
         self._flags = FlagRenderer()
         self._open_editor_cb = open_editor_cb
         self._selected_treaty_id = ""
@@ -125,6 +123,12 @@ class LiveTreatiesPanel:
         return True
 
     def render(self, state, context: PanelRenderContext) -> bool:
+        if self._diplomacy is None:
+            factory = contribution_for(
+                state,
+                ClientPresentationKeys.DIPLOMACY_SYSTEM_FACTORY,
+            )
+            self._diplomacy = factory()
         self._resolve_participant_update(state, context)
         if self._requested_treaty_id:
             if not self.show_treaty(state, self._requested_treaty_id):
@@ -296,7 +300,10 @@ class LiveTreatiesPanel:
                 imgui.end_tab_bar()
         if ui.button("btnNew", "NEW TREATY", "treaties.new_treaty",
                      enabled=context.is_own_country and self._open_editor_cb is not None):
-            reason = country_diplomacy_restriction(state.tables.get("country_governments"), country_tag)
+            reason = contribution_for(
+                state,
+                ClientPresentationKeys.COUNTRY_DIPLOMACY_RESTRICTION,
+            )(state.tables.get("country_governments"), country_tag)
             if reason:
                 if context.on_notice:
                     context.on_notice("New treaty", reason)

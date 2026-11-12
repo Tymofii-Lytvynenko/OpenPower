@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from modules.base.systems.world.treaty_proposal_policy import (
-    country_diplomacy_restriction,
-    treaty_title_restriction,
-)
+from src.client.services.client_presentation import contribution_for
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
@@ -17,6 +14,7 @@ from src.client.ui.panels.politics.treaty_participant_dialog import (
 from src.client.ui.panels.shared.panel_data import active_country_tags
 from src.client.ui.panels.shared.panel_widgets import draw_required_tables
 from src.shared.actions import ActionCreateTreaty
+from src.shared.mod_api import ClientPresentationKeys
 from src.shared.treaties import TREATY_DEFINITIONS, treaty_type_labels
 
 
@@ -156,8 +154,14 @@ class LiveTreatyEditorPanel:
         if imgui.button("SEND PROPOSAL", (-1, 30), test_id="treaty.proposal.submit"):
             # Recheck the latest snapshot: a draft can outlive a government
             # change or another proposal reserving its name.
-            reason = country_diplomacy_restriction(state.tables.get("country_governments"), country_tag)
-            reason = reason or treaty_title_restriction(
+            reason = contribution_for(
+                state,
+                ClientPresentationKeys.COUNTRY_DIPLOMACY_RESTRICTION,
+            )(state.tables.get("country_governments"), country_tag)
+            reason = reason or contribution_for(
+                state,
+                ClientPresentationKeys.TREATY_TITLE_RESTRICTION,
+            )(
                 self._title.strip() or treaty_label,
                 state.tables.get("countries_treaties"), state.tables.get("pending_treaties"),
             )

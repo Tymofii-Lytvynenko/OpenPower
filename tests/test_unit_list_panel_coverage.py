@@ -8,14 +8,15 @@ from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.panels.military import unit_list_panel as panel_module
 from src.client.ui.panels.military.unit_list_panel import (
     UnitListPanel,
-    _UnitListEntry,
     _format_intelligence_context,
     _format_quantity,
     _source_position,
     _status_color,
     _status_kind,
+    _UnitListEntry,
 )
 from src.shared.actions import ActionDisbandUnits, ActionListUsedUnit
+from tests.test_support.client_presentation import client_state
 
 
 class FakeUI:
@@ -160,7 +161,7 @@ def test_render_content_composes_owned_and_foreign_flows(monkeypatch):
     panel._render_actions = Mock()
     panel._first_visible_row = 12
     context = PanelRenderContext(target_tag=" usa ", is_own_country=True)
-    state = object()
+    state = client_state()
     ui = FakeUI()
 
     panel._render_content(state, context, ui)
@@ -169,7 +170,7 @@ def test_render_content_composes_owned_and_foreign_flows(monkeypatch):
     panel._render_headers.assert_called_once_with(ui, own_country=True)
     panel._apply_wheel_scroll.assert_called_once_with(ui, 5)
     panel._render_scrollbar.assert_called_once_with(ui, 5)
-    panel._render_rows.assert_called_once_with(values, True, ui)
+    panel._render_rows.assert_called_once_with(values, True, ui, state)
     panel._render_actions.assert_called_once()
     assert panel._first_visible_row == 5
 
@@ -186,11 +187,11 @@ def test_render_content_composes_owned_and_foreign_flows(monkeypatch):
     panel._render_actions = Mock()
     foreign_context = PanelRenderContext(target_tag="CAN", is_own_country=False)
 
-    panel._render_content(object(), foreign_context, ui)
+    panel._render_content(client_state(), foreign_context, ui)
 
     panel._render_accuracy.assert_called_once()
     panel._render_headers.assert_called_once_with(ui, own_country=False)
-    panel._render_rows.assert_called_once_with([], False, ui)
+    panel._render_rows.assert_called_once_with([], False, ui, state)
     panel._render_actions.assert_not_called()
 
 
@@ -254,7 +255,7 @@ def test_type_filter_updates_selection_and_resets_scroll_and_rows(monkeypatch):
     panel._selected_unit_ids = {"U1"}
     ui = FakeUI()
 
-    panel._render_type_filter([entry()], ui)
+    panel._render_type_filter([entry()], ui, client_state())
 
     assert panel._filter_type == panel_module.REFERENCE_UNIT_TYPE_OPTIONS[0].label
     assert panel._first_visible_row == 0
@@ -270,7 +271,7 @@ def test_type_filter_ignores_invalid_combo_index_and_restores_style(monkeypatch)
     panel = UnitListPanel()
     panel._filter_type = "All"
 
-    panel._render_type_filter([], FakeUI())
+    panel._render_type_filter([], FakeUI(), client_state())
 
     assert panel._filter_type == "All"
     fake.push_style_var.assert_called_once()
@@ -379,13 +380,14 @@ def test_filter_supports_role_labels_and_arbitrary_foreign_types():
     panel = UnitListPanel()
     rows = [entry(unit_type="infantry"), entry("U2", unit_type="tanks"), entry("U3", unit_type="Orbital Defense")]
     panel._filter_type = "Infantry"
-    assert [row.unit_id for row in panel._filtered_entries(rows)] == ["U1"]
+    state = client_state()
+    assert [row.unit_id for row in panel._filtered_entries(rows, state)] == ["U1"]
 
     panel._filter_type = "Orbital Defense"
-    assert [row.unit_id for row in panel._filtered_entries(rows)] == ["U3"]
+    assert [row.unit_id for row in panel._filtered_entries(rows, state)] == ["U3"]
 
     panel._filter_type = "All"
-    assert panel._filtered_entries(rows) is rows
+    assert panel._filtered_entries(rows, state) is rows
 
 
 @pytest.mark.parametrize(
@@ -497,7 +499,7 @@ def test_empty_roster_explains_why_no_rows_are_shown(own, filter_type, expected)
     panel._filter_type = filter_type
     ui = FakeUI()
 
-    panel._render_rows([], own, ui)
+    panel._render_rows([], own, ui, client_state())
 
     assert ui.calls[0][0] == "text_at"
     assert ui.calls[0][1][1] == expected
@@ -507,7 +509,7 @@ def test_render_rows_draws_foreign_data_without_selection_controls():
     panel = UnitListPanel()
     ui = FakeUI()
 
-    panel._render_rows([entry(unit_id="")], False, ui)
+    panel._render_rows([entry(unit_id="")], False, ui, client_state())
 
     assert len([call for call in ui.calls if call[0] == "text"]) == 7
     assert not any(call[0] == "hitbox" for call in ui.calls)
@@ -519,7 +521,7 @@ def test_row_click_selects_and_double_click_opens_design(monkeypatch):
     panel = UnitListPanel(open_design_cb=Mock())
     ui = FakeUI(clicked={"unit_list.view_design.U1"})
 
-    panel._render_rows([entry()], True, ui)
+    panel._render_rows([entry()], True, ui, client_state())
 
     assert panel._selected_unit_ids == {"U1"}
     assert panel._open_design_cb.call_args.args == ("design-1",)
@@ -532,7 +534,7 @@ def test_control_click_toggles_existing_row_selection(monkeypatch):
     panel = UnitListPanel()
     panel._selected_unit_ids = {"U1"}
 
-    panel._render_rows([entry()], True, FakeUI(clicked={"unit_list.view_design.U1"}))
+    panel._render_rows([entry()], True, FakeUI(clicked={"unit_list.view_design.U1"}), client_state())
 
     assert panel._selected_unit_ids == set()
 
@@ -543,7 +545,7 @@ def test_control_click_adds_an_unselected_row(monkeypatch):
     panel = UnitListPanel()
     panel._selected_unit_ids = {"U2"}
 
-    panel._render_rows([entry()], True, FakeUI(clicked={"unit_list.view_design.U1"}))
+    panel._render_rows([entry()], True, FakeUI(clicked={"unit_list.view_design.U1"}), client_state())
 
     assert panel._selected_unit_ids == {"U1", "U2"}
 
@@ -557,7 +559,7 @@ def test_row_hitbox_stops_at_next_compressed_row(monkeypatch):
         next_frame: SimpleNamespace(x=0, y=24, width=100, height=16),
     })
 
-    UnitListPanel()._render_rows([entry()], True, ui)
+    UnitListPanel()._render_rows([entry()], True, ui, client_state())
 
     row_hit = next(call for call in ui.calls if call[0] == "hitbox")
     assert row_hit[3]["height"] == 14
@@ -582,7 +584,7 @@ def test_render_entry_draws_sale_marker():
     panel = UnitListPanel()
     ui = FakeUI()
 
-    panel._render_entry(entry(for_sale=True), 1, False, ui)
+    panel._render_entry(entry(for_sale=True), 1, False, ui, client_state())
 
     assert len([call for call in ui.calls if call[0] == "text"]) == 7
 

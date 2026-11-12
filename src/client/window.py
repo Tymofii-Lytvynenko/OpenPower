@@ -1,13 +1,14 @@
-import arcade
 import threading
 from queue import Empty, Queue
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from src.shared.config import GameConfig
-from src.client.services.navigation_service import NavigationService
-from src.client.services.imgui_service import ImGuiService
-from src.client.services.game_settings_service import GameSettingsService
+import arcade
+
 from src.client.interfaces.session_factory import ClientSessionPort, SessionFactory
+from src.client.services.game_settings_service import GameSettingsService
+from src.client.services.imgui_service import ImGuiService
+from src.client.services.navigation_service import NavigationService
+from src.shared.config import GameConfig
 
 if TYPE_CHECKING:
     from src.client.renderers.map_renderer import MapRenderer
@@ -59,12 +60,14 @@ class MainWindow(arcade.Window):
 
     def _sync_geo_language_to_session(self) -> None:
         session = self.session
-        if session is None or getattr(session, "state", None) is None:
+        if session is None:
             return
 
-        globals_dict = getattr(session.state, "globals", None)
-        if isinstance(globals_dict, dict):
-            globals_dict["geo_language_code"] = self.settings.settings.geo_language_code
+        presentation_state = getattr(session, "presentation_state", None)
+        if presentation_state is not None:
+            presentation_state.geo_language_code = (
+                self.settings.settings.geo_language_code
+            )
 
     def setup(self):
         self._boot_ready_received = False

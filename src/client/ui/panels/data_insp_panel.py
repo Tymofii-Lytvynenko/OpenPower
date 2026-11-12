@@ -1,10 +1,11 @@
-import polars as pl
 import dataclasses
-from src.client.ui.core.instrumented_imgui import imgui
 
-from src.client.ui.core.theme import GAMETHEME
+import polars as pl
+
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
+from src.client.ui.core.theme import GAMETHEME
 
 
 class DataInspectorPanel:
@@ -46,7 +47,7 @@ class DataInspectorPanel:
                 inspectables[f"[Table] {name}"] = df
         
         # Add Globals
-        if hasattr(state, "globals") and isinstance(state.globals, dict):
+        if hasattr(state, "globals") and hasattr(state.globals, "items"):
             for k, v in state.globals.items():
                 inspectables[f"[Global] {k}"] = v
 

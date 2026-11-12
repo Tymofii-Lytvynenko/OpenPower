@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 
-from modules.base.systems.military.covert_operations_system import CovertOperationsSystem
-from modules.base.systems.military.covert_policy import SKILL_LEVELS
+from src.client.services.client_presentation import contribution_for
 from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.layouts.gml_popup import gml_popup_modal
@@ -26,6 +25,7 @@ from src.shared.covert_mission_options import (
     mission_profile_type,
     resource_label,
 )
+from src.shared.mod_api import ClientPresentationKeys
 
 
 class CovertActionWindows:
@@ -37,7 +37,7 @@ class CovertActionWindows:
         "mission": ("Covert_Actions_New_Mission", "New Covert Mission", "covert.new_mission.dialog"),
     }
 
-    def __init__(self) -> None:
+    def __init__(self, covert_operations=None) -> None:
         self._active_window = ""
         self._popup_requested = False
         self._cell_name = "New covert cell"
@@ -45,7 +45,7 @@ class CovertActionWindows:
         self._create_training_level = "Recruit"
         self._create_quote_key = None
         self._create_quote = None
-        self._covert_operations = CovertOperationsSystem()
+        self._covert_operations = covert_operations
         self._training_cell = ""
         self._training_cell_ids: tuple[str, ...] = ()
         self._training_points = 100.0
@@ -121,6 +121,16 @@ class CovertActionWindows:
                 imgui.close_current_popup()
 
     def _render_create(self, state, context: PanelRenderContext) -> None:
+        if self._covert_operations is None:
+            factory = contribution_for(
+                state,
+                ClientPresentationKeys.COVERT_OPERATIONS_FACTORY,
+            )
+            self._covert_operations = factory()
+        skill_levels = contribution_for(
+            state,
+            ClientPresentationKeys.COVERT_SKILL_LEVELS,
+        )
         with self._modal_window("create") as is_open:
             if not is_open:
                 self._active_window = ""
@@ -160,20 +170,20 @@ class CovertActionWindows:
                     )
                     self._create_target = countries[selected_index]
 
-                if self._create_training_level not in SKILL_LEVELS:
-                    self._create_training_level = SKILL_LEVELS[0]
+                if self._create_training_level not in skill_levels:
+                    self._create_training_level = skill_levels[0]
                 imgui.text_disabled(
                     "Training level",
                     gml_id="Covert_Actions_Cell_Creation/frmInner/frmCell/lblTraining",
                 )
                 _, training_index = imgui.combo(
                     "##create_training_level",
-                    SKILL_LEVELS.index(self._create_training_level),
-                    list(SKILL_LEVELS),
+                    skill_levels.index(self._create_training_level),
+                    list(skill_levels),
                     test_id="covert.cell_creation.training_level",
                     gml_id="Covert_Actions_Cell_Creation/frmInner/frmCell/cboTraining",
                 )
-                self._create_training_level = SKILL_LEVELS[training_index]
+                self._create_training_level = skill_levels[training_index]
 
                 quote_key = (owner_tag, self._create_target, self._create_training_level)
                 if quote_key != self._create_quote_key:

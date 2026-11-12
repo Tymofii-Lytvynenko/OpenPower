@@ -5,7 +5,13 @@ from unittest.mock import Mock
 import polars as pl
 
 from src.client.ui.panels.military import covert_action_windows as covert_ui
-from src.shared.actions import ActionCreateCovertCell, ActionStartCovertMission, ActionTrainCovertCell
+from src.shared.actions import (
+    ActionCreateCovertCell,
+    ActionStartCovertMission,
+    ActionTrainCovertCell,
+)
+from src.shared.mod_api import ClientPresentationKeys
+from tests.test_support.client_presentation import client_state, presentation_values
 
 
 class FakeImgui:
@@ -83,7 +89,12 @@ def state(*, countries=("UKR", "POL", "USA"), resources=None):
         tables["resource_ledger"] = pl.DataFrame(
             [{"country_id": tag, "game_resource_id": resource} for tag, resource in resources]
         )
-    return SimpleNamespace(tables=tables)
+    return client_state(tables=tables)
+
+
+def _windows_with_operations():
+    factory = presentation_values()[ClientPresentationKeys.COVERT_OPERATIONS_FACTORY]
+    return covert_ui.CovertActionWindows(covert_operations=factory())
 
 
 def context(client=None, *, own=True, tag="UKR"):
@@ -113,7 +124,7 @@ def presenter_with(cells):
 
 
 def test_open_deduplicates_cell_ids_and_resets_transient_form_state():
-    windows = covert_ui.CovertActionWindows()
+    windows = _windows_with_operations()
     windows.open("train", "fallback", cell_ids=("a", "a", "", "b"))
     assert windows._training_cell_ids == ("a", "b")
     assert windows._training_cell == "a"
@@ -136,7 +147,7 @@ def test_open_deduplicates_cell_ids_and_resets_transient_form_state():
 
 def test_render_unknown_window_is_a_noop_and_closed_popup_clears_form(monkeypatch):
     ui = install_ui(monkeypatch, popup_open=False)
-    windows = covert_ui.CovertActionWindows()
+    windows = _windows_with_operations()
     windows.open("create")
     windows.render(state(), context(), presenter_with([]))
     assert windows._active_window == ""
@@ -155,7 +166,7 @@ def test_create_cell_quotes_once_then_sends_normalized_action(monkeypatch):
         combos={"covert.cell_creation.target": 1, "covert.cell_creation.training_level": 2},
     ))
     client = FakeClient()
-    windows = covert_ui.CovertActionWindows()
+    windows = _windows_with_operations()
     quote = SimpleNamespace(
         setup_cost=1200, daily_upkeep=17.5, deployment_minutes=1500, rejection_reason=""
     )
@@ -171,9 +182,10 @@ def test_create_cell_quotes_once_then_sends_normalized_action(monkeypatch):
     assert action.country_tag == "UKR"
     assert action.target_country_tag == "USA"
     assert action.cell_name == "Field Office"
-    assert action.training_level == covert_ui.SKILL_LEVELS[2]
+    skill_levels = presentation_values()[ClientPresentationKeys.COVERT_SKILL_LEVELS]
+    assert action.training_level == skill_levels[2]
     windows._covert_operations.quote_cell_creation.assert_called_once_with(
-        game_state, "UKR", "USA", covert_ui.SKILL_LEVELS[2]
+        game_state, "UKR", "USA", skill_levels[2]
     )
     assert windows._cell_name == "New covert cell"
     assert windows._create_quote is quote
@@ -183,7 +195,7 @@ def test_create_cell_quotes_once_then_sends_normalized_action(monkeypatch):
 def test_create_without_targets_disables_submit_and_cancel_closes(monkeypatch):
     ui = install_ui(monkeypatch, FakeImgui(clicks={"covert.cell_creation.submit", "covert.cell_creation.cancel"}))
     client = FakeClient()
-    windows = covert_ui.CovertActionWindows()
+    windows = _windows_with_operations()
     windows._covert_operations.quote_cell_creation = Mock(
         return_value=SimpleNamespace(
             setup_cost=0, daily_upkeep=0, deployment_minutes=None, rejection_reason=""
@@ -201,7 +213,7 @@ def test_create_without_targets_disables_submit_and_cancel_closes(monkeypatch):
 
 def test_create_quote_cache_invalidates_when_target_or_training_changes(monkeypatch):
     ui = install_ui(monkeypatch)
-    windows = covert_ui.CovertActionWindows()
+    windows = _windows_with_operations()
     windows._covert_operations.quote_cell_creation = Mock(
         return_value=SimpleNamespace(
             setup_cost=1, daily_upkeep=2, deployment_minutes=None, rejection_reason="blocked"
@@ -225,7 +237,7 @@ def test_training_single_selection_filters_status_and_sends_adjusted_points(monk
     ))
     client = FakeClient()
     rows = [cell("inactive", status="captured"), cell("cell-1"), cell("cell-2", name="Second")]
-    windows = covert_ui.CovertActionWindows()
+    windows = _windows_with_operations()
     windows.open("train", "cell-2")
     windows.render(state(), context(client), presenter_with(rows))
 
@@ -408,7 +420,7 @@ def test_compact_control_style_is_restored_even_when_rendering_raises(monkeypatc
 
 def test_create_resets_unknown_training_level_before_render(monkeypatch):
     install_ui(monkeypatch)
-    windows = covert_ui.CovertActionWindows()
+    windows = _windows_with_operations()
     windows._covert_operations.quote_cell_creation = Mock(
         return_value=SimpleNamespace(
             setup_cost=0,
@@ -422,7 +434,9 @@ def test_create_resets_unknown_training_level_before_render(monkeypatch):
 
     windows.render(state(), context(), presenter_with([]))
 
-    assert windows._create_training_level == covert_ui.SKILL_LEVELS[0]
+    assert windows._create_training_level == presentation_values()[
+        ClientPresentationKeys.COVERT_SKILL_LEVELS
+    ][0]
 
 
 def test_closed_training_and_mission_popups_clear_active_window(monkeypatch):

@@ -1,10 +1,10 @@
-<!-- Project policy text moved out of tool-managed configuration; principles and version unchanged. -->
+<!-- Project policy is maintained here under the amendment procedure below. -->
 
 # OpenPower Engine Project Constitution
 
-**Version:** 1.1.0  
+**Version:** 1.2.0
 **Ratification Date:** 2026-07-22  
-**Last Amended Date:** 2026-07-22  
+**Last Amended Date:** 2026-11-12
 
 ---
 
@@ -23,7 +23,7 @@ Code in OpenPower MUST strictly follow the layer separation hierarchy defined be
 #### 1.1 Shared Layer (`src/shared`) — Data Contracts & Constants
 - **Role**: The **Passive Data Dictionary** of the project. Contains definitions, types, schemas, and global constants (`actions.py`, `events.py`, `config.py`, `economy_meta.py`).
 - **Golden Rule**: **No Logic allowed.** `shared` MUST remain a "leaf node" in the dependency tree.
-- **Imports Allowed**: Python Standard Library ONLY (`typing`, `dataclasses`, `pathlib`).
+- **Imports Allowed**: Python Standard Library and the established shared-data dependencies `polars`, `numpy`, `pycountry`, and `rtoml`. External libraries do not permit imports from another OpenPower layer.
 - **NEVER Imports**: Any other layer (`core`, `client`, `server`, `engine`, `modules`).
 
 #### 1.2 Core Layer (`src/core`) — Game Framework & SDK
@@ -35,26 +35,36 @@ Code in OpenPower MUST strictly follow the layer separation hierarchy defined be
 #### 1.3 Engine Layer (`src/engine`) — Simulation Runner
 - **Role**: Content-agnostic machinery orchestrating the execution of simulation systems (`simulator.py`, `mod_manager.py`, `ai_framework.py`).
 - **Golden Rule**: The Engine MUST remain **content-agnostic**. It knows *how* to run a system in topological order via `graphlib.TopologicalSorter`, but not *what* a system does.
-- **Imports Allowed**: `src/shared`, `src/core`, `src/server` (interfaces only).
-- **NEVER Imports**: `src/client` (must run headless) or specific content `modules`.
+- **Imports Allowed**: `src/shared`, `src/core`, and the Engine's own components.
+- **NEVER Imports**: `src/server`, `src/client`, `src/simulation`, `src/modding`, or `modules`. Runtime mod loading is a narrow dynamic composition point and does not authorize static imports of game content.
 
 #### 1.4 Server Layer (`src/server`) — State & Persistence
 - **Role**: Authoritative state container (`GameState`), loading/saving, and Arrow IPC serialization (`session.py`, `state.py`, `server_process.py`, `io/`).
 - **Golden Rule**: The Server cares about **Data Integrity**, not Data Processing. It ensures data is valid when loaded, but does not simulate changes over time. Lives in background process.
 - **Imports Allowed**: `src/shared`, `src/core`, `src/engine`.
-- **NEVER Imports**: `src/client` (the server must not know about UI).
+- **NEVER Imports**: `src/client`, `src/simulation`, `src/modding`, or concrete `modules` packages. The server may compose shared, core, and Engine services.
 
 #### 1.5 Client Layer (`src/client`) — Presentation & User Interaction
 - **Role**: Visualizing `GameState` using shaders (Arcade/OpenGL) and UI components (ImGui), capturing user input and dispatching semantic `GameActions` (`window.py`, controllers, renderers, views, panels).
 - **Golden Rule**: The Client is a **passive observer**. It MUST NEVER modify `GameState` directly. It visualizes IPC data snapshots and dispatches intent (`GameAction`) across IPC.
-- **Imports Allowed**: `src/shared`, `src/core`, `src/server` (strictly for type hinting and `from_ipc`).
-- **NEVER Imports**: `src/engine` (does not know how simulation loop works).
+- **Imports Allowed**: `src/shared`, `src/core`, and the Client's own presentation components. The client receives a read-only `ClientGameStateView` over decoded snapshots.
+- **NEVER Imports**: `src/engine`, `src/server`, `src/simulation`, `src/modding`, or `modules`. Application composition in `main.py` or `src/cli.py` starts the local server and connects it to the Client.
 
 #### 1.6 Module Layer (`modules`) — Content & Gameplay Policy
 - **Role**: Concrete implementations of `ISystem` (Demographics, Economy, Military, Politics, World AI), static datasets (TSV/TOML), and mod registrations (`registration.py`).
 - **Golden Rule**: Code here represents **Policy**. Uses mechanisms from `src/core` to implement game rules inside the simulation process. Has no direct access to UI/Window context.
-- **Imports Allowed**: `src/shared`, `src/core`, `src/engine` (interfaces only).
-- **NEVER Imports**: `src/engine` (internals), `src/server` (manual file writes), `src/client` (UI logic).
+- **Imports Allowed**: `src/shared`, `src/core`, the module's own package, and only other modules explicitly declared in its `mod.toml` dependencies.
+- **NEVER Imports**: `src/engine` (including interfaces; public system contracts live in `src/shared`), `src/server`, `src/client`, `src/simulation`, or `src/modding`.
+
+#### 1.7 Composition and Tooling
+- `main.py` and `src/cli.py` are application composition points. `src/modding` and `src/simulation` are tooling and headless composition namespaces; they must not become production-layer dependencies.
+- Dynamic imports are permitted only at named composition points for Engine module registration and the versioned client presentation extension. Other dynamic imports are prohibited in production Python code.
+- Cross-module imports require an explicit dependency in the importing module's `mod.toml`; module dependency cycles are prohibited.
+
+#### 1.8 Executable Architecture Contracts
+- Import Linter enforces transitive layer boundaries, client/server independence, and protected Engine internals. Imports under `TYPE_CHECKING` remain part of the graph.
+- Ruff checks Python defects, imports, and selected APIs. OpenPower AST checks enforce manifest dependencies, approved dynamic loaders, client snapshot passivity, and package coverage.
+- `python -m tools.architecture_check` is the required local check. The `Architecture / validate` GitHub Actions status is the merge gate.
 
 ---
 
@@ -122,3 +132,12 @@ Code in OpenPower MUST strictly follow the layer separation hierarchy defined be
    - Every proposal, feature specification, and implementation plan MUST include an explicit Constitution Check to ensure 100% alignment before execution.
 
 ---
+
+## Formal Amendment 1.2.0 — Strict Architecture Contracts
+
+**Date:** 2026-11-12
+**Change:** Align the layer import rules with the audited OpenPower graph; remove Engine-to-Server and Modules-to-Engine dependencies; isolate the Client from Engine, Server, simulation tools, modding tools, and gameplay modules; require declared cross-module dependencies; and permit only the audited shared-data libraries listed in Principle 1.1. Add executable Import Linter, Ruff, and AST enforcement.
+
+**Justification:** The previous text allowed dependencies already contradicted by the Engine rules and the actual runtime boundary. It also limited `src/shared` to the standard library despite established Polars, NumPy, pycountry, and rtoml usage. The amendment states the intended contracts directly and leaves the existing shared table/data behavior intact.
+
+**Impact:** Save migration ownership now follows the lower-layer direction; the Client receives module-provided presentation helpers through a versioned shared API and a read-only snapshot view; test tooling is composed under `src/simulation`; and CI blocks future boundary regressions. No save format or simulation rules change.

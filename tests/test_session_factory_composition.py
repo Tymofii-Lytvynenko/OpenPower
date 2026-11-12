@@ -25,6 +25,7 @@ def test_composition_root_cleans_spawned_process_when_proxy_creation_fails() -> 
     bundle = _bundle(process)
 
     with (
+        patch("src.modding.client_extensions.load_client_presentation", return_value={}),
         patch("src.server.launcher.spawn_local_server", return_value=bundle) as spawn,
         patch("src.client.client_session.ClientSessionProxy", side_effect=RuntimeError("proxy failed")),
         pytest.raises(RuntimeError, match="proxy failed"),
@@ -45,6 +46,7 @@ def test_composition_root_passes_ipc_channels_into_proxy() -> None:
     proxy = object()
 
     with (
+        patch("src.modding.client_extensions.load_client_presentation", return_value={}),
         patch("src.server.launcher.spawn_local_server", return_value=bundle),
         patch("src.client.client_session.ClientSessionProxy", return_value=proxy) as client_proxy,
     ):

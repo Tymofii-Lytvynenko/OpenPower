@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
+from src.client.client_state import ClientGameStateView, ClientPresentationState
 from src.shared.config import GameConfig
 from src.shared.protocols import SessionPort
 
@@ -12,6 +13,8 @@ class ClientSessionPort(SessionPort, Protocol):
 
     map_data: Any
     progress_queue: Any
+    state: ClientGameStateView | None
+    presentation_state: ClientPresentationState
 
     def tick(self, delta_time: float) -> None:
         ...

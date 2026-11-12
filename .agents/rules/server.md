@@ -27,9 +27,11 @@ The Server cares about **Data Integrity**, not Data Processing. It ensures data 
 ## 🔗 Relationships
 * **Imports from:**
     * `src/shared`: Contracts and Config.
-    * `src/core`: File utils, ID generators.
+    * `src/core`: File utils, ID generators, and default save migrations.
     * `src/engine`: To instantiate the simulation driver.
 * **Used by:**
-    * `src/client`: The Client requests the `GameState` snapshot (via IPC) for rendering.
+    * The application composition point launches the server; the client uses its proxy and IPC contracts.
 * **NEVER imports:**
-    * `src/client`: The Server must not know about the UI.
+    * `src/client`, `src/simulation`, `src/modding`, or concrete `modules`: the Server must not know about the UI, tooling, or one game's content.
+
+Provide composed schema registries through constructor or function arguments rather than importing a schema from a concrete mod.

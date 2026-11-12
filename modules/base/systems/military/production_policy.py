@@ -7,10 +7,12 @@ from typing import Any, Iterable, Mapping
 
 import polars as pl
 
+from src.shared.military_constants import (
+    MAX_PRODUCTION_QUEUE_ORDERS,
+    MAX_UNIT_PRODUCTION_QUANTITY,
+)
 
 DEFAULT_PRODUCTION_COEFFICIENT = 48.0
-MAX_PRODUCTION_QUEUE_ORDERS = 50
-MAX_UNIT_PRODUCTION_QUANTITY = 1_000_000
 _DAYS_PER_YEAR = 365.25
 _TERMINAL_ORDER_STATES = {"cancelled", "completed", "delivered", "awaiting_deployment"}
 

@@ -1,18 +1,46 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import TypeAlias, TypeVar
+from typing import Any, TypeAlias, TypeVar
 
 from src.shared.migrations import SaveMigration
 from src.shared.schema import TableSchema
 from src.shared.system_interfaces import ISystem, SystemAccess
 
-
 ENGINE_MOD_API_VERSION = 1
+CLIENT_PRESENTATION_API_VERSION = 1
 SystemFactory: TypeAlias = Callable[[], ISystem]
 SystemSpec: TypeAlias = ISystem | type[ISystem] | SystemFactory
 T = TypeVar("T")
+
+
+class ClientPresentationKeys:
+    """Stable contribution keys for optional, client-only mod extensions."""
+
+    READINESS_POLICY_FACTORY = "base.military.readiness_policy_factory"
+    COVERT_OPERATIONS_FACTORY = "base.military.covert_operations_factory"
+    COVERT_SKILL_LEVELS = "base.military.covert_skill_levels"
+    DOMESTIC_SECURITY_COVERAGE = "base.military.domestic_security_coverage"
+    WEAPONS_TRADE_POLICY_FACTORY = "base.military.weapons_trade_policy_factory"
+    UNIT_UPKEEP_BY_ID = "base.military.unit_upkeep_by_id"
+    DEFAULT_ROLE_PROFILES = "base.military.default_role_profiles"
+    CAPABILITY_BOUNDS = "base.military.capability_bounds"
+    CAPABILITY_METADATA = "base.military.capability_metadata"
+    CANONICAL_ROLE = "base.military.canonical_role"
+    INITIAL_PRODUCTION_ETA_DAYS = "base.military.initial_production_eta_days"
+    FOREIGN_GOVERNMENT_CHANGE_RESTRICTION = "base.politics.foreign_government_change_restriction"
+    DIPLOMACY_SYSTEM_FACTORY = "base.politics.diplomacy_system_factory"
+    COUNTRY_DIPLOMACY_RESTRICTION = "base.politics.country_diplomacy_restriction"
+    TREATY_TITLE_RESTRICTION = "base.politics.treaty_title_restriction"
+
+
+@dataclass(frozen=True)
+class ClientPresentationContribution:
+    """Client-side presentation helpers loaded independently from simulation systems."""
+
+    api_version: int
+    values: Mapping[str, Any]
 
 
 @dataclass(frozen=True)

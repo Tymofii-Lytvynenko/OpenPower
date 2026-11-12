@@ -12,7 +12,6 @@ UNIT_ROLE_DOMAINS = {
     "strategic_missiles": "strategic", "missile_defense": "strategic",
 }
 
-
 ROLE_ALIASES = {
     "army": "infantry",
     "infantry_vehicle": "infantry_vehicles",
@@ -41,3 +40,6 @@ ROLE_ALIASES = {
     "strategic_missile": "strategic_missiles",
     "ballistic_missile": "strategic_missiles",
 }
+
+MAX_PRODUCTION_QUEUE_ORDERS = 50
+MAX_UNIT_PRODUCTION_QUANTITY = 1_000_000
