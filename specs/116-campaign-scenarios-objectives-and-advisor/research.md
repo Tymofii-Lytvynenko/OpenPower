@@ -27,4 +27,4 @@ The skipped test is the opt-in performance gate. No performance remeasurement or
 
 Coverage includes setup atomicity/scope, every canonical objective measurement family, all seven objective states, hold reset and decay, deterministic deadline/outcome boundaries, scoped delegation and return, advisor signal lifecycle, overview projection, and campaign continuation through snapshot, IPC, save/load, and replay.
 
-The rendered 30-second desktop usability criterion (T020 / SC-006) remains open: no native desktop app was exposed to this task, so headless tests are not treated as a substitute. `ruff` is not installed in the workspace environment; no lint-pass claim is made.
+The rendered 30-second desktop usability criterion (SC-006) is unverified and deferred from active tasks while work focuses on freeplay. It is not treated as complete, and no manual desktop acceptance task remains in `tasks.md`. `ruff` is not installed in the workspace environment; no lint-pass claim is made.

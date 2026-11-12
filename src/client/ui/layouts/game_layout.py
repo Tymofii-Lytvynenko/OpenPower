@@ -16,7 +16,9 @@ from src.client.ui.components.main_menu_content import MainMenuContent, build_in
 from src.client.ui.components.guided_tutorial_window import GuidedTutorialWindow
 from src.client.ui.components.settings_content import GameSettingsContent
 from src.client.ui.components.hud.panel_shortcuts import consume_panel_shortcuts
-from src.client.ui.components.hud.panel_manager import PanelManager
+from src.client.ui.components.hud.panel_manager import PanelManager, PanelSpec
+from src.client.ui.panels.service.performance_panel import PerformancePanel
+from imgui_bundle import icons_fontawesome_6
 from src.client.ui.core.composer import UIComposer
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.panel_context import PanelRenderContext
@@ -122,6 +124,14 @@ class GameLayout:
                                            open_tutorial_cb=self._open_tutorial,
                                            close_mail_cb=lambda: self.panel_manager.set_visible("MAIL", False)):
             self.panel_manager.register_spec(spec)
+
+        telemetry = getattr(getattr(self.net, "session", None), "telemetry", None)
+        if telemetry is not None:
+            self.panel_manager.register_spec(PanelSpec(
+                id="PERFORMANCE", title="Performance Monitor", category="service",
+                factory=lambda: PerformancePanel(telemetry),
+                icon=icons_fontawesome_6.ICON_FA_CHART_LINE,
+            ))
 
         self.feed_presenter = FeedPresenter(self.mail_inbox_state)
         self.toggle_bar = ToggleBar(self.panel_manager)

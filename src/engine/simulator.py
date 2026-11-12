@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from graphlib import CycleError, TopologicalSorter
 from typing import Any, Dict, Iterable, List
 
+from src.core.telemetry import PerformanceCollector
 from src.shared.actions import GameAction
 from src.shared.events import EventSystemError
 from src.shared.state import GameState
@@ -38,7 +39,8 @@ class EngineStepResult:
 class Engine:
     """Deterministic simulation scheduler with strict dependency validation."""
 
-    def __init__(self, dev_mode: bool = False):
+    def __init__(self, dev_mode: bool = False, telemetry: PerformanceCollector | None = None):
+        self.telemetry = telemetry
         self.dev_mode = dev_mode
         self.systems_map: Dict[str, ISystem] = {}
         self.execution_order: List[ISystem] = []
@@ -166,8 +168,13 @@ class Engine:
         self._ensure_execution_order()
         self._validate_runtime_state_contracts()
 
-        state_checkpoint = state.create_checkpoint()
-        runtime_checkpoint = self._snapshot_mutable_system_state()
+        if self.telemetry and self.telemetry.enabled:
+            with self.telemetry.measure("simulation.checkpoint_ms"):
+                state_checkpoint = state.create_checkpoint()
+                runtime_checkpoint = self._snapshot_mutable_system_state()
+        else:
+            state_checkpoint = state.create_checkpoint()
+            runtime_checkpoint = self._snapshot_mutable_system_state()
         next_tick = int(state.globals.get("tick", 0)) + 1
         state.events.clear()
         state.globals["tick"] = next_tick
@@ -175,7 +182,11 @@ class Engine:
 
         for system in self.execution_order:
             try:
-                system.update(state, float(delta_time))
+                if self.telemetry and self.telemetry.enabled:
+                    with self.telemetry.measure(f"simulation.system.{system.id}.update_ms"):
+                        system.update(state, float(delta_time))
+                else:
+                    system.update(state, float(delta_time))
             except Exception as exc:
                 failure = SystemFailure(
                     system_id=system.id,
@@ -186,8 +197,14 @@ class Engine:
                     f"[Engine] Error in system '{system.id}': {exc}\n"
                     f"{failure.traceback_text}"
                 )
-                state.restore_checkpoint(state_checkpoint)
-                self._restore_mutable_system_state(runtime_checkpoint)
+                if self.telemetry and self.telemetry.enabled:
+                    self.telemetry.increment("simulation.failed_ticks")
+                    with self.telemetry.measure("simulation.rollback_ms"):
+                        state.restore_checkpoint(state_checkpoint)
+                        self._restore_mutable_system_state(runtime_checkpoint)
+                else:
+                    state.restore_checkpoint(state_checkpoint)
+                    self._restore_mutable_system_state(runtime_checkpoint)
                 state.events = [
                     EventSystemError(
                         system_id=failure.system_id,

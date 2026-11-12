@@ -48,6 +48,9 @@ def create_local_session(config, *, save_name=None, player_tag=None):
             progress_queue=bundle.progress_queue,
             snapshot_ack_queue=bundle.snapshot_ack_queue,
             process=bundle.process,
+            **({"telemetry_queue": bundle.telemetry_queue,
+                "telemetry_output_dir": config.project_root / "user_data" / "telemetry"}
+               if getattr(bundle, "telemetry_queue", None) is not None else {}),
         )
     except BaseException:
         process = bundle.process
@@ -59,8 +62,10 @@ def create_local_session(config, *, save_name=None, player_tag=None):
             bundle.state_queue,
             bundle.progress_queue,
             bundle.snapshot_ack_queue,
+            getattr(bundle, "telemetry_queue", None),
         ):
-            channel.close()
+            if channel is not None:
+                channel.close()
         raise
 
 

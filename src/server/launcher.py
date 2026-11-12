@@ -44,6 +44,7 @@ def spawn_local_server(
     state_queue: mp.Queue = mp.Queue(maxsize=2)
     progress_queue: mp.Queue = mp.Queue()
     snapshot_ack_queue: mp.Queue = mp.Queue()
+    telemetry_queue: mp.Queue = mp.Queue(maxsize=2)
 
     # Spawn the background CPU core (headless, no OpenGL context)
     process = mp.Process(
@@ -52,6 +53,7 @@ def spawn_local_server(
         kwargs={
             "player_tag": player_tag,
             "snapshot_ack_queue": snapshot_ack_queue,
+            "telemetry_queue": telemetry_queue,
         },
         daemon=True,  # Ensures process dies if the window is closed abruptly
     )
@@ -78,4 +80,5 @@ def spawn_local_server(
         progress_queue=progress_queue,
         snapshot_ack_queue=snapshot_ack_queue,
         process=process,
+        telemetry_queue=telemetry_queue,
     )

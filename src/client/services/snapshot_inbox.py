@@ -8,7 +8,8 @@ from src.shared.state import GameState
 
 
 class SnapshotInbox:
-    def __init__(self, state_queue, acknowledgement_queue):
+    def __init__(self, state_queue, acknowledgement_queue, telemetry=None):
+        self._telemetry = telemetry
         self._queue = state_queue
         self._acknowledgements = acknowledgement_queue
         self._decoder = StateSnapshotDecoder()
@@ -36,12 +37,22 @@ class SnapshotInbox:
             except (EOFError, OSError, ValueError):
                 return
             try:
-                state = self._decoder.decode(packet)
+                if self._telemetry and self._telemetry.enabled:
+                    with self._telemetry.measure("ipc.snapshot.decode_ms"):
+                        state = self._decoder.decode(packet)
+                    self._telemetry.increment("ipc.snapshots.received")
+                else:
+                    state = self._decoder.decode(packet)
             except SnapshotProtocolError as exc:
                 print(f"[SnapshotInbox] Snapshot protocol error: {exc}")
                 continue
-            with self._lock:
-                self._latest = state
+            if self._telemetry and self._telemetry.enabled:
+                with self._telemetry.measure("ipc.snapshot.publish_ms"):
+                    with self._lock:
+                        self._latest = state
+            else:
+                with self._lock:
+                    self._latest = state
             try:
                 self._acknowledgements.put_nowait(self._decoder.sequence)
             except Full:

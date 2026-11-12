@@ -74,10 +74,9 @@
 
 ## Phase 9: Polish and acceptance
 
-- [X] T017 [P] Record an FR/SC-to-file/test coverage matrix and remaining manual acceptance in `specs/116-campaign-scenarios-objectives-and-advisor/coverage.md`.
+- [X] T017 [P] Record an FR/SC-to-file/test coverage matrix and deferred SC-006 status in `specs/116-campaign-scenarios-objectives-and-advisor/coverage.md`.
 - [X] T018 Re-run the focused quickstart command and relevant schema, AI, IPC, save, and layer-boundary tests; record exact outcomes in `specs/116-campaign-scenarios-objectives-and-advisor/research.md`.
 - [X] T019 Verify the existing 10,000-objective/5,000-signal performance evidence and carry the 3-iteration limit forward; do not run another optimization iteration in `tests/test_campaign_performance.py`.
-- [ ] T020 Complete 30-second campaign overview usability acceptance in a rendered desktop client; headless tests do not satisfy this manual criterion.
 
 ## Dependencies and execution order
 
@@ -87,8 +86,8 @@
 - User Story 6 depends on stable campaign records and is client-only over those records.
 - User Story 7 validates all persisted state after functional behavior stabilizes.
 - T019 consumes the already-completed performance evidence in `research.md`; this performance algorithm has used all three optimization iterations and must not receive a fourth.
-- T020 remains external/manual if no rendered desktop client is exposed.
+- The rendered campaign overview usability check is deferred from active work; it is not claimed complete and is outside the current freeplay focus. Automated projection coverage remains recorded in `coverage.md`.
 
 ## Implementation strategy
 
-Preserve the existing architecture and passing behavior. Complete the traceability audit first, write or strengthen a focused failing test before each functional change, and only change the layer that owns the demonstrated gap. Treat the existing passing performance gate as closed to further tuning. Finish with the quickstart suite and mark manual UI acceptance separately.
+Preserve the existing architecture and passing behavior. Complete the traceability audit first, write or strengthen a focused failing test before each functional change, and only change the layer that owns the demonstrated gap. Treat the existing passing performance gate as closed to further tuning. Finish with the quickstart suite; SC-006 is documented as deferred and is not an active task.

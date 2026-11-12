@@ -62,7 +62,7 @@ Command: the focused campaign, AI delegation, IPC, save, and layer-boundary test
 | SC-003 a lost held condition is not falsely completed | Existing hold reset test plus decay case. |
 | SC-004 every configured high-priority signal has context and expiry | Signal-family/lifecycle tests. |
 | SC-005 seeded/replayed/save-loaded state is identical | Campaign persistence/replay test. |
-| SC-006 next action/deadline discoverable in 30 seconds | Panel text is covered headlessly, but the rendered 30-second desktop check is still open because no native app is exposed in this task. |
+| SC-006 next action/deadline discoverable in 30 seconds | Presenter and panel projection are covered headlessly. Rendered usability remains unverified and is deferred from active tasks because current work focuses on freeplay; it is not claimed complete. |
 | SC-007 10,000 objectives + 5,000 signals under 500 ms | 458.45 ms after exactly three optimization iterations; no further tuning permitted. |
 
 ## Scope exclusions

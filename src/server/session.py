@@ -171,6 +171,15 @@ class GameSession:
         return RegionMapData(str(config.get_asset_path("map/regions.png")))
 
     def tick(self, delta_time: float) -> None:
+        telemetry = getattr(self.engine, "telemetry", None)
+        if telemetry is None or not telemetry.enabled:
+            self._tick(delta_time)
+            return
+        telemetry.increment("simulation.ticks")
+        with telemetry.measure("simulation.tick.total_ms"):
+            self._tick(delta_time)
+
+    def _tick(self, delta_time: float) -> None:
         next_tick = int(self.state.globals.get("tick", 0)) + 1
         prepared = self.command_pipeline.prepare(self.state, next_tick)
         for result in prepared.rejected:
@@ -200,11 +209,16 @@ class GameSession:
             self.state.current_actions = []
             return
 
-        step_result = self.engine.step(
-            self.state,
-            [command.action for command in simulation_commands],
-            float(delta_time),
-        )
+        telemetry = getattr(self.engine, "telemetry", None)
+        if telemetry and telemetry.enabled:
+            with telemetry.measure("simulation.engine_step_ms"):
+                step_result = self.engine.step(
+                    self.state, [command.action for command in simulation_commands], float(delta_time)
+                )
+        else:
+            step_result = self.engine.step(
+                self.state, [command.action for command in simulation_commands], float(delta_time)
+            )
         status = CommandStatus.EXECUTED if step_result.success else CommandStatus.FAILED
         failure_message = (
             step_result.failures[0].error_message if step_result.failures else ""

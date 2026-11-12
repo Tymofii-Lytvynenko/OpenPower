@@ -157,8 +157,14 @@ class MainWindow(arcade.Window):
     def on_update(self, delta_time: float):
         if self.session:
             # Grabs the latest IPC payload (Takes < 0.001 seconds!)
-            self.session.tick(delta_time)
-            self._sync_geo_language_to_session()
+            telemetry = getattr(self.session, "telemetry", None)
+            if telemetry and telemetry.collector.enabled:
+                with telemetry.collector.measure("client.update_ms"):
+                    self.session.tick(delta_time)
+                    self._sync_geo_language_to_session()
+            else:
+                self.session.tick(delta_time)
+                self._sync_geo_language_to_session()
 
     def on_close(self):
         self._boot_closing.set()

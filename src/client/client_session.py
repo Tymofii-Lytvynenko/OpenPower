@@ -6,6 +6,8 @@ from typing import Optional
 
 from src.core.map_data import RegionMapData
 from src.client.services.client_game_clock import ClientGameClock
+from src.client.services.telemetry_service import TelemetryService
+from pathlib import Path
 from src.shared.actions import GameAction
 from src.shared.commands import CommandEnvelope, command_id_for
 from src.shared.events import EventSystemError
@@ -22,6 +24,8 @@ class ClientSessionProxy:
         progress_queue: mp.Queue,
         snapshot_ack_queue: mp.Queue,
         process: mp.Process,
+        telemetry_queue=None,
+        telemetry_output_dir: Path | None = None,
     ) -> None:
         self.map_data = map_data
         self.action_queue = action_queue
@@ -34,7 +38,8 @@ class ClientSessionProxy:
         self.system_errors: list[dict[str, object]] = []
         self._known_system_errors: set[tuple[str, str, int]] = set()
         self._command_sequences: dict[str, int] = defaultdict(int)
-        self._snapshot_inbox = SnapshotInbox(state_queue, snapshot_ack_queue)
+        self.telemetry = TelemetryService(action_queue, telemetry_queue, telemetry_output_dir or Path("user_data/telemetry"), process)
+        self._snapshot_inbox = SnapshotInbox(state_queue, snapshot_ack_queue, self.telemetry.collector)
         self._state_poll_accumulator = 0.0
         self._state_poll_interval = 1.0 / 30.0
         self._display_clock = ClientGameClock()
@@ -58,6 +63,10 @@ class ClientSessionProxy:
         return command_id
 
     def tick(self, delta_time: float) -> None:
+        try:
+            self.telemetry.refresh()
+        except Exception:
+            self.telemetry.collector._log_failure()
         self._display_clock.advance(delta_time)
         if delta_time > 0.0:
             self._state_poll_accumulator += delta_time
@@ -70,10 +79,17 @@ class ClientSessionProxy:
 
         latest = self._snapshot_inbox.take_latest()
         if latest is not None:
-            self.state = latest
-            self._display_clock.sync(self.state.time)
-            self._hydrate_command_sequences()
-            self._capture_system_errors()
+            if self.telemetry.collector.enabled:
+                with self.telemetry.collector.measure("ipc.snapshot.apply_ms"):
+                    self._apply_snapshot(latest)
+            else:
+                self._apply_snapshot(latest)
+
+    def _apply_snapshot(self, latest: GameState) -> None:
+        self.state = latest
+        self._display_clock.sync(self.state.time)
+        self._hydrate_command_sequences()
+        self._capture_system_errors()
 
     def _hydrate_command_sequences(self) -> None:
         if self.state is None:
@@ -117,6 +133,7 @@ class ClientSessionProxy:
 
     def shutdown(self) -> None:
         self._snapshot_inbox.close()
+        self.telemetry.close()
         self.action_queue.put("SHUTDOWN")
         self.process.join(timeout=2.0)
         if self.process.is_alive():

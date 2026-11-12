@@ -14,3 +14,4 @@ class ServerProcessBundle:
     progress_queue: mp.Queue
     snapshot_ack_queue: mp.Queue
     process: mp.Process
+    telemetry_queue: mp.Queue | None = None

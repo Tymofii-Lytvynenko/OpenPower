@@ -1,21 +1,4 @@
-<!-- SYNC IMPACT REPORT
-Version change: 1.0.0 → 1.1.0
-Modified principles: Expanded Principles 1-5 to explicitly enshrine all system layer rules (.agents/rules/*.md), database schema contracts (DATA_SCHEMA.md), global engineering guidelines, and repository standards (README.md, CONTRIBUTING.md).
-Added sections:
-- Section 1.1: Shared Layer Rules (.agents/rules/shared.md)
-- Section 1.2: Core Layer Rules (.agents/rules/core.md)
-- Section 1.3: Engine Layer Rules (.agents/rules/engine.md)
-- Section 1.4: Server Layer Rules (.agents/rules/server.md)
-- Section 1.5: Client Layer Rules (.agents/rules/client.md)
-- Section 1.6: Module Layer Rules (.agents/rules/base-module.md)
-- Section 2.1: Authoritative Database Schemas & Data Contracts (DATA_SCHEMA.md)
-- Section 4.1: Professional Commenting Guidelines (User Global Rule)
-Templates requiring updates:
-- .specify/templates/plan-template.md (⚠ pending initialization)
-- .specify/templates/spec-template.md (⚠ pending initialization)
-- .specify/templates/tasks-template.md (⚠ pending initialization)
-Follow-up TODOs: None
--->
+<!-- Project policy text moved out of tool-managed configuration; principles and version unchanged. -->
 
 # OpenPower Engine Project Constitution
 

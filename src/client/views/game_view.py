@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+from time import perf_counter_ns
 import arcade
 from src.shared.config import GameConfig
 from src.client.services.network_client_service import NetworkClient
@@ -26,6 +28,8 @@ class GameView(BaseImGuiView):
         self.config = config
         self.player_tag = player_tag
         self.net = NetworkClient(session)
+        self._performance = getattr(getattr(session, "telemetry", None), "collector", None)
+        self._last_frame_ns = None
 
         # 1. Initialize Camera & Renderer
         # We reuse the shared renderer from the Window to keep the state (position/zoom) intact.
@@ -186,7 +190,27 @@ class GameView(BaseImGuiView):
     def on_selection_changed(self, region_id: int | None):
         self.selected_region_id = region_id
 
+    def _measure_performance(self, name):
+        collector = getattr(self, "_performance", None)
+        return collector.measure(name) if collector is not None and collector.enabled else nullcontext()
+
     def on_draw(self):
+        collector = getattr(self, "_performance", None)
+        if collector is not None and collector.enabled:
+            now = perf_counter_ns()
+            if self._last_frame_ns is not None:
+                interval = (now - self._last_frame_ns) / 1_000_000
+                collector.observe("render.frame_interval_ms", interval)
+                if interval > 0:
+                    collector.gauge("render.fps", 1000 / interval, "fps")
+            self._last_frame_ns = now
+            with collector.measure("render.frame_cpu_ms"):
+                self._draw_game()
+        else:
+            self._last_frame_ns = None
+            self._draw_game()
+
+    def _draw_game(self):
         # ImGui and batched overlays can leave a clipping rectangle active. It must be
         # removed before clearing, otherwise stale depth values cut holes into the globe.
         ctx = self.window.ctx
@@ -207,7 +231,8 @@ class GameView(BaseImGuiView):
 
         # 3. Render 3D World
 
-        self.renderer.draw()
+        with self._measure_performance("render.map_ms"):
+            self.renderer.draw()
 
         # 4. Render Unit Overlay and UI
         self.window.use() # Switch back for UI
@@ -218,52 +243,56 @@ class GameView(BaseImGuiView):
             active_country = self.viewport_ctrl.selected_country_tag or self.player_tag
             visible_owners = self._visible_unit_owners(state, active_country)
 
-        self.unit_renderer.render(
-            state=state,
-            selected_unit_id=self.unit_interactions.selected_unit_id,
-            selected_unit_ids=self.unit_interactions.selected_unit_ids,
-            hovered_unit_id=self.unit_interactions.hovered_unit_id,
-            drag_preview=self.unit_interactions.drag_preview,
-            selection_rect=self._active_selection_rect(),
-            visible_owners=visible_owners,
-            show_engagement_zones=self.viewport_ctrl.show_engagement_zones,
-            presentation_total_minutes=presentation_total_minutes,
-            viewer_country_tag=self.viewport_ctrl.selected_country_tag or self.player_tag,
-        )
+        with self._measure_performance("render.units_ms"):
+            self.unit_renderer.render(
+                state=state,
+                selected_unit_id=self.unit_interactions.selected_unit_id,
+                selected_unit_ids=self.unit_interactions.selected_unit_ids,
+                hovered_unit_id=self.unit_interactions.hovered_unit_id,
+                drag_preview=self.unit_interactions.drag_preview,
+                selection_rect=self._active_selection_rect(),
+                visible_owners=visible_owners,
+                show_engagement_zones=self.viewport_ctrl.show_engagement_zones,
+                presentation_total_minutes=presentation_total_minutes,
+                viewer_country_tag=self.viewport_ctrl.selected_country_tag or self.player_tag,
+            )
 
         # Draw random event placards above affected regions
-        self.event_renderer.render(state)
+        with self._measure_performance("render.effects_ms"):
+            self.event_renderer.render(state)
 
-        settings_service = getattr(self.window, "settings", None)
-        reduce_motion = bool(
-            getattr(getattr(settings_service, "settings", None), "reduce_motion", False)
-        )
-        self.battle_effect_renderer.render(
-            state,
-            presentation_total_minutes,
-            reduce_motion=reduce_motion,
-        )
+            settings_service = getattr(self.window, "settings", None)
+            reduce_motion = bool(
+                getattr(getattr(settings_service, "settings", None), "reduce_motion", False)
+            )
+            self.battle_effect_renderer.render(
+                state,
+                presentation_total_minutes,
+                reduce_motion=reduce_motion,
+            )
 
-        try:
-            self.layout.render(
-                self.selected_region_id,
-                self.imgui.real_fps,
-                self.nav,
-                state=state,
-                presentation_total_minutes=presentation_total_minutes,
-            )
-            self.unit_context_menu.render()
-            self.unit_order_targeting_prompt.render(
-                self.unit_interactions.pending_order_mode,
-                self.unit_interactions.cancel_order_targeting,
-            )
-            self.unit_details_window.render(state)
-            self._render_map_information(state)
-        except Exception as e:
-            print(f"[GameView] UI Rendering Error: {e}")
+        with self._measure_performance("render.ui_ms"):
+            try:
+                self.layout.render(
+                    self.selected_region_id,
+                    self.imgui.real_fps,
+                    self.nav,
+                    state=state,
+                    presentation_total_minutes=presentation_total_minutes,
+                )
+                self.unit_context_menu.render()
+                self.unit_order_targeting_prompt.render(
+                    self.unit_interactions.pending_order_mode,
+                    self.unit_interactions.cancel_order_targeting,
+                )
+                self.unit_details_window.render(state)
+                self._render_map_information(state)
+            except Exception as e:
+                print(f"[GameView] UI Rendering Error: {e}")
 
         self._deployment_drop_over_ui = imgui.is_window_hovered(imgui.HoveredFlags_.any_window)
-        self.imgui.render()
+        with self._measure_performance("render.imgui_ms"):
+            self.imgui.render()
 
     def _render_map_information(self, state):
         self.map_information.render_selected_unit(
