@@ -163,7 +163,8 @@ class StateSnapshotDecoder:
                 globals=copy.deepcopy(packet["globals"]),
                 system_state=copy.deepcopy(packet.get("system_state", {})),
                 determinism=DeterminismState(**packet.get("determinism", {})),
-                journal=JournalState(**packet.get("journal", {})),
+                # Full packets can be decoded more than once; each publication owns its journal.
+                journal=JournalState(**copy.deepcopy(packet.get("journal", {}))),
                 events=copy.deepcopy(packet.get("events", [])),
             )
             self.state = state

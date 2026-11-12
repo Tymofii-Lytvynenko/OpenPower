@@ -76,3 +76,14 @@ def test_replayed_delta_is_rejected_without_mutating_decoder(frame):
         decoder.decode(delta)
     assert decoder.state is current
     assert decoder.sequence == delta['sequence']
+
+@given(st.lists(st.integers(-100, 100), max_size=5))
+def test_full_snapshot_decoding_is_independent_of_packet_and_other_decodes(values):
+    state = GameState()
+    state.journal.command_results.append({'command_id': 'c', 'payload': {'values': values.copy()}})
+    packet = StateSnapshotEncoder().encode(state)
+    first = StateSnapshotDecoder().decode(packet)
+    second = StateSnapshotDecoder().decode(packet)
+    second.journal.command_results[0]['payload']['values'].append(5)
+    assert first.journal.command_results[0]['payload']['values'] == values
+    assert packet['journal']['command_results'][0]['payload']['values'] == values

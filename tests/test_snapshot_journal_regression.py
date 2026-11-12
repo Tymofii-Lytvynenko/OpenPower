@@ -28,3 +28,14 @@ def test_replayed_delta_cannot_replace_newer_snapshot():
     with pytest.raises(SnapshotProtocolError, match='not newer'):
         decoder.decode(delta)
     assert decoder.state is previous
+
+
+def test_full_packet_journal_is_not_shared_between_decodes():
+    state = GameState()
+    state.journal.command_results.append({'command_id': 'c', 'payload': {'values': []}})
+    packet = StateSnapshotEncoder().encode(state)
+    first = StateSnapshotDecoder().decode(packet)
+    second = StateSnapshotDecoder().decode(packet)
+    second.journal.command_results[0]['payload']['values'].append(5)
+    assert first.journal.command_results[0]['payload']['values'] == []
+    assert packet['journal']['command_results'][0]['payload']['values'] == []
