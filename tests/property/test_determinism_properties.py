@@ -51,3 +51,27 @@ def test_equivalent_graphs_and_restored_state_replay_identically(frame, seed, ac
     two._rebuild_execution_order()
     assert [s.id for s in one.execution_order] == [s.id for s in two.execution_order]
     assert state_fingerprint(first) == state_fingerprint(second)
+
+@given(valid_tables(), st.integers(1, 10000), st.lists(st.tuples(st.integers(1, 5), st.booleans()), max_size=6))
+def test_real_time_system_replay_and_runtime_restore(frame, seed, commands):
+    from modules.base.systems.world.time_system import TimeSystem
+    from src.shared.actions import ActionSetGameSpeed
+
+    first = GameState(tables={'sample': frame})
+    first.determinism.reset(seed)
+    first_engine = Engine(dev_mode=True)
+    first_engine.register_systems([TimeSystem()])
+    for speed, paused in commands[:len(commands) // 2]:
+        assert first_engine.step(first, [ActionSetGameSpeed('p', speed), ActionSetPaused('p', paused)], 0.6).success
+    first_engine.snapshot_system_state(first)
+    second = GameState.from_ipc(first.to_ipc())
+    second_engine = Engine(dev_mode=True)
+    second_engine.register_systems([TimeSystem()])
+    second_engine.restore_system_state(second)
+    assert state_fingerprint(first) == state_fingerprint(second)
+    for speed, paused in commands[len(commands) // 2:]:
+        actions = [ActionSetGameSpeed('p', speed), ActionSetPaused('p', paused)]
+        for active_engine, state in ((first_engine, first), (second_engine, second)):
+            assert active_engine.step(state, actions, 0.6).success
+            active_engine.snapshot_system_state(state)
+        assert state_fingerprint(first) == state_fingerprint(second)

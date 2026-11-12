@@ -53,3 +53,37 @@ def test_engine_failure_restores_checkpoint(frame, values):
     assert not engine.step(state, [], 0.0).success
     assert state_fingerprint(state) == before
     assert state.table_revisions == revisions
+
+@given(st.lists(st.integers(-100, 100), max_size=5))
+def test_failed_system_restores_runtime_and_state_containers(values):
+    from src.engine.simulator import Engine
+    from src.shared.system_interfaces import SystemAccess
+    from src.shared.system_state import SYSTEM_STATE_CHECKPOINT
+
+    class FailingCheckpointedSystem:
+        id = 'checkpointed'
+        dependencies = []
+        access = SystemAccess()
+        runtime_state_contract = {'payload': SYSTEM_STATE_CHECKPOINT}
+
+        def __init__(self):
+            self.payload = {'nested': [values.copy()]}
+
+        def export_persistent_state(self):
+            return {'payload': self.payload}
+
+        def import_persistent_state(self, data):
+            self.payload = data['payload']
+
+        def update(self, state, dt):
+            self.payload['nested'][0].append(1)
+            state.system_state['nested']['values'].append(2)
+            raise RuntimeError('controlled failure')
+
+    system = FailingCheckpointedSystem()
+    state = GameState(system_state={'nested': {'values': values.copy()}})
+    engine = Engine()
+    engine.register_systems([system])
+    assert not engine.step(state, [], 0).success
+    assert system.payload == {'nested': [values]}
+    assert state.system_state['nested']['values'] == values
