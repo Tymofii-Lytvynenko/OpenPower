@@ -2,7 +2,8 @@
 import polars as pl
 from hypothesis import strategies as st
 
-from modules.base.schema import build_base_schema_registry
+from modules.base.schema import COUNTRY_RUNTIME_SCHEMA
+from src.shared.schema import WorldSchemaRegistry
 from src.shared.state import GameState
 
 
@@ -17,7 +18,7 @@ def world_states(draw):
         'countries': pl.DataFrame({'id': tags}),
         'regions': pl.DataFrame({'id': list(range(1, region_count + 1)), 'owner': owners}, schema={'id': pl.Int32, 'owner': pl.String}),
     })
-    registry = build_base_schema_registry()
+    registry = WorldSchemaRegistry((COUNTRY_RUNTIME_SCHEMA,))
     registry.capture_state(state)
     registry.ensure_state(state)
     return state
