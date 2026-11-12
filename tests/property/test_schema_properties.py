@@ -38,7 +38,7 @@ def test_incompatible_cast_and_conflicting_schema_rejected(text):
     with pytest.raises(RuntimeError, match='conflict'):
         registry.register(TableSchema('sample', {'id': ColumnSpec(pl.String)}))
 
-from tests.property.strategies.tables import duplicate_key_tables, null_key_tables, tables_with_extras, wrong_type_tables
+from tests.property.strategies.tables import duplicate_key_tables, missing_columns, null_key_tables, tables_with_extras, wrong_type_tables
 
 
 @given(duplicate_key_tables(), null_key_tables(), tables_with_extras(), wrong_type_tables())
@@ -49,3 +49,10 @@ def test_generated_schema_faults_are_distinguished(duplicate, null_key, extra, w
     assert 'null_key' in issues(null_key)
     assert registry.normalize('sample', extra).equals(extra)
     assert 'wrong_dtype' in issues(wrong)
+
+@given(missing_columns())
+def test_each_missing_column_receives_registered_default(frame):
+    missing = next(name for name in TABLE_SCHEMA.columns if name not in frame.columns)
+    result = WorldSchemaRegistry([TABLE_SCHEMA]).normalize('sample', frame)
+    assert result.schema == {name: spec.dtype for name, spec in TABLE_SCHEMA.columns.items()}
+    assert result[missing].to_list() == [TABLE_SCHEMA.columns[missing].default] * frame.height

@@ -12,4 +12,4 @@ Run them separately with `python -m pytest tests/property -q -m slow
 They use temporary directories, and the headless runner reads project data only.
 
 Hypothesis stores local examples in `.hypothesis/`; reproduce a failure with
-its reported seed or example. Add a deterministic regression test for a fixed bug.
+its reported seed with `--hypothesis-seed=1234` or its minimal example. Add a deterministic regression test for a fixed bug.
