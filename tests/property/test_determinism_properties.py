@@ -75,3 +75,24 @@ def test_real_time_system_replay_and_runtime_restore(frame, seed, commands):
             assert active_engine.step(state, actions, 0.6).success
             active_engine.snapshot_system_state(state)
         assert state_fingerprint(first) == state_fingerprint(second)
+
+import pytest
+from hypothesis import settings
+from tests.property.strategies.world_state import world_states
+
+
+@pytest.mark.slow
+@settings(max_examples=8, deadline=None)
+@given(world_states(), st.lists(st.booleans(), min_size=1, max_size=3))
+def test_minimal_world_replay_matches_after_snapshot(state, pauses):
+    from modules.base.systems.world.time_system import TimeSystem
+
+    restored = GameState.from_ipc(state.to_ipc())
+    engines = (Engine(dev_mode=True), Engine(dev_mode=True))
+    for instance in engines:
+        instance.register_systems([TimeSystem()])
+    for paused in pauses:
+        for instance, world in zip(engines, (state, restored)):
+            assert instance.step(world, [ActionSetPaused('player', paused)], 0.6).success
+            instance.snapshot_system_state(world)
+        assert state_fingerprint(state) == state_fingerprint(restored)
