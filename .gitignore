@@ -265,3 +265,6 @@ __marimo__/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Hypothesis local example database.
+.hypothesis/
