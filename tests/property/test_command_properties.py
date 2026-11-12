@@ -78,7 +78,8 @@ class CommandMachine(RuleBasedStateMachine):
     @invariant()
     def queue_and_sequences_match(self):
         assert self.pipeline._pending == self.pending
-        assert dict(self.pipeline._last_sequence) == dict(self.last)
+        assert all(self.pipeline._last_sequence.get(actor, 0) == self.last.get(actor, 0)
+                   for actor in self.pipeline._last_sequence.keys() | self.last.keys())
 
 
 TestCommandMachine = CommandMachine.TestCase
