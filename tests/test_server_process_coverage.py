@@ -25,6 +25,7 @@ class QueueLike:
 class FakeSession:
     def __init__(self, action_queue=None, ack_queue=None):
         self.state = object()
+        self.engine = SimpleNamespace(telemetry=None)
         self.action_queue = action_queue
         self.ack_queue = ack_queue
         self.commands = []
@@ -83,6 +84,7 @@ class Event:
 
 
 def install_runtime(monkeypatch, *, session=None, create_error=None, event_states=(False, False, True)):
+    monkeypatch.delenv("OPENPOWER_TELEMETRY", raising=False)
     clock = Clock()
     snapshots = Snapshots()
     create_calls = []
@@ -152,6 +154,8 @@ def test_server_process_routes_controls_between_fixed_steps_and_handles_full_sta
         ("PROGRESS", 0.5, "Loading"),
         ("READY", 1.0, "Engine Started"),
     ]
+    assert isinstance(session.engine.telemetry, server_process.PerformanceCollector)
+    assert not session.engine.telemetry.enabled
     assert session.saves == 2
     assert session.commands == ["outer", "catch-up"]
     assert session.deltas == [0.1, 0.1]
