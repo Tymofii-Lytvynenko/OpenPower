@@ -176,6 +176,11 @@ class StateSnapshotDecoder:
                     f"Snapshot delta requires sequence {base_sequence}, "
                     f"client has {self.sequence}."
                 )
+            # An old delta can overwrite newer tables even when its base is valid.
+            if "sequence" in packet and int(packet["sequence"]) <= self.sequence:
+                raise SnapshotProtocolError(
+                    f"Snapshot delta sequence {packet['sequence']} is not newer than {self.sequence}."
+                )
             # Published snapshots may still be rendered while the next delta is decoded.
             # Share immutable frames, but keep mutable containers owned by each snapshot.
             state = GameState(

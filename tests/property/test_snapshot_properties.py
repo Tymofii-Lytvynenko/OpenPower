@@ -62,3 +62,17 @@ def test_published_snapshot_journal_records_are_independent(values):
     second = decoder.decode(encoder.encode(state))
     second.journal.domain_events[0]['payload']['values'].append(123)
     assert first.journal.domain_events[0]['payload']['values'] == values
+
+@given(valid_tables())
+def test_replayed_delta_is_rejected_without_mutating_decoder(frame):
+    state = GameState(tables={'sample': frame})
+    encoder, decoder = StateSnapshotEncoder(), StateSnapshotDecoder()
+    full = encoder.encode(state)
+    decoder.decode(full)
+    encoder.acknowledge(full['sequence'])
+    delta = encoder.encode(state)
+    current = decoder.decode(delta)
+    with pytest.raises(SnapshotProtocolError):
+        decoder.decode(delta)
+    assert decoder.state is current
+    assert decoder.sequence == delta['sequence']
