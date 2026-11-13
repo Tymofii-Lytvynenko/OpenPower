@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -108,7 +109,7 @@ class EconomyPresenter:
         policies = self._policies(state, country_id)
         distress = self._distress(state, country_id)
         terms = getattr(state, "globals", {}).get("economic_health_terms", {})
-        terms = terms if isinstance(terms, dict) else {}
+        terms = terms if isinstance(terms, Mapping) else {}
         thresholds = (
             ("inflation_warning", self._finite(terms.get("inflation_warning_rate"), 0.10)),
             ("unemployment_warning", self._finite(terms.get("unemployment_warning_rate"), 0.15)),

@@ -1,4 +1,5 @@
 import dataclasses
+from collections.abc import Mapping
 
 import polars as pl
 
@@ -92,7 +93,7 @@ class DataInspectorPanel:
                 imgui.same_line()
                 imgui.text_colored(GAMETHEME.colors.politics, "Type: Dataclass")
 
-            elif isinstance(data, dict):
+            elif isinstance(data, Mapping):
                 imgui.same_line()
                 imgui.text_colored(GAMETHEME.colors.politics, f"Type: Dict ({len(data)} keys)")
 
@@ -106,7 +107,7 @@ class DataInspectorPanel:
                 self._render_dataframe(target_data)
             elif dataclasses.is_dataclass(target_data):
                 self._render_dataclass(target_data)
-            elif isinstance(target_data, dict):
+            elif isinstance(target_data, Mapping):
                 self._render_dict(target_data)
             else:
                 self._render_generic_object(target_data)
@@ -233,7 +234,7 @@ class DataInspectorPanel:
             
             imgui.end_table()
 
-    def _render_dict(self, data: dict):
+    def _render_dict(self, data: Mapping):
         """Renders a Dictionary."""
         flags = (imgui.TableFlags_.borders | imgui.TableFlags_.row_bg | imgui.TableFlags_.resizable)
         

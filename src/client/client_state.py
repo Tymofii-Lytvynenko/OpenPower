@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Iterator, Mapping
 from types import MappingProxyType
 from typing import Any
@@ -94,7 +95,7 @@ class ClientGameStateView:
             "update_table",
         }
     )
-    __slots__ = ("_state", "client_presentation", "presentation_state", "_tables", "_globals")
+    __slots__ = ("_state", "client_presentation", "presentation_state", "_tables", "_globals", "_events", "_current_actions")
 
     def __init__(
         self,
@@ -107,6 +108,8 @@ class ClientGameStateView:
         object.__setattr__(self, "presentation_state", presentation_state)
         object.__setattr__(self, "_tables", _ReadOnlyTableMapping(state.tables))
         object.__setattr__(self, "_globals", _read_only_value(state.globals))
+        object.__setattr__(self, "_events", copy.deepcopy(state.events))
+        object.__setattr__(self, "_current_actions", copy.deepcopy(state.current_actions))
 
     def __setattr__(self, name: str, value: object) -> None:
         raise AttributeError(f"Client snapshot attribute '{name}' is read-only.")
@@ -121,11 +124,11 @@ class ClientGameStateView:
 
     @property
     def events(self) -> tuple[Any, ...]:
-        return tuple(self._state.events)
+        return tuple(copy.deepcopy(self._events))
 
     @property
     def current_actions(self) -> tuple[Any, ...]:
-        return tuple(self._state.current_actions)
+        return tuple(copy.deepcopy(self._current_actions))
 
     @property
     def table_revisions(self) -> Mapping[str, int]:

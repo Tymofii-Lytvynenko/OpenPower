@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
@@ -174,7 +176,7 @@ class BattleOverviewPanel:
         client = context.net_client
         player_id = str(getattr(client, "player_id", "") or "")
         player_map = state.globals.get("player_country_map", {})
-        mapped_country = player_map.get(player_id, "") if isinstance(player_map, dict) else ""
+        mapped_country = player_map.get(player_id, "") if isinstance(player_map, Mapping) else ""
         country = mapped_country or state.globals.get("player_tag", "")
         if not country and context.is_own_country:
             country = context.target_tag

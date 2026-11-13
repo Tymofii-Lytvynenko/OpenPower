@@ -12,7 +12,10 @@ from src.shared.state import GameState
 
 class RecordingClient:
     def __init__(self, state: GameState):
+        self._state = state
         self.state = state
+        self._presentation = None
+        self._presentation_state = None
         self.player_id = "ui-test-player"
         self.player_country = "UKR"
         self.actions: list = []
@@ -20,22 +23,38 @@ class RecordingClient:
         self.system_errors = list(state.globals.get("ui_system_errors", []))
         self.session = self
 
+    def enable_client_view(self, presentation):
+        from src.client.client_state import ClientPresentationState
+
+        self._presentation = presentation
+        self._presentation_state = ClientPresentationState()
+        self._refresh_view()
+
+    def _refresh_view(self):
+        if self._presentation is not None:
+            from src.client.client_state import ClientGameStateView
+
+            self.state = ClientGameStateView(self._state, self._presentation, self._presentation_state)
+
     def get_state(self):
         return self.state
 
     def send_action(self, action):
         self.actions.append(action)
         for outcome in self.state.globals.get("ui_command_results", {}).get(type(action).__name__, []):
-            self.state.journal.append_command_result({
+            self._state.journal.append_command_result({
                 "actor_id": self.player_id, "action_type": type(action).__name__, **outcome,
             })
+        self._refresh_view()
 
     def deliver_event(self,event_type,payload,event_id):
-        self.state.journal.domain_events.append(dict(event_id=event_id,event_type=event_type,
+        self._state.journal.domain_events.append(dict(event_id=event_id,event_type=event_type,
             payload=dict(payload),tick=int(self.state.globals.get("tick",0)),source="ui-test-authoritative-delivery"))
+        self._refresh_view()
 
     def deliver_snapshot(self, snapshot):
-        apply_fixture_snapshot(self.state, snapshot)
+        apply_fixture_snapshot(self._state, snapshot)
+        self._refresh_view()
 
     def get_system_errors(self):
         return self.system_errors

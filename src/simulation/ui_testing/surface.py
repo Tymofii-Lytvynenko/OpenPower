@@ -20,18 +20,33 @@ from src.simulation.ui_testing.fixtures import (
 )
 
 
+class _CurrentClientState:
+    """Follow snapshots delivered while a test surface is open."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def __getattr__(self, name):
+        return getattr(self._client.get_state(), name)
+
+
 def run_surface(name: str, output: Path, project_root: Path, size=(1920, 1080),
                 journey: dict | None = None, fixture: dict | None = None,
                 baseline: Path | None = None, tolerance: float = 0.03) -> int:
     state = build_test_world(project_root, fixture)
     client = RecordingClient(state)
+    from src.modding.client_extensions import load_client_presentation
+    from src.shared.config import GameConfig
+
+    config = GameConfig(project_root)
+    client.enable_client_view(load_client_presentation(config))
+    state = _CurrentClientState(client)
     support = (fixture or {}).get("test_support", {})
     player_country = str(support.get("player_country") or client.player_country).strip().upper()
     client.player_country = player_country
     settings = test_settings()
     window = TestWindow(size)
-    from src.shared.config import GameConfig
-    window.game_config = GameConfig(project_root)
+    window.game_config = config
     if support.get("use_base_region_map"):
         from types import SimpleNamespace
 
