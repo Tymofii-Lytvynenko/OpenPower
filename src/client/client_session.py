@@ -2,6 +2,7 @@
 
 import multiprocessing as mp
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -13,7 +14,14 @@ from src.core.map_data import RegionMapData
 from src.shared.actions import GameAction
 from src.shared.commands import CommandEnvelope, command_id_for
 from src.shared.events import EventSystemError
-from src.shared.state import GameState
+from src.shared.state import GameState, TimeData
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedClientSnapshot:
+    view: ClientGameStateView
+    time: TimeData
+    sequences: dict[str, int]
 
 
 class ClientSessionProxy:
@@ -43,7 +51,12 @@ class ClientSessionProxy:
         self._known_system_errors: set[tuple[str, str, int]] = set()
         self._command_sequences: dict[str, int] = defaultdict(int)
         self.telemetry = TelemetryService(action_queue, telemetry_queue, telemetry_output_dir or Path("user_data/telemetry"), process)
-        self._snapshot_inbox = SnapshotInbox(state_queue, snapshot_ack_queue, self.telemetry.collector)
+        self._prepared_journal = None
+        self._prepared_sequences: dict[str, int] = {}
+        self._snapshot_inbox = SnapshotInbox(
+            state_queue, snapshot_ack_queue, self.telemetry.collector,
+            prepare=self._prepare_snapshot,
+        )
         self._state_poll_accumulator = 0.0
         self._state_poll_interval = 1.0 / 30.0
         self._display_clock = ClientGameClock()
@@ -89,26 +102,43 @@ class ClientSessionProxy:
             else:
                 self._apply_snapshot(latest)
 
-    def _apply_snapshot(self, latest: GameState) -> None:
-        self.state = ClientGameStateView(
-            latest,
-            self._client_presentation,
-            self.presentation_state,
+    def _prepare_snapshot(self, state: GameState, is_delta: bool = False) -> _PreparedClientSnapshot:
+        previous = self._prepared_journal if is_delta else None
+        view = ClientGameStateView(
+            state, self._client_presentation, self.presentation_state,
+            _previous_journal=previous,
         )
-        self._display_clock.sync(latest.time)
-        self._hydrate_command_sequences()
-        self._capture_system_errors()
-
-    def _hydrate_command_sequences(self) -> None:
-        if self.state is None:
-            return
-        for result in self.state.journal.command_results:
+        reuse_commands = (
+            previous is not None
+            and len(state.journal.command_results) >= len(previous.command_results)
+        )
+        sequences = dict(self._prepared_sequences) if reuse_commands else {}
+        start = len(previous.command_results) if reuse_commands else 0
+        for result in view.journal.command_results[start:]:
             actor = str(result.get("actor_id", ""))
             if actor:
-                self._command_sequences[actor] = max(
-                    self._command_sequences[actor],
-                    int(result.get("sequence", 0)),
-                )
+                sequences[actor] = max(sequences.get(actor, 0), int(result.get("sequence", 0)))
+        self._prepared_journal = view.journal
+        self._prepared_sequences = sequences
+        return _PreparedClientSnapshot(view, state.time, sequences)
+
+    def _apply_snapshot(self, latest: _PreparedClientSnapshot) -> None:
+        self.state = latest.view
+        self._display_clock.sync(latest.time)
+        self._hydrate_command_sequences(latest.sequences)
+        self._capture_system_errors()
+
+    def _hydrate_command_sequences(self, sequences: dict[str, int] | None = None) -> None:
+        if self.state is None:
+            return
+        if sequences is None:
+            sequences = {}
+            for result in self.state.journal.command_results:
+                actor = str(result.get("actor_id", ""))
+                if actor:
+                    sequences[actor] = max(sequences.get(actor, 0), int(result.get("sequence", 0)))
+        for actor, sequence in sequences.items():
+            self._command_sequences[actor] = max(self._command_sequences[actor], sequence)
 
     def _capture_system_errors(self) -> None:
         if self.state is None:
