@@ -173,7 +173,9 @@ default branch.
   are checked for declared cross-module dependencies.
 - Top-level Python modules must belong to a contracted package, except for the
   application CLI. Namespace root initializers may contain only a docstring.
-- Client snapshots freeze journal records once per published view, and the live
-  inspection report converts nested read-only mappings into JSON data. Creating
-  a view still traverses the journal once; very large histories can therefore
-  increase snapshot publication time.
+- The client snapshot receiver freezes journals outside the render loop. For
+  successfully prepared delta sequences it shares previously frozen append-only records
+  and processes only newly appended journal entries; full snapshots and failed
+  preparation reset the cache. Full preparation and shared-protocol decoding
+  still traverse large journals on the receiver thread. The live inspection
+  report converts nested read-only mappings into JSON data.

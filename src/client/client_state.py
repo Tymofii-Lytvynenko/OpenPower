@@ -38,9 +38,19 @@ class _ReadOnlyJournalView:
 
     __slots__ = ("domain_events", "command_results")
 
-    def __init__(self, journal: Any) -> None:
-        object.__setattr__(self, "domain_events", _read_only_value(journal.domain_events))
-        object.__setattr__(self, "command_results", _read_only_value(journal.command_results))
+    def __init__(self, journal: Any, previous: _ReadOnlyJournalView | None = None) -> None:
+        def freeze_suffix(records, old):
+            # The decoder guarantees that a delta only appends journal records.
+            if old is None or len(records) < len(old):
+                return _read_only_value(records)
+            return old + tuple(_read_only_value(record) for record in records[len(old):])
+
+        object.__setattr__(self, "domain_events", freeze_suffix(
+            journal.domain_events, None if previous is None else previous.domain_events
+        ))
+        object.__setattr__(self, "command_results", freeze_suffix(
+            journal.command_results, None if previous is None else previous.command_results
+        ))
 
     def __setattr__(self, name: str, value: object) -> None:
         raise AttributeError(f"Snapshot journal attribute '{name}' is read-only.")
@@ -115,13 +125,15 @@ class ClientGameStateView:
         state: GameState,
         client_presentation: Mapping[str, object],
         presentation_state: ClientPresentationState,
+        *,
+        _previous_journal: _ReadOnlyJournalView | None = None,
     ) -> None:
         object.__setattr__(self, "_state", state)
         object.__setattr__(self, "client_presentation", MappingProxyType(dict(client_presentation)))
         object.__setattr__(self, "presentation_state", presentation_state)
         object.__setattr__(self, "_tables", _ReadOnlyTableMapping(state.tables))
         object.__setattr__(self, "_globals", _read_only_value(state.globals))
-        object.__setattr__(self, "_journal", _ReadOnlyJournalView(state.journal))
+        object.__setattr__(self, "_journal", _ReadOnlyJournalView(state.journal, _previous_journal))
         object.__setattr__(self, "_events", copy.deepcopy(state.events))
         object.__setattr__(self, "_current_actions", copy.deepcopy(state.current_actions))
 
