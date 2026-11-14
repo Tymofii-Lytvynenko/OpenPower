@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -402,7 +403,7 @@ class PoliticalOverviewPresenter:
 
     def _rows_for_country(self, state, table_name: str, country_id: str) -> list[dict[str, Any]]:
         tables = getattr(state, "tables", {})
-        frame = tables.get(table_name) if isinstance(tables, dict) else None
+        frame = tables.get(table_name) if isinstance(tables, Mapping) else None
         country_key = "id" if table_name == "countries" else "country_id"
         if frame is None or frame.is_empty() or country_key not in frame.columns:
             return []
@@ -479,7 +480,7 @@ def _form_id(value: Any) -> str:
 
 
 def _decode_object_list(value: Any) -> list[dict[str, Any]]:
-    if isinstance(value, list):
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
         parsed = value
     else:
         try:

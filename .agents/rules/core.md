@@ -26,5 +26,7 @@ It gives you the tool to "calculate time," but it doesn't decide "when the game 
 
 ## 🔗 Relationship with other layers
 * **Imports from:** `src/shared` (It uses the data contracts).
-* **Used by:** `src/engine` AND `modules`.
-* **NEVER imports:** `src/engine`, `src/client`, `src/server`.
+* **Used by:** `src/engine`, `src/server`, `src/client`, and `modules`.
+* **NEVER imports:** `src/engine`, `src/client`, `src/server`, `src/simulation`, `src/modding`, or `modules`.
+
+Import Linter checks the transitive direction. Keep Core reusable by expressing policy in modules and composition in application entry points.

@@ -1,10 +1,12 @@
-import polars as pl
 import dataclasses
-from src.client.ui.core.instrumented_imgui import imgui
+from collections.abc import Mapping
 
-from src.client.ui.core.theme import GAMETHEME
+import polars as pl
+
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
+from src.client.ui.core.theme import GAMETHEME
 
 
 class DataInspectorPanel:
@@ -46,7 +48,7 @@ class DataInspectorPanel:
                 inspectables[f"[Table] {name}"] = df
         
         # Add Globals
-        if hasattr(state, "globals") and isinstance(state.globals, dict):
+        if hasattr(state, "globals") and hasattr(state.globals, "items"):
             for k, v in state.globals.items():
                 inspectables[f"[Global] {k}"] = v
 
@@ -91,7 +93,7 @@ class DataInspectorPanel:
                 imgui.same_line()
                 imgui.text_colored(GAMETHEME.colors.politics, "Type: Dataclass")
 
-            elif isinstance(data, dict):
+            elif isinstance(data, Mapping):
                 imgui.same_line()
                 imgui.text_colored(GAMETHEME.colors.politics, f"Type: Dict ({len(data)} keys)")
 
@@ -105,7 +107,7 @@ class DataInspectorPanel:
                 self._render_dataframe(target_data)
             elif dataclasses.is_dataclass(target_data):
                 self._render_dataclass(target_data)
-            elif isinstance(target_data, dict):
+            elif isinstance(target_data, Mapping):
                 self._render_dict(target_data)
             else:
                 self._render_generic_object(target_data)
@@ -232,7 +234,7 @@ class DataInspectorPanel:
             
             imgui.end_table()
 
-    def _render_dict(self, data: dict):
+    def _render_dict(self, data: Mapping):
         """Renders a Dictionary."""
         flags = (imgui.TableFlags_.borders | imgui.TableFlags_.row_bg | imgui.TableFlags_.resizable)
         

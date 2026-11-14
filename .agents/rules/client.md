@@ -21,15 +21,17 @@ The Client is a **passive observer**. It must never modify the `GameState` direc
 | Reading `state.get_table("regions")` for map coloring. | Writing `state.tables["regions"][id] = value`. |
 | Dispatching an `ActionSetTax` command. | Calculating tax revenue logic inside a UI button. |
 | Using `core.math` to interpolate unit movement. | Implementing pathfinding logic (belongs in Engine/Modules). |
-| Calling `spawn_local_server(config)` from `MainWindow` or a loading task. | Constructing `ClientSessionProxy` directly or importing `run_server_process`. |
+| Rendering the read-only `ClientGameStateView` supplied by `ClientSessionProxy`. | Calling `GameState.update_table()` or mutating snapshot tables/globals. |
 
 ## 🔗 Relationships
 * **Imports from:**
-    * `src/shared`: To use Actions, Events, Config, and `GameState` (for type hints and `from_ipc`).
+    * `src/shared`: To use Actions, Events, Config, and shared contracts.
     * `src/core`: To use universal math utils, color generators, or `list_available_saves`.
-    * `src/server` (**Launcher only**): `MainWindow` and loading tasks may call `spawn_local_server` from `src.server.launcher`. This is the **only** permitted server import in the client layer.
-* **Used by:** The entry point (`main.py`).
+    * Its own client components.
+* **Used by:** The application composition point (`main.py`), which connects the Client proxy to the local server.
 * **NEVER imports:**
     * `src/engine`: The Client should not know how the simulation loop works.
-    * `src/server` (internals): No imports of `GameSession`, `DataLoader`, `SaveWriter`, `DataExporter`, `server_process`, `state_bootstrap`, or any `src/server/io` module.
-    * `modules`: The Client must not depend on specific game content code.
+    * `src/server`: server startup and lifecycle belong to application composition, not Client code.
+    * `src/simulation`, `src/modding`, and `modules`: the Client consumes a versioned presentation contribution through its own API and must not import gameplay implementation.
+
+Import Linter checks transitive dependencies. Client snapshot views are read-only; UI-only settings belong in `ClientPresentationState`.

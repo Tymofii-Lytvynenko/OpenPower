@@ -1,12 +1,14 @@
 """OpenPower-native values shown by the Main Bar sphere meters."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
+from collections.abc import Mapping
+from dataclasses import dataclass
 
 import polars as pl
 
-from modules.base.systems.military.readiness_policy import ReadinessPolicy
+from src.client.services.client_presentation import contribution_for
+from src.shared.mod_api import ClientPresentationKeys
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,9 +20,9 @@ class SphereMetric:
 def main_bar_sphere_metrics(state, country_tag: str) -> dict[str, SphereMetric]:
     """Resolve displayed values for the selected country without source-formula guesses."""
     tables = getattr(state, "tables", {})
-    countries = tables.get("countries") if isinstance(tables, dict) else None
+    countries = tables.get("countries") if isinstance(tables, Mapping) else None
     country = _country_row(countries, country_tag)
-    units = tables.get("units") if isinstance(tables, dict) else None
+    units = tables.get("units") if isinstance(tables, Mapping) else None
 
     return {
         "frmMeterPolitic": SphereMetric(
@@ -28,7 +30,7 @@ def main_bar_sphere_metrics(state, country_tag: str) -> dict[str, SphereMetric]:
         ),
         "frmMeterMilitary": SphereMetric(
             "Ready or fortified military units",
-            _ready_unit_share(units, country_tag),
+            _ready_unit_share(state, units, country_tag),
         ),
         "frmMeterEconomic": SphereMetric(
             "Economic health", _scaled_index(country.get("economic_health"))
@@ -43,14 +45,17 @@ def _country_row(countries: pl.DataFrame | None, country_tag: str) -> dict:
     return rows.to_dicts()[0] if not rows.is_empty() else {}
 
 
-def _ready_unit_share(units: pl.DataFrame | None, country_tag: str) -> float | None:
+def _ready_unit_share(state, units: pl.DataFrame | None, country_tag: str) -> float | None:
     if units is None or "owner" not in units.columns or "readiness_status" not in units.columns:
         return None
     owned = units.filter(pl.col("owner").cast(pl.Utf8) == str(country_tag))
     if owned.is_empty():
         return 0.0
 
-    policy = ReadinessPolicy()
+    policy = contribution_for(
+        state,
+        ClientPresentationKeys.READINESS_POLICY_FACTORY,
+    )()
     statuses = owned.get_column("readiness_status").to_list()
     ready = sum(
         policy.normalize(status) != "parked"

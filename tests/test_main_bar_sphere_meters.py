@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 import polars as pl
@@ -6,10 +5,11 @@ import polars as pl
 from src.client.ui.components.hud.sphere_metrics import main_bar_sphere_metrics
 from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.layouts.gml_layout import GMLLayoutSession, get_gml_layout
+from tests.test_support.client_presentation import client_state
 
 
 def test_main_bar_sphere_metrics_use_selected_country_and_native_openpower_state():
-    state = SimpleNamespace(
+    state = client_state(
         tables={
             "countries": pl.DataFrame(
                 {
@@ -38,7 +38,7 @@ def test_main_bar_sphere_metrics_use_selected_country_and_native_openpower_state
 
 
 def test_main_bar_sphere_metrics_clamp_country_values_and_report_empty_force():
-    state = SimpleNamespace(
+    state = client_state(
         tables={
             "countries": pl.DataFrame(
                 {"id": ["AAA"], "gvt_approval": [120.0], "economic_health": [-0.5]}
@@ -57,7 +57,7 @@ def test_main_bar_sphere_metrics_clamp_country_values_and_report_empty_force():
 
 
 def test_main_bar_sphere_metrics_handle_missing_country_and_unit_columns():
-    state = SimpleNamespace(
+    state = client_state(
         tables={
             "countries": pl.DataFrame({"country": ["AAA"]}),
             "units": pl.DataFrame({"owner": ["AAA"]}),
@@ -72,7 +72,7 @@ def test_main_bar_sphere_metrics_handle_missing_country_and_unit_columns():
 
 
 def test_main_bar_sphere_metrics_hide_non_finite_country_values():
-    state = SimpleNamespace(
+    state = client_state(
         tables={
             "countries": pl.DataFrame(
                 {"id": ["AAA"], "gvt_approval": [float("nan")], "economic_health": [float("inf")]}

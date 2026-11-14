@@ -100,7 +100,7 @@ def test_ui_run_validates_dimensions_and_visual_tolerance(tmp_path):
 
 
 def test_ui_run_uses_journey_fixture_and_resolves_relative_artifacts(monkeypatch, tmp_path):
-    from src.client.ui.testing import surface
+    from src.simulation.ui_testing import surface
 
     root = tmp_path / "project"
     root.mkdir()
@@ -139,7 +139,7 @@ def test_ui_run_uses_journey_fixture_and_resolves_relative_artifacts(monkeypatch
 
 
 def test_ui_run_honors_explicit_fixture_and_absolute_output(monkeypatch, tmp_path):
-    from src.client.ui.testing import surface
+    from src.simulation.ui_testing import surface
 
     root = tmp_path / "project"
     root.mkdir()
@@ -179,7 +179,7 @@ def test_ui_run_honors_explicit_fixture_and_absolute_output(monkeypatch, tmp_pat
 
 @pytest.mark.parametrize("payload", [[], "not an object"])
 def test_ui_run_rejects_non_object_journey_and_fixture_files(monkeypatch, tmp_path, payload):
-    from src.client.ui.testing import surface
+    from src.simulation.ui_testing import surface
 
     root = tmp_path / "project"
     root.mkdir()
@@ -204,7 +204,7 @@ def test_ui_run_rejects_non_object_journey_and_fixture_files(monkeypatch, tmp_pa
 
 
 def test_ui_run_rejects_a_non_object_fixture_file(monkeypatch, tmp_path):
-    from src.client.ui.testing import surface
+    from src.simulation.ui_testing import surface
 
     root = tmp_path / "project"
     root.mkdir()
@@ -231,7 +231,7 @@ def test_ui_run_rejects_a_non_object_fixture_file(monkeypatch, tmp_path):
 
 
 def test_ui_run_uses_defaults_without_journey_fixture_or_output(monkeypatch, tmp_path):
-    from src.client.ui.testing import surface
+    from src.simulation.ui_testing import surface
 
     root = tmp_path / "project"
     root.mkdir()

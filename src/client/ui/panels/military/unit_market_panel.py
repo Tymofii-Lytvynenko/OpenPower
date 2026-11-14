@@ -2,28 +2,27 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from modules.base.systems.military.capability_catalog import (
-    CAPABILITY_BOUNDS,
-    CAPABILITY_METADATA,
-    canonical_role,
-)
+from src.client.services.client_presentation import contribution_for
+from src.client.ui.components.shared.gml_value_repeat import GMLValueRepeatPair
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.formatting import format_currency
 from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.theme import GAMETHEME
-from src.client.ui.components.shared.gml_value_repeat import GMLValueRepeatPair
 from src.client.ui.layouts.gml_layout import active_gml_layout
 from src.client.ui.panels.military.presenter import MilitaryPresenter
-from src.client.ui.panels.military.unit_design_widgets import DESIGN_METRICS, saved_capabilities
+from src.client.ui.panels.military.unit_design_widgets import (
+    DESIGN_METRICS,
+    saved_capabilities,
+)
 from src.client.ui.panels.military.unit_type_options import (
     UnitTypeOption,
     unit_type_options_for_roles,
 )
 from src.client.ui.panels.shared.panel_widgets import draw_empty_state
 from src.shared.actions import ActionBuyMarketUnit
-
+from src.shared.mod_api import ClientPresentationKeys
 
 _ROOT = "Unit_Buy_Used_Window"
 _LIST_SLOT = "frmBorder/frmInner/frmDesignList"
@@ -60,11 +59,12 @@ class UnitMarketPanel:
         listings = self._presenter.market_listings_for_country(state, country_tag)
         designs = self._designs_by_id(state)
         role_by_listing = {
-            str(row.get("id") or ""): self._listing_role(row, designs)
+            str(row.get("id") or ""): self._listing_role(row, designs, state)
             for row in listings
         }
         role_options = unit_type_options_for_roles(
-            role for role in role_by_listing.values() if role
+            (role for role in role_by_listing.values() if role),
+            state,
         )
         roles = [option.role for option in role_options]
         if self._selected_role not in roles:
@@ -93,7 +93,7 @@ class UnitMarketPanel:
             ]
             selected = self._render_listing_list(ui, visible_listings)
             self._render_selection(ui, selected, designs, context)
-            self._render_capabilities(ui, selected, designs)
+            self._render_capabilities(ui, selected, designs, state)
             return True
 
     @staticmethod
@@ -104,7 +104,8 @@ class UnitMarketPanel:
         return {str(row.get("id") or ""): row for row in table.to_dicts()}
 
     @staticmethod
-    def _listing_role(listing: dict, designs: dict[str, dict]) -> str:
+    def _listing_role(listing: dict, designs: dict[str, dict], state) -> str:
+        canonical_role = contribution_for(state, ClientPresentationKeys.CANONICAL_ROLE)
         design = designs.get(str(listing.get("design_id") or ""), {})
         role = design.get("class_name") or listing.get("unit_type")
         return canonical_role(role) if role else ""
@@ -601,6 +602,7 @@ class UnitMarketPanel:
         ui: GMLWidgets,
         listing: dict | None,
         designs: dict[str, dict],
+        state,
     ) -> None:
         design = designs.get(str((listing or {}).get("design_id") or ""), {})
         values = self._saved_capabilities(design)
@@ -629,7 +631,9 @@ class UnitMarketPanel:
                 label_slot = f"{_CAPABILITIES_ROOT}/lbl{component}"
                 meter_slot = f"{_CAPABILITIES_ROOT}/frm{component}"
                 self._draw_scrolled_text(session, label_slot, label, f"unit_market.capability.{key}.label")
-                self._draw_scrolled_capability(session, meter_slot, key, values.get(key))
+                self._draw_scrolled_capability(
+                    session, meter_slot, key, values.get(key), state,
+                )
         imgui.end_child()
 
     _saved_capabilities = staticmethod(saved_capabilities)
@@ -647,7 +651,9 @@ class UnitMarketPanel:
         imgui.text_disabled(value, test_id=test_id)
 
     @staticmethod
-    def _draw_scrolled_capability(session, slot: str, key: str, value: float | None) -> None:
+    def _draw_scrolled_capability(
+        session, slot: str, key: str, value: float | None, state,
+    ) -> None:
         component = session.layout.component(slot)
         if component is None:
             return
@@ -672,11 +678,13 @@ class UnitMarketPanel:
                 imgui.set_tooltip(reason)
             return
 
-        minimum, maximum = CAPABILITY_BOUNDS.get(key, (0.0, 0.0))
+        capability_bounds = contribution_for(state, ClientPresentationKeys.CAPABILITY_BOUNDS)
+        capability_metadata = contribution_for(state, ClientPresentationKeys.CAPABILITY_METADATA)
+        minimum, maximum = capability_bounds.get(key, (0.0, 0.0))
         fraction = 0.0 if maximum <= minimum else (value - minimum) / (maximum - minimum)
         fraction = min(1.0, max(0.0, fraction))
         display = f"{value:g}"
-        unit = CAPABILITY_METADATA.get(key, {}).get("unit")
+        unit = capability_metadata.get(key, {}).get("unit")
         imgui.progress_bar(
             fraction,
             (rect.width, rect.height),

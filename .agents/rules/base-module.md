@@ -24,12 +24,13 @@ Code here represents **Policy**. It uses the **Mechanisms** provided by `src/cor
 
 ## 🔗 Relationships
 * **Imports from:**
-    * `src/shared`: To use Actions, Events, and define data schemas.
+    * `src/shared`: To use Actions, Events, `ISystem`, `SystemAccess`, `ModContribution`, and define data schemas.
     * `src/core`: To use Standard Simulation Tools (Timers, Math) and Utils.
-    * `src/engine` (Interfaces only): To implement `ISystem`.
+    * Its own package and other modules only when the dependency is declared in this module's `mod.toml`.
 * **Used by:**
     * `src/engine`: The Engine dynamically loads these modules within the background process.
 * **NEVER imports:**
-    * `src/engine` (Internals): Do not touch the loop logic.
-    * `src/server`: Do not manually save files or touch the session.
-    * `src/client`: Do not implement UI logic in the simulation.
+    * Any `src/engine` module: public system contracts live in `src/shared`; do not touch engine internals.
+    * `src/server`, `src/client`, `src/simulation`, or `src/modding`.
+
+Cross-module imports must have a direct manifest dependency; transitive dependencies are not sufficient. Module dependency cycles are rejected.

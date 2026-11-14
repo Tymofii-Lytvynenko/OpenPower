@@ -36,6 +36,7 @@ def test_session_rejects_state_that_failed_tactical_migration(monkeypatch, tmp_p
 def test_session_reports_world_schema_issues(monkeypatch, tmp_path):
     issue = SimpleNamespace(table="countries", code="missing-id")
     registry = SimpleNamespace(
+        get=lambda _table: None,
         capture_state=lambda _state: None,
         ensure_state=lambda _state: None,
         validate_state=lambda _state: [issue],

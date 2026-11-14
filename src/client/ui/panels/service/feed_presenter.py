@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import polars as pl
+
 from src.client.ui.panels.service.mail_inbox_state import MailInboxState
 
 
@@ -75,7 +77,7 @@ class FeedPresenter:
             return None
 
         tables = getattr(state, "tables", {})
-        regions = tables.get("regions") if isinstance(tables, dict) else None
+        regions = tables.get("regions") if isinstance(tables, Mapping) else None
         if regions is None or "id" not in regions.columns:
             return None
 
@@ -84,7 +86,7 @@ class FeedPresenter:
             return explicit_region_id
 
         country_tag = str(news_item.get("related_country_id") or "").strip()
-        governments = tables.get("country_governments") if isinstance(tables, dict) else None
+        governments = tables.get("country_governments") if isinstance(tables, Mapping) else None
         if not country_tag or governments is None or not {
             "country_id", "capital_region_id"
         }.issubset(governments.columns):

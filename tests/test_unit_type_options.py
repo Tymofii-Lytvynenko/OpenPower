@@ -8,6 +8,7 @@ from src.client.ui.panels.military.unit_type_options import (
     source_unit_type_label,
     unit_type_options_for_roles,
 )
+from tests.test_support.client_presentation import client_state
 
 
 class UnitTypeOptionsTests(unittest.TestCase):
@@ -25,14 +26,14 @@ class UnitTypeOptionsTests(unittest.TestCase):
 
     def test_openpower_extension_follows_native_types_without_reference_id(self) -> None:
         roles = [option.role for option in DESIGN_UNIT_TYPE_OPTIONS]
-        options = unit_type_options_for_roles(roles)
+        options = unit_type_options_for_roles(roles, client_state())
 
         self.assertEqual([option.role for option in options], roles)
         self.assertEqual(options[-1].label, "Missile Defense (OpenPower)")
         self.assertIsNone(options[-1].source_string_id)
 
     def test_aliases_resolve_to_source_labels_and_order(self) -> None:
-        options = unit_type_options_for_roles(["Tank", "Fighter Aircraft"])
+        options = unit_type_options_for_roles(["Tank", "Fighter Aircraft"], client_state())
 
         self.assertEqual([option.role for option in options], ["tanks", "fighters"])
         self.assertEqual(
@@ -41,16 +42,17 @@ class UnitTypeOptionsTests(unittest.TestCase):
         )
 
     def test_unknown_openpower_roles_are_retained(self) -> None:
-        options = unit_type_options_for_roles(["custom_ground_unit", "tanks"])
+        options = unit_type_options_for_roles(["custom_ground_unit", "tanks"], client_state())
 
         self.assertEqual([option.role for option in options], ["tanks", "custom_ground_unit"])
         self.assertEqual(options[-1].label, "Custom Ground Unit")
         self.assertIsNone(options[-1].source_string_id)
 
     def test_rows_use_source_labels_for_known_types_and_keep_openpower_labels(self) -> None:
-        self.assertEqual(source_unit_type_label("Fighter"), "Fighter Aircraft")
-        self.assertEqual(source_unit_type_label("Tanks"), "Tank")
-        self.assertEqual(source_unit_type_label("Estimated forces"), "Estimated forces")
+        state = client_state()
+        self.assertEqual(source_unit_type_label("Fighter", state), "Fighter Aircraft")
+        self.assertEqual(source_unit_type_label("Tanks", state), "Tank")
+        self.assertEqual(source_unit_type_label("Estimated forces", state), "Estimated forces")
 
 
 if __name__ == "__main__":

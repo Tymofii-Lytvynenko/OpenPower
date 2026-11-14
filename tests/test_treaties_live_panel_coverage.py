@@ -5,8 +5,14 @@ from unittest.mock import MagicMock, Mock
 import pytest
 
 from src.client.ui.panels.politics import treaties_live
-from src.client.ui.panels.politics.treaties_live import LiveTreatiesPanel, _format_ratio_condition, _selectable_table_entry
+from src.client.ui.panels.politics.treaties_live import (
+    LiveTreatiesPanel,
+    _format_ratio_condition,
+    _selectable_table_entry,
+)
 from src.shared.actions import ActionRespondTreaty
+from src.shared.mod_api import ClientPresentationKeys
+from tests.test_support.client_presentation import client_state, presentation_values
 
 
 class Table:
@@ -48,6 +54,13 @@ class Imgui:
 
     def text_wrapped(self, value, *, test_id):
         self.wrapped.append((value, test_id))
+
+
+def _panel(**kwargs):
+    instance = LiveTreatiesPanel(**kwargs)
+    factory = presentation_values()[ClientPresentationKeys.TREATY_ELIGIBILITY_QUERY_SERVICE_FACTORY]
+    instance._diplomacy = factory()
+    return instance
 
 
 class Ui:
@@ -163,8 +176,8 @@ def test_treaty_lookup_and_effect_lookup_handle_missing_tables_and_filter_ids():
 
 
 def test_external_selection_opens_active_or_pending_treaty_and_ignores_unknown_id():
-    panel = LiveTreatiesPanel()
-    state = SimpleNamespace(
+    panel = _panel()
+    state = client_state(
         tables={
             "countries_treaties": Table([{"id": "active"}]),
             "pending_treaties": Table([{"id": "proposal"}]),
@@ -226,7 +239,7 @@ def test_conditions_render_saved_values_as_read_only_source_options():
 
 
 def test_proposal_response_actions_send_accept_and_reject_only_for_required_country(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     client = Client()
     ui = Ui(clicked={"treaties.details.accept", "treaties.details.reject"})
     context = SimpleNamespace(target_tag=" usa ", is_own_country=True, net_client=client)
@@ -275,14 +288,14 @@ def test_pressure_fallback_preserves_slots_without_reporting_pressure(monkeypatc
 
 def participant_state(*, results=(), treaty=None):
     rows = [] if treaty is None else [treaty]
-    return SimpleNamespace(
+    return client_state(
         tables={"countries_treaties": Table(rows)},
         journal=SimpleNamespace(command_results=list(results)),
     )
 
 
 def test_participant_result_cursor_ignores_unrelated_result_and_marks_rejected_members(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     dialog = ParticipantDialog()
     panel._participant_dialog = dialog
     panel._editing_treaty_id = "T1"
@@ -317,7 +330,7 @@ def test_participant_result_cursor_ignores_unrelated_result_and_marks_rejected_m
 
 @pytest.mark.parametrize("status", ["accepted", "applied", "succeeded"])
 def test_participant_result_acceptance_resolves_pending_dialog(status):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     dialog = ParticipantDialog()
     panel._participant_dialog = dialog
     panel._editing_treaty_id = "T1"
@@ -338,7 +351,7 @@ def test_participant_result_acceptance_resolves_pending_dialog(status):
 
 
 def test_participant_snapshot_match_resolves_without_command_result():
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     dialog = ParticipantDialog()
     panel._participant_dialog = dialog
     panel._editing_treaty_id = "T1"
@@ -354,7 +367,7 @@ def test_participant_snapshot_match_resolves_without_command_result():
 
 
 def test_detail_lifecycle_notifies_once_and_acknowledges_only_current_treaty():
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._show_details = True
     panel._selected_treaty_id = "missing"
     panel._editing_treaty_id = "T-old"
@@ -362,7 +375,7 @@ def test_detail_lifecycle_notifies_once_and_acknowledges_only_current_treaty():
     notices = []
     context = SimpleNamespace(on_notice=lambda *args, **kwargs: notices.append((args, kwargs)))
 
-    panel._update_detail_lifecycle(SimpleNamespace(tables={}, journal=SimpleNamespace(domain_events=[])), context)
+    panel._update_detail_lifecycle(client_state(tables={}, journal=SimpleNamespace(domain_events=[])), context)
 
     assert panel._participant_dialog.dismissed == 1
     assert panel._editing_treaty_id == ""
@@ -376,7 +389,7 @@ def test_detail_lifecycle_notifies_once_and_acknowledges_only_current_treaty():
 
 
 def test_render_closes_list_and_dismisses_participant_dialog_when_window_is_closed(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     dialog = SimpleNamespace(is_open=False, dismiss=Mock(), render=Mock(return_value=None))
     panel._participant_dialog = dialog
     panel._resolve_participant_update = Mock()
@@ -390,7 +403,7 @@ def test_render_closes_list_and_dismisses_participant_dialog_when_window_is_clos
     monkeypatch.setattr(treaties_live.WindowManager, "window", closed_window)
     context = SimpleNamespace(target_tag="USA", net_client=None, is_own_country=True)
 
-    assert panel.render(SimpleNamespace(tables={}), context) is False
+    assert panel.render(client_state(tables={}), context) is False
 
     dialog.dismiss.assert_called_once()
     dialog.render.assert_not_called()
@@ -399,7 +412,7 @@ def test_render_closes_list_and_dismisses_participant_dialog_when_window_is_clos
 
 
 def test_render_resolves_requested_treaty_and_sends_participant_changes(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel.request_treaty("T1")
     panel._editing_treaty_id = "T1"
     panel._resolve_participant_update = Mock()
@@ -415,7 +428,7 @@ def test_render_resolves_requested_treaty_and_sends_participant_changes(monkeypa
     panel._participant_dialog = dialog
     client = Client()
     context = SimpleNamespace(target_tag="USA", net_client=client, is_own_country=True)
-    state = SimpleNamespace(
+    state = client_state(
         tables={
             "countries_treaties": Table([{"id": "T1", "members": ["USA", "CAN"]}]),
             "pending_treaties": Table([]),
@@ -438,7 +451,7 @@ def test_render_resolves_requested_treaty_and_sends_participant_changes(monkeypa
 
 
 def test_content_renders_filters_sections_and_new_treaty_controls(monkeypatch):
-    panel = LiveTreatiesPanel(open_editor_cb=Mock())
+    panel = _panel(open_editor_cb=Mock())
     panel._selected_treaty_id = "T1"
     panel._filter_member_tag = "OLD"
     panel._filter_type_key = "old_type"
@@ -457,7 +470,8 @@ def test_content_renders_filters_sections_and_new_treaty_controls(monkeypatch):
         [("USA", "United States")], [("alliance", "Alliance")],
     ))
     monkeypatch.setattr(treaties_live, "_matches_treaty_filter", lambda *_args: True)
-    monkeypatch.setattr(treaties_live, "country_diplomacy_restriction", lambda *_args: None)
+    values = presentation_values()
+    values[ClientPresentationKeys.COUNTRY_DIPLOMACY_RESTRICTION] = lambda *_args: None
 
     @contextmanager
     def opened_child(*_args, **_kwargs):
@@ -469,7 +483,10 @@ def test_content_renders_filters_sections_and_new_treaty_controls(monkeypatch):
     fake_imgui.begin_tab_bar.return_value = True
     fake_imgui.begin_tab_item.side_effect = [(True, None), (True, None)]
     monkeypatch.setattr(treaties_live, "imgui", fake_imgui)
-    state = SimpleNamespace(tables={"countries_treaties": Table([]), "pending_treaties": Table([])})
+    state = client_state(
+        client_presentation=values,
+        tables={"countries_treaties": Table([]), "pending_treaties": Table([])},
+    )
     context = SimpleNamespace(target_tag="usa", is_own_country=True, on_notice=None)
 
     panel._render_content(state, context)
@@ -487,7 +504,7 @@ def test_content_renders_filters_sections_and_new_treaty_controls(monkeypatch):
 
 
 def test_active_and_pending_tables_select_rows_and_show_response_counts(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     ui = MagicMock()
     ui.TableFlags_.borders_inner = 1
     ui.TableFlags_.row_bg = 2
@@ -529,7 +546,7 @@ def test_active_and_pending_tables_select_rows_and_show_response_counts(monkeypa
 
 
 def test_active_treaty_actions_dispatch_leave_and_join_commands(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._selected_treaty_id = "T1"
     ui = MagicMock()
     ui.button.side_effect = [True, True]
@@ -553,7 +570,7 @@ def test_active_treaty_actions_dispatch_leave_and_join_commands(monkeypatch):
 
 
 def test_details_window_renders_active_treaty_and_closes_on_request(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._show_details = True
     panel._details_needs_focus = True
     panel._selected_treaty_id = "T1"
@@ -614,7 +631,7 @@ def test_details_window_renders_active_treaty_and_closes_on_request(monkeypatch)
 
 
 def test_details_window_skips_missing_row_when_lifecycle_is_not_initialized():
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._show_details = True
     panel._detail_lifecycle = None
 
@@ -624,7 +641,7 @@ def test_details_window_skips_missing_row_when_lifecycle_is_not_initialized():
 
 
 def test_details_member_list_handles_populated_empty_and_closed_slots(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._flags.draw_flag = Mock()
     ui = Ui()
     fake_imgui = MagicMock()
@@ -654,7 +671,7 @@ def test_details_member_list_handles_populated_empty_and_closed_slots(monkeypatc
 
 
 def test_participant_editor_preserves_two_sides_and_protects_sponsor():
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     dialog = Mock()
     panel._participant_dialog = dialog
     panel._diplomacy.ineligible_treaty_members = Mock(return_value={"MEX"})
@@ -683,7 +700,7 @@ def test_participant_editor_preserves_two_sides_and_protects_sponsor():
 
 
 def test_participant_editor_places_one_sided_members_on_side_a():
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._participant_dialog = Mock()
     panel._diplomacy.ineligible_treaty_members = Mock(return_value=set())
 
@@ -710,7 +727,7 @@ def test_participant_editor_places_one_sided_members_on_side_a():
 
 
 def test_eligibility_list_renders_sorted_rows_and_removes_ineligible_members(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     ui = Ui(clicked={"treaties.details.remove_ineligible"})
     row_ui = MagicMock()
     notices = []
@@ -766,7 +783,7 @@ def test_eligibility_list_renders_sorted_rows_and_removes_ineligible_members(mon
 
 
 def test_eligibility_list_handles_no_rows_and_disables_read_only_removal(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     ui = Ui(clicked={"treaties.details.remove_ineligible"})
     panel._diplomacy.eligible_treaty_countries = Mock(return_value=set())
     panel._diplomacy.ineligible_treaty_members = Mock(return_value={"USA"})
@@ -795,7 +812,7 @@ def test_eligibility_list_handles_no_rows_and_disables_read_only_removal(monkeyp
 
 
 def test_recognition_panel_shows_empty_state_when_there_are_no_cases(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._recognition_presenter.cases_for_country = Mock(return_value=[])
     empty_state = Mock()
     monkeypatch.setattr(treaties_live, "draw_empty_state", empty_state)
@@ -811,7 +828,7 @@ def test_recognition_panel_shows_empty_state_when_there_are_no_cases(monkeypatch
 
 
 def test_recognition_panel_dispatches_votes_and_renders_case_status(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     cases = [
         {
             "id": "C1", "region_id": "R1", "claimant_id": "USA", "former_owner_id": "CAN",
@@ -856,7 +873,7 @@ def test_recognition_panel_dispatches_votes_and_renders_case_status(monkeypatch)
 
 
 def test_render_handles_missing_requested_treaty_and_list_branch(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel.request_treaty("missing")
     panel._resolve_participant_update = Mock()
     panel._update_detail_lifecycle = Mock()
@@ -894,7 +911,7 @@ def test_render_handles_missing_requested_treaty_and_list_branch(monkeypatch):
 
 
 def test_participant_update_and_detail_lifecycle_skip_missing_or_hidden_records():
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._editing_treaty_id = "missing"
     panel._pending_participant_sides = (frozenset({"USA"}), frozenset({"CAN"}))
     state = participant_state()
@@ -909,13 +926,17 @@ def test_participant_update_and_detail_lifecycle_skip_missing_or_hidden_records(
 
 
 def test_content_returns_for_missing_tables_and_notifies_when_creation_is_restricted(monkeypatch):
-    panel = LiveTreatiesPanel(open_editor_cb=Mock())
+    panel = _panel(open_editor_cb=Mock())
     context = SimpleNamespace(
         target_tag="USA",
         is_own_country=True,
         on_notice=Mock(),
     )
-    state = SimpleNamespace(tables={})
+    values = presentation_values()
+    values[ClientPresentationKeys.COUNTRY_DIPLOMACY_RESTRICTION] = (
+        lambda *_args: "This country cannot initiate treaties."
+    )
+    state = client_state(client_presentation=values, tables={})
     monkeypatch.setattr(treaties_live, "draw_required_tables", lambda *_args: False)
     panel._render_content(state, context)
 
@@ -930,11 +951,6 @@ def test_content_returns_for_missing_tables_and_notifies_when_creation_is_restri
     monkeypatch.setattr(treaties_live, "GMLWidgets", lambda _root: ui)
     monkeypatch.setattr(treaties_live, "_treaty_filter_options", lambda *_args: ([], []))
     monkeypatch.setattr(treaties_live, "_matches_treaty_filter", lambda *_args: True)
-    monkeypatch.setattr(
-        treaties_live,
-        "country_diplomacy_restriction",
-        lambda *_args: "This country cannot initiate treaties.",
-    )
     fake_imgui = MagicMock()
     fake_imgui.combo.side_effect = [(False, 0), (False, 0)]
     fake_imgui.begin_tab_bar.return_value = True
@@ -955,7 +971,7 @@ def test_content_returns_for_missing_tables_and_notifies_when_creation_is_restri
 
 
 def test_action_and_details_methods_return_for_nonlocal_or_hidden_views(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._render_actions(
         SimpleNamespace(),
         SimpleNamespace(net_client=None, is_own_country=True),
@@ -992,7 +1008,7 @@ def _install_details_window(monkeypatch, *, opened, tables_available=True, ui=No
 
 
 def test_details_window_closes_or_skips_when_window_or_tables_are_unavailable(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._show_details = True
     panel._detail_lifecycle = SimpleNamespace(message="", last_row={})
     state = SimpleNamespace(tables={})
@@ -1009,7 +1025,7 @@ def test_details_window_closes_or_skips_when_window_or_tables_are_unavailable(mo
 
 
 def test_details_window_renders_lifecycle_fallback_proposal_and_edit_paths(monkeypatch):
-    panel = LiveTreatiesPanel()
+    panel = _panel()
     panel._render_conditions = Mock()
     panel._render_details_member_list = Mock()
     panel._render_eligibility_list = Mock()

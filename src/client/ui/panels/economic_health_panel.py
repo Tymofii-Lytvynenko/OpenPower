@@ -1,4 +1,5 @@
 import math
+from collections.abc import Mapping
 
 import polars as pl
 
@@ -418,10 +419,10 @@ class EconomicHealthPanel:
 
     @staticmethod
     def _gradient_color(position: float, stops) -> tuple[float, float, float, float]:
-        for (left_pos, left), (right_pos, right) in zip(stops, stops[1:]):
+        for (left_pos, left), (right_pos, right) in zip(stops, stops[1:], strict=False):
             if position <= right_pos:
                 fraction = (position - left_pos) / max(1e-9, right_pos - left_pos)
-                return tuple(a + (b - a) * fraction for a, b in zip(left, right))
+                return tuple(a + (b - a) * fraction for a, b in zip(left, right, strict=True))
         return stops[-1][1]
 
     def _initialize_policy_draft(self, country_row, view, country_tag: str) -> None:
@@ -439,7 +440,7 @@ class EconomicHealthPanel:
 
     def _policy_rate_bounds(self, state, value_name: str) -> tuple[float, float]:
         terms = getattr(state, "globals", {}).get("economic_health_terms", {})
-        terms = terms if isinstance(terms, dict) else {}
+        terms = terms if isinstance(terms, Mapping) else {}
         try:
             lower = float(terms.get(f"min_{value_name}", 0.0))
             upper = float(terms.get(f"max_{value_name}", 0.5))
@@ -606,7 +607,7 @@ class EconomicHealthPanel:
     def _render_policy_controls(self, state, context: PanelRenderContext, view, country_row) -> None:
         client = context.net_client
         terms = getattr(state, "globals", {}).get("economic_health_terms", {})
-        terms = terms if isinstance(terms, dict) else {}
+        terms = terms if isinstance(terms, Mapping) else {}
         self._initialize_policy_draft(country_row, view, context.target_tag)
         imgui.dummy((0, 8))
         Prims.header("SCHEDULE ECONOMIC POLICY", show_bg=False)

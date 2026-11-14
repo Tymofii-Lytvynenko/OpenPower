@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Iterable
 
 import polars as pl
 
-from src.shared.geo_names import DEFAULT_GEO_LANGUAGE_CODE, get_geo_name_resolver, normalize_geo_language_code
+from src.shared.geo_names import (
+    DEFAULT_GEO_LANGUAGE_CODE,
+    get_geo_name_resolver,
+    normalize_geo_language_code,
+)
+
 
 def safe_float(value: Any, default: float = 0.0) -> float:
     if value is None:
@@ -32,8 +38,17 @@ def safe_text(value: Any, default: str = "") -> str:
 
 
 def _geo_language_code(state) -> str:
+    presentation_state = getattr(state, "presentation_state", None)
+    if presentation_state is not None:
+        return normalize_geo_language_code(
+            safe_text(
+                getattr(presentation_state, "geo_language_code", None),
+                DEFAULT_GEO_LANGUAGE_CODE,
+            )
+        )
+
     state_globals = getattr(state, "globals", None)
-    if isinstance(state_globals, dict):
+    if isinstance(state_globals, Mapping):
         return normalize_geo_language_code(
             safe_text(state_globals.get("geo_language_code"), DEFAULT_GEO_LANGUAGE_CODE)
         )

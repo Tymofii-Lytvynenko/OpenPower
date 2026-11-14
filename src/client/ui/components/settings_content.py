@@ -3,12 +3,13 @@ from __future__ import annotations
 from dataclasses import replace
 
 from imgui_bundle import icons_fontawesome_6
-from src.core.saves import validate_save_name
+
 from src.client.services.display_modes import choose_best_mode, clamp_index
 from src.client.services.game_settings_service import GameSettings, GameSettingsService
 from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.primitives import UIPrimitives as Prims
 from src.client.ui.core.theme import GAMETHEME
+from src.core.saves import validate_save_name
 
 
 class GameSettingsContent:
@@ -253,10 +254,8 @@ class GameSettingsContent:
 
     def _sync_geo_language_runtime(self) -> None:
         session = getattr(self._window, "session", None)
-        state = getattr(session, "state", None)
-        if state is None:
-            return
-
-        globals_dict = getattr(state, "globals", None)
-        if isinstance(globals_dict, dict):
-            globals_dict["geo_language_code"] = self._settings_service.settings.geo_language_code
+        presentation_state = getattr(session, "presentation_state", None)
+        if presentation_state is not None:
+            presentation_state.geo_language_code = (
+                self._settings_service.settings.geo_language_code
+            )

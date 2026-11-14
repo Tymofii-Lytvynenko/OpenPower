@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 import src.client.ui.panels.military.unit_market_panel as market_module
 from src.client.ui.panels.military.unit_market_panel import UnitMarketPanel
+from tests.test_support.client_presentation import client_state
 
 
 def _rect(x=10.0, y=20.0, width=80.0, height=16.0):
@@ -49,7 +50,7 @@ def test_render_centers_window_filters_roles_and_returns_closed_state(monkeypatc
     panel = UnitMarketPanel()
     panel._presenter.market_listings_for_country = Mock(return_value=[])
     panel._designs_by_id = Mock(return_value={})
-    assert panel.render(SimpleNamespace(), SimpleNamespace(target_tag=" usa ")) is False
+    assert panel.render(client_state(), SimpleNamespace(target_tag=" usa ")) is False
     assert window_calls[0][1]["x"] == 0.0
     assert window_calls[0][1]["y"] == 0.0
     gml_widgets.assert_not_called()
@@ -62,7 +63,7 @@ def test_render_centers_window_filters_roles_and_returns_closed_state(monkeypatc
         {"id": "C", "unit_type": ""},
     ]
     panel._presenter.market_listings_for_country.return_value = listings
-    panel._listing_role = Mock(side_effect=lambda row, _designs: {
+    panel._listing_role = Mock(side_effect=lambda row, _designs, _state: {
         "A": "infantry", "B": "armor", "C": "",
     }[row["id"]])
     options = [
@@ -71,7 +72,7 @@ def test_render_centers_window_filters_roles_and_returns_closed_state(monkeypatc
     ]
     roles_seen = []
 
-    def options_for(roles):
+    def options_for(roles, _state):
         roles_seen.extend(roles)
         return options
 
@@ -82,7 +83,7 @@ def test_render_centers_window_filters_roles_and_returns_closed_state(monkeypatc
     panel._render_listing_list = Mock(return_value=listings[0])
     panel._render_selection = Mock()
     panel._render_capabilities = Mock()
-    state = SimpleNamespace()
+    state = client_state()
     context = SimpleNamespace(target_tag=" usa ")
 
     assert panel.render(state, context) is True
@@ -96,7 +97,7 @@ def test_render_centers_window_filters_roles_and_returns_closed_state(monkeypatc
     assert panel._selected_role == "infantry"
     panel._render_listing_list.assert_called_once_with(ui, [listings[0]])
     panel._render_selection.assert_called_once_with(ui, listings[0], {}, context)
-    panel._render_capabilities.assert_called_once_with(ui, listings[0], {})
+    panel._render_capabilities.assert_called_once_with(ui, listings[0], {}, state)
 
 
 def test_source_frames_and_type_selector_reset_changed_selection(monkeypatch):
@@ -234,7 +235,7 @@ def test_render_capabilities_handles_missing_layout_rect_and_closed_child(monkey
     panel._saved_capabilities = Mock(return_value={})
     ui = Mock()
     monkeypatch.setattr(market_module, "active_gml_layout", lambda: None)
-    panel._render_capabilities(ui, None, {})
+    panel._render_capabilities(ui, None, {}, client_state())
 
     session = SimpleNamespace(
         layout=SimpleNamespace(component=Mock(return_value=None)),
@@ -242,7 +243,7 @@ def test_render_capabilities_handles_missing_layout_rect_and_closed_child(monkey
         resize_component=Mock(),
     )
     monkeypatch.setattr(market_module, "active_gml_layout", lambda: session)
-    panel._render_capabilities(ui, {"design_id": "D"}, {"D": {"design": "saved"}})
+    panel._render_capabilities(ui, {"design_id": "D"}, {"D": {"design": "saved"}}, client_state())
     session.layout.component.assert_called_once_with(
         "Unit_Buy_Used_Window/frmDesignView/frmUnitSpecs/frmList",
     )
@@ -252,7 +253,7 @@ def test_render_capabilities_handles_missing_layout_rect_and_closed_child(monkey
     session.layout.component.return_value = object()
     session.rect_for.return_value = rect
     imgui.begin_child.return_value = False
-    panel._render_capabilities(ui, None, {})
+    panel._render_capabilities(ui, None, {}, client_state())
 
     session.resize_component.assert_called_once_with(
         "Unit_Buy_Used_Window/frmDesignView/frmUnitSpecs/frmList", width=134.0,
@@ -289,7 +290,8 @@ def test_render_capabilities_draws_each_source_metric_when_child_is_open(monkeyp
     ui = Mock()
     design = {"id": "D"}
 
-    panel._render_capabilities(ui, {"design_id": "D"}, {"D": design})
+    state = client_state()
+    panel._render_capabilities(ui, {"design_id": "D"}, {"D": design}, state)
 
     panel._saved_capabilities.assert_called_once_with(design)
     assert panel._draw_scrolled_text.call_args_list == [
@@ -297,6 +299,6 @@ def test_render_capabilities_draws_each_source_metric_when_child_is_open(monkeyp
         ((session, "Unit_Buy_Used_Window/frmDesignView/frmUnitSpecs/frmList/frmInner/lblSpeed", "Speed", "unit_market.capability.speed.label"), {}),
     ]
     assert panel._draw_scrolled_capability.call_args_list == [
-        ((session, "Unit_Buy_Used_Window/frmDesignView/frmUnitSpecs/frmList/frmInner/frmArmor", "armor", 4.0), {}),
-        ((session, "Unit_Buy_Used_Window/frmDesignView/frmUnitSpecs/frmList/frmInner/frmSpeed", "speed", None), {}),
+        ((session, "Unit_Buy_Used_Window/frmDesignView/frmUnitSpecs/frmList/frmInner/frmArmor", "armor", 4.0, state), {}),
+        ((session, "Unit_Buy_Used_Window/frmDesignView/frmUnitSpecs/frmList/frmInner/frmSpeed", "speed", None, state), {}),
     ]

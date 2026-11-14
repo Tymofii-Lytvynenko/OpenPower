@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-from modules.base.systems.military.capability_catalog import canonical_role
+from src.client.services.client_presentation import contribution_for
+from src.shared.mod_api import ClientPresentationKeys
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,8 +48,12 @@ DESIGN_UNIT_TYPE_OPTIONS = REFERENCE_UNIT_TYPE_OPTIONS + OPENPOWER_UNIT_TYPE_EXT
 _OPTION_BY_ROLE = {option.role: option for option in DESIGN_UNIT_TYPE_OPTIONS}
 
 
-def unit_type_options_for_roles(roles: Iterable[object]) -> tuple[UnitTypeOption, ...]:
+def unit_type_options_for_roles(
+    roles: Iterable[object],
+    state,
+) -> tuple[UnitTypeOption, ...]:
     """Return available roles in REFERENCE order, followed by OpenPower extensions."""
+    canonical_role = contribution_for(state, ClientPresentationKeys.CANONICAL_ROLE)
     available = {canonical_role(role) for role in roles}
     available.discard("")
 
@@ -60,7 +65,8 @@ def unit_type_options_for_roles(roles: Iterable[object]) -> tuple[UnitTypeOption
     return tuple(options)
 
 
-def source_unit_type_label(role: object) -> str:
+def source_unit_type_label(role: object, state) -> str:
     """Use the REFERENCE catalog label for mapped roles and preserve other OpenPower names."""
+    canonical_role = contribution_for(state, ClientPresentationKeys.CANONICAL_ROLE)
     option = _OPTION_BY_ROLE.get(canonical_role(role))
     return option.label if option is not None else str(role or "")

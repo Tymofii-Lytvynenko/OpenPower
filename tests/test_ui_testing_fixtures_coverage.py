@@ -6,7 +6,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-import src.client.ui.testing.fixtures as ui_fixtures
+import src.simulation.ui_testing.fixtures as ui_fixtures
 from src.shared.state import GameState
 
 

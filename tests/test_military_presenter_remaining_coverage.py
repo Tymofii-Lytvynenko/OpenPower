@@ -4,14 +4,11 @@ import polars as pl
 import pytest
 
 from src.client.ui.panels.military.presenter import MilitaryPresenter
+from tests.test_support.client_presentation import client_state
 
 
 def _state(tables=None, globals_=None):
-    return SimpleNamespace(
-        tables=tables or {},
-        globals=globals_ or {},
-        table_revisions={},
-    )
+    return client_state(tables=tables or {}, globals=globals_ or {}, table_revisions={})
 
 
 def test_strategic_orders_redact_undetected_details_and_filter_impacts():

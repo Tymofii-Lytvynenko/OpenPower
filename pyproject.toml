@@ -41,8 +41,10 @@ dependencies = [
 dev = [
     "pyinstrument",
     "hypothesis>=6.168.5,<7",
+    "import-linter>=2.15,<3",
     "pytest>=8.3",
     "pytest-cov>=6.0",
+    "ruff>=0.14,<1",
 ]
 
 [project.scripts]
@@ -63,14 +65,157 @@ namespaces = true
 [tool.pyright]
 extraPaths = ["."]
 
+[tool.importlinter]
+root_packages = ["src", "modules"]
+exclude_type_checking_imports = false
+
+[[tool.importlinter.contracts]]
+name = "Shared is the lowest internal layer"
+id = "shared-is-leaf"
+type = "forbidden"
+source_modules = ["src.shared"]
+forbidden_modules = [
+    "src.core",
+    "src.engine",
+    "src.server",
+    "src.client",
+    "src.simulation",
+    "src.modding",
+    "modules",
+]
+
+[[tool.importlinter.contracts]]
+name = "Core depends only on shared contracts"
+id = "core-isolation"
+type = "forbidden"
+source_modules = ["src.core"]
+forbidden_modules = [
+    "src.engine",
+    "src.server",
+    "src.client",
+    "src.simulation",
+    "src.modding",
+    "modules",
+]
+
+[[tool.importlinter.contracts]]
+name = "Engine is host and content agnostic"
+id = "engine-isolation"
+type = "forbidden"
+source_modules = ["src.engine"]
+forbidden_modules = [
+    "src.server",
+    "src.client",
+    "src.simulation",
+    "src.modding",
+    "modules",
+]
+
+[[tool.importlinter.contracts]]
+name = "Server has no client, tool, or mod implementation dependencies"
+id = "server-isolation"
+type = "forbidden"
+source_modules = ["src.server"]
+forbidden_modules = [
+    "src.client",
+    "src.simulation",
+    "src.modding",
+    "modules",
+]
+
+[[tool.importlinter.contracts]]
+name = "Client is limited to shared and core contracts"
+id = "client-isolation"
+type = "forbidden"
+source_modules = ["src.client"]
+forbidden_modules = [
+    "src.engine",
+    "src.server",
+    "src.simulation",
+    "src.modding",
+    "modules",
+]
+
+[[tool.importlinter.contracts]]
+name = "Gameplay modules use public contracts and declared module dependencies"
+id = "modules-isolation"
+type = "forbidden"
+source_modules = ["modules"]
+forbidden_modules = [
+    "src.engine",
+    "src.server",
+    "src.client",
+    "src.simulation",
+    "src.modding",
+]
+
+[[tool.importlinter.contracts]]
+name = "Server runtime layers depend in one direction"
+id = "server-engine-core-shared-layers"
+type = "layers"
+layers = ["src.server", "src.engine", "src.core", "src.shared"]
+
+[[tool.importlinter.contracts]]
+name = "Client presentation depends on core contracts"
+id = "client-core-shared-layers"
+type = "layers"
+layers = ["src.client", "src.core", "src.shared"]
+
+[[tool.importlinter.contracts]]
+name = "Gameplay modules depend on shared mechanisms"
+id = "modules-core-shared-layers"
+type = "layers"
+layers = ["modules", "src.core", "src.shared"]
+
+[[tool.importlinter.contracts]]
+name = "Client and server remain independent hosts"
+id = "client-server-independence"
+type = "independence"
+modules = ["src.client", "src.server"]
+
+[[tool.importlinter.contracts]]
+name = "Engine internals are not a mod API"
+id = "engine-internals-protected"
+type = "protected"
+protected_modules = [
+    "src.engine.simulator",
+    "src.engine.mod_manager",
+    "src.engine.command_pipeline",
+]
+allowed_importers = [
+    "src.engine",
+    "src.server.session",
+    "src.simulation.ui_testing.fixtures",
+]
+
 [dependency-groups]
 dev = [
     "hypothesis>=6.168.5,<7",
+    "import-linter>=2.15,<3",
     "pytest>=8.3",
     "pytest-cov>=6.0",
+    "ruff>=0.14,<1",
 ]
 
 
 [tool.pytest.ini_options]
 addopts = "-m 'not slow'"
 markers = ["slow: integration tests with filesystem or full simulation"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "TID251", "TID252"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"src.engine.simulator.Engine" = { msg = "The Engine is an internal runtime component; use the public shared mod API for extension code." }
+"src.engine.mod_manager.ModManager" = { msg = "ModManager is an internal runtime component; use the public shared mod API for extension code." }
+"src.engine.command_pipeline.CommandPipeline" = { msg = "CommandPipeline is an internal runtime component; use the public shared command contracts." }
+
+[tool.ruff.lint.per-file-ignores]
+"src/server/session.py" = ["TID251"]
+"src/simulation/ui_testing/fixtures.py" = ["TID251"]

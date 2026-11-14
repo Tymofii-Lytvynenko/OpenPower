@@ -9,8 +9,8 @@ import rtoml
 from PIL import Image
 
 from src.core.region_adjacency_source import load_region_adjacency
+from src.core.save_migrations import CORE_SAVE_MIGRATIONS
 from src.core.saves import save_backup_path, validate_save_name
-from src.server.io.migrations import CORE_SAVE_MIGRATIONS
 from src.server.io.static_loader import StaticAssetLoader
 from src.shared.config import GameConfig
 from src.shared.migrations import MigrationRegistry

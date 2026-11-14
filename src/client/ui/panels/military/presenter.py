@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 import polars as pl
-from src.core.map.geo import EquirectangularProjection, GeoCoordinate
-from src.shared.strategic_profiles import DEFAULT_DEFENSE, PAYLOAD_PROFILES
-from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
-from modules.base.systems.economy.unit_upkeep import unit_upkeep_by_id
 
+from src.client.services.client_presentation import contribution_for
+from src.client.ui.panels.military.design_selection import supports_design_details
 from src.client.ui.panels.shared.panel_data import (
     as_ratio,
     format_side_names,
@@ -21,7 +20,19 @@ from src.client.ui.panels.shared.panel_data import (
     safe_int,
     safe_text,
 )
-from src.client.ui.panels.military.design_selection import supports_design_details
+from src.core.map.geo import EquirectangularProjection, GeoCoordinate
+from src.shared.mod_api import ClientPresentationKeys
+from src.shared.strategic_profiles import DEFAULT_DEFENSE, PAYLOAD_PROFILES
+
+
+def _foreign_order_pairs(value) -> set[tuple[str, str]]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return set()
+    return {
+        (str(pair[0]).strip().upper(), str(pair[1]).strip().upper())
+        for pair in value
+        if isinstance(pair, Sequence) and not isinstance(pair, (str, bytes)) and len(pair) == 2
+    }
 
 
 BATTLE_MODE_LABELS = {
@@ -213,7 +224,10 @@ class MilitaryPresenter:
             if safe_text(listing.get("status"), "listed").lower() == "listed"
             and safe_int(listing.get("quantity"), 0) > 0
         }
-        upkeep_by_id = unit_upkeep_by_id(state)
+        upkeep_by_id = contribution_for(
+            state,
+            ClientPresentationKeys.UNIT_UPKEEP_BY_ID,
+        )(state)
         for row in self._country_units(state, country_tag):
             owner_tag = safe_text(row.get("owner"), country_tag)
             requested_design_id = safe_text(row.get("design_id"), "")
@@ -635,14 +649,14 @@ class MilitaryPresenter:
         return opponents
 
     def _country_tag_set(self, value) -> set[str]:
-        if isinstance(value, (list, tuple, set)):
+        if isinstance(value, (list, tuple, set, frozenset)):
             raw_tags = value
         else:
             try:
                 parsed = json.loads(str(value or "[]"))
             except (TypeError, ValueError, json.JSONDecodeError):
                 parsed = str(value or "").split(",")
-            raw_tags = parsed if isinstance(parsed, (list, tuple, set)) else [parsed]
+            raw_tags = parsed if isinstance(parsed, (list, tuple, set, frozenset)) else [parsed]
         return {safe_text(tag, "").strip().upper() for tag in raw_tags if safe_text(tag, "").strip()}
 
     def _public_intelligence_factors(self, factors) -> dict[str, object]:
@@ -737,7 +751,7 @@ class MilitaryPresenter:
 
     def strategic_authorization_contexts(self, state) -> list[str]:
         contexts = state.globals.get("strategic_authorization_contexts", [])
-        if not isinstance(contexts, (list, tuple, set)):
+        if not isinstance(contexts, (list, tuple, set, frozenset)):
             return []
         return sorted({str(context).strip() for context in contexts if str(context).strip()})
 
@@ -865,7 +879,7 @@ class MilitaryPresenter:
         if policy == "open":
             return {"authorized": True, "label": "authorized by open policy", "reason": ""}
         approved = state.globals.get("strategic_authorized_countries", [])
-        if isinstance(approved, (list, tuple, set)) and owner in {str(item).strip().upper() for item in approved}:
+        if isinstance(approved, (list, tuple, set, frozenset)) and owner in {str(item).strip().upper() for item in approved}:
             return {"authorized": True, "label": "authorized by scenario policy", "reason": ""}
         contexts = self.strategic_authorization_contexts(state)
         if context and context in contexts:
@@ -949,10 +963,10 @@ class MilitaryPresenter:
     def strategic_payload_profiles(self, state) -> dict[int, tuple[float, float]]:
         result = dict(PAYLOAD_PROFILES)
         overrides = state.globals.get("strategic_payload_profiles", {})
-        if not isinstance(overrides, dict):
+        if not isinstance(overrides, Mapping):
             return result
         for key, profile in overrides.items():
-            if not isinstance(profile, dict):
+            if not isinstance(profile, Mapping):
                 continue
             try:
                 level = int(key)
@@ -1140,17 +1154,16 @@ class MilitaryPresenter:
         buyer = str(buyer_country_tag or "").strip().upper()
         effects = state.tables.get("treaty_effects")
         permissions = state.globals.get("foreign_order_permissions", [])
-        permitted_pairs = {
-            (str(pair[0]).strip().upper(), str(pair[1]).strip().upper())
-            for pair in permissions
-            if isinstance(pair, (list, tuple)) and len(pair) == 2
-        } if isinstance(permissions, list) else set()
+        permitted_pairs = _foreign_order_pairs(permissions)
         profiles = state.tables.get("seller_acceptance_profiles")
         accepting = set() if profiles is None else {
             str(row.get("country_id") or "").strip().upper()
             for row in profiles.to_dicts() if bool(row.get("accepts_foreign_orders"))
         }
-        trade = WeaponsTradePolicy()
+        trade = contribution_for(
+            state,
+            ClientPresentationKeys.WEAPONS_TRADE_POLICY_FACTORY,
+        )()
         result = []
         for row in designs.to_dicts():
             seller = str(row.get("country_id") or "").strip().upper()
@@ -1198,22 +1211,22 @@ class MilitaryPresenter:
             return []
         buyer = str(country_tag or "").strip().upper()
         effects = state.tables.get("treaty_effects")
-        permissions = state.globals.get("foreign_order_permissions", [])
+        permissions = _foreign_order_pairs(state.globals.get("foreign_order_permissions", []))
         designs_table = state.tables.get("unit_designs")
         designs = {} if designs_table is None else {
             str(row.get("id") or ""): row for row in designs_table.to_dicts()
         }
-        trade = WeaponsTradePolicy()
+        trade = contribution_for(
+            state,
+            ClientPresentationKeys.WEAPONS_TRADE_POLICY_FACTORY,
+        )()
         visible = []
         for source in listings.to_dicts():
             if str(source.get("status") or "listed").lower() != "listed" or safe_int(source.get("quantity"), 0) <= 0:
                 continue
             seller = str(source.get("seller_country_id") or "").strip().upper()
             if seller != buyer:
-                eligible = trade.can_order(effects, buyer, seller, "open") and (
-                    [buyer, seller] in permissions if isinstance(permissions, list)
-                    else False
-                )
+                eligible = trade.can_order(effects, buyer, seller, "open") and (buyer, seller) in permissions
                 eligible = eligible or trade.can_order(effects, buyer, seller, "treaty")
                 if not eligible:
                     continue
@@ -1535,7 +1548,7 @@ class MilitaryPresenter:
         if not bool(weapon.get("research_permitted")):
             reasons.append("Required strategic program and weapon research are incomplete.")
         authorized_countries = state.globals.get("strategic_production_authorized_countries")
-        if isinstance(authorized_countries, (list, tuple, set)) and owner not in {
+        if isinstance(authorized_countries, (list, tuple, set, frozenset)) and owner not in {
             str(country).strip().upper() for country in authorized_countries
         }:
             reasons.append("This country lacks policy authority to produce strategic weapons.")

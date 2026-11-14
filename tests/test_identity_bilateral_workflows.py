@@ -10,15 +10,17 @@ import pytest
 from modules.base.systems.politics.identity_policy_system import IdentityPolicySystem
 from modules.base.systems.world.bilateral_trade_system import BilateralTradeSystem
 from src.client.ui.core.panel_context import PanelRenderContext
-from src.client.ui.panels.trade_panel import TradePanel
 from src.client.ui.panels.trade_options import country_options, technology_options
-from src.client.ui.testing.fixtures import RecordingClient, build_test_world
+from src.client.ui.panels.trade_panel import TradePanel
 from src.shared.actions import (
-    ActionCounterTradeDeal, ActionCreateTradeDeal, ActionRespondTradeDeal,
-    ActionSetCountryIdentityPolicy, ActionWithdrawTradeDeal,
+    ActionCounterTradeDeal,
+    ActionCreateTradeDeal,
+    ActionRespondTradeDeal,
+    ActionSetCountryIdentityPolicy,
+    ActionWithdrawTradeDeal,
 )
 from src.shared.events import EventNewDay
-
+from src.simulation.ui_testing.fixtures import RecordingClient, build_test_world
 
 ROOT = Path(__file__).resolve().parents[1]
 

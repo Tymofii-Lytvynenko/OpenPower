@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import sys
-import os
 import multiprocessing as mp
+import os
+import sys
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -37,8 +37,10 @@ def export_profile_html(profiler: Any, output_path: Path) -> Path | None:
 def create_local_session(config, *, save_name=None, player_tag=None):
     """Compose server process and client proxy at the application boundary."""
     from src.client.client_session import ClientSessionProxy
+    from src.modding.client_extensions import load_client_presentation
     from src.server.launcher import spawn_local_server
 
+    client_presentation = load_client_presentation(config)
     bundle = spawn_local_server(config, save_name=save_name, player_tag=player_tag)
     try:
         return ClientSessionProxy(
@@ -48,6 +50,7 @@ def create_local_session(config, *, save_name=None, player_tag=None):
             progress_queue=bundle.progress_queue,
             snapshot_ack_queue=bundle.snapshot_ack_queue,
             process=bundle.process,
+            client_presentation=client_presentation,
             **({"telemetry_queue": bundle.telemetry_queue,
                 "telemetry_output_dir": config.project_root / "user_data" / "telemetry"}
                if getattr(bundle, "telemetry_queue", None) is not None else {}),
@@ -76,8 +79,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return cli_main(arguments)
 
     import arcade
-    from src.shared.config import GameConfig
+
     from src.client.window import MainWindow
+    from src.shared.config import GameConfig
 
     profiler = None
     if profiling_enabled():

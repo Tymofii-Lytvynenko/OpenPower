@@ -9,6 +9,7 @@ from modules.base.systems.military.military_system import UNIT_SCHEMA, UnitFacto
 from src.client.ui.panels.military.presenter import MilitaryPresenter
 from src.core.map.geo import GeoCoordinate
 from src.shared.state import GameState
+from tests.test_support.client_presentation import attach_client_presentation
 
 
 class MilitaryRoutePresenterTest(unittest.TestCase):
@@ -30,6 +31,7 @@ class MilitaryRoutePresenterTest(unittest.TestCase):
             "has_custom_destination": False, "is_naval_invasion": True,
             "status": "in_transit", "rejection_reason": "", "updated_at_minute": 0,
         }], schema=state.get_table("unit_movement_routes").schema))
+        attach_client_presentation(state)
 
         row = MilitaryPresenter().unit_rows(state, "USA")[0]
 
@@ -47,6 +49,7 @@ class MilitaryRoutePresenterTest(unittest.TestCase):
             "destination_region_id": 2, "route_region_ids": [1], "route_index": 0,
             "status": "blocked", "rejection_reason": "Transit rights expired.",
         }], schema=state.get_table("unit_movement_routes").schema))
+        attach_client_presentation(state)
 
         row = MilitaryPresenter().unit_rows(state, "USA")[0]
 
@@ -66,6 +69,7 @@ class MilitaryRoutePresenterTest(unittest.TestCase):
             "destination_latitude": 10.01, "destination_longitude": 20.0,
             "status": "retreating", "rejection_reason": "",
         }], schema=state.get_table("unit_movement_routes").schema))
+        attach_client_presentation(state)
 
         row = MilitaryPresenter().unit_rows(state, "USA")[0]
 

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any
 
 import polars as pl
 
 from modules.base.systems.world.ai.common import country_frame, with_defaults
-from modules.base.systems.world.infrastructure_policy import configured_category_policies
+from modules.base.systems.world.infrastructure_policy import (
+    configured_category_policies,
+)
 from src.core.ai_framework import AITableContext, empty_candidates
 from src.shared.actions import ActionInvestRegionalInfrastructure, GameAction
 

@@ -7,12 +7,15 @@ import pytest
 import src.client.ui.panels.politics.constitutional_form_panel as panel_module
 from src.client.ui.components.shared.dirty_close_confirmation import CloseDecision
 from src.client.ui.core.panel_context import PanelRenderContext
-from src.client.ui.panels.politics.constitutional_form_panel import ConstitutionalFormPanel
+from src.client.ui.panels.politics.constitutional_form_panel import (
+    ConstitutionalFormPanel,
+)
 from src.shared.actions import ActionSetCountryCapital, ActionSetGovernmentForm
+from tests.test_support.client_presentation import client_state
 
 
 def _state(tables=None, command_results=None):
-    return SimpleNamespace(
+    return client_state(
         tables=tables or {},
         globals={},
         journal=SimpleNamespace(command_results=list(command_results or [])),

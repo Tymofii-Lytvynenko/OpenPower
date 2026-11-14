@@ -5,7 +5,12 @@ from unittest.mock import Mock
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.panels.military import unit_production_panel as production_module
 from src.client.ui.panels.military.unit_production_panel import UnitProductionPanel
-from src.shared.actions import ActionQueueUnitProduction, ActionRequestForeignUnitOrder, ActionSetForeignOrderAcceptance
+from src.shared.actions import (
+    ActionQueueUnitProduction,
+    ActionRequestForeignUnitOrder,
+    ActionSetForeignOrderAcceptance,
+)
+from tests.test_support.client_presentation import client_state
 
 
 class FakeUI:
@@ -351,7 +356,7 @@ def test_design_details_queues_domestic_order_and_updates_quantity(monkeypatch):
     design = {"id": "D1", "display_name": "Interceptor", "class_name": "fighter", "cost": 1200}
 
     panel._render_design_details(
-        SimpleNamespace(tables={}),
+        client_state(tables={}),
         design,
         "USA",
         ui,
@@ -379,7 +384,7 @@ def test_design_details_without_selection_shows_build_hint_and_sends_nothing(mon
     client = Client()
 
     panel._render_design_details(
-        SimpleNamespace(tables={}), None, "USA", ui,
+        client_state(tables={}), None, "USA", ui,
         PanelRenderContext(target_tag="USA", is_own_country=True, net_client=client),
     )
 
@@ -405,7 +410,7 @@ def test_design_details_requests_accepted_foreign_design_and_disables_unaccepted
     }
 
     panel._render_design_details(
-        SimpleNamespace(tables={}), design, "USA", ui,
+        client_state(tables={}), design, "USA", ui,
         PanelRenderContext(target_tag="USA", is_own_country=True, net_client=client),
     )
 
@@ -417,7 +422,7 @@ def test_design_details_requests_accepted_foreign_design_and_disables_unaccepted
     design["seller_accepts_orders"] = False
     ui = FakeUI()
     panel._render_design_details(
-        SimpleNamespace(tables={}), design, "USA", ui,
+        client_state(tables={}), design, "USA", ui,
         PanelRenderContext(target_tag="USA", is_own_country=True, net_client=client),
     )
     build = next(call for call in ui.calls if call[0] == "button")
@@ -438,7 +443,7 @@ def test_design_details_shows_infantry_population_and_queue_limit(monkeypatch):
     design = {"id": "INF", "display_name": "Infantry", "class_name": "infantry", "cost": 100}
 
     panel._render_design_details(
-        SimpleNamespace(tables={}), design, "USA", ui,
+        client_state(tables={}), design, "USA", ui,
         PanelRenderContext(target_tag="USA", is_own_country=True, net_client=Client()),
     )
 

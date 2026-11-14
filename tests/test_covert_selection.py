@@ -1,8 +1,14 @@
 from types import SimpleNamespace
+
 import polars as pl
 
-from src.client.ui.panels.military.covert_selection import CovertSelection, selected_mission, mission_index
+from src.client.ui.panels.military.covert_selection import (
+    CovertSelection,
+    mission_index,
+    selected_mission,
+)
 from src.client.ui.panels.service.journal_dispatches import journal_dispatches
+from tests.test_support.client_presentation import client_state
 
 
 def roster():
@@ -71,7 +77,7 @@ def test_extended_selection_can_merge_a_range_containing_an_unlisted_cell():
 
 def test_ready_dispatch_is_private_current_and_disappears_after_execution():
     cells, missions = roster()
-    state = SimpleNamespace(tables=dict(covert_cells=pl.DataFrame(cells), covert_missions=pl.DataFrame(missions)))
+    state = client_state(tables=dict(covert_cells=pl.DataFrame(cells), covert_missions=pl.DataFrame(missions)))
     notice = journal_dispatches(state, "UKR")
     assert len(notice) == 1
     assert notice[0]["kind"] == "covert_ready"
@@ -85,7 +91,7 @@ def test_ready_dispatch_is_private_current_and_disappears_after_execution():
 def test_ready_dispatch_hides_removed_or_captured_cell():
     cells, missions = roster()
     for rows in (cells[:1], [{**r, "status": "captured"} for r in cells]):
-        state = SimpleNamespace(tables=dict(covert_cells=pl.DataFrame(rows), covert_missions=pl.DataFrame(missions)))
+        state = client_state(tables=dict(covert_cells=pl.DataFrame(rows), covert_missions=pl.DataFrame(missions)))
         assert journal_dispatches(state, "UKR") == []
 
 
@@ -98,6 +104,7 @@ def test_mission_index_prefers_active_mission_to_newer_history():
 
 def test_foreign_country_switch_closes_forms_before_reading_roster():
     from unittest.mock import Mock
+
     from src.client.ui.panels.military.covert_action_windows import CovertActionWindows
     windows = CovertActionWindows()
     windows.open("mission", "private")

@@ -10,10 +10,11 @@ from src.client.ui.panels.military.presenter import (
     MilitarySummaryViewModel,
     UnitListRow,
 )
-from src.client.ui.panels.military_panel import MilitaryPanel
 from src.client.ui.panels.military.unit_design_panel import UnitDesignPanel
-from src.client.ui.panels.military.unit_type_options import unit_type_options_for_roles
 from src.client.ui.panels.military.unit_list_panel import UnitListPanel
+from src.client.ui.panels.military.unit_type_options import unit_type_options_for_roles
+from src.client.ui.panels.military_panel import MilitaryPanel
+from tests.test_support.client_presentation import client_state
 
 
 class UnitListPanelTest(unittest.TestCase):
@@ -289,7 +290,7 @@ class UnitListPanelTest(unittest.TestCase):
         mock_imgui = MagicMock()
         mock_imgui.button.return_value = False
         mock_imgui.combo.side_effect = [
-            (False, [option.role for option in unit_type_options_for_roles(DEFAULT_ROLE_PROFILES)].index("tanks")),
+            (False, [option.role for option in unit_type_options_for_roles(DEFAULT_ROLE_PROFILES, client_state())].index("tanks")),
             (False, 0),
         ]
 
@@ -297,7 +298,7 @@ class UnitListPanelTest(unittest.TestCase):
             "src.client.ui.panels.military.unit_design_panel.draw_required_tables"
         ):
             panel._render_content(
-                object(),
+                client_state(),
                 PanelRenderContext(
                     target_tag="USA",
                     is_own_country=True,

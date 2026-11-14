@@ -10,6 +10,7 @@ from modules.base.systems.military.military_system import UNIT_SCHEMA, UnitFacto
 from src.client.ui.panels.military.presenter import MilitaryPresenter
 from src.core.map.geo import GeoCoordinate
 from src.shared.state import GameState
+from tests.test_support.client_presentation import attach_client_presentation
 
 
 class MilitaryMarketPresenterTest(unittest.TestCase):
@@ -26,6 +27,7 @@ class MilitaryMarketPresenterTest(unittest.TestCase):
             "id": "listing-1", "seller_country_id": "CAN", "design_id": "can-design",
             "unit_id": "can-unit", "quantity": 2, "price": 100.0, "status": "listed",
         }], schema=state.get_table("unit_market_listings").schema))
+        attach_client_presentation(state)
         presenter = MilitaryPresenter()
 
         self.assertEqual(presenter.market_listings_for_country(state, "USA"), [])
@@ -63,6 +65,7 @@ class MilitaryMarketPresenterTest(unittest.TestCase):
         state.update_table("battle_units", pl.DataFrame([{
             "battle_id": "battle-1", "unit_id": "USA-open", "country_id": "USA", "side": "SIDE_A",
         }], schema=state.get_table("battle_units").schema))
+        attach_client_presentation(state)
 
         result = MilitaryPresenter().marketable_units_for_country(state, "USA")
 
@@ -90,6 +93,7 @@ class MilitaryMarketPresenterTest(unittest.TestCase):
             "design_id": "can-design", "quantity": 2, "price": 25.0,
             "status": "in_production", "reason": "Delivery in 10 days.",
         }], schema=state.get_table("foreign_unit_orders").schema))
+        attach_client_presentation(state)
         state.update_table("production_orders", pl.DataFrame([{
             "id": "order-1", "country_id": "USA", "design_id": "local-design",
             "quantity": 3, "priority": 4, "progress": 0.5, "eta_days": 6,

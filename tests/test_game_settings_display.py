@@ -6,8 +6,8 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from uuid import uuid4
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 from src.client.services.display_modes import DisplayModeOption, DisplayScreenOption
 from src.client.services.game_settings_service import (
@@ -18,7 +18,6 @@ from src.client.services.game_settings_service import (
 )
 from src.client.ui.components import settings_content as settings_content_module
 from src.client.ui.components.settings_content import GameSettingsContent
-
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -783,7 +782,10 @@ class TestGameSettingsContentStateCoverage(unittest.TestCase):
     def test_staged_settings_session_validation_and_apply(self):
         service = DummySettingsService(language_index=1, geo_language_index=1)
         service.apply_options = MagicMock()
-        self.window.session = SimpleNamespace(state=SimpleNamespace(globals={}))
+        self.window.session = SimpleNamespace(
+            state=SimpleNamespace(globals={}),
+            presentation_state=SimpleNamespace(geo_language_code="en"),
+        )
 
         regular = GameSettingsContent(service, self.window)
         self.assertEqual(regular.options, service.settings)
@@ -805,7 +807,7 @@ class TestGameSettingsContentStateCoverage(unittest.TestCase):
         self.assertTrue(staged.apply())
         self.assertEqual(service.apply_options.call_count, 2)
         self.assertEqual(
-            self.window.session.state.globals["geo_language_code"],
+            self.window.session.presentation_state.geo_language_code,
             service.settings.geo_language_code,
         )
 

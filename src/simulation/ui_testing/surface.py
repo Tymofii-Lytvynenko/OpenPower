@@ -8,10 +8,26 @@ from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.testability import UIRunTelemetry
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.testing.catalog import build_surface
-from src.client.ui.testing.fixtures import (build_test_world, RecordingClient, RecordingNavigation,
-                                          RecordingViewport, TestWindow, test_settings)
 from src.client.ui.testing.harness import UITestScenario, run_imgui_test
 from src.client.ui.testing.journey import action_record, run_steps
+from src.simulation.ui_testing.fixtures import (
+    RecordingClient,
+    RecordingNavigation,
+    RecordingViewport,
+    TestWindow,
+    build_test_world,
+    test_settings,
+)
+
+
+class _CurrentClientState:
+    """Follow snapshots delivered while a test surface is open."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def __getattr__(self, name):
+        return getattr(self._client.get_state(), name)
 
 
 def run_surface(name: str, output: Path, project_root: Path, size=(1920, 1080),
@@ -19,15 +35,21 @@ def run_surface(name: str, output: Path, project_root: Path, size=(1920, 1080),
                 baseline: Path | None = None, tolerance: float = 0.03) -> int:
     state = build_test_world(project_root, fixture)
     client = RecordingClient(state)
+    from src.modding.client_extensions import load_client_presentation
+    from src.shared.config import GameConfig
+
+    config = GameConfig(project_root)
+    client.enable_client_view(load_client_presentation(config))
+    state = _CurrentClientState(client)
     support = (fixture or {}).get("test_support", {})
     player_country = str(support.get("player_country") or client.player_country).strip().upper()
     client.player_country = player_country
     settings = test_settings()
     window = TestWindow(size)
-    from src.shared.config import GameConfig
-    window.game_config = GameConfig(project_root)
+    window.game_config = config
     if support.get("use_base_region_map"):
         from types import SimpleNamespace
+
         from src.client.ui.testing.country_info_assets import load_compact_region_map
 
         window.session = SimpleNamespace(map_data=load_compact_region_map(project_root))

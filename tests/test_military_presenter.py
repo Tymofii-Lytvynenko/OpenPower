@@ -1,10 +1,11 @@
-import unittest
 import json
+import unittest
 
 import polars as pl
 
 from src.client.ui.panels.military.presenter import MilitaryPresenter
 from src.shared.state import GameState
+from tests.test_support.client_presentation import attach_client_presentation
 
 
 class TestMilitaryPresenter(unittest.TestCase):
@@ -31,6 +32,7 @@ class TestMilitaryPresenter(unittest.TestCase):
             }
         )
 
+        attach_client_presentation(state)
         rows = MilitaryPresenter().unit_rows(state, "USA", presentation_total_minutes=20.0)
 
         self.assertEqual(len(rows), 1)

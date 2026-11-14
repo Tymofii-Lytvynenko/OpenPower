@@ -7,6 +7,8 @@ import pytest
 
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.panels.politics.treaty_editor_live import LiveTreatyEditorPanel
+from src.shared.mod_api import ClientPresentationKeys
+from tests.test_support.client_presentation import client_state, presentation_values
 
 
 class _Definition:
@@ -79,8 +81,9 @@ class _FakeImgui:
         self.calls.append(("end_disabled",))
 
 
-def _state(country_tags=("USA", "CAN", "MEX")):
-    return SimpleNamespace(
+def _state(country_tags=("USA", "CAN", "MEX"), *, client_presentation=None):
+    return client_state(
+        client_presentation=client_presentation,
         tables={
             "countries_treaties": None,
             "pending_treaties": None,
@@ -127,8 +130,6 @@ def _install(monkeypatch, *, imgui=None, window_open=True, child_open=True, tabl
         "Prims",
         SimpleNamespace(combo_row=lambda _label, index, _options, _width: index),
     )
-    monkeypatch.setattr(module, "country_diplomacy_restriction", lambda *_args: None)
-    monkeypatch.setattr(module, "treaty_title_restriction", lambda *_args: None)
     monkeypatch.setattr(module, "TreatyParticipantDialog", _ParticipantDialog)
     return module, imgui, window_calls
 
@@ -268,12 +269,13 @@ def test_bilateral_proposal_inverts_sides_and_checks_restriction_notice(monkeypa
 
     notice = Mock()
     rejected_context = _context(notice=notice)
-    monkeypatch.setattr(module, "country_diplomacy_restriction", lambda *_args: "No mandate")
+    values = presentation_values()
+    values[ClientPresentationKeys.COUNTRY_DIPLOMACY_RESTRICTION] = lambda *_args: "No mandate"
     rejected = LiveTreatyEditorPanel()
     rejected._type_options = [("bilateral", "Bilateral")]
     rejected._type_index = 0
     rejected._title = "Existing proposal"
-    rejected._render_content(_state(), rejected_context)
+    rejected._render_content(_state(client_presentation=values), rejected_context)
 
     notice.assert_called_once_with("Treaty proposal", "No mandate")
     rejected_context.net_client.send_action.assert_not_called()

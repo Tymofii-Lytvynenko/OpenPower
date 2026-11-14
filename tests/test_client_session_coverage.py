@@ -54,7 +54,10 @@ def test_proxy_polling_clock_and_empty_state_helpers():
     proxy._snapshot_inbox.latest = snapshot
     proxy.tick(0.0)
 
-    assert proxy.get_state_snapshot() is snapshot
+    client_state = proxy.get_state_snapshot()
+    assert client_state is proxy.state
+    assert client_state is not snapshot
+    assert client_state.time.total_minutes == snapshot.time.total_minutes
     assert proxy.get_display_date_text() is not None
     assert proxy.get_display_total_minutes() == 0.0
     proxy._snapshot_inbox.close()

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from src.client.client_state import ClientGameStateView, ClientPresentationState
 from src.client.interfaces.loading import LoadingTask
 from src.client.interfaces.session_factory import ClientSessionPort, SessionFactory
 from src.client.services.network_client_service import NetworkClient
@@ -13,6 +14,8 @@ from src.shared.protocols import SessionPort
 @dataclass
 class PassiveSession:
     received: list[object]
+    state: ClientGameStateView | None = None
+    presentation_state: ClientPresentationState = field(default_factory=ClientPresentationState)
 
     def receive_action(self, action):
         self.received.append(action)

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-import json
 from typing import Any
 
 import polars as pl
@@ -124,13 +125,13 @@ class EventFeedPresenter:
             return typed_items
 
         state_globals = getattr(state, "globals", {})
-        raw_events = state_globals.get("active_events", []) if isinstance(state_globals, dict) else []
-        if not isinstance(raw_events, list):
+        raw_events = state_globals.get("active_events", []) if isinstance(state_globals, Mapping) else []
+        if not isinstance(raw_events, Sequence) or isinstance(raw_events, (str, bytes)):
             return []
 
         region_index = self._region_index(state)
         events = sorted(
-            (row for row in raw_events if isinstance(row, dict)),
+            (row for row in raw_events if isinstance(row, Mapping)),
             key=lambda row: self._integer(row.get("start_minute")),
             reverse=True,
         )
@@ -157,7 +158,7 @@ class EventFeedPresenter:
 
     def _typed_event_items(self, state) -> list[EventFeedItem]:
         tables = getattr(state, "tables", {})
-        instances = tables.get("random_event_instances") if isinstance(tables, dict) else None
+        instances = tables.get("random_event_instances") if isinstance(tables, Mapping) else None
         if instances is None or instances.is_empty():
             return []
 
@@ -243,7 +244,7 @@ class EventFeedPresenter:
     ) -> list[EventFeedItem]:
         journal = getattr(state, "journal", None)
         records = getattr(journal, "domain_events", [])
-        if not isinstance(records, list):
+        if not isinstance(records, Sequence) or isinstance(records, (str, bytes)):
             return []
         represented_events = {
             item.id.removeprefix("instance:")
@@ -252,10 +253,10 @@ class EventFeedPresenter:
         }
         items: list[EventFeedItem] = []
         for index, record in enumerate(records[-100:]):
-            if not isinstance(record, dict) or record.get("event_type") != "EventRandomEventLifecycleChanged":
+            if not isinstance(record, Mapping) or record.get("event_type") != "EventRandomEventLifecycleChanged":
                 continue
             payload = record.get("payload")
-            if not isinstance(payload, dict):
+            if not isinstance(payload, Mapping):
                 continue
             event_id = str(payload.get("event_id") or "")
             status = str(payload.get("status") or "")
@@ -302,7 +303,7 @@ class EventFeedPresenter:
         return tuple(
             (str(row.get("response_id") or ""), EventFeedPresenter._number(row.get("cost")))
             for row in rows
-            if isinstance(row, dict) and str(row.get("response_id") or "").strip()
+            if isinstance(row, Mapping) and str(row.get("response_id") or "").strip()
         )
 
     @staticmethod

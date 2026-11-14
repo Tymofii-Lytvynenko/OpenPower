@@ -5,8 +5,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.client.ui.testing import surface as surface_module
+from src.modding import client_extensions
 from src.shared import config as config_module
+from src.simulation.ui_testing import surface as surface_module
 
 
 @dataclass
@@ -56,6 +57,8 @@ def install_surface_runtime(
         requests=[{"type": "save"}],
         deliver_event=Mock(),
         deliver_snapshot=Mock(),
+        enable_client_view=Mock(),
+        get_state=Mock(return_value=state),
     )
     telemetry_instances = []
     draw = Mock()
@@ -127,10 +130,13 @@ def install_surface_runtime(
     monkeypatch.setattr(surface_module, "run_imgui_test", run_imgui_test)
     monkeypatch.setattr(surface_module, "imgui", imgui)
     monkeypatch.setattr(surface_module, "GAMETHEME", theme)
+    presentation = {"test.presentation": object()}
+    monkeypatch.setattr(client_extensions, "load_client_presentation", Mock(return_value=presentation))
     monkeypatch.setattr(config_module, "GameConfig", FakeGameConfig)
     monkeypatch.setitem(__import__("sys").modules, telemetry_module.__name__, telemetry_module)
     monkeypatch.setitem(__import__("sys").modules, renderer_module.__name__, renderer_module)
     monkeypatch.setitem(__import__("sys").modules, textures_module.__name__, textures_module)
+    calls["presentation"] = presentation
     calls["run_imgui_test"] = run_imgui_test
     return state, client, telemetry_instances, draw, theme, imgui, calls
 
@@ -172,6 +178,8 @@ def test_run_surface_builds_and_executes_custom_fixture_journey(monkeypatch, tmp
     assert result == 6
     surface_module.build_test_world.assert_called_once_with(tmp_path, fixture)
     assert client.player_country == "CA"
+    client.enable_client_view.assert_called_once_with(calls["presentation"])
+    assert surface_module.build_surface.call_args.args[1]._client is client
     assert surface_module.build_surface.call_args.args[0] == "country-info"
     context = surface_module.build_surface.call_args.args[3]
     window = surface_module.build_surface.call_args.args[5]
