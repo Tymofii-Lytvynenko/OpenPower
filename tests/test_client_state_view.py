@@ -81,3 +81,22 @@ def test_other_polars_in_place_operations_are_isolated_from_table_snapshot():
 
     assert state.tables["countries"].equals(original)
     assert view.tables["countries"].equals(original)
+
+
+def test_journal_is_frozen_once_per_client_snapshot():
+    state = GameState()
+    state.journal.domain_events.append({'payload': {'items': [1]}})
+    state.journal.command_results.append({'actor_id': 'player'})
+    view = ClientGameStateView(state, {}, ClientPresentationState())
+    events = view.journal.domain_events
+    results = view.journal.command_results
+    assert view.journal.domain_events is events
+    assert view.journal.command_results is results
+    state.journal.domain_events[0]['payload']['items'].append(2)
+    state.journal.command_results.append({'actor_id': 'other'})
+    assert events[0]['payload']['items'] == (1,)
+    assert len(results) == 1
+    with pytest.raises(TypeError):
+        events[0]['payload']['items'] = ()
+    with pytest.raises(AttributeError):
+        view.journal.domain_events = ()

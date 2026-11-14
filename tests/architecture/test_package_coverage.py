@@ -77,3 +77,21 @@ def test_contract_suppression_options_exit_nonzero(tmp_path, contract_id, option
 
     assert result.returncode != 0
     assert option in output
+
+
+@pytest.mark.parametrize("path", ["src/uncontracted.py", "modules/uncontracted.py"])
+def test_uncontracted_root_python_module_exits_nonzero(tmp_path, path):
+    custom_fixture_root(tmp_path)
+    write_file(tmp_path, path, "import modules.base\n")
+    result = run_architecture_tool(tmp_path)
+    assert result.returncode != 0
+    assert "outside the contracted architecture packages" in result.stdout
+
+
+@pytest.mark.parametrize("path", ["src/__init__.py", "modules/__init__.py"])
+def test_root_initializer_cannot_hide_uncontracted_imports(tmp_path, path):
+    custom_fixture_root(tmp_path)
+    write_file(tmp_path, path, "import modules.base\n")
+    result = run_architecture_tool(tmp_path)
+    assert result.returncode != 0
+    assert "Architecture root initializer must contain only a docstring" in result.stdout

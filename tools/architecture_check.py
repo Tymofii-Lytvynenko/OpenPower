@@ -142,7 +142,9 @@ def _module_name(root: Path, path: Path) -> str:
     return ".".join(parts)
 
 
-def _import_targets(node: ast.AST, module_name: str) -> tuple[str, ...]:
+def _import_targets(
+    node: ast.AST, module_name: str, *, is_package: bool = False
+) -> tuple[str, ...]:
     if isinstance(node, ast.Import):
         return tuple(alias.name for alias in node.names)
     if not isinstance(node, ast.ImportFrom):
@@ -153,7 +155,7 @@ def _import_targets(node: ast.AST, module_name: str) -> tuple[str, ...]:
         current_parts = module_name.split(".")
         if current_parts[-1] == "__init__":
             current_parts.pop()
-        package_parts = current_parts[:-1]
+        package_parts = current_parts if is_package else current_parts[:-1]
         remove_count = max(node.level - 1, 0)
         if remove_count:
             package_parts = package_parts[:-remove_count]
@@ -181,6 +183,22 @@ def _coverage_findings(root: Path, config: dict, source_files: list[Path]) -> li
     if not src_root.is_dir() or not modules_root.is_dir():
         missing = [name for name, path in (("src", src_root), ("modules", modules_root)) if not path.is_dir()]
         return [Finding(root, 1, f"Architecture roots missing: {', '.join(missing)}.")]
+
+    allowed_root_files = {src_root: {"__init__.py", "cli.py"}, modules_root: {"__init__.py"}}
+    for package_root, allowed in allowed_root_files.items():
+        for path in sorted(package_root.glob("*.py")):
+            if path.name not in allowed:
+                findings.append(Finding(path, 1, "Python module is outside the contracted architecture packages."))
+            elif path.name == "__init__.py":
+                try:
+                    body = ast.parse(path.read_text(encoding="utf-8"), filename=str(path)).body
+                except (OSError, SyntaxError) as exc:
+                    findings.append(Finding(path, getattr(exc, "lineno", 1) or 1, f"Cannot parse Python source: {exc}."))
+                    continue
+                if body and not (len(body) == 1 and isinstance(body[0], ast.Expr)
+                                 and isinstance(body[0].value, ast.Constant)
+                                 and isinstance(body[0].value.value, str)):
+                    findings.append(Finding(path, 1, "Architecture root initializer must contain only a docstring."))
 
     src_packages = {
         path.name for path in src_root.iterdir() if path.is_dir() and not path.name.startswith("__")
@@ -451,9 +469,12 @@ def _manifest_findings(root: Path, modules: dict[str, Path]) -> list[Finding]:
             findings.append(Finding(manifest, 1, f"Duplicate module ID '{module_id}' also declared by {paths_by_id[module_id].relative_to(root).as_posix()}."))
         paths_by_id[module_id] = manifest
         dependencies[module_id] = set(declared)
-        for dependency in declared:
-            if dependency not in modules:
-                findings.append(Finding(manifest, 1, f"Module '{module_id}' declares missing dependency '{dependency}'."))
+
+    # Dependency declarations refer to manifest IDs, which may differ from directory names.
+    for module_id, declared in dependencies.items():
+        for dependency in sorted(declared):
+            if dependency not in paths_by_id:
+                findings.append(Finding(paths_by_id[module_id], 1, f"Module '{module_id}' declares missing dependency '{dependency}'."))
 
     cycle = _cycle_path(dependencies)
     if cycle:
@@ -483,7 +504,7 @@ def _manifest_findings(root: Path, modules: dict[str, Path]) -> list[Finding]:
             continue
         source_module = _module_name(root, source_file)
         for node in ast.walk(tree):
-            for target in _import_targets(node, source_module):
+            for target in _import_targets(node, source_module, is_package=source_file.name == "__init__.py"):
                 target_parts = target.split(".")
                 if len(target_parts) < 2 or target_parts[0] != "modules":
                     continue
@@ -514,7 +535,7 @@ def _manifest_findings(root: Path, modules: dict[str, Path]) -> list[Finding]:
             continue
         source_module = _module_name(root, source_file)
         for node in ast.walk(tree):
-            for target in _import_targets(node, source_module):
+            for target in _import_targets(node, source_module, is_package=source_file.name == "__init__.py"):
                 parts = target.split(".")
                 if len(parts) >= 2 and parts[0] == "modules":
                     target_id = package_to_id.get(parts[1])

@@ -334,3 +334,18 @@ def test_update_and_close_forward_to_live_session_and_imgui() -> None:
     session.shutdown.assert_called_once_with()
     window.imgui.shutdown.assert_called_once_with()
     base_close.assert_called_once_with()
+
+
+def test_inspection_snapshot_serializes_readonly_nested_command_results():
+    import json
+
+    from src.client.client_state import ClientGameStateView, ClientPresentationState
+    from src.shared.state import GameState
+
+    state = GameState()
+    state.journal.command_results.append({'actor_id': 'p', 'details': {'items': [1, 2]}})
+    window = MainWindow.__new__(MainWindow)
+    window.session = SimpleNamespace(state=ClientGameStateView(state, {}, ClientPresentationState()))
+    with patch.object(MainWindow, 'current_view', new_callable=PropertyMock, return_value=SimpleNamespace(player_tag=None)):
+        snapshot = window._inspection_snapshot()
+    assert json.loads(json.dumps(snapshot))['command_results'][0]['details']['items'] == [1, 2]

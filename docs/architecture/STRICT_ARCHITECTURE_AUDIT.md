@@ -165,3 +165,15 @@ The workflow runs on PRs, pushes to `main`, and manual dispatch; pushing a
 feature branch alone does not trigger it. Configure `Architecture / validate`
 as a required status check after the workflow is available on the repository's
 default branch.
+
+## Follow-up review, 2026-11-14
+
+- Manifest dependencies are resolved by module ID, including when an ID differs
+  from its Python package directory. Relative imports in package initializers
+  are checked for declared cross-module dependencies.
+- Top-level Python modules must belong to a contracted package, except for the
+  application CLI. Namespace root initializers may contain only a docstring.
+- Client snapshots freeze journal records once per published view, and the live
+  inspection report converts nested read-only mappings into JSON data. Creating
+  a view still traverses the journal once; very large histories can therefore
+  increase snapshot publication time.

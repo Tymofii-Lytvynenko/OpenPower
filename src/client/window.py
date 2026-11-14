@@ -1,4 +1,5 @@
 import threading
+from collections.abc import Mapping
 from queue import Empty, Queue
 from typing import TYPE_CHECKING, Optional
 
@@ -12,6 +13,15 @@ from src.shared.config import GameConfig
 
 if TYPE_CHECKING:
     from src.client.renderers.map_renderer import MapRenderer
+
+
+def _inspection_value(value):
+    # Snapshot mappings are read-only proxies and must be converted before JSON export.
+    if isinstance(value, Mapping):
+        return {key: _inspection_value(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_inspection_value(item) for item in value]
+    return value
 
 
 class MainWindow(arcade.Window):
@@ -55,7 +65,7 @@ class MainWindow(arcade.Window):
                 "total_minutes": state.time.total_minutes, "paused": state.time.is_paused,
                 "speed": state.time.speed_level, "country": country,
                 "table_rows": {name: frame.height for name, frame in state.tables.items()},
-                "command_results": list(state.journal.command_results[-20:]),
+                "command_results": _inspection_value(state.journal.command_results[-20:]),
                 "system_errors": list(getattr(session, "system_errors", []))}
 
     def _sync_geo_language_to_session(self) -> None:

@@ -33,6 +33,19 @@ class _ReadOnlyObjectView:
         raise AttributeError(f"Snapshot data attribute '{name}' is read-only.")
 
 
+class _ReadOnlyJournalView:
+    """Freeze journal records once, so repeated rendering does not recopy history."""
+
+    __slots__ = ("domain_events", "command_results")
+
+    def __init__(self, journal: Any) -> None:
+        object.__setattr__(self, "domain_events", _read_only_value(journal.domain_events))
+        object.__setattr__(self, "command_results", _read_only_value(journal.command_results))
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError(f"Snapshot journal attribute '{name}' is read-only.")
+
+
 class _ReadOnlyTableMapping(Mapping[str, pl.DataFrame]):
     """Keep a stable table snapshot and return detached Polars handles on reads."""
 
@@ -95,7 +108,7 @@ class ClientGameStateView:
             "update_table",
         }
     )
-    __slots__ = ("_state", "client_presentation", "presentation_state", "_tables", "_globals", "_events", "_current_actions")
+    __slots__ = ("_state", "client_presentation", "presentation_state", "_tables", "_globals", "_events", "_current_actions", "_journal")
 
     def __init__(
         self,
@@ -108,6 +121,7 @@ class ClientGameStateView:
         object.__setattr__(self, "presentation_state", presentation_state)
         object.__setattr__(self, "_tables", _ReadOnlyTableMapping(state.tables))
         object.__setattr__(self, "_globals", _read_only_value(state.globals))
+        object.__setattr__(self, "_journal", _ReadOnlyJournalView(state.journal))
         object.__setattr__(self, "_events", copy.deepcopy(state.events))
         object.__setattr__(self, "_current_actions", copy.deepcopy(state.current_actions))
 
@@ -121,6 +135,10 @@ class ClientGameStateView:
     @property
     def globals(self) -> Mapping[str, Any]:
         return self._globals
+
+    @property
+    def journal(self) -> _ReadOnlyJournalView:
+        return self._journal
 
     @property
     def events(self) -> tuple[Any, ...]:
