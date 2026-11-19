@@ -7,14 +7,13 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from src.client.client_session import ClientSessionProxy
-from src.engine.simulator import Engine
+from src.server import launcher
 from src.server.launcher import spawn_local_server
 from src.server.server_process import run_server_process
 from src.server.session import GameSession
 from src.shared.actions import ActionSetPaused
 from src.shared.config import GameConfig
 from src.shared.state import GameState
-from src.server import launcher
 
 
 class TestHeadlessServer(unittest.TestCase):
@@ -50,11 +49,18 @@ class TestHeadlessServer(unittest.TestCase):
         )
 
         self.assertIsNone(session.map_data)
-        self.assertIsInstance(session.engine, Engine)
+        self.assertIsNotNone(session.engine)
         self.assertTrue(progress_messages)
         self.assertEqual(progress_messages[-1], (1.0, "Server: Ready."))
+        self.assertTrue(session.state.globals["history_start_seed_pending"])
 
         session.tick(0.1)
+        population_baselines = session.state.tables["history_snapshots"].filter(
+            (session.state.tables["history_snapshots"]["indicator_id"] == "region.population")
+            & (session.state.tables["history_snapshots"]["game_minute"] == 0)
+        )
+        self.assertFalse(population_baselines.is_empty())
+        self.assertIn("regional_population_provenance.tsv", population_baselines["source_reference"][0])
         ipc_payload = session.state.to_ipc()
         round_tripped_state = GameState.from_ipc(ipc_payload)
 
@@ -62,6 +68,10 @@ class TestHeadlessServer(unittest.TestCase):
         self.assertIn("countries", round_tripped_state.tables)
         self.assertFalse(round_tripped_state.get_table("regions").is_empty())
         self.assertFalse(round_tripped_state.get_table("countries").is_empty())
+        self.assertTrue(any(
+            "regional_population_provenance.tsv" in value
+            for value in round_tripped_state.get_table("history_snapshots")["source_reference"].to_list()
+        ))
         self.assertIn("base.time", round_tripped_state.system_state)
 
     def test_launcher_client_proxy_executes_command_over_delta_ipc(self):

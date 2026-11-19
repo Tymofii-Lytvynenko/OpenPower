@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable
 
 from src.shared.commands import (
+    COMMAND_PROTOCOL_ERROR,
     COMMAND_SCHEMA_VERSION,
     CommandEnvelope,
     CommandResult,
@@ -64,11 +65,11 @@ class CommandPipeline:
                         command,
                         tick,
                         CommandStatus.REJECTED,
-                        "protocol_error",
+                        COMMAND_PROTOCOL_ERROR,
                         protocol_error,
                     )
                 )
-                self._seen_ids.add(command.command_id)
+                # An invalid envelope must not reserve the ID of a later valid retry.
                 continue
 
             validation_error = next(

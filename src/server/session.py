@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Callable, Optional
 
+from src.core.paths import resolve_region_map_path
 from src.core.map_data import RegionMapData
 from src.engine.command_pipeline import CommandPipeline
 from src.engine.journal import DomainEventJournal
@@ -18,7 +19,13 @@ from src.server.state_migrations import (
     validate_tactical_combat_state,
 )
 from src.shared.actions import ActionSaveGame, GameAction
-from src.shared.commands import CommandEnvelope, CommandStatus, command_id_for
+from src.shared.commands import (
+    COMMAND_PROTOCOL_ERROR,
+    LOCAL_SESSION_ACTOR_ID,
+    CommandEnvelope,
+    CommandStatus,
+    command_id_for,
+)
 from src.shared.config import GameConfig
 from src.shared.schema import WorldSchemaRegistry
 from src.shared.state import GameState
@@ -74,6 +81,9 @@ class GameSession:
 
         initial_sequences: dict[str, int] = defaultdict(int)
         for result in self.state.journal.command_results:
+            # Protocol rejections never consume a sequence in the live pipeline.
+            if result.get("code") == COMMAND_PROTOCOL_ERROR:
+                continue
             actor = str(result.get("actor_id", ""))
             if actor:
                 initial_sequences[actor] = max(
@@ -101,6 +111,8 @@ class GameSession:
         load_map_data: bool = True,
         player_tag: str | None = None,
         random_seed: int | None = 1,
+        *,
+        player_party_id: str | None = None,
     ) -> "GameSession":
         def report(progress: float, text: str) -> None:
             if progress_cb:
@@ -121,7 +133,17 @@ class GameSession:
         exporter = DataExporter(config)
 
         report(0.3, "Server: Loading world database...")
-        initial_state = loader.load_save(save_name) if save_name else loader.load_initial_state()
+        is_new_game = not bool(save_name)
+        initial_state = loader.load_initial_state() if is_new_game else loader.load_save(save_name)
+        if is_new_game:
+            initial_state.globals["history_start_seed_pending"] = True
+            # Distinguish a fresh world waiting for army inputs from legacy saves
+            # whose intentionally empty armies must not be recreated.
+            initial_state.globals.setdefault("military_initial_units_created", False)
+            # A fresh local host owns scenario settings unless the world assigns them explicitly.
+            initial_state.globals.setdefault("scenario_admin_id", LOCAL_SESSION_ACTOR_ID)
+            if player_tag and player_party_id:
+                initial_state.globals["player_party_id"] = player_party_id.strip()
         if save_name is None and random_seed is not None:
             initial_state.determinism.reset(random_seed)
 
@@ -152,6 +174,8 @@ class GameSession:
         save_name: Optional[str] = None,
         player_tag: str | None = None,
         random_seed: int | None = 1,
+        *,
+        player_party_id: str | None = None,
     ) -> "GameSession":
         return cls.create_local(
             config,
@@ -160,15 +184,12 @@ class GameSession:
             load_map_data=False,
             player_tag=player_tag,
             random_seed=random_seed,
+            player_party_id=player_party_id,
         )
 
     @staticmethod
     def _load_map_data(config: GameConfig) -> RegionMapData:
-        for data_dir in config.get_data_dirs():
-            candidate = data_dir / "regions" / "regions.png"
-            if candidate.exists():
-                return RegionMapData(str(candidate))
-        return RegionMapData(str(config.get_asset_path("map/regions.png")))
+        return RegionMapData(str(resolve_region_map_path(config)))
 
     def tick(self, delta_time: float) -> None:
         telemetry = getattr(self.engine, "telemetry", None)
@@ -192,22 +213,36 @@ class GameSession:
             command for command in prepared.ready if not isinstance(command.action, ActionSaveGame)
         )
 
-        for command in save_commands:
+        simulation_succeeded = self._run_simulation_step(simulation_commands, delta_time)
+        if save_commands and not simulation_commands and delta_time <= 0:
             self.engine.snapshot_system_state(self.state)
-            saved = SaveWriter(self.config).save_game(self.state, command.action.save_name)
+
+        # Save the published tick, including gameplay commands received alongside the save request.
+        for command in save_commands:
+            saved = simulation_succeeded and SaveWriter(self.config).save_game(
+                self.state, command.action.save_name
+            )
+            failure_message = ""
+            if not simulation_succeeded:
+                failure_message = "Could not save because the simulation step failed."
+            elif not saved:
+                failure_message = f"Could not save '{command.action.save_name}'."
             status = CommandStatus.EXECUTED if saved else CommandStatus.FAILED
             result = self.command_pipeline.result(
                 command,
                 int(self.state.globals.get("tick", 0)),
                 status,
                 "" if saved else "save_failed",
-                "" if saved else f"Could not save '{command.action.save_name}'.",
+                failure_message,
             )
             self.state.journal.append_command_result(result.to_record())
 
+    def _run_simulation_step(
+        self, simulation_commands: tuple[CommandEnvelope, ...], delta_time: float
+    ) -> bool:
         if not simulation_commands and delta_time <= 0:
             self.state.current_actions = []
-            return
+            return True
 
         telemetry = getattr(self.engine, "telemetry", None)
         if telemetry and telemetry.enabled:
@@ -236,6 +271,7 @@ class GameSession:
         self.domain_journal.capture(self.state)
         self.engine.snapshot_system_state(self.state)
         self.state.current_actions = []
+        return step_result.success
 
     def receive_action(self, action: GameAction) -> str:
         actor_id = str(action.player_id)

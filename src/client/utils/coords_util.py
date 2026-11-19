@@ -36,8 +36,16 @@ def calculate_centroid(
         
     # 1. Calculate Average in Image Space (Raw Data)
     # We use Polars mean() which ignores nulls automatically
-    avg_x = regions_df["center_x"].mean()
-    avg_y = regions_df["center_y"].mean()
+    if not {"center_x", "center_y"}.issubset(regions_df.columns):
+        # A missing camera hint should not prevent the game session from starting.
+        return None
+    # Ignore invalid points as a pair so the two axes describe the same regions.
+    centers = regions_df.select(
+        pl.col("center_x").cast(pl.Float64, strict=False),
+        pl.col("center_y").cast(pl.Float64, strict=False),
+    ).filter(pl.col("center_x").is_finite() & pl.col("center_y").is_finite())
+    avg_x = centers["center_x"].mean()
+    avg_y = centers["center_y"].mean()
     
     if avg_x is None or avg_y is None:
         return None
@@ -58,8 +66,15 @@ def _calculate_geo_centroid(regions_df: pl.DataFrame) -> Optional[GeoCoordinate]
         if latitude is None or longitude is None:
             continue
 
-        lat = math.radians(float(latitude))
-        lon = math.radians(float(longitude))
+        try:
+            latitude, longitude = float(latitude), float(longitude)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not math.isfinite(latitude) or not math.isfinite(longitude):
+            continue
+
+        lat = math.radians(latitude)
+        lon = math.radians(longitude)
         cos_lat = math.cos(lat)
         sum_x += cos_lat * math.cos(lon)
         sum_y += math.sin(lat)
@@ -82,5 +97,6 @@ def _infer_map_width(regions_df: pl.DataFrame) -> float:
     if "center_x" not in regions_df.columns:
         return 1.0
 
-    max_x = regions_df["center_x"].max()
-    return float(max_x or 1.0) + 1.0
+    values = regions_df["center_x"].cast(pl.Float64, strict=False)
+    max_x = values.filter(values.is_finite()).max()
+    return max(1.0, float(max_x or 0.0) + 1.0)

@@ -30,6 +30,19 @@ class CommandFeedback:
                 if action == "ActionSaveGame" and str(record.get("command_id") or "") in quiet_save_result_ids:
                     continue
                 self._dialog.enqueue(title, message or "The command could not be completed.", severity="error")
+            elif status == "applied" and action in {"ActionCreateTreaty", "ActionRespondTreaty"} and message:
+                self._dialog.enqueue("Treaty proposal" if action == "ActionCreateTreaty" else "Treaty response", message)
+            elif status == "applied" and action in {
+                "ActionDeclareWar", "ActionJoinWar", "ActionOfferPeace", "ActionJoinTreaty",
+                "ActionLeaveTreaty", "ActionExpelTreatyMember", "ActionUpdateTreatyParticipants",
+                "ActionSetGovernmentForm", "ActionSetCountryCapital", "ActionChangePoliticalLaw",
+            } and message:
+                # These domain outcomes confirm the change, unlike transport receipts.
+                self._dialog.enqueue(title, message)
+            elif status == "queued" and action in {"ActionAttackUnit", "ActionMoveUnit"} and message:
+                # A transport acknowledgement alone does not explain why an
+                # order has not started while the unit changes readiness.
+                self._dialog.enqueue("Attack queued" if action == "ActionAttackUnit" else "Move queued", message)
             elif (status == "executed" and action == "ActionSaveGame"
                   and str(record.get("command_id") or "") not in quiet_save_result_ids):
                 # Executed transport records are not proof of domain acceptance.

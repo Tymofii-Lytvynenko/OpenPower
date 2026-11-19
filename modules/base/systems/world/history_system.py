@@ -9,10 +9,9 @@ from typing import Any
 
 import polars as pl
 
-from src.shared.state import GameState
 from src.shared.frame_fingerprint import frame_fingerprint
+from src.shared.state import GameState
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
-
 
 _COUNTRY_INDICATORS = {
     "gdp": "USD/year",
@@ -45,6 +44,43 @@ _COUNTRY_INDICATORS = {
     "budget_infra_ratio": "ratio",
 }
 
+_HISTORICAL_COUNTRY_INDICATORS = {
+    "birth_rate": ("country.baseline_2001.birth_rate", "births/1,000 people/year"),
+    "death_rate": ("country.baseline_2001.death_rate", "deaths/1,000 people/year"),
+    "fertility_rate": ("country.baseline_2001.fertility_rate", "births/woman"),
+    "life_expectancy": ("country.baseline_2001.life_expectancy", "years at birth"),
+    "arable_land_pct": ("country.baseline_2001.arable_land_pct", "% of land area"),
+    "forest_area_pct": ("country.baseline_2001.forest_area_pct", "% of land area"),
+    "reference_land_area_km2": ("country.baseline_2001.land_area", "km²"),
+    "reference_total_area_km2": ("country.baseline_2001.total_surface_area", "km²"),
+    "reference_water_area_km2": ("country.baseline_2001.inland_water_area", "km²"),
+    "national_park_land_area_km2_2001": ("country.baseline_2001.national_park_area", "km²"),
+    "national_park_land_coverage_pct_2001": (
+        "country.baseline_2001.national_park_land_coverage", "% of country area",
+    ),
+    "other_land_pct": ("country.baseline_2001.other_land_pct", "% of land area"),
+    "reference_human_dev": ("country.baseline_2001.human_development", "HDI"),
+    "reference_life_expectancy": ("country.baseline_2001.undp_life_expectancy", "years at birth"),
+    "expected_years_schooling": ("country.baseline_2001.expected_years_schooling", "years"),
+    "mean_years_schooling": ("country.baseline_2001.mean_years_schooling", "years"),
+    "gross_national_income_per_capita_ppp": (
+        "country.baseline_2001.gni_per_capita_ppp", "2021 PPP USD/person/year",
+    ),
+    "terrestrial_protected_area_pct_2000": (
+        "country.baseline_2000.protected_area_pct", "% of country surface area",
+    ),
+    "historical_poverty_rate_pct": (
+        "country.historical_poverty_line_estimate", "% of population",
+    ),
+}
+_HISTORICAL_COUNTRY_INDICATOR_IDS = frozenset(
+    indicator_id for indicator_id, _ in _HISTORICAL_COUNTRY_INDICATORS.values()
+)
+_HISTORICAL_COUNTRY_FIELDS_BY_ID = {
+    indicator_id: field for field, (indicator_id, _) in _HISTORICAL_COUNTRY_INDICATORS.items()
+}
+_HISTORICAL_PROVENANCE_FIELD = "historical_metric_provenance_json"
+
 _TABLES_READ = frozenset({
     "countries", "regions", "countries_relations", "units", "strategic_weapons",
     "regional_infrastructure", "regional_production", "domestic_production",
@@ -57,6 +93,11 @@ _TABLES_READ = frozenset({
 _TABLES_WRITTEN = frozenset({
     "history_indicator_definitions", "history_series_state", "history_snapshots", "history_events",
 })
+_START_SEED_INDICATORS = frozenset({
+    "region.pop_14", "region.pop_15_64", "region.pop_65", "region.population", "country.population",
+} | _HISTORICAL_COUNTRY_INDICATOR_IDS)
+_REGIONAL_POPULATION_SOURCE = "modules/base/data/regions/regions_pop.tsv"
+_REGIONAL_POPULATION_PROVENANCE = "modules/base/data/sources/2001/regional_population_provenance.tsv"
 
 
 class HistorySystem(ISystem):
@@ -92,6 +133,16 @@ class HistorySystem(ISystem):
                 defaults.append(self._definition(
                     f"country.{field}", "country", "countries", field, "id", unit,
                 ))
+            if _HISTORICAL_PROVENANCE_FIELD in countries.columns:
+                for field, (indicator_id, unit) in _HISTORICAL_COUNTRY_INDICATORS.items():
+                    if field not in countries.columns or f"{field}_available" not in countries.columns:
+                        continue
+                    defaults.append(self._definition(
+                        indicator_id, "country", "countries", field, "id", unit,
+                        sample_interval_minutes=5_256_000,
+                        retention_window_minutes=5_256_000,
+                        max_samples_per_series=1,
+                    ))
             for field, unit in (
                 ("gvt_approval", "index"),
                 ("gvt_stability", "index"),
@@ -245,13 +296,17 @@ class HistorySystem(ISystem):
         derivation: str = "",
         filter_field: str = "",
         filter_value: str = "",
+        sample_interval_minutes: int = 1440,
+        retention_window_minutes: int = 5_256_000,
+        max_samples_per_series: int = 3650,
     ) -> dict[str, Any]:
         return {
             "id": indicator_id, "subject_type": subject_type, "source_table": source_table,
             "source_field": source_field, "subject_id_field": subject_id_field,
             "related_id_field": related_id_field, "unit": unit,
-            "sample_interval_minutes": 1440, "retention_window_minutes": 5_256_000,
-            "max_samples_per_series": 3650, "aggregation": aggregation,
+            "sample_interval_minutes": sample_interval_minutes,
+            "retention_window_minutes": retention_window_minutes,
+            "max_samples_per_series": max_samples_per_series, "aggregation": aggregation,
             "derivation": derivation, "filter_field": filter_field, "filter_value": filter_value,
             "missing_data_policy": "mark_gap", "enabled": True, "schema_version": 1,
         }
@@ -262,7 +317,12 @@ class HistorySystem(ISystem):
         snapshots_table = state.tables.get("history_snapshots")
         if definitions is None or series_table is None or snapshots_table is None:
             return
-        enabled = [row for row in definitions.to_dicts() if row.get("enabled", True)]
+        # Static scenario facts are seeded once for new games, never sampled as live simulation state.
+        enabled = [
+            row for row in definitions.to_dicts()
+            if row.get("enabled", True)
+            and str(row.get("id") or "") not in _HISTORICAL_COUNTRY_INDICATOR_IDS
+        ]
         if not enabled:
             return
         previous_revisions = state.globals.get("history_source_revisions")
@@ -317,8 +377,6 @@ class HistorySystem(ISystem):
             values, kinds = self._measure_definition(state, definition)
             indicator_id = str(definition.get("id") or "")
             interval = max(1, int(definition.get("sample_interval_minutes") or 1440))
-            retention = max(interval, int(definition.get("retention_window_minutes") or 5_256_000))
-            limit = max(1, int(definition.get("max_samples_per_series") or 3650))
             subject_type = str(definition.get("subject_type") or "world")
             next_boundary = self._next_boundary(now, interval)
             snapshot_template = dict(snapshot_defaults)
@@ -1096,3 +1154,318 @@ class HistorySystem(ISystem):
     def _slug(value: str) -> str:
         normalized = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
         return normalized or "other"
+
+
+class HistoryStartSeedSystem(ISystem):
+    """Seeds source-backed population and historical country metrics at minute zero for new games."""
+
+    access = SystemAccess(
+        reads=_TABLES_READ,
+        writes=_TABLES_WRITTEN,
+        phase=SystemPhase.STARTUP,
+    )
+
+    @property
+    def id(self) -> str:
+        return "base.history_start_seed"
+
+    @property
+    def dependencies(self) -> list[str]:
+        return []
+
+    def update(self, state: GameState, delta_time: float) -> None:
+        if state.globals.get("history_start_seed_pending") is not True:
+            return
+
+        state.globals["history_start_seed_pending"] = False
+        if int(state.time.total_minutes) != 0:
+            return
+
+        regions = state.tables.get("regions")
+        required_region_columns = {"id", "hex", "owner", "pop_14", "pop_15_64", "pop_65"}
+        region_hex_by_id: dict[str, str] = {}
+        if regions is not None and not regions.is_empty() and required_region_columns.issubset(regions.columns):
+            region_rows = regions.select(["id", "hex"]).to_dicts()
+            candidate_region_hexes = {
+                str(row["id"]): str(row["hex"]).strip()
+                for row in region_rows
+                if row["id"] is not None and row["hex"] is not None and str(row["hex"]).strip()
+            }
+            if len(candidate_region_hexes) == len(region_rows) and len(
+                set(candidate_region_hexes.values())
+            ) == len(candidate_region_hexes):
+                region_hex_by_id = candidate_region_hexes
+
+        history = HistorySystem()
+        history._ensure_defaults(state)
+        definitions_table = state.tables.get("history_indicator_definitions")
+        series_table = state.tables.get("history_series_state")
+        snapshots_table = state.tables.get("history_snapshots")
+        if definitions_table is None or series_table is None or snapshots_table is None:
+            return
+        if series_table.height or snapshots_table.height:
+            return
+
+        expected_definitions = {
+            "region.pop_14": ("region", "regions", "pop_14", "id", "", "people"),
+            "region.pop_15_64": ("region", "regions", "pop_15_64", "id", "", "people"),
+            "region.pop_65": ("region", "regions", "pop_65", "id", "", "people"),
+            "region.population": ("region", "regions", "pop_14", "id", "region_population", "people"),
+            "country.population": ("country", "regions", "id", "owner", "country_population", "people"),
+        }
+        expected_definitions.update({
+            indicator_id: ("country", "countries", field, "id", "", unit)
+            for field, (indicator_id, unit) in _HISTORICAL_COUNTRY_INDICATORS.items()
+        })
+        definitions = {
+            str(row.get("id") or ""): row
+            for row in definitions_table.to_dicts()
+            if str(row.get("id") or "") in _START_SEED_INDICATORS
+        }
+        tick = int(state.globals.get("tick", 0))
+        snapshots: list[dict[str, Any]] = []
+        series: list[dict[str, Any]] = []
+        snapshot_defaults = history._row_defaults(state, "history_snapshots")
+        series_defaults = history._row_defaults(state, "history_series_state")
+
+        for indicator_id in sorted(_START_SEED_INDICATORS):
+            definition = definitions.get(indicator_id)
+            expected = expected_definitions[indicator_id]
+            if indicator_id == "country.population" and not region_hex_by_id:
+                continue
+            if definition is None or not definition.get("enabled", True) or (
+                str(definition.get("subject_type") or ""),
+                str(definition.get("source_table") or ""),
+                str(definition.get("source_field") or ""),
+                str(definition.get("subject_id_field") or ""),
+                str(definition.get("derivation") or ""),
+                str(definition.get("unit") or ""),
+            ) != expected:
+                continue
+
+            source_references: dict[str, str] = {}
+            confidences: dict[str, float] = {}
+            completeness_by_subject: dict[str, str] = {}
+            if indicator_id in _HISTORICAL_COUNTRY_INDICATOR_IDS:
+                field = _HISTORICAL_COUNTRY_FIELDS_BY_ID[indicator_id]
+                (
+                    values, kinds, source_references, confidences, completeness_by_subject,
+                ) = self._historical_baseline_values(state, field)
+            else:
+                values, kinds = history._measure_definition(state, definition)
+            for subject_id, value in sorted(values.items()):
+                if subject_id in source_references:
+                    source_reference = source_references[subject_id]
+                elif indicator_id.startswith("region."):
+                    region_hex = region_hex_by_id.get(str(subject_id))
+                    if not region_hex:
+                        continue
+                    source_reference = (
+                        f"{_REGIONAL_POPULATION_SOURCE}; provenance row: "
+                        f"{_REGIONAL_POPULATION_PROVENANCE}#hex={region_hex} "
+                        "(source, method, and status). Value uses the mod-layered runtime region row."
+                    )
+                else:
+                    source_reference = (
+                        f"Sum of mod-layered {_REGIONAL_POPULATION_SOURCE} cohort rows by owner={subject_id}; "
+                        f"regional source, method, and status are keyed by hex in {_REGIONAL_POPULATION_PROVENANCE}."
+                    )
+
+                value_kind = kinds.get(subject_id, "authoritative")
+                confidence = confidences.get(subject_id, 0.9 if value_kind == "derived" else 1.0)
+                snapshot_id = f"history:{indicator_id}:{definition['subject_type']}:{subject_id}:0:{tick}"
+                snapshot = dict(snapshot_defaults)
+                snapshot.update({
+                    "id": snapshot_id,
+                    "subject_type": str(definition["subject_type"]),
+                    "subject_id": str(subject_id),
+                    "indicator_id": indicator_id,
+                    "value": value,
+                    "unit": str(definition.get("unit") or ""),
+                    "game_minute": 0,
+                    "tick": tick,
+                    "source_boundary": "initial",
+                    "confidence": confidence,
+                    "completeness": completeness_by_subject.get(subject_id, "complete"),
+                    "value_kind": value_kind,
+                    "source_reference": source_reference,
+                })
+                snapshots.append(snapshot)
+
+                series_id = history._series_id(str(definition["subject_type"]), str(subject_id), indicator_id)
+                series_row = dict(series_defaults)
+                series_row.update({
+                    "id": series_id,
+                    "subject_type": str(definition["subject_type"]),
+                    "subject_id": str(subject_id),
+                    "indicator_id": indicator_id,
+                    "unit": str(definition.get("unit") or ""),
+                    "latest_value": value,
+                    "latest_snapshot_id": snapshot_id,
+                    "latest_source_boundary": "initial",
+                    "latest_confidence": confidence,
+                    "latest_value_kind": value_kind,
+                    "last_sample_minute": 0,
+                    "last_sample_tick": tick,
+                    "next_sample_at_minute": history._next_boundary(0, int(definition.get("sample_interval_minutes") or 1440)),
+                    "sample_count": 1,
+                    "last_compacted_at_minute": 0,
+                    "completeness": completeness_by_subject.get(subject_id, "complete"),
+                    "source_revision": int(state.table_revisions.get(str(definition.get("source_table") or "regions"), 0)),
+                    "schema_version": 1,
+                })
+                series.append(series_row)
+
+        if not snapshots:
+            return
+
+        state.update_table("history_snapshots", history._append(snapshots_table, snapshots))
+        state.update_table("history_series_state", history._append(series_table, series))
+        state.globals["history_series_snapshot_revision"] = int(
+            state.table_revisions.get("history_snapshots", 0)
+        )
+
+    @staticmethod
+    def _historical_baseline_values(
+        state: GameState,
+        field: str,
+    ) -> tuple[
+        dict[str, float | None], dict[str, str], dict[str, str], dict[str, float], dict[str, str],
+    ]:
+        countries = state.tables.get("countries")
+        if countries is None or not {"id", field, f"{field}_available", _HISTORICAL_PROVENANCE_FIELD}.issubset(
+            countries.columns
+        ):
+            return {}, {}, {}, {}, {}
+
+        values: dict[str, float | None] = {}
+        kinds: dict[str, str] = {}
+        references: dict[str, str] = {}
+        confidences: dict[str, float] = {}
+        completeness: dict[str, str] = {}
+        for row in countries.to_dicts():
+            subject_id = str(row.get("id") or "").strip()
+            if not subject_id:
+                continue
+            is_available = HistoryStartSeedSystem._is_available(row.get(f"{field}_available"))
+            try:
+                value = float(row.get(field))
+            except (TypeError, ValueError):
+                value = math.nan
+
+            source_index = row.get(_HISTORICAL_PROVENANCE_FIELD)
+            if isinstance(source_index, str):
+                try:
+                    source_index = json.loads(source_index)
+                except json.JSONDecodeError:
+                    continue
+            if not isinstance(source_index, dict):
+                source_index = {}
+            source = source_index.get(field)
+            if not is_available:
+                values[subject_id] = None
+                kinds[subject_id] = "historical_unavailable"
+                status_field = {
+                    "reference_human_dev": "reference_human_dev_status",
+                    "national_park_land_area_km2_2001": "national_park_status",
+                    "national_park_land_coverage_pct_2001": "national_park_status",
+                    "terrestrial_protected_area_pct_2000": "terrestrial_protected_area_method",
+                    "other_land_pct": "other_land_source_flag_description",
+                }.get(field, f"{field}_status")
+                source_status = row.get(status_field) or ""
+                reason = f"; status={source_status}" if source_status else ""
+                references[subject_id] = (
+                    f"No source-backed value is available for {field} in "
+                    f"modules/base/data/countries/countries_historical.tsv; "
+                    f"country={subject_id}; {field}_available=False{reason}."
+                )
+                confidences[subject_id] = 0.0
+                completeness[subject_id] = "missing"
+                continue
+            if not math.isfinite(value) or not isinstance(source, dict) or not str(source.get("source") or "").strip():
+                values[subject_id] = None
+                kinds[subject_id] = "historical_unavailable"
+                references[subject_id] = (
+                    f"Historical value for {field} was marked available but failed numeric/source validation; "
+                    f"country={subject_id}; see modules/base/data/sources/2001/provenance.tsv."
+                )
+                confidences[subject_id] = 0.0
+                completeness[subject_id] = "missing"
+                continue
+
+            value_kind = HistoryStartSeedSystem._historical_value_kind(field, source)
+            values[subject_id] = value
+            kinds[subject_id] = value_kind
+            references[subject_id] = HistoryStartSeedSystem._historical_source_reference(field, source)
+            confidences[subject_id] = {
+                "historical_observation": 1.0,
+                "historical_derived": 0.9,
+                "historical_estimate": 0.65,
+                "historical_imputed": 0.55,
+                "historical_proxy": 0.4,
+                "historical_inference": 0.35,
+            }[value_kind]
+            completeness[subject_id] = "complete"
+        return values, kinds, references, confidences, completeness
+
+    @staticmethod
+    def _is_available(value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        return str(value or "").strip().lower() in {"1", "true", "yes"}
+
+    @staticmethod
+    def _historical_value_kind(field: str, source: dict[str, Any]) -> str:
+        source_name = str(source.get("source") or "").lower()
+        status = str(source.get("reference_human_dev_status") or source.get("national_park_status") or "").lower()
+        if field == "other_land_pct":
+            quality = str(source.get("other_land_source_flag_description") or "").lower()
+            if str(source.get("other_land_source_flag") or "").upper() == "I" or "imput" in quality:
+                return "historical_imputed"
+            if "estimate" in quality:
+                return "historical_estimate"
+        if field == "reference_human_dev":
+            if "proxy" in status:
+                return "historical_proxy"
+            if "estimate" in status or "model" in status:
+                return "historical_estimate"
+        if field == "terrestrial_protected_area_pct_2000":
+            evidence = " ".join((
+                str(source.get("source_note") or ""),
+                str(source.get("terrestrial_protected_area_method") or ""),
+            )).lower()
+            if "derived as zero" in evidence or "derived zero" in evidence:
+                return "historical_inference"
+        if field.startswith("national_park_"):
+            if "inference" in status or "zero" in status:
+                return "historical_inference"
+            if "derived" in status or "sum" in status:
+                return "historical_derived"
+        if "derived" in source_name or field == "reference_water_area_km2":
+            return "historical_derived"
+        if "factbook" in source_name or "estimate" in source_name:
+            return "historical_estimate"
+        return "historical_observation"
+
+    @staticmethod
+    def _historical_source_reference(field: str, source: dict[str, Any]) -> str:
+        observation_year = source.get("observation_year")
+        parts = [
+            "Historical scenario baseline",
+            f"scenario year={source.get('year') or 2001}",
+            f"observation year={observation_year if observation_year is not None else 'not reported'}",
+            f"source={source.get('source')}",
+        ]
+        if source.get("url"):
+            parts.append(f"URL={source['url']}")
+        if source.get("source_note"):
+            parts.append(f"note={source['source_note']}")
+        for key in (
+            "reference_human_dev_status", "reference_human_dev_method", "national_park_status",
+            "national_park_notes", "other_land_source_flag", "other_land_source_flag_description",
+            "terrestrial_protected_area_source", "terrestrial_protected_area_method",
+        ):
+            if source.get(key):
+                parts.append(f"{key}={source[key]}")
+        parts.insert(1, f"indicator field={field}")
+        return "; ".join(parts)

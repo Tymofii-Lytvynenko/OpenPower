@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+
 @dataclass
 class GameAction:
     """
@@ -242,6 +243,9 @@ class ActionUpdateResourcePolicy(GameAction):
     is_gov_controlled: bool
     is_legal: bool
     tax_rate: float # Ratio, e.g. 0.05 for 5%
+    global_tax_modifier: Optional[float] = None
+    desired_trade_usd: Optional[float] = None
+    meet_consumption: Optional[bool] = None
 
 
 @dataclass
@@ -480,6 +484,14 @@ class ActionLeaveTreaty(GameAction):
 
 
 @dataclass
+class ActionSetTreatyPressure(GameAction):
+    """Start or stop a country's diplomatic support without signing an agreement."""
+    treaty_id: str
+    country_tag: str
+    is_supporting: bool = True
+
+
+@dataclass
 class ActionJoinTreaty(GameAction):
     """Requests admission to an active treaty that accepts eligible members."""
 
@@ -514,6 +526,7 @@ class ActionQueueUnitProduction(GameAction):
     quantity: int
     priority: int = 1
     training_level: str = "Recruit"
+    production_speed: str = "normal"
 
 
 @dataclass

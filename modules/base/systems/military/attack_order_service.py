@@ -7,8 +7,11 @@ from typing import Any, Callable, Protocol
 
 import polars as pl
 
+from modules.base.systems.military.authority_policy import player_controls_country
+from modules.base.systems.military.unit_order_workflow import sync_unit_readiness
+
 from src.core.map.geo import GeoCoordinate
-from src.shared.actions import ActionAttackUnit
+from src.shared.actions import ActionAttackUnit, ActionMoveUnit
 from src.shared.state import GameState
 
 
@@ -26,6 +29,8 @@ class _UnitOrderWorkflow(Protocol):
     def release_fortified_for_order(self, state: GameState, unit: dict[str, Any]) -> bool: ...
 
     def queue_attack(self, state: GameState, action: ActionAttackUnit) -> str: ...
+
+    def clear_pending_order(self, state: GameState, unit_id: str) -> None: ...
 
 
 @dataclass
@@ -55,7 +60,16 @@ class MilitaryAttackOrderService:
         self._units_from_rows = units_from_rows
 
     def process(self, state: GameState, units: pl.DataFrame) -> pl.DataFrame:
-        actions = [action for action in state.current_actions if isinstance(action, ActionAttackUnit)]
+        actions = []
+        owners = dict(units.select("id", "owner").iter_rows()) if {"id", "owner"}.issubset(units.columns) else {}
+        for action in state.current_actions:
+            if isinstance(action, ActionAttackUnit):
+                unit_id = str(action.attacker_unit_id)
+                owner = owners.get(unit_id)
+                if not owner or not player_controls_country(state, action.player_id, owner):
+                    self._reject_action(state, action, "The attacker is unavailable or is not controlled by the actor.")
+                    continue
+                actions.append(action)
         if not actions or units.is_empty():
             return units
 
@@ -83,14 +97,61 @@ class MilitaryAttackOrderService:
         context: _AttackOrderContext,
         action: ActionAttackUnit,
     ) -> bool:
+        attacker = context.units_by_id.get(str(action.attacker_unit_id or ""))
+        if attacker is None or not attacker.get("owner") or not player_controls_country(
+            context.state, action.player_id, attacker.get("owner")
+        ):
+            self._reject_action(context.state, action, "The attacker is unavailable or is not controlled by the actor.")
+            return False
         targets = self._resolve_targets(action, context)
         if targets is None:
+            self._reject_action(context.state, action, "The target must be a hostile unit with combat strength in the same region.")
             return False
         attacker, defender = targets
         if not self._prepare_attack(context.state, action, attacker):
-            return False
+            sync_unit_readiness(context.state, attacker)
+            return True
         self._begin_assault(attacker, defender, context.current_minute)
+        self._interrupt_routes(context.state, attacker, defender, context.current_minute)
+        context.state.journal.append_command_result({
+            "tick": int(context.state.globals.get("tick", 0)),
+            "player_id": str(action.player_id),
+            "action_type": type(action).__name__,
+            "status": "applied",
+            "reason": "The unit began its assault.",
+            "unit_id": str(action.attacker_unit_id),
+        })
         return True
+
+    @staticmethod
+    def _interrupt_routes(state: GameState, attacker: dict[str, Any], defender: dict[str, Any], now: int) -> None:
+        routes = state.tables.get("unit_movement_routes")
+        if routes is None or routes.is_empty() or not {"unit_id", "status"}.issubset(routes.columns):
+            return
+        unit_ids = [str(attacker.get("id") or ""), str(defender.get("id") or "")]
+        active = pl.col("unit_id").is_in(unit_ids) & (pl.col("status") == "in_transit")
+        if routes.filter(active).is_empty():
+            return
+        changes = [pl.when(active).then(pl.lit("interrupted")).otherwise(pl.col("status")).alias("status")]
+        if "rejection_reason" in routes.columns:
+            changes.append(pl.when(active).then(pl.lit("Movement interrupted by combat contact."))
+                           .otherwise(pl.col("rejection_reason")).alias("rejection_reason"))
+        if "updated_at_minute" in routes.columns:
+            changes.append(pl.when(active).then(pl.lit(now)).otherwise(pl.col("updated_at_minute"))
+                           .alias("updated_at_minute"))
+        # Route rows must agree with the stopped unit positions before movement advances again.
+        state.update_table("unit_movement_routes", routes.with_columns(changes))
+
+    @staticmethod
+    def _reject_action(state: GameState, action: ActionAttackUnit, reason: str) -> None:
+        state.journal.append_command_result({
+            "tick": int(state.globals.get("tick", 0)),
+            "player_id": str(action.player_id),
+            "action_type": type(action).__name__,
+            "status": "rejected",
+            "reason": reason,
+            "unit_id": str(action.attacker_unit_id),
+        })
 
     def _resolve_targets(
         self,
@@ -114,6 +175,11 @@ class MilitaryAttackOrderService:
         if not self._has_combat_strength(attacker):
             return False
         if not self._has_combat_strength(defender):
+            return False
+        # Direct attacks represent contact, while travel to another region uses movement orders.
+        attacker_region = int(attacker.get("current_region_id") or 0)
+        defender_region = int(defender.get("current_region_id") or 0)
+        if attacker_region <= 0 or attacker_region != defender_region:
             return False
         return self._are_hostile(attacker, defender, hostile_pairs)
 
@@ -155,9 +221,18 @@ class MilitaryAttackOrderService:
             attacker_id,
         )
         if can_execute:
+            self._unit_order_workflow.clear_pending_order(state, attacker_id)
             self._reset_attacker_readiness(attacker)
             return True
         self._unit_order_workflow.queue_attack(state, action)
+        state.journal.append_command_result({
+            "tick": int(state.globals.get("tick", 0)),
+            "player_id": str(action.player_id),
+            "action_type": type(action).__name__,
+            "status": "queued",
+            "reason": "The attack will begin when the unit is ready.",
+            "unit_id": attacker_id,
+        })
         return False
 
     def _reset_attacker_readiness(self, attacker: dict[str, Any]) -> None:

@@ -83,45 +83,28 @@ def _make_cache_newer_than_source(cache_path: Path, source_path: Path) -> None:
     os.utime(cache_path, (newer_time, newer_time))
 
 
-def test_map_indexer_computes_indices_once_then_uses_verified_cache(tmp_path: Path) -> None:
-    class MemoryCache:
-        def __init__(self) -> None:
-            self.archive = None
-            self.saved = 0
-
-        @staticmethod
-        def get_cache_path(source_path: Path, suffix: str) -> Path:
-            return source_path.parent / f"{source_path.stem}{suffix}"
-
-        @staticmethod
-        def compute_file_hash(source_path: Path) -> str:
-            return "source-hash"
-
-        def is_cache_valid(self, source_path: Path, cache_path: Path) -> bool:
-            return self.archive is not None
-
-        def load_numpy_archive(self, cache_path: Path):
-            return self.archive
-
-        def save_numpy_archive(self, cache_path: Path, **values) -> None:
-            self.archive = values
-            self.saved += 1
-
+def test_map_indexer_computes_indices_once_then_uses_verified_cache(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     source = tmp_path / "regions.png"
     source.write_bytes(b"source")
-    cache = MemoryCache()
+    cache = _real_cache_service(tmp_path, monkeypatch)
     indexer = MapIndexer(cache)
     region_ids = np.array([[2, 1], [2, 3]], dtype=np.int32)
 
-    unique_ids, dense_map = indexer.get_indices(source, region_ids)
-    cached_ids, cached_map = indexer.get_indices(source, region_ids)
+    with patch.object(indexer, "_collect_unique_ids", wraps=indexer._collect_unique_ids) as collect:
+        unique_ids, dense_map = indexer.get_indices(source, region_ids)
+        cached_ids, cached_map = indexer.get_indices(source, region_ids)
 
     np.testing.assert_array_equal(unique_ids, [1, 2, 3])
     np.testing.assert_array_equal(dense_map, [[1, 0], [1, 2]])
     np.testing.assert_array_equal(cached_ids, unique_ids)
     np.testing.assert_array_equal(cached_map, dense_map)
     assert dense_map.shape == region_ids.shape
-    assert cache.saved == 1
+    assert dense_map.dtype == np.uint8
+    assert isinstance(cached_map, np.memmap)
+    assert collect.call_count == 1
 
 
 def test_map_indexer_rejects_non_grid_inputs(tmp_path: Path) -> None:
@@ -129,26 +112,44 @@ def test_map_indexer_rejects_non_grid_inputs(tmp_path: Path) -> None:
         MapIndexer(MagicMock()).get_indices(tmp_path / "regions.png", np.array([1, 2]))
 
 
-def test_map_indexer_rejects_invalid_cached_array_shapes(tmp_path: Path) -> None:
-    cache_path = tmp_path / "regions_index.npz"
-    invalid_archives = [
+def test_map_indexer_rejects_invalid_cached_array_shapes(tmp_path: Path, monkeypatch) -> None:
+    cache = _real_cache_service(tmp_path, monkeypatch)
+    source = tmp_path / "regions.png"
+    source.write_bytes(b"source")
+    metadata_path = cache.get_cache_path(source, "_index_v2.npz")
+    dense_path = cache.get_cache_path(source, "_index_v2_dense.npy")
+    invalid_metadata = [
         {
+            "version": np.asarray(MapIndexer.CACHE_VERSION),
             "hash": np.asarray("source-hash"),
             "unique_ids": np.array([[1, 2]]),
-            "dense_map": np.array([[0, 1], [1, 0]]),
+            "shape": np.array([2, 2]),
         },
         {
+            "version": np.asarray(MapIndexer.CACHE_VERSION),
             "hash": np.asarray("source-hash"),
             "unique_ids": np.array([1, 2]),
-            "dense_map": np.array([[0, 1, 1, 0]]),
+            "shape": np.array([1, 4]),
         },
     ]
 
-    for archive in invalid_archives:
-        cache = SimpleNamespace(load_numpy_archive=lambda _path, result=archive: result)
+    for metadata in invalid_metadata:
+        cache.save_numpy_archive(metadata_path, **metadata)
+        cache.save_numpy_array(
+            dense_path,
+            np.array([[0, 1], [1, 0]], dtype=np.uint8),
+            in_background=False,
+        )
+        _make_cache_newer_than_source(metadata_path, source)
+        _make_cache_newer_than_source(dense_path, source)
         indexer = MapIndexer(cache)
 
-        assert indexer._load_from_cache(cache_path, "source-hash", (2, 2)) is None
+        assert indexer._load_from_cache(
+            metadata_path,
+            dense_path,
+            "source-hash",
+            (2, 2),
+        ) is None
 
 
 def test_cache_service_archive_is_copied_closed_and_atomically_replaceable(
@@ -188,16 +189,23 @@ def test_map_indexer_rebuilds_malformed_or_mismatched_archives(
     cache = _real_cache_service(tmp_path, monkeypatch)
     source = tmp_path / "regions.png"
     source.write_bytes(b"source")
-    cache_path = cache.get_cache_path(source, "_index.npz")
-    cache.save_numpy_archive(cache_path, **cached_members)
-    _make_cache_newer_than_source(cache_path, source)
+    metadata_path = cache.get_cache_path(source, "_index_v2.npz")
+    dense_path = cache.get_cache_path(source, "_index_v2_dense.npy")
+    cache.save_numpy_archive(metadata_path, **cached_members)
+    cache.save_numpy_array(
+        dense_path,
+        np.array([[0, 1], [1, 0]], dtype=np.uint8),
+        in_background=False,
+    )
+    _make_cache_newer_than_source(metadata_path, source)
+    _make_cache_newer_than_source(dense_path, source)
     indexer = MapIndexer(cache)
     region_ids = np.array([[2, 1], [2, 3]], dtype=np.int32)
 
-    with patch("src.core.map_indexer.np.unique", wraps=np.unique) as unique:
+    with patch.object(indexer, "_collect_unique_ids", wraps=indexer._collect_unique_ids) as collect:
         unique_ids, dense_map = indexer.get_indices(source, region_ids)
 
-    unique.assert_called_once()
+    collect.assert_called_once()
     np.testing.assert_array_equal(unique_ids, [1, 2, 3])
     np.testing.assert_array_equal(dense_map, [[1, 0], [1, 2]])
     assert dense_map.shape == region_ids.shape
@@ -210,22 +218,31 @@ def test_map_indexer_uses_only_fresh_archives_and_rebuilds_stale_mtime(
     cache = _real_cache_service(tmp_path, monkeypatch)
     source = tmp_path / "regions.png"
     source.write_bytes(b"source")
-    cache_path = cache.get_cache_path(source, "_index.npz")
+    metadata_path = cache.get_cache_path(source, "_index_v2.npz")
+    dense_path = cache.get_cache_path(source, "_index_v2_dense.npy")
     current_hash = cache.compute_file_hash(source)
     region_ids = np.array([[2, 1], [2, 3]], dtype=np.int32)
     cache.save_numpy_archive(
-        cache_path,
+        metadata_path,
+        version=np.asarray(MapIndexer.CACHE_VERSION, dtype=np.int16),
         hash=np.asarray(current_hash),
         unique_ids=np.array([1, 2, 3]),
-        dense_map=np.array([[1, 0], [1, 2]]),
+        shape=np.asarray(region_ids.shape, dtype=np.int64),
     )
+    cache.save_numpy_array(
+        dense_path,
+        np.array([[1, 0], [1, 2]], dtype=np.uint8),
+        in_background=False,
+    )
+    _make_cache_newer_than_source(metadata_path, source)
     stale_time = source.stat().st_mtime - 5.0
-    os.utime(cache_path, (stale_time, stale_time))
+    os.utime(dense_path, (stale_time, stale_time))
 
-    with patch("src.core.map_indexer.np.unique", wraps=np.unique) as unique:
-        MapIndexer(cache).get_indices(source, region_ids)
+    indexer = MapIndexer(cache)
+    with patch.object(indexer, "_collect_unique_ids", wraps=indexer._collect_unique_ids) as collect:
+        indexer.get_indices(source, region_ids)
 
-    unique.assert_called_once()
+    collect.assert_called_once()
 
 
 def test_map_indexer_reads_a_fresh_archive_without_recomputing(
@@ -235,25 +252,30 @@ def test_map_indexer_reads_a_fresh_archive_without_recomputing(
     cache = _real_cache_service(tmp_path, monkeypatch)
     source = tmp_path / "regions.png"
     source.write_bytes(b"source")
-    cache_path = cache.get_cache_path(source, "_index.npz")
+    metadata_path = cache.get_cache_path(source, "_index_v2.npz")
+    dense_path = cache.get_cache_path(source, "_index_v2_dense.npy")
     current_hash = cache.compute_file_hash(source)
     expected_ids = np.array([1, 2, 3])
-    expected_map = np.array([[1, 0], [1, 2]])
+    expected_map = np.array([[1, 0], [1, 2]], dtype=np.uint8)
     cache.save_numpy_archive(
-        cache_path,
+        metadata_path,
+        version=np.asarray(MapIndexer.CACHE_VERSION, dtype=np.int16),
         hash=np.asarray(current_hash),
         unique_ids=expected_ids,
-        dense_map=expected_map,
+        shape=np.asarray(expected_map.shape, dtype=np.int64),
     )
-    _make_cache_newer_than_source(cache_path, source)
+    cache.save_numpy_array(dense_path, expected_map, in_background=False)
+    _make_cache_newer_than_source(metadata_path, source)
+    _make_cache_newer_than_source(dense_path, source)
 
-    with patch("src.core.map_indexer.np.unique", wraps=np.unique) as unique:
-        unique_ids, dense_map = MapIndexer(cache).get_indices(
+    indexer = MapIndexer(cache)
+    with patch.object(indexer, "_collect_unique_ids", wraps=indexer._collect_unique_ids) as collect:
+        unique_ids, dense_map = indexer.get_indices(
             source,
             np.array([[2, 1], [2, 3]], dtype=np.int32),
         )
 
-    unique.assert_not_called()
+    collect.assert_not_called()
     np.testing.assert_array_equal(unique_ids, expected_ids)
     np.testing.assert_array_equal(dense_map, expected_map)
 
@@ -262,17 +284,25 @@ def test_map_indexer_rebuilds_an_unreadable_archive(tmp_path: Path, monkeypatch)
     cache = _real_cache_service(tmp_path, monkeypatch)
     source = tmp_path / "regions.png"
     source.write_bytes(b"source")
-    cache_path = cache.get_cache_path(source, "_index.npz")
-    cache_path.write_bytes(b"not a valid zip archive")
-    _make_cache_newer_than_source(cache_path, source)
+    metadata_path = cache.get_cache_path(source, "_index_v2.npz")
+    dense_path = cache.get_cache_path(source, "_index_v2_dense.npy")
+    metadata_path.write_bytes(b"not a valid zip archive")
+    cache.save_numpy_array(
+        dense_path,
+        np.array([[0, 1], [1, 0]], dtype=np.uint8),
+        in_background=False,
+    )
+    _make_cache_newer_than_source(metadata_path, source)
+    _make_cache_newer_than_source(dense_path, source)
 
-    with patch("src.core.map_indexer.np.unique", wraps=np.unique) as unique:
-        ids, dense_map = MapIndexer(cache).get_indices(
+    indexer = MapIndexer(cache)
+    with patch.object(indexer, "_collect_unique_ids", wraps=indexer._collect_unique_ids) as collect:
+        ids, dense_map = indexer.get_indices(
             source,
             np.array([[3, 1], [3, 2]], dtype=np.int32),
         )
 
-    unique.assert_called_once()
+    collect.assert_called_once()
     np.testing.assert_array_equal(ids, [1, 2, 3])
     np.testing.assert_array_equal(dense_map, [[2, 0], [2, 1]])
 

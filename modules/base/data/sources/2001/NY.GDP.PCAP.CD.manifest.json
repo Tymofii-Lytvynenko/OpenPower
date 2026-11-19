@@ -1,0 +1,9 @@
+{
+  "indicator": "NY.GDP.PCAP.CD",
+  "scenario_year": 2001,
+  "observation_year_filter": "2001",
+  "url": "https://api.worldbank.org/v2/country/all/indicator/NY.GDP.PCAP.CD?date=2001&format=json&per_page=1000",
+  "data_url": "https://data.worldbank.org/indicator/NY.GDP.PCAP.CD",
+  "source_release_last_updated": "2026-11-11",
+  "sha256": "082032fc582faef66f2d9a09583a5b6b11d60f4db7bc10dff00054e026ae4194"
+}

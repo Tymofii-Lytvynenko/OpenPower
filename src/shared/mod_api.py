@@ -29,6 +29,8 @@ class ClientPresentationKeys:
     CAPABILITY_METADATA = "base.military.capability_metadata"
     CANONICAL_ROLE = "base.military.canonical_role"
     INITIAL_PRODUCTION_ETA_DAYS = "base.military.initial_production_eta_days"
+    PRODUCTION_ORDER_QUOTE = "base.military.production_order_quote"
+    TREATY_PRESSURE_SUMMARY = "base.diplomacy.treaty_pressure_summary"
     FOREIGN_GOVERNMENT_CHANGE_RESTRICTION = "base.politics.foreign_government_change_restriction"
     TREATY_ELIGIBILITY_QUERY_SERVICE_FACTORY = "base.politics.treaty_eligibility_query_service_factory"
     COUNTRY_DIPLOMACY_RESTRICTION = "base.politics.country_diplomacy_restriction"

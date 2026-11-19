@@ -155,17 +155,28 @@ class LiveUIBridge:
             import cv2
             from src.client.ui.testing.overlay import save_overlay
             path = Path(report["screenshot"])
-            if frame is not None and not cv2.imwrite(str(path), frame, [cv2.IMWRITE_PNG_COMPRESSION, 1]):
-                raise OSError("Could not save the live UI screenshot.")
+            if frame is not None:
+                pending_frame = path.with_name(f"{path.stem}.pending{path.suffix}")
+                try:
+                    if not cv2.imwrite(
+                        str(pending_frame), frame, [cv2.IMWRITE_PNG_COMPRESSION, 1]
+                    ):
+                        raise OSError("Could not save the live UI screenshot.")
+                    self._replace_pending_file(pending_frame, path)
+                finally:
+                    pending_frame.unlink(missing_ok=True)
             report["overlay"] = save_overlay(path, self.directory / "overlay.png", snapshot, frame=frame)
         pending = self.directory / "report.pending.json"
         pending.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-        # Windows readers may briefly deny replacement while inspecting the
-        # current report. Retry on the artifact worker, never on the render loop.
+        self._replace_pending_file(pending, self.directory / "report.json")
+
+    @staticmethod
+    def _replace_pending_file(pending: Path, destination: Path) -> None:
+        # Windows readers may briefly deny replacement while inspecting artifacts.
         for attempt in range(10):
             try:
-                pending.replace(self.directory / "report.json")
-                break
+                pending.replace(destination)
+                return
             except PermissionError:
                 if attempt == 9:
                     raise

@@ -1,17 +1,24 @@
 """GML-sized split dialogs and compatible-unit merge selection."""
 from __future__ import annotations
 
-from contextlib import contextmanager
 import math
+from contextlib import contextmanager
 
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.layouts.gml_layout import gml_child_frame
-from src.shared.actions import ActionMergeUnits, ActionSplitUnit, ActionListUsedUnit, ActionWithdrawUsedUnitListing
 from src.client.ui.panels.military.unit_training_confirmation import (
-    UnitTrainingConfirmation, training_offer, training_unavailable_reason,
+    UnitTrainingConfirmation,
+    training_offer,
+    training_unavailable_reason,
+)
+from src.shared.actions import (
+    ActionListUsedUnit,
+    ActionMergeUnits,
+    ActionSplitUnit,
+    ActionWithdrawUsedUnitListing,
 )
 
 
@@ -77,16 +84,32 @@ class UnitReorganizationWindows:
             return
         if self._mode == "split":
             if not self._direct_split:
-                self._split(unit)
+                self._split(unit, state)
             if self._mode and self._quantity_direction:
                 self._quantity_window()
         else:
             self._merge(unit, rows)
 
-    def _split(self, unit):
+    @staticmethod
+    def _design_name(state, unit):
+        design_id = str(unit.get("design_id") or "")
+        owner = str(unit.get("owner") or "")
+        designs = getattr(state, "tables", {}).get("unit_designs") if state is not None else None
+        if not design_id or not owner or designs is None or designs.is_empty():
+            return "Unknown design"
+        design = next((row for row in designs.to_dicts()
+                       if str(row.get("id") or "") == design_id
+                       and str(row.get("country_id") or "") == owner), None)
+        if design is None:
+            return "Unknown design"
+        return str(design.get("display_name") or design.get("name") or "Unknown design")
+
+    def _split(self, unit, state=None):
         total = max(0,int(unit.get("strength") or 0))
         self._detached = min(total,max(0,self._detached))
         root = "Split_Group_Window"
+        design_name = self._design_name(state, unit)
+        training_level = str(unit.get("training_level") or "Recruit")
         size = imgui.get_io().display_size
         with WindowManager.window("Split group", x=(size.x-631)/2,y=(size.y-347)/2,w=631,h=347,
                                   test_id="unit.split.group",gml_template=root) as opened:
@@ -102,10 +125,12 @@ class UnitReorganizationWindows:
                     if visible:
                         imgui.dummy((0,4))
                         imgui.set_cursor_pos_x(imgui.get_cursor_pos_x()+5)
-                        imgui.selectable(f"{unit.get('unit_type') or unit.get('type') or 'Unit'}: {count:,}",True,
+                        unit_type = unit.get('unit_type') or unit.get('type') or 'Unit'
+                        imgui.selectable(f"{design_name} · {unit_type}: {count:,}",True,
                                          size=(max(1,imgui.get_content_region_avail().x-5),0),
                                          test_id=f"unit.split.{side}.row")
                         imgui.text(f"Personnel: {count}",test_id=f"unit.split.{side}.strength")
+                        imgui.text(f"Training: {training_level}",test_id=f"unit.split.{side}.training")
                         equipment = max(0,int(unit.get("equipment_quantity") or 0))
                         detached_equipment = equipment*self._detached//total if total else 0
                         imgui.text(f"Equipment: {equipment-detached_equipment if side=='original' else detached_equipment}")
@@ -192,7 +217,9 @@ class UnitReorganizationWindows:
                         if imgui.selectable(key,self._list_unit_id==key,
                             size=(max(1,imgui.get_content_region_avail().x-5),0),test_id=f"unit.group.select.{key}")[0]:
                             self._list_unit_id = key
+                        imgui.text(self._design_name(state, row))
                         imgui.text(str(row.get("unit_type") or row.get("type") or "Unit"))
+                        imgui.text(f"Training: {str(row.get('training_level') or 'Recruit')}")
                         imgui.text(f"Personnel: {int(row.get('strength') or 0)}")
                         imgui.text(f"Equipment: {int(row.get('equipment_quantity') or 0)}")
                 elif visible:
@@ -239,8 +266,10 @@ class UnitReorganizationWindows:
                 changed, selected = imgui.checkbox(f"{key} ({int(row.get('strength') or 0)})",key in self._merge_sources,
                                                    test_id=f"unit.merge.select.{key}")
                 if changed:
-                    if selected:self._merge_sources.add(key)
-                    else:self._merge_sources.discard(key)
+                    if selected:
+                        self._merge_sources.add(key)
+                    else:
+                        self._merge_sources.discard(key)
             if not candidates:
                 imgui.text_wrapped("No compatible units share this location and status.")
             imgui.begin_disabled(not self._merge_sources or not self._available(unit))

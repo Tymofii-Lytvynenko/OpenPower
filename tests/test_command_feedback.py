@@ -18,11 +18,16 @@ def test_new_local_failure_is_delivered_once():
     assert not dialog.is_open
 
 
-def test_history_other_players_and_transport_execution_do_not_raise_notices():
+def test_other_player_ai_and_accepted_transport_results_do_not_raise_notices():
     dialog = GenericMessageDialog()
     records = [result()]
     feedback = CommandFeedback(dialog, records)
-    records += [dict(result(), actor_id="other"), result("executed")]
+    records += [
+        dict(result(), actor_id="other"),
+        dict(result(), actor_id="AI_SYSTEM", player_id="local"),
+        result("accepted"),
+        result("executed"),
+    ]
     feedback.update(records, "local")
     assert not dialog.is_open
 

@@ -14,25 +14,22 @@ from typing import Optional
 
 from src.shared.config import GameConfig
 from src.core.map_data import RegionMapData
+from src.core.paths import resolve_region_map_path
 from src.server.server_process import run_server_process
 from src.server.process_bundle import ServerProcessBundle
 
 
 def _resolve_map_path(config: GameConfig):
     """Finds the technical region map image used for UI pixel-picking."""
-    for data_dir in config.get_data_dirs():
-        candidate = data_dir / "regions" / "regions.png"
-        if candidate.exists():
-            return candidate
-
-    # Fall back to the asset path defined in config
-    return config.get_asset_path("map/regions.png")
+    return resolve_region_map_path(config)
 
 
 def spawn_local_server(
     config: GameConfig,
     save_name: Optional[str] = None,
     player_tag: Optional[str] = None,
+    *,
+    player_party_id: str | None = None,
 ) -> ServerProcessBundle:
     """
     Spawns a background simulation process and returns a bundle with IPC channels.
@@ -52,6 +49,7 @@ def spawn_local_server(
         args=(str(config.project_root), action_queue, state_queue, progress_queue, save_name),
         kwargs={
             "player_tag": player_tag,
+            "player_party_id": player_party_id,
             "snapshot_ack_queue": snapshot_ack_queue,
             "telemetry_queue": telemetry_queue,
         },

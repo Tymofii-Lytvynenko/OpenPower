@@ -148,8 +148,8 @@ class InternalLawsPanel:
             government, rule = party_policy_context(state, self._party_draft.country)
             for party in overview.parties:
                 with gml_row("lstInternalLawsGroups", party.party_id) as row_ui:
-                    row_ui.text("lblName", party.display_name)
-                    row_ui.text("lblPerc", "—" if party.support_pct is None else f"{party.support_pct:.1f}%", right=True)
+                    row_ui.text("lblName", self._party_display_name(party))
+                    row_ui.text("lblPerc", self._party_support_label(party), right=True)
                     editable = bool(context.is_own_country and context.net_client is not None and rule
                                     and rule.get("party_policy_editable") and not party.is_ruling and party.eligible is not None)
                     status = self._party_draft.status(party)
@@ -220,6 +220,24 @@ class InternalLawsPanel:
             if ui.button_at(prefix + slot, title, test_id, size=size,
                             enabled=self._open_migration is not None) and self._open_migration:
                 self._open_migration()
+
+    @staticmethod
+    def _party_display_name(party):
+        if (
+            str(party.party_id or "").strip().casefold() == "incumbent"
+            and str(party.display_name or "").strip().casefold() == "incumbent"
+        ):
+            return "Incumbent (fallback)"
+        return party.display_name
+
+    @staticmethod
+    def _party_support_label(party):
+        if (
+            str(party.party_id or "").strip().casefold() == "incumbent"
+            and str(party.display_name or "").strip().casefold() == "incumbent"
+        ):
+            return "—"
+        return "—" if party.support_pct is None else f"{party.support_pct:.1f}%"
 
     @staticmethod
     def _format_migration_rate(rate: float | None) -> str:

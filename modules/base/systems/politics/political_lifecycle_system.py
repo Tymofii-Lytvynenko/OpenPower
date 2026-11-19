@@ -21,7 +21,7 @@ from modules.base.systems.politics.political_policy import (
     initialize_country_politics,
     normalize_political_indicators,
 )
-from modules.base.systems.world.authority_policy import player_controls_country
+from modules.base.systems.world.authority_policy import LOCAL_CLIENT_ACTORS, player_controls_country
 from modules.base.systems.politics.political_crisis_policy import (
     RegimeChangeAssessment,
     assess_regime_change,
@@ -139,6 +139,17 @@ class PoliticalLifecycleSystem(ISystem):
     def dependencies(self) -> list[str]:
         return ["base.bootstrap", "base.politics"]
 
+    def _reject_unavailable_actions(self, state: GameState, reason: str) -> None:
+        # A handled command must not look successful when required tables are missing.
+        for action in state.current_actions:
+            if type(action) in self.access.handles:
+                state.journal.append_command_result({
+                    "tick": int(state.globals.get("tick", 0)),
+                    "player_id": str(action.player_id),
+                    "action_type": type(action).__name__,
+                    "status": "rejected", "reason": reason, "system_id": self.id,
+                })
+
     def update(self, state: GameState, delta_time: float) -> None:
         required = {
             "countries",
@@ -155,10 +166,12 @@ class PoliticalLifecycleSystem(ISystem):
             "news_items",
         }
         if not required.issubset(state.tables):
+            self._reject_unavailable_actions(state, "Political data is unavailable.")
             return
 
         countries = state.tables["countries"]
         if countries.is_empty() or "id" not in countries.columns:
+            self._reject_unavailable_actions(state, "Country data is unavailable.")
             return
 
         self._initialize_political_state(state, countries)
@@ -877,6 +890,18 @@ class PoliticalLifecycleSystem(ISystem):
             transition_row = transition_index[transition_id]
             transition_row["status"] = outcome
             transition_row["reason"] = reason or "The law became effective at its scheduled game minute."
+            player_id = str(transition.get("player_id") or "")
+            if outcome != "effective" and player_id:
+                state.journal.append_command_result({
+                    "tick": int(state.globals.get("tick", 0)),
+                    "player_id": player_id,
+                    "action_type": ActionChangePoliticalLaw.__name__,
+                    "status": "rejected",
+                    "reason": f"Scheduled law change {outcome}. {transition_row['reason']}",
+                    "country_id": country_id,
+                    "law_id": law_id,
+                    "transition_id": transition_id,
+                })
             if outcome == "effective" and law is not None:
                 old_value = str(law.get("value") or "")
                 new_value = str(transition.get("target_value") or "")
@@ -918,6 +943,21 @@ class PoliticalLifecycleSystem(ISystem):
                         "result": "effective",
                     }
                 )
+                history_changed = True
+            elif outcome != "effective":
+                # The overview reads history, so failed transitions must remain inspectable after notification.
+                history.append({
+                    "id": runtime.next_id("political-history", int(state.globals.get("tick", 0))),
+                    "country_id": country_id,
+                    "event_type": f"law_change_{outcome}",
+                    "source_type": "law_transition",
+                    "source_id": transition_id,
+                    "game_minute": now,
+                    "previous_value": str(transition.get("previous_value") or ""),
+                    "new_value": str(law.get("value") or "") if law is not None else "",
+                    "reason": transition_row["reason"],
+                    "result": outcome,
+                })
                 history_changed = True
 
             state.events.append(
@@ -996,6 +1036,9 @@ class PoliticalLifecycleSystem(ISystem):
     ) -> tuple[bool, bool]:
         mapping = state.globals.get("player_country_map", {})
         actor_country = self._tag(mapping.get(str(action.player_id))) if isinstance(mapping, dict) else ""
+        if not actor_country and self._tag(action.player_id) in LOCAL_CLIENT_ACTORS:
+            # Offline sessions identify their player by the selected country, without a player map.
+            actor_country = self._tag(state.globals.get("player_tag"))
         if not actor_country and str(action.player_id).strip().upper() in {"SERVER", "AI", "AI_SYSTEM"}:
             actor_country = requested_country_id
         if not actor_country:

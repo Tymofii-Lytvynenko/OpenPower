@@ -11,7 +11,7 @@ from src.shared.config import GameConfig
 
 
 class LoadGameTask:
-    """Starts a saved campaign and waits for its first authoritative snapshot."""
+    """Starts a saved session and waits for its first authoritative snapshot."""
 
     def __init__(self, window, config: GameConfig, save_name: str) -> None:
         self.window = window
@@ -44,12 +44,6 @@ class LoadGameTask:
     def run(self):
         session = None
         try:
-            current_session = getattr(self.window, "session", None)
-            if current_session is not None:
-                self.status_text = "Stopping current simulation..."
-                self.progress = 0.1
-                current_session.shutdown()
-
             self.status_text = f"Initializing load for {self.save_name}..."
             self.progress = 0.2
 
@@ -67,7 +61,13 @@ class LoadGameTask:
             self._session = session
             self.status_text = "Synchronizing game state..."
             self.progress = 0.9
-            wait_for_initial_state(session, cancel_event=self._cancel_event)
+            state = wait_for_initial_state(session, cancel_event=self._cancel_event)
+            player_tag = str(state.globals.get("player_tag") or "").strip().upper()
+            countries = state.tables.get("countries")
+            if (not player_tag or countries is None or "id" not in countries.columns
+                    or player_tag not in {str(value or "").strip().upper() for value in countries["id"].to_list()}):
+                # Loading as a default country would silently change the player's identity.
+                raise ValueError("The save does not contain a valid player country.")
             self.progress = 1.0
             self.status_text = "Ready."
             return session

@@ -7,11 +7,13 @@ from typing import Any, Callable, Iterable, Protocol
 
 import polars as pl
 
+from modules.base.systems.military.authority_policy import player_controls_country
 from modules.base.systems.military.movement_access import MovementAccessPolicy
 from modules.base.systems.military.movement_constants import NO_TARGET_REGION
 from modules.base.systems.military.movement_order_policy import MilitaryMovementOrderPolicy
 from modules.base.systems.military.naval_invasion_policy import NavalInvasionPolicy
 from modules.base.systems.military.route_policy import MilitaryRoutePlanner, RegionRouteGraph, RoutePlan
+from modules.base.systems.military.unit_order_workflow import sync_unit_readiness
 from src.core.map.geo import GeoCoordinate
 from src.shared.actions import ActionMoveUnit
 from src.shared.state import GameState
@@ -21,10 +23,18 @@ class _ReadinessPreparer(Protocol):
     def prepare_order(self, state: GameState, unit_id: str) -> bool: ...
 
 
+class _UnitMovement(Protocol):
+    def unit_geo_at(self, row: dict[str, Any], current_minute: int) -> GeoCoordinate: ...
+
+    def stop_unit_at(self, row: dict[str, Any], geo: GeoCoordinate, current_minute: int) -> None: ...
+
+
 class _UnitOrderWorkflow(Protocol):
     def release_fortified_for_order(self, state: GameState, unit: dict[str, Any]) -> bool: ...
 
     def queue_move(self, state: GameState, action: ActionMoveUnit) -> str: ...
+
+    def clear_pending_order(self, state: GameState, unit_id: str) -> None: ...
 
     def record_feedback(
         self,
@@ -44,6 +54,7 @@ class _UnitOrderWorkflow(Protocol):
 class _MovementOrderContext:
     state: GameState
     action_by_unit: dict[str, ActionMoveUnit]
+    player_action_ids: set[int]
     input_unit_rows: list[dict[str, Any]]
     result_rows: list[dict[str, Any]]
     current_minute: int
@@ -85,6 +96,7 @@ class MilitaryMoveOrderService:
         movement_order_policy: MilitaryMovementOrderPolicy,
         readiness_preparer: _ReadinessPreparer,
         unit_order_workflow: _UnitOrderWorkflow,
+        unit_movement: _UnitMovement,
         units_from_rows: Callable[[list[dict[str, Any]]], pl.DataFrame],
         route_schema: dict[str, pl.DataType],
     ) -> None:
@@ -94,6 +106,7 @@ class MilitaryMoveOrderService:
         self._movement_order_policy = movement_order_policy
         self._readiness_preparer = readiness_preparer
         self._unit_order_workflow = unit_order_workflow
+        self._unit_movement = unit_movement
         self._units_from_rows = units_from_rows
         self._route_schema = route_schema
 
@@ -104,14 +117,50 @@ class MilitaryMoveOrderService:
         additional_actions: Iterable[ActionMoveUnit] = (),
         capability_speed_by_unit: dict[str, float] | None = None,
     ) -> pl.DataFrame:
-        actions = [action for action in state.current_actions if isinstance(action, ActionMoveUnit)]
-        actions.extend(additional_actions)
+        owners = dict(units.select("id", "owner").iter_rows()) if {"id", "owner"}.issubset(units.columns) else {}
+        actions = [action for action in state.current_actions
+                   if isinstance(action, ActionMoveUnit)]
+        valid_actions = []
+        for action in actions:
+            if action.unit_id not in owners:
+                reason = "The selected unit no longer exists or has no owner record."
+            elif not owners[action.unit_id] or not player_controls_country(state, action.player_id, owners[action.unit_id]):
+                reason = "The actor does not control the selected unit."
+            elif "regions" not in state.tables:
+                reason = "Region data is unavailable."
+            else:
+                valid_actions.append(action)
+                continue
+            # Send preflight failures to the issuer rather than the unit's owner.
+            state.journal.append_command_result({
+                "tick": int(state.globals.get("tick", 0)),
+                "player_id": str(action.player_id),
+                "action_type": type(action).__name__,
+                "status": "rejected",
+                "reason": reason,
+                "unit_id": action.unit_id,
+            })
+        # Explicit orders take precedence over automatic dispatch in the same tick.
+        actions = [*additional_actions, *valid_actions]
         if not actions or units.is_empty() or "regions" not in state.tables:
             return units
 
-        action_by_unit = {action.unit_id: action for action in actions}
+        action_by_unit = {}
+        for action in actions:
+            previous = action_by_unit.get(action.unit_id)
+            if previous is not None:
+                # The last order wins; report superseded player orders instead of silently dropping them.
+                state.journal.append_command_result({
+                    "tick": int(state.globals.get("tick", 0)),
+                    "player_id": str(previous.player_id),
+                    "action_type": type(previous).__name__,
+                    "status": "rejected",
+                    "reason": "A newer movement order replaced this order in the same simulation step.",
+                    "unit_id": previous.unit_id,
+                })
+            action_by_unit[action.unit_id] = action
 
-        context = self._build_context(state, units, action_by_unit, capability_speed_by_unit)
+        context = self._build_context(state, units, action_by_unit, capability_speed_by_unit, {id(action) for action in valid_actions})
         for row in units.to_dicts():
             self._process_unit(context, row)
         self._publish_results(context)
@@ -123,6 +172,7 @@ class MilitaryMoveOrderService:
         units: pl.DataFrame,
         action_by_unit: dict[str, ActionMoveUnit],
         capability_speed_by_unit: dict[str, float] | None,
+        player_action_ids: set[int],
     ) -> _MovementOrderContext:
         regions = state.get_table("regions")
         region_locations = self._movement_order_policy.region_locations(regions)
@@ -136,6 +186,7 @@ class MilitaryMoveOrderService:
         return _MovementOrderContext(
             state=state,
             action_by_unit=action_by_unit,
+            player_action_ids=player_action_ids,
             input_unit_rows=units.to_dicts(),
             result_rows=[],
             current_minute=int(state.time.total_minutes),
@@ -210,6 +261,10 @@ class MilitaryMoveOrderService:
             unit,
             deployment_dispatch,
         )
+        if not deployment_dispatch and unit.get("is_moving"):
+            # Replacement routes must begin at the current interpolated position,
+            # not the coordinates retained from the previous simulation step.
+            source_geo = self._unit_movement.unit_geo_at(unit, context.current_minute)
         target_geo = self._movement_order_policy.resolve_target_geo(
             action,
             target_region_id,
@@ -246,8 +301,15 @@ class MilitaryMoveOrderService:
             context.prepared_graph.edge_distance_km,
         )
         blocked_domains: list[int] = []
+        missing_locations: list[int] = []
 
         def can_enter(region: dict[str, Any], final: bool) -> bool:
+            region_id = int(region.get("id") or 0)
+            if not final and region_id not in context.region_locations:
+                # Exclude unusable intermediate waypoints while allowing the
+                # planner to find another route before reporting a failure.
+                missing_locations.append(region_id)
+                return False
             domain_allowed, _ = self._movement_order_policy.domain_route_compatible(
                 unit_domain,
                 region,
@@ -278,6 +340,8 @@ class MilitaryMoveOrderService:
                     f"The route contains a region incompatible with the {unit_domain} domain "
                     f"(region {min(blocked_domains)})."
                 )
+            elif missing_locations:
+                reason = f"No usable route was found; region {min(missing_locations)} has no valid location."
             self._reject(context, unit, "move", reason)
             return None
         return _PlannedMovement(
@@ -349,6 +413,16 @@ class MilitaryMoveOrderService:
     ) -> bool:
         if len(route.route_plan.region_ids) >= 2:
             return False
+        if (route.action.target_latitude is not None and route.action.target_longitude is not None
+                and (abs(route.source_geo.latitude - route.target_geo.latitude) > 1e-7
+                     or abs(route.source_geo.longitude - route.target_geo.longitude) > 1e-7)
+                and str(unit.get("engagement_mode") or "").lower() != "positional"):
+            if not self._prepare_order_for_departure(context, unit, route):
+                return True
+            # A clicked point within the same region still requires actual travel.
+            self._start_route(context, unit, route, [route.source_region_id, route.target_region_id],
+                              route.target_region_id, route.target_geo)
+            return True
         if str(unit.get("engagement_mode") or "").lower() == "positional":
             if not self._prepare_order_for_departure(context, unit, route):
                 return True
@@ -361,6 +435,22 @@ class MilitaryMoveOrderService:
                 "The unit escalated its existing contact instead of leaving the battle.",
             )
         else:
+            # A valid local order supersedes an older queued destination even
+            # though no new route needs to be started.
+            self._unit_order_workflow.clear_pending_order(context.state, route.unit_id)
+            if unit.get("unit_lifecycle") == "route_blocked":
+                unit["unit_lifecycle"] = "available"
+            if unit.get("is_moving"):
+                self._unit_movement.stop_unit_at(unit, route.source_geo, context.current_minute)
+            previous_route = context.route_by_unit.get(route.unit_id)
+            if previous_route is not None and previous_route.get("status") in {"in_transit", "blocked"}:
+                # Keep the input snapshot intact so publishing detects this change.
+                context.route_by_unit[route.unit_id] = {
+                    **previous_route,
+                    "status": "interrupted",
+                    "rejection_reason": "Movement stopped by a new local order.",
+                    "updated_at_minute": context.current_minute,
+                }
             self._record(
                 context,
                 route,
@@ -416,6 +506,7 @@ class MilitaryMoveOrderService:
         )
         if not can_execute:
             self._unit_order_workflow.queue_move(context.state, route.action)
+            sync_unit_readiness(context.state, unit)
             self._record(
                 context,
                 route,
@@ -426,6 +517,7 @@ class MilitaryMoveOrderService:
             context.result_rows.append(unit)
             return False
         if not route.deployment_dispatch:
+            self._unit_order_workflow.clear_pending_order(context.state, route.unit_id)
             unit["readiness_status"] = "ready"
             unit["readiness_progress"] = 0.0
             unit["readiness_transition_id"] = ""
@@ -441,10 +533,15 @@ class MilitaryMoveOrderService:
         next_region_id: int,
         next_geo: GeoCoordinate,
     ) -> None:
-        duration = route.segment_duration(
-            context.region_by_id[route.source_region_id],
-            context.region_by_id[next_region_id],
+        duration = (
+            self._movement_order_policy.local_segment_minutes(route.source_geo, next_geo)
+            if route.source_region_id == next_region_id
+            else route.segment_duration(context.region_by_id[route.source_region_id], context.region_by_id[next_region_id])
         )
+        # Contact detection compares the stored position with the new segment;
+        # retain the interpolated replacement position instead of the old tick's.
+        unit["latitude"] = route.source_geo.latitude
+        unit["longitude"] = route.source_geo.longitude
         unit["source_region_id"] = route.source_region_id
         unit["source_latitude"] = route.source_geo.latitude
         unit["source_longitude"] = route.source_geo.longitude
@@ -457,6 +554,9 @@ class MilitaryMoveOrderService:
         unit["is_moving"] = True
         if route.deployment_dispatch:
             unit["unit_lifecycle"] = "deployment_transit"
+        elif unit.get("unit_lifecycle") == "route_blocked":
+            # A replacement route clears the prior access failure.
+            unit["unit_lifecycle"] = "available"
         context.route_by_unit[route.unit_id] = {
             "unit_id": route.unit_id,
             "owner_country_id": route.owner,
@@ -485,6 +585,17 @@ class MilitaryMoveOrderService:
         order_type: str,
         reason: str,
     ) -> None:
+        action = context.action_by_unit.get(str(unit.get("id") or ""))
+        if action is not None and id(action) in context.player_action_ids:
+            # Transport acceptance does not imply that route validation succeeded.
+            context.state.journal.append_command_result({
+                "tick": int(context.state.globals.get("tick", 0)),
+                "player_id": str(action.player_id),
+                "action_type": type(action).__name__,
+                "status": "rejected",
+                "reason": reason,
+                "unit_id": str(unit.get("id") or ""),
+            })
         self._unit_order_workflow.record_feedback(
             context.feedback_rows,
             str(unit.get("id") or ""),
@@ -504,6 +615,16 @@ class MilitaryMoveOrderService:
         status: str,
         reason: str,
     ) -> None:
+        if id(route.action) in context.player_action_ids:
+            # Record the domain outcome separately from command transport acceptance.
+            context.state.journal.append_command_result({
+                "tick": int(context.state.globals.get("tick", 0)),
+                "player_id": str(route.action.player_id),
+                "action_type": type(route.action).__name__,
+                "status": "queued" if status == "queued" else "applied",
+                "reason": reason,
+                "unit_id": route.unit_id,
+            })
         self._unit_order_workflow.record_feedback(
             context.feedback_rows,
             route.unit_id,

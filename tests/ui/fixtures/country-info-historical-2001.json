@@ -1,0 +1,140 @@
+{
+  "test_support": {
+    "country_info_regions_from_base_data": [
+      "UKR",
+      "POL"
+    ],
+    "use_base_region_map": true
+  },
+  "tables": {
+    "countries": [
+      {
+        "id": "UKR",
+        "human_dev": 0.728,
+        "infrastructure_index": 0.58,
+        "telecom_index": 0.72,
+        "reference_year": 2001.0,
+        "birth_rate": 7.779,
+        "death_rate": 15.41,
+        "arable_land_pct": 56.161215154915,
+        "forest_area_pct": 16.4215068611375,
+        "terrestrial_protected_area_pct_2000": 3.5,
+        "reference_land_area_km2": 579350.0,
+        "reference_total_area_km2": 603550.0,
+        "reference_water_area_km2": 24200.0,
+        "climate_description": "temperate continental; Mediterranean only on the southern Crimean coast; precipitation disproportionately distributed, highest in west and north, lesser in east and southeast; winters vary from cool along the Black Sea to cold farther inland; summers are warm across the greater part of the country, hot in the south",
+        "reference_human_dev": 0.728,
+        "reference_life_expectancy": 67.675,
+        "expected_years_schooling": 13.54780006,
+        "mean_years_schooling": 10.93999958,
+        "gross_national_income_per_capita_ppp": 11090.08301,
+        "birth_rate_available": true,
+        "death_rate_available": true,
+        "arable_land_pct_available": true,
+        "forest_area_pct_available": true,
+        "terrestrial_protected_area_pct_2000_available": true,
+        "reference_land_area_km2_available": true,
+        "reference_total_area_km2_available": true,
+        "reference_water_area_km2_available": true,
+        "climate_description_available": true,
+        "reference_human_dev_available": true,
+        "reference_life_expectancy_available": true,
+        "expected_years_schooling_available": true,
+        "mean_years_schooling_available": true,
+        "gross_national_income_per_capita_ppp_available": true,
+        "poverty_rate": 0.3,
+        "fertility_rate": 1.092,
+        "life_expectancy": 67.675
+      },
+      {
+        "id": "POL",
+        "human_dev": 0.809,
+        "infrastructure_index": 0.64,
+        "telecom_index": 0.69,
+        "reference_year": 2001.0,
+        "birth_rate": 9.6,
+        "death_rate": 9.5,
+        "arable_land_pct": 44.350125697868,
+        "forest_area_pct": 29.6646968559209,
+        "terrestrial_protected_area_pct_2000": 21.8,
+        "reference_land_area_km2": 306290.0,
+        "reference_total_area_km2": 312690.0,
+        "reference_water_area_km2": 6400.0,
+        "climate_description": "temperate with cold, cloudy, moderately severe winters with frequent precipitation; mild summers with frequent showers and thundershowers",
+        "reference_human_dev": 0.809,
+        "reference_life_expectancy": 74.177,
+        "expected_years_schooling": 15.26095009,
+        "mean_years_schooling": 11.34641896,
+        "gross_national_income_per_capita_ppp": 18923.50385,
+        "birth_rate_available": true,
+        "death_rate_available": true,
+        "arable_land_pct_available": true,
+        "forest_area_pct_available": true,
+        "terrestrial_protected_area_pct_2000_available": true,
+        "reference_land_area_km2_available": true,
+        "reference_total_area_km2_available": true,
+        "reference_water_area_km2_available": true,
+        "climate_description_available": true,
+        "reference_human_dev_available": true,
+        "reference_life_expectancy_available": true,
+        "expected_years_schooling_available": true,
+        "mean_years_schooling_available": true,
+        "gross_national_income_per_capita_ppp_available": true,
+        "poverty_rate": 0.15,
+        "fertility_rate": 1.31,
+        "life_expectancy": 74.2
+      }
+    ],
+    "regions": [
+      {
+        "id": 1,
+        "name": "Kyiv",
+        "owner": "UKR",
+        "controller": "UKR",
+        "area_km2": 603.0,
+        "pop_14": 100000,
+        "pop_15_64": 500000,
+        "pop_65": 100000,
+        "lat": 50.45,
+        "lon": 30.52
+      },
+      {
+        "id": 4,
+        "name": "Lviv",
+        "owner": "UKR",
+        "controller": "UKR",
+        "area_km2": 218.0,
+        "pop_14": 40000,
+        "pop_15_64": 220000,
+        "pop_65": 60000,
+        "lat": 49.84,
+        "lon": 24.03
+      },
+      {
+        "id": 2,
+        "name": "Warsaw",
+        "owner": "POL",
+        "controller": "POL",
+        "area_km2": 517.0,
+        "pop_14": 120000,
+        "pop_15_64": 570000,
+        "pop_65": 110000,
+        "lat": 52.23,
+        "lon": 21.01
+      }
+    ],
+    "historical_world_indicators": [
+      {
+        "id": "WLD",
+        "year": 2001,
+        "source": "UNDP HDR 2025: 2001 observations",
+        "source_url": "https://hdr.undp.org/sites/default/files/2025_HDR/HDR25_Composite_indices_complete_time_series.csv",
+        "reference_human_dev": 0.657,
+        "reference_life_expectancy": 67.91017422,
+        "expected_years_schooling": 10.33057367,
+        "mean_years_schooling": 7.12685413,
+        "gross_national_income_per_capita_ppp": 12841.37096
+      }
+    ]
+  }
+}

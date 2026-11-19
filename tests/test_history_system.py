@@ -6,7 +6,11 @@ from unittest.mock import patch
 import polars as pl
 
 from modules.base.schema import build_base_schema_registry
-from modules.base.systems.world.history_system import HistorySystem
+from modules.base.systems.world.history_system import (
+    HistoryStartSeedSystem,
+    HistorySystem,
+)
+from src.client.services.history_query_service import HistoryQueryService
 from src.server.io.data_load_manager import DataLoader
 from src.server.io.save_writer import SaveWriter
 from src.shared.config import GameConfig
@@ -17,8 +21,8 @@ from src.shared.events import (
     EventWarEnded,
     EventWarStarted,
 )
-from src.client.services.history_query_service import HistoryQueryService
 from src.shared.state import GameState
+from src.shared.system_interfaces import SystemPhase
 
 
 def _state() -> GameState:
@@ -117,6 +121,242 @@ def test_history_records_authoritative_and_derived_metrics_without_changing_sour
         "politics.gvt_corruption", "country.budget_balance", "country.expense_military_upkeep",
         "country.resource_balance",
     }
+
+
+def test_new_game_population_baseline_is_one_provenanced_minute_zero_point() -> None:
+    state = _state()
+    state.update_table(
+        "regions",
+        state.tables["regions"].with_columns(
+            pl.Series("hex", ["#REGION-1", "#REGION-2", "#REGION-3"])
+        ),
+    )
+    state.globals["history_start_seed_pending"] = True
+    seed_system = HistoryStartSeedSystem()
+
+    assert seed_system.access.phase == SystemPhase.STARTUP
+    assert seed_system.access.phase < SystemPhase.CLOCK
+    seed_system.update(state, 0.0)
+
+    allowed_indicators = {
+        "region.pop_14",
+        "region.pop_15_64",
+        "region.pop_65",
+        "region.population",
+        "country.population",
+    }
+    snapshots = [
+        row for row in _rows(state, "history_snapshots")
+        if row["indicator_id"] in allowed_indicators
+    ]
+    assert len(snapshots) == 14
+    assert all(row["game_minute"] == 0 and row["source_boundary"] == "initial" for row in snapshots)
+    assert all(row["source_reference"] for row in snapshots)
+    assert all(
+        "regional_population_provenance.tsv" in row["source_reference"]
+        for row in snapshots
+    )
+    region_source = next(row["source_reference"] for row in snapshots if row["indicator_id"] == "region.pop_14")
+    assert "#hex=#REGION-1" in region_source
+    country_source = next(row["source_reference"] for row in snapshots if row["indicator_id"] == "country.population")
+    assert "by owner" in country_source
+    assert not any(row["indicator_id"] in {"country.gdp", "country.human_dev"} for row in snapshots)
+
+    counts = {}
+    for row in snapshots:
+        key = (row["subject_type"], row["subject_id"], row["indicator_id"])
+        counts[key] = counts.get(key, 0) + 1
+    assert set(counts.values()) == {1}
+
+    service = HistoryQueryService()
+    series = service.series(state, "region", "1", "region.pop_15_64")
+    assert len(series) == 1
+    assert series[0]["value"] == 60.0
+    assert "#hex=#REGION-1" in series[0]["source_reference"]
+    assert "source_reference" in service.export_csv(series).splitlines()[0]
+
+    initial_count = state.tables["history_snapshots"].height
+    seed_system.update(state, 0.0)
+    HistorySystem().update(state, 0.0)
+    repeated_series = service.series(state, "region", "1", "region.pop_15_64")
+    repeated_population_snapshots = [
+        row for row in _rows(state, "history_snapshots")
+        if row["indicator_id"] in allowed_indicators
+    ]
+    assert len(repeated_series) == 1
+    assert state.tables["history_snapshots"].height >= initial_count
+    assert len(repeated_population_snapshots) == 14
+    assert state.globals["history_start_seed_pending"] is False
+
+
+def test_new_game_seeds_source_backed_country_baselines_without_turning_missing_into_zero() -> None:
+    state = _state()
+    countries = state.tables["countries"].with_columns(
+        pl.Series("birth_rate", [0.0, 12.5]),
+        pl.Series("birth_rate_available", [True, False]),
+        pl.Series("reference_human_dev", [0.75, 0.5]),
+        pl.Series("reference_human_dev_available", [True, False]),
+        pl.Series("reference_human_dev_status", ["official_undp_hdr2025", "not_reported"]),
+        pl.Series("historical_metric_provenance_json", [
+            json.dumps({
+                "birth_rate": {
+                    "year": 2001, "observation_year": 2001, "source": "World Bank WDI",
+                    "source_note": "Dated observation.", "url": "https://data.worldbank.org/indicator/SP.DYN.CBRT.IN",
+                },
+                "reference_human_dev": {
+                    "year": 2001, "observation_year": 2001, "source": "UNDP HDR 2025",
+                    "source_note": "Retrospective series.", "url": "https://hdr.undp.org/",
+                    "reference_human_dev_status": "official_undp_hdr2025",
+                },
+            }),
+            json.dumps({}),
+        ]),
+    )
+    state.update_table("countries", countries)
+    state.update_table(
+        "regions",
+        state.tables["regions"].with_columns(
+            pl.Series("hex", ["#REGION-1", "#REGION-2", "#REGION-3"])
+        ),
+    )
+    state.globals["history_start_seed_pending"] = True
+
+    HistoryStartSeedSystem().update(state, 0.0)
+
+    baselines = [
+        row for row in _rows(state, "history_snapshots")
+        if row["indicator_id"] in {
+            "country.baseline_2001.birth_rate", "country.baseline_2001.human_development",
+        }
+    ]
+    assert {(row["indicator_id"], row["subject_id"], row["value"]) for row in baselines} == {
+        ("country.baseline_2001.birth_rate", "USA", 0.0),
+        ("country.baseline_2001.birth_rate", "CAN", None),
+        ("country.baseline_2001.human_development", "USA", 0.75),
+        ("country.baseline_2001.human_development", "CAN", None),
+    }
+    assert all(row["game_minute"] == 0 and row["source_boundary"] == "initial" for row in baselines)
+    birth_rate = next(
+        row for row in baselines
+        if row["indicator_id"].endswith("birth_rate") and row["subject_id"] == "USA"
+    )
+    assert birth_rate["value_kind"] == "historical_observation"
+    assert "observation year=2001" in birth_rate["source_reference"]
+    assert "https://data.worldbank.org/indicator/SP.DYN.CBRT.IN" in birth_rate["source_reference"]
+    hdi = next(
+        row for row in baselines
+        if row["indicator_id"].endswith("human_development") and row["subject_id"] == "USA"
+    )
+    assert hdi["value_kind"] == "historical_observation"
+    assert "UNDP HDR 2025" in hdi["source_reference"]
+
+    query = HistoryQueryService()
+    series = query.series(state, "country", "USA", "country.baseline_2001.birth_rate")
+    assert len(series) == 1 and series[0]["value"] == 0.0
+    assert "source_reference" in query.export_csv(series).splitlines()[0]
+    unavailable = query.series(state, "country", "CAN", "country.baseline_2001.birth_rate")
+    assert len(unavailable) == 1
+    assert unavailable[0]["value"] is None and unavailable[0]["completeness"] == "missing"
+    assert "birth_rate_available=False" in unavailable[0]["source_reference"]
+
+
+def test_legacy_save_does_not_backfill_static_historical_baselines() -> None:
+    state = _state()
+    state.update_table("countries", state.tables["countries"].with_columns(
+        pl.Series("birth_rate", [12.0, 15.0]),
+        pl.Series("birth_rate_available", [True, True]),
+        pl.Series("historical_metric_provenance_json", [
+            json.dumps({"birth_rate": {
+                "year": 2001, "observation_year": 2001, "source": "World Bank WDI",
+                "url": "https://data.worldbank.org/indicator/SP.DYN.CBRT.IN",
+            }}),
+            json.dumps({"birth_rate": {
+                "year": 2001, "observation_year": 2001, "source": "World Bank WDI",
+                "url": "https://data.worldbank.org/indicator/SP.DYN.CBRT.IN",
+            }}),
+        ]),
+    ))
+
+    HistorySystem().update(state, 0.0)
+
+    assert not any(
+        row["indicator_id"] == "country.baseline_2001.birth_rate"
+        for row in _rows(state, "history_snapshots")
+    )
+
+
+def test_country_historical_baselines_do_not_depend_on_regional_population_rows() -> None:
+    state = _state()
+    countries = state.tables["countries"].with_columns(
+        pl.Series("birth_rate", [12.0, 15.0]),
+        pl.Series("birth_rate_available", [True, True]),
+        pl.Series("historical_metric_provenance_json", [
+            json.dumps({"birth_rate": {
+                "year": 2001, "observation_year": 2001, "source": "World Bank WDI",
+                "url": "https://data.worldbank.org/indicator/SP.DYN.CBRT.IN",
+            }}),
+            json.dumps({"birth_rate": {
+                "year": 2001, "observation_year": 2001, "source": "World Bank WDI",
+                "url": "https://data.worldbank.org/indicator/SP.DYN.CBRT.IN",
+            }}),
+        ]),
+    )
+    state.update_table("countries", countries)
+    empty_regions = state.tables["regions"].head(0).with_columns(
+        pl.Series("hex", [], dtype=pl.Utf8)
+    )
+    state.update_table("regions", empty_regions)
+    state.globals["history_start_seed_pending"] = True
+
+    HistoryStartSeedSystem().update(state, 0.0)
+
+    rows = [
+        row for row in _rows(state, "history_snapshots")
+        if row["indicator_id"] == "country.baseline_2001.birth_rate"
+    ]
+    assert {row["subject_id"] for row in rows} == {"USA", "CAN"}
+    assert not any(row["indicator_id"] == "country.population" for row in _rows(state, "history_snapshots"))
+
+
+def test_historical_baseline_quality_tags_follow_source_method_and_status() -> None:
+    classify = HistoryStartSeedSystem._historical_value_kind
+
+    assert classify("other_land_pct", {"other_land_source_flag": "I"}) == "historical_imputed"
+    assert classify("reference_human_dev", {"reference_human_dev_status": "regional_estimate_proxy"}) == "historical_proxy"
+    assert classify("historical_poverty_rate_pct", {"source": "CIA Factbook 2001"}) == "historical_estimate"
+    assert classify("reference_water_area_km2", {"source": "WDI surface area minus land area"}) == "historical_derived"
+    assert classify("national_park_land_area_km2_2001", {"national_park_status": "bounded_zero_inference"}) == "historical_inference"
+    assert classify("terrestrial_protected_area_pct_2000", {
+        "source_note": "The Maldives value is derived as zero from the official register.",
+    }) == "historical_inference"
+
+
+def test_start_seed_does_not_backfill_existing_or_advanced_games() -> None:
+    old_save = _state()
+    old_save.update_table(
+        "regions",
+        old_save.tables["regions"].with_columns(
+            pl.Series("hex", ["#REGION-1", "#REGION-2", "#REGION-3"])
+        ),
+    )
+    HistoryStartSeedSystem().update(old_save, 0.0)
+    assert old_save.tables["history_snapshots"].is_empty()
+
+    state = _state()
+    state.update_table(
+        "regions",
+        state.tables["regions"].with_columns(
+            pl.Series("hex", ["#REGION-1", "#REGION-2", "#REGION-3"])
+        ),
+    )
+    state.time.total_minutes = 60
+    state.globals["history_start_seed_pending"] = True
+
+    HistoryStartSeedSystem().update(state, 0.0)
+
+    assert state.tables["history_snapshots"].is_empty()
+    assert state.tables["history_series_state"].is_empty()
+    assert state.globals["history_start_seed_pending"] is False
 
 
 def test_source_backed_history_measures_refresh_when_budget_or_resource_inputs_change() -> None:
@@ -685,6 +925,14 @@ def test_history_survives_state_snapshot_roundtrip_without_replaying_events() ->
 
 def test_history_survives_save_load_and_deterministic_replay_continuation(tmp_path) -> None:
     state = _state()
+    state.update_table(
+        "regions",
+        state.tables["regions"].with_columns(
+            pl.Series("hex", ["#REGION-1", "#REGION-2", "#REGION-3"])
+        ),
+    )
+    state.globals["history_start_seed_pending"] = True
+    HistoryStartSeedSystem().update(state, 0.0)
     state.journal.append_domain_event(
         EventWarStarted("war-1", "USA", "CAN"), event_id="saved-war", tick=1,
         source="simulation", game_minute=0,
@@ -705,6 +953,11 @@ def test_history_survives_save_load_and_deterministic_replay_continuation(tmp_pa
         assert all(
             candidate.get_table(name).to_dicts() == state.get_table(name).to_dicts()
             for name in table_names
+        )
+        assert any(
+            row["source_reference"]
+            for row in candidate.get_table("history_snapshots").to_dicts()
+            if row["indicator_id"] == "region.population"
         )
 
     continuations = (state, ipc_copy, loaded)

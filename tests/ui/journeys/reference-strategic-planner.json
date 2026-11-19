@@ -97,6 +97,11 @@
       "visible": true
     },
     {
+      "op": "select",
+      "target": "strategic.multiple.target.usa-icbm",
+      "value": "Poland (POL): Warsaw"
+    },
+    {
       "op": "click",
       "target": "strategic.multiple.missiles"
     },

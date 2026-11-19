@@ -1,0 +1,22 @@
+{
+  "dataset": "FAOSTAT Land Use (RL), Inputs_LandUse_E_All_Data_(Normalized).zip",
+  "url": "https://bulks-faostat.fao.org/production/Inputs_LandUse_E_All_Data_(Normalized).zip",
+  "source_last_modified": "2026-10-02 (verified FAOSTAT bulk archive Last-Modified)",
+  "observation_year": 2001,
+  "item": "Other land (6670)",
+  "denominator": "Land area (6601)",
+  "unit_in_source": "1000 ha",
+  "derived_measure": "Other land area / Land area * 100",
+  "mapped_game_country_count": 193,
+  "other_land_flag_counts": {
+    "I": 193
+  },
+  "source_sha256": "39b739fbfb694971207a2efa572c41e8de2386fc5cb33caaf2a188e9c9a6ca3f",
+  "flags": {
+    "A": "Official value",
+    "E": "Estimated value",
+    "I": "Value imputed by a receiving agency",
+    "L": "Missing value; data exist but were not collected",
+    "X": "Value from external organization"
+  }
+}

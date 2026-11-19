@@ -25,6 +25,7 @@ from modules.base.systems.military.covert_policy import (
 )
 from modules.base.systems.military.production_policy import (
     initial_production_eta_days,
+    production_order_quote,
 )
 from modules.base.systems.military.readiness_policy import ReadinessPolicy
 from modules.base.systems.military.weapons_trade_policy import WeaponsTradePolicy
@@ -34,6 +35,7 @@ from modules.base.systems.world.authority_policy import (
 from modules.base.systems.world.treaty_diplomacy import (
     DiplomacySystem as _DiplomacySystem,
 )
+from modules.base.systems.world.treaty_pressure_policy import treaty_pressure_summary
 from modules.base.systems.world.treaty_proposal_policy import (
     country_diplomacy_restriction,
     treaty_title_restriction,
@@ -103,6 +105,8 @@ def contribute_client_presentation() -> ClientPresentationContribution:
                 ClientPresentationKeys.CAPABILITY_METADATA: CAPABILITY_METADATA,
                 ClientPresentationKeys.CANONICAL_ROLE: canonical_role,
                 ClientPresentationKeys.INITIAL_PRODUCTION_ETA_DAYS: initial_production_eta_days,
+                ClientPresentationKeys.PRODUCTION_ORDER_QUOTE: production_order_quote,
+                ClientPresentationKeys.TREATY_PRESSURE_SUMMARY: treaty_pressure_summary,
                 ClientPresentationKeys.FOREIGN_GOVERNMENT_CHANGE_RESTRICTION:
                     foreign_government_change_restriction,
                 ClientPresentationKeys.TREATY_ELIGIBILITY_QUERY_SERVICE_FACTORY:

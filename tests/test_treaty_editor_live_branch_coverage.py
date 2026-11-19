@@ -193,6 +193,50 @@ def test_render_content_rejects_missing_sponsor_client_or_counterpart(
     assert ("text_disabled", expected) in imgui.calls
 
 
+def test_default_title_tracks_type_but_preserves_manual_title(monkeypatch):
+    module, imgui, _ = _install(monkeypatch)
+    module.TREATY_DEFINITIONS = {
+        "request_war_declaration": _Definition(
+            two_sided=True, multi_member=False, long_term=False
+        ),
+        "cultural_exchanges": _Definition(
+            two_sided=False, multi_member=False, long_term=False
+        ),
+    }
+    panel = LiveTreatyEditorPanel()
+    panel._type_options = [
+        ("request_war_declaration", "Request war declaration"),
+        ("cultural_exchanges", "Cultural exchanges"),
+    ]
+    selected_type = {"index": 0}
+    monkeypatch.setattr(
+        module,
+        "Prims",
+        SimpleNamespace(
+            combo_row=lambda label, index, _options, _width: (
+                selected_type["index"] if label == "TYPE" else index
+            )
+        ),
+    )
+
+    panel._render_content(_state(), _context())
+    assert panel._title == "USA Request war declaration"
+
+    selected_type["index"] = 1
+    panel._render_content(_state(), _context())
+    assert panel._title == "USA Cultural exchanges"
+
+    panel._title = "Custom cultural exchange terms"
+    selected_type["index"] = 0
+    panel._render_content(_state(), _context())
+    assert panel._title == "Custom cultural exchange terms"
+    assert [call[2] for call in imgui.calls if call[:2] == ("input_text", "NAME")] == [
+        "USA Request war declaration",
+        "USA Cultural exchanges",
+        "Custom cultural exchange terms",
+    ]
+
+
 def test_render_content_builds_and_sends_long_term_multimember_proposal(monkeypatch):
     imgui = _FakeImgui(
         buttons={"treaty.proposal.edit_participants", "treaty.proposal.submit"},
@@ -248,7 +292,8 @@ def test_render_content_builds_and_sends_long_term_multimember_proposal(monkeypa
         "allow_members_at_war": True,
     }
     assert action.open_to_new_members is True
-    assert panel._terms == ""
+    # The draft stays editable because the simulation can reject a dispatched proposal.
+    assert panel._terms == "  mutual defense  "
     assert ("begin_disabled", False) in imgui.calls
 
 

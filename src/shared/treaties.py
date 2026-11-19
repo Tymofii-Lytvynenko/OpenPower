@@ -7,9 +7,9 @@ needs to import a gameplay system merely to inspect an agreement.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import re
+from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
 import polars as pl
@@ -233,6 +233,7 @@ TREATY_TYPE_ALIASES: dict[str, str] = {
 
 
 TREATY_SCHEMA: dict[str, pl.DataType] = {
+    "pressure_members": pl.List(pl.Utf8),
     "id": pl.Utf8,
     "name": pl.Utf8,
     "type": pl.Utf8,
@@ -254,6 +255,7 @@ TREATY_SCHEMA: dict[str, pl.DataType] = {
 
 
 PENDING_TREATY_SCHEMA: dict[str, pl.DataType] = {
+    "pressure_members": pl.List(pl.Utf8),
     "id": pl.Utf8,
     "source_country_id": pl.Utf8,
     "target_country_id": pl.Utf8,

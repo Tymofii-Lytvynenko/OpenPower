@@ -1,6 +1,7 @@
 import threading
 from collections.abc import Mapping
 from queue import Empty, Queue
+from time import monotonic
 from typing import TYPE_CHECKING, Optional
 
 import arcade
@@ -9,6 +10,11 @@ from src.client.interfaces.session_factory import ClientSessionPort, SessionFact
 from src.client.services.game_settings_service import GameSettingsService
 from src.client.services.imgui_service import ImGuiService
 from src.client.services.navigation_service import NavigationService
+from src.client.tasks.session_startup import (
+    INITIAL_STATE_TIMEOUT_SECONDS,
+    SERVER_READY_TIMEOUT_SECONDS,
+    shutdown_session,
+)
 from src.shared.config import GameConfig
 
 if TYPE_CHECKING:
@@ -80,7 +86,12 @@ class MainWindow(arcade.Window):
             )
 
     def setup(self):
+        if self._boot_thread is not None and self._boot_thread.is_alive():
+            return
+        previous_session, self.session = self.session, None
+        arcade.unschedule(self._check_server_boot)
         self._boot_ready_received = False
+        self._boot_deadline = None
         self.boot_progress = 0.0
         self.boot_status = "Preparing client..."
         self.boot_error: Optional[str] = None
@@ -92,12 +103,17 @@ class MainWindow(arcade.Window):
         arcade.schedule(self._check_server_boot, 1 / 60)
         self._boot_thread = threading.Thread(
             target=self._create_boot_session,
+            args=(previous_session,),
             name="openpower-session-startup",
             daemon=True,
         )
         self._boot_thread.start()
 
-    def _create_boot_session(self) -> None:
+    def _create_boot_session(self, previous_session: ClientSessionPort | None = None) -> None:
+        # The boot poller must only read messages from the replacement session.
+        shutdown_session(previous_session)
+        if self._boot_closing.is_set():
+            return
         try:
             session = self.session_factory(self.game_config)
         except Exception as exc:
@@ -124,6 +140,7 @@ class MainWindow(arcade.Window):
                 arcade.unschedule(self._check_server_boot)
                 return
             self.session = result  # type: ignore[assignment]
+            self._boot_deadline = monotonic() + SERVER_READY_TIMEOUT_SECONDS
 
         if getattr(self, "_boot_ready_received", False):
             msg_type, progress, text = "READY", 1.0, "Ready"
@@ -131,18 +148,22 @@ class MainWindow(arcade.Window):
             try:
                 msg_type, progress, text = self.session.progress_queue.get_nowait()
             except Empty:
+                self._check_boot_stall("Timed out waiting for the simulation server to become ready.")
                 return
 
         if msg_type == "PROGRESS":
             self.boot_progress = float(progress)
             self.boot_status = str(text)
         elif msg_type == "READY":
+            if not getattr(self, "_boot_ready_received", False):
+                self._boot_deadline = monotonic() + INITIAL_STATE_TIMEOUT_SECONDS
             self._boot_ready_received = True
             self.session.tick(0.0)
             # Progress and snapshots use different queues. Background decoding
             # can finish after READY; navigation needs the first usable world.
             if getattr(self.session, "state", None) is None:
                 self.boot_status = "Synchronizing game state..."
+                self._check_boot_stall("Timed out waiting for the initial game state.")
                 return
             arcade.unschedule(self._check_server_boot)
             self.boot_progress = 1.0
@@ -150,10 +171,22 @@ class MainWindow(arcade.Window):
             self._sync_geo_language_to_session()
             self.nav.show_main_menu(self.session, self.game_config)
         elif msg_type == "ERROR":
-            failed_session, self.session = self.session, None
-            self.boot_error = str(text)
-            self.boot_status = "Server boot failed."
-            arcade.unschedule(self._check_server_boot)
+            self._fail_server_boot(str(text))
+
+    def _check_boot_stall(self, timeout_message: str) -> None:
+        process = getattr(self.session, "process", None)
+        exit_code = getattr(process, "exitcode", None)
+        if isinstance(exit_code, int):
+            self._fail_server_boot(f"The simulation server stopped during startup (exit code {exit_code}).")
+        elif (deadline := getattr(self, "_boot_deadline", None)) is not None and monotonic() >= deadline:
+            self._fail_server_boot(timeout_message)
+
+    def _fail_server_boot(self, message: str) -> None:
+        failed_session, self.session = self.session, None
+        self.boot_error = message
+        self.boot_status = "Server boot failed."
+        arcade.unschedule(self._check_server_boot)
+        if failed_session is not None:
             threading.Thread(target=failed_session.shutdown, daemon=True).start()
 
     def on_resize(self, width: int, height: int):

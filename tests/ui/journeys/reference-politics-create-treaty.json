@@ -1,4 +1,5 @@
 {
+  "fixture": "tests/ui/fixtures/reference-politics-create-treaty.json",
   "steps": [
     {"op": "click", "target": "hud.panel.pol"},
     {"op": "click", "target": "politics.open_treaties"},

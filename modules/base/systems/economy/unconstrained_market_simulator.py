@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
-from modules.base.systems.economy.fast_market_eligibility import FastMarketEligibilityPolicy
-from modules.base.systems.economy.fast_market_input_builder import FastMarketInputBuilder
+from modules.base.systems.economy.fast_market_eligibility import (
+    FastMarketEligibilityPolicy,
+)
+from modules.base.systems.economy.fast_market_input_builder import (
+    FastMarketInputBuilder,
+)
+from modules.base.systems.economy.fast_market_output_publisher import (
+    FastMarketOutputPublisher,
+)
 from modules.base.systems.economy.market_clearing_kernel import (
     UnconstrainedMarketResult,
     calculate_unconstrained_market,
@@ -12,8 +19,9 @@ from modules.base.systems.economy.market_data import (
     _MarketIndexCache,
 )
 from modules.base.systems.economy.market_index_layout import MarketIndexLayoutResolver
-from modules.base.systems.economy.fast_market_output_publisher import FastMarketOutputPublisher
-from modules.base.systems.economy.missing_column_warning_registry import MissingColumnWarningRegistry
+from modules.base.systems.economy.missing_column_warning_registry import (
+    MissingColumnWarningRegistry,
+)
 from src.shared.state import GameState
 
 
@@ -85,6 +93,9 @@ class UnconstrainedMarketSimulator:
             government_controlled=arrays.government_controlled,
             legal=arrays.legal,
             tax_rates=arrays.tax_rates,
+            global_tax_modifiers=arrays.global_tax_modifiers,
+            desired_trade=arrays.desired_trade,
+            meet_consumption=arrays.meet_consumption,
             fraction=fraction,
             row_count=layout.context.production.height,
             country_count=layout.context.countries.height,

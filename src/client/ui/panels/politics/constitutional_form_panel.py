@@ -477,7 +477,9 @@ class ConstitutionalFormPanel:
             self._pending_government_form_id = None
             self._expected_government_form_id = None
             self._pending_martial_law = None
-            self._notify(context, reason)
+            # The shared command feedback already presents authoritative rejections.
+            if context.on_notice is None:
+                self._notify(context, reason)
 
     def _clear_government_form_submission(self) -> None:
         self._submitted_government_form_id = None

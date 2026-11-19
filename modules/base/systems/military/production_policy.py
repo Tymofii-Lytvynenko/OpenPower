@@ -3,18 +3,40 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
 import polars as pl
 
-from src.shared.military_constants import (
-    MAX_PRODUCTION_QUEUE_ORDERS,
-    MAX_UNIT_PRODUCTION_QUANTITY,
-)
-
 DEFAULT_PRODUCTION_COEFFICIENT = 48.0
 _DAYS_PER_YEAR = 365.25
 _TERMINAL_ORDER_STATES = {"cancelled", "completed", "delivered", "awaiting_deployment"}
+
+
+@dataclass(frozen=True, slots=True)
+class ProductionOrderQuote:
+    unit_cost: float
+    total_cost: float
+    work_required: float
+    initial_eta_days: int
+
+
+def production_order_quote(unit_cost: Any, quantity: Any, priority: Any,
+                           production_speed: str = "normal") -> ProductionOrderQuote:
+    """Quote domestic overtime using explicit scenario tuning, not historical statistics."""
+    if production_speed not in {"normal", "fast"}:
+        raise ValueError("Production speed must be normal or fast.")
+    base_unit_cost = _finite_nonnegative(unit_cost)
+    count = max(0, int(quantity))
+    # Overtime costs more cash but reduces factory work; never increase national capacity itself.
+    cost_multiplier, work_multiplier = (1.5, 0.75) if production_speed == "fast" else (1.0, 1.0)
+    paid_unit_cost = base_unit_cost * cost_multiplier
+    return ProductionOrderQuote(
+        unit_cost=paid_unit_cost,
+        total_cost=paid_unit_cost * count,
+        work_required=base_unit_cost * count * work_multiplier,
+        initial_eta_days=max(1, math.ceil(initial_production_eta_days(priority) * work_multiplier)),
+    )
 
 
 def annual_production_capacity(

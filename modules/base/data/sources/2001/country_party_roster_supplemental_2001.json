@@ -1,0 +1,66 @@
+{
+  "data_year": 2001,
+  "data_file": "country_party_roster_supplemental_2001.tsv",
+  "data_sha256": "28749e3df7dd4dcd4ba38ddf2ad3efda1e315345e9cb42c6280f467ef00c35f9",
+  "runtime_file": "modules/base/data/world/country_party_roster_supplemental_2001.toml",
+  "runtime_sha256": "4180b79c08d560b0dc8d107c0bde03941c61a54b4cb6b92e3619118207a4f0b7",
+  "record_count": 49,
+  "country_counts": {
+    "KOS": 14,
+    "MNE": 16,
+    "PSE": 2,
+    "SRB": 4,
+    "SSD": 1,
+    "TLS": 12
+  },
+  "sources": {
+    "OSCE Mission in Kosovo and Kosovo Central Election Commission": {
+      "source_url": "https://omik.osce.org/kosovo/54021",
+      "source_reference": "Kosovo Central Election Commission, final results of the 17 November 2001 Assembly election, announced 26 November 2001",
+      "country_id": "KOS",
+      "record_count": 14
+    },
+    "OSCE Office for Democratic Institutions and Human Rights (OSCE/ODIHR)": {
+      "source_url": "https://www.osce.org/files/f/documents/a/2/15168.pdf",
+      "source_reference": "OSCE/ODIHR Election Observation Mission Report, Montenegro parliamentary election of 22 April 2001, final results table, p. 17",
+      "country_id": "MNE",
+      "record_count": 16
+    },
+    "United Nations Transitional Administration in East Timor (UNTAET)": {
+      "source_url": "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm",
+      "source_reference": "Independent Electoral Commission, final results of the 30 August 2001 Constituent Assembly election, announced 6 September 2001",
+      "country_id": "TLS",
+      "record_count": 12
+    },
+    "National Assembly of the Republic of Serbia": {
+      "source_url": "https://www.parlament.gov.rs/national-assembly/history/after-second-world-war.534.html",
+      "source_reference": "National Assembly of the Republic of Serbia, parliamentary elections of 23 December 2000, seat-winning lists",
+      "country_id": "SRB",
+      "record_count": 4
+    },
+    "Palestinian Central Elections Commission": {
+      "source_url": "https://www.elections.ps/portals/0/pdf/resultselection1996.pdf",
+      "source_reference": "Palestinian Central Elections Commission, The 1996 Presidential and Legislative Elections, Legislative Council results, 20 January 1996",
+      "country_id": "PSE",
+      "record_count": 2
+    },
+    "United States Central Intelligence Agency, The World Factbook 2001": {
+      "source_url": "https://www.gutenberg.org/cache/epub/27638/pg27638.txt",
+      "source_reference": "CIA World Factbook 2001, Sudan, Political pressure groups and leaders (information generally available as of 1 January 2001)",
+      "country_id": "SSD",
+      "record_count": 1
+    }
+  },
+  "limitations": [
+    "Rows are separately sourced electoral or political-context entities, not additions to the CIA Factbook extractor output.",
+    "Kosovo rows include only the 14 entities reported as winning Assembly seats; the OSCE notes 26 contestants.",
+    "Montenegro rows preserve the 16 electoral-list labels in the OSCE/ODIHR result table; these may be parties or coalitions.",
+    "East Timor rows include the 12 parties reported as winning national seats from 16 registered parties.",
+    "Serbia rows include only the four lists reported by the National Assembly history page as winning seats in the 23 December 2000 election.",
+    "Palestinian rows preserve two exact Legislative Council outcome categories from the official 20 January 1996 results; these are historical election context, not a complete 2001 party roster.",
+    "Each row's source_year is the year of the underlying election or source record; records may predate the 2001 scenario year.",
+    "Supplemental leaders are shown only where the cited source explicitly names one; no vote shares, support, eligibility, or ruling-party status are added.",
+    "The CIA Factbook lists the Sudan People's Liberation Army with Dr. John Garang as a political pressure group; its 2001 Sudan-wide entry supplies southern-territory context for SSD, not a separate country party roster or election result.",
+    "No entries are attributed from the combined Yugoslavia Factbook record to Serbia, Kosovo, or Montenegro by this importer."
+  ]
+}

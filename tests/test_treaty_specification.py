@@ -201,7 +201,7 @@ class TreatySpecificationTest(unittest.TestCase):
     ) -> None:
         state.current_actions = [
             ActionCreateTreaty(
-                player_id="player",
+                player_id="USA",
                 source_country_tag="USA",
                 target_country_tag="CAN",
                 treaty_type=treaty_type,
@@ -215,7 +215,7 @@ class TreatySpecificationTest(unittest.TestCase):
         self.system.update(state, 0.1)
 
     def _respond(self, state: GameState, proposal_id: str, country_tag: str) -> None:
-        state.current_actions = [ActionRespondTreaty("player", proposal_id, country_tag, True)]
+        state.current_actions = [ActionRespondTreaty(country_tag, proposal_id, country_tag, True)]
         self.system.update(state, 0.1)
 
     def _state(self) -> GameState:

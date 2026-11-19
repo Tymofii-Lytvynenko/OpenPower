@@ -203,6 +203,13 @@ class DeterministicEconomicPolicyChangeValidator:
                 indicator=str(inputs.requested_policy_name),
             )
 
+        if policy_name not in inputs.country:
+            return self._rejected(
+                policy_name=policy_name,
+                reason="This policy field is unavailable for the selected country.",
+                indicator=policy_name,
+            )
+
         target_value = self._finite_target_value(inputs.target_value)
         if target_value is None:
             return self._rejected(

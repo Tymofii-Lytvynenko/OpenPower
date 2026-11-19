@@ -1,0 +1,11 @@
+{
+  "indicator": "PCPIPCH",
+  "release": "World Economic Outlook, October 2026",
+  "scenario_year_filter": 2001,
+  "url": "https://www.imf.org/external/datamapper/api/v2/PCPIPCH?periods=2001",
+  "country_catalog_url": "https://www.imf.org/external/datamapper/api/v2/countries",
+  "label": "Inflation rate, average consumer prices",
+  "unit": "Annual percent change",
+  "source_last_modified": "2026-10-08 14:43:36",
+  "sha256": "3183be640193b22c1c81f4875e33c66b7a0390aec06de6377be90d52e59223d1"
+}

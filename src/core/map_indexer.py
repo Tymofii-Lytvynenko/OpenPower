@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -11,95 +14,165 @@ logger = logging.getLogger(__name__)
 
 
 class MapIndexer:
-    """
-    Handles calculation of map indices. 
-    Relies on CacheService for storage and integrity checks.
-    """
+    """Build and cache compact dense region IDs for map textures."""
+
+    CACHE_VERSION = 2
+    CHUNK_PIXEL_LIMIT = 1 << 20
 
     def __init__(self, cache_service: CacheService):
         self.cache = cache_service
 
-    def get_indices(self, 
-                    source_path: Path, 
-                    map_data_array: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Retrieves map indices from cache if valid, otherwise computes them.
-        """
+    def get_indices(
+        self,
+        source_path: Path,
+        map_data_array: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Load a verified index cache or build a compact memory-mapped index."""
         if map_data_array.ndim != 2:
             raise ValueError("Map index input must be a 2D region-ID grid.")
+        if not map_data_array.size:
+            raise ValueError("Map index input must not be empty.")
 
-        cache_path = self.cache.get_cache_path(source_path, "_index.npz")
+        metadata_path = self.cache.get_cache_path(source_path, "_index_v2.npz")
+        dense_path = self.cache.get_cache_path(source_path, "_index_v2_dense.npy")
         current_hash = self.cache.compute_file_hash(source_path)
 
-        if self.cache.is_cache_valid(source_path, cache_path):
-            cached_data = self._load_from_cache(
-                cache_path,
+        if self.cache.is_cache_valid(source_path, metadata_path) and self.cache.is_cache_valid(
+            source_path,
+            dense_path,
+        ):
+            cached = self._load_from_cache(
+                metadata_path,
+                dense_path,
                 current_hash,
                 map_data_array.shape,
             )
-        else:
-            cached_data = None
+            if cached is not None:
+                logger.debug("Using validated memory-mapped region index for %s.", source_path)
+                return cached
 
-        if cached_data is not None:
-            logger.debug("Using validated map index cache for %s.", source_path)
-            return cached_data
-
-        logger.info("Rebuilding map index cache for %s.", source_path)
-        return self._compute_and_cache(map_data_array, cache_path, current_hash)
+        logger.info("Building compact region index for %s.", source_path)
+        return self._compute_and_cache(
+            map_data_array,
+            metadata_path,
+            dense_path,
+            current_hash,
+        )
 
     def _load_from_cache(
         self,
-        cache_path: Path,
+        metadata_path: Path,
+        dense_path: Path,
         current_hash: str,
         expected_shape: tuple[int, int],
     ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
-        data = self.cache.load_numpy_archive(cache_path)
-        if not data:
+        metadata = self.cache.load_numpy_archive(metadata_path)
+        if not metadata:
             return None
 
-        required_members = {"hash", "unique_ids", "dense_map"}
-        if not required_members.issubset(data):
+        required_members = {"version", "hash", "unique_ids", "shape"}
+        if not required_members.issubset(metadata):
             logger.warning(
-                "Map index cache %s is missing members: %s.",
-                cache_path,
-                sorted(required_members.difference(data)),
+                "Region index metadata %s is missing members: %s.",
+                metadata_path,
+                sorted(required_members.difference(metadata)),
             )
             return None
 
-        cached_hash = np.asarray(data["hash"])
+        version = np.asarray(metadata["version"])
+        cached_hash = np.asarray(metadata["hash"])
+        unique_ids = np.asarray(metadata["unique_ids"])
+        cached_shape = np.asarray(metadata["shape"])
+        if version.ndim != 0 or int(version.item()) != self.CACHE_VERSION:
+            logger.warning("Region index metadata %s has an unsupported version.", metadata_path)
+            return None
         if cached_hash.ndim != 0 or str(cached_hash.item()) != current_hash:
-            logger.warning("Map index cache %s has a stale or malformed source hash.", cache_path)
+            logger.warning("Region index metadata %s has a stale source hash.", metadata_path)
+            return None
+        if unique_ids.ndim != 1 or not unique_ids.size:
+            logger.warning("Region index metadata %s has invalid unique IDs.", metadata_path)
+            return None
+        if cached_shape.shape != (2,) or tuple(cached_shape.tolist()) != expected_shape:
+            logger.warning("Region index metadata %s has an unexpected map shape.", metadata_path)
             return None
 
-        unique_ids = np.asarray(data["unique_ids"])
-        dense_map = np.asarray(data["dense_map"])
-        if unique_ids.ndim != 1:
-            logger.warning("Map index cache %s has a non-vector unique-ID array.", cache_path)
-            return None
-        if dense_map.ndim != 2 or dense_map.shape != expected_shape:
-            logger.warning(
-                "Map index cache %s has dense-map shape %s; expected %s.",
-                cache_path,
-                dense_map.shape,
-                expected_shape,
-            )
+        dense_map = self.cache.load_numpy_array(dense_path, mmap_mode="r")
+        if (
+            dense_map is None
+            or dense_map.ndim != 2
+            or dense_map.shape != expected_shape
+            or dense_map.dtype.kind not in "ui"
+        ):
+            logger.warning("Region index data %s is missing or malformed.", dense_path)
             return None
 
         return unique_ids, dense_map
 
-    def _compute_and_cache(self, 
-                           map_array: np.ndarray, 
-                           cache_path: Path, 
-                           current_hash: str) -> Tuple[np.ndarray, np.ndarray]:
-        
-        unique_ids, dense_map = np.unique(map_array, return_inverse=True)
-        dense_map = dense_map.reshape(map_array.shape)
+    def _compute_and_cache(
+        self,
+        map_array: np.ndarray,
+        metadata_path: Path,
+        dense_path: Path,
+        current_hash: str,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        unique_ids = self._collect_unique_ids(map_array)
+        dense_dtype = self._smallest_unsigned_dtype(unique_ids.size)
+        temporary_path = dense_path.with_name(f"{dense_path.stem}.tmp.npy")
+        dense_map = None
+
+        try:
+            dense_map = np.lib.format.open_memmap(
+                temporary_path,
+                mode="w+",
+                dtype=dense_dtype,
+                shape=map_array.shape,
+            )
+            rows_per_chunk = max(1, self.CHUNK_PIXEL_LIMIT // map_array.shape[1])
+            for row_start in range(0, map_array.shape[0], rows_per_chunk):
+                row_end = min(map_array.shape[0], row_start + rows_per_chunk)
+                source_rows = map_array[row_start:row_end]
+                dense_map[row_start:row_end] = np.searchsorted(
+                    unique_ids,
+                    source_rows,
+                ).astype(dense_dtype, copy=False)
+            dense_map.flush()
+            del dense_map
+            dense_map = None
+            os.replace(temporary_path, dense_path)
+        except BaseException:
+            if dense_map is not None:
+                dense_map.flush()
+                del dense_map
+            if temporary_path.exists():
+                temporary_path.unlink()
+            raise
 
         self.cache.save_numpy_archive(
-            cache_path,
-            unique_ids=unique_ids,
-            dense_map=dense_map,
+            metadata_path,
+            version=np.asarray(self.CACHE_VERSION, dtype=np.int16),
             hash=np.asarray(current_hash),
+            unique_ids=unique_ids,
+            shape=np.asarray(map_array.shape, dtype=np.int64),
         )
+        cached_map = self.cache.load_numpy_array(dense_path, mmap_mode="r")
+        if cached_map is None:
+            raise OSError(f"Failed to reopen region index cache: {dense_path}")
+        return unique_ids, cached_map
 
-        return unique_ids, dense_map
+    def _collect_unique_ids(self, map_array: np.ndarray) -> np.ndarray:
+        rows_per_chunk = max(1, self.CHUNK_PIXEL_LIMIT // map_array.shape[1])
+        unique_chunks = [
+            np.unique(map_array[row_start : row_start + rows_per_chunk])
+            for row_start in range(0, map_array.shape[0], rows_per_chunk)
+        ]
+        return np.unique(np.concatenate(unique_chunks))
+
+    @staticmethod
+    def _smallest_unsigned_dtype(item_count: int) -> np.dtype:
+        if item_count <= np.iinfo(np.uint8).max + 1:
+            return np.dtype(np.uint8)
+        if item_count <= np.iinfo(np.uint16).max + 1:
+            return np.dtype(np.uint16)
+        if item_count <= np.iinfo(np.uint32).max + 1:
+            return np.dtype(np.uint32)
+        return np.dtype(np.uint64)

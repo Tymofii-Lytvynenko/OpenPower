@@ -1,6 +1,6 @@
 [
   {
-    "source_file": "Client/Source/reference_history_window.cpp",
+    "source_file": "Client/Source/sp2_history_window.cpp",
     "source_line": 147,
     "source_window": "History_Window",
     "target_window": "History_Tooltip_Window",
@@ -19,7 +19,7 @@
     "reason": "The journey covers grouped event markers, text-measured runtime geometry, tooltip dismissal, source offset/edge placement, and the 4 px all-side GML label anchors. reference marker-type labels and localization remain unavailable."
   },
   {
-    "source_file": "Client/Source/reference_advisor_settings_window.cpp",
+    "source_file": "Client/Source/sp2_advisor_settings_window.cpp",
     "source_line": 125,
     "source_window": "Advisor_Settings_Window",
     "target_window": "Save_Confirmation_Window",
@@ -36,7 +36,7 @@
     "reason": "Advisor modes persist through the server-validated ActionUpdateAdvisorSettings action; dirty close uses the shared Apply/Discard dialog. Advisor execution and confirmation workflows remain unsupported."
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 4550,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Unit_Ground_Deployment_Window",
@@ -53,7 +53,7 @@
     "reason": "Restored the source keyboard toggle; second press runs the normal close path, preserving dirty-change confirmation."
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 4567,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Unit_Production_Window",
@@ -70,7 +70,7 @@
     "reason": "Restored the source keyboard toggle; second press runs the normal close path, preserving dirty-change confirmation."
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 4584,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Covert_Actions_Window",
@@ -87,7 +87,7 @@
     "reason": "Restored the source keyboard toggle; second press runs the normal close path, preserving dirty-change confirmation."
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 4611,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "War_List_Window",
@@ -104,7 +104,7 @@
     "reason": "Restored the source keyboard toggle; second press runs the normal close path, preserving dirty-change confirmation."
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 4628,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Budget_Window",
@@ -121,7 +121,7 @@
     "reason": "Restored the source keyboard toggle; second press runs the normal close path, preserving dirty-change confirmation."
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 4646,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Resources_Window",
@@ -138,7 +138,7 @@
     "reason": "Restored the source keyboard toggle; second press runs the normal close path, preserving dirty-change confirmation."
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 4664,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -155,13 +155,13 @@
     "reason": "Restored the source keyboard toggle; second press runs the normal close path, preserving dirty-change confirmation."
   },
   {
-    "source_file": "Client/Source/reference_covert_actions_new_cell.cpp",
+    "source_file": "Client/Source/sp2_covert_actions_new_cell.cpp",
     "source_line": 109,
     "source_window": "Covert_Actions_Cell_Creation",
     "target_window": "Generic_Message_Window",
     "event": "OnMouseClick",
     "mode": "show",
-    "source_excerpt": "         {\n            if(m_pObjNameEdt->Text().Trim() == L\"\")\n            {\n               if(!g_ClientDDL.GenericMessageWindow())\n                  g_ClientDDL.GenericMessageWindowSpawn();\n\n               g_ClientDDL.GenericMessageWindow()->Show( g_ClientDAL.GetString(EStrId::MustEnterName), this );\n            }\n            else\n            {\n               SDK::GGameEventSPtr l_Event = CREATE_GAME_EVENT(reference::Event::GEventCellCreation);\n               reference::Event::GEventCellCreation* l_pEvent = (reference::Event::GEventCellCreation*)l_Event.get();\n",
+    "source_excerpt": "            {\n               if(!g_ClientDDL.GenericMessageWindow())\n                  g_ClientDDL.GenericMessageWindowSpawn();\n\n               g_ClientDDL.GenericMessageWindow()->Show( g_ClientDAL.GetString(EStrId::MustEnterName), this );\n            }\n            else",
     "status": "scenario_bound",
     "reason": "The source rejects an empty cell name with a message. Python keeps the creation dialog open, disables submission for whitespace-only input, and dispatches no ActionCreateCovertCell. This is alternative validation, not a tested Generic Message route.",
     "journey_file": "tests/ui/journeys/reference-covert-empty-name.json",
@@ -175,7 +175,7 @@
     "openpower_surface": "PanelSpec/COVERT_OPS/CovertActionWindows creation dialog"
   },
   {
-    "source_file": "Client/Source/reference_game_lobby_window.cpp",
+    "source_file": "Client/Source/sp2_game_lobby_window.cpp",
     "source_line": 438,
     "source_window": "Game_Lobby",
     "target_window": "Party_Selection_Window",
@@ -186,7 +186,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_game_lobby_window.cpp",
+    "source_file": "Client/Source/sp2_game_lobby_window.cpp",
     "source_line": 424,
     "source_window": "Game_Lobby",
     "target_window": "Country_Profile_Window",
@@ -197,7 +197,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_internal_laws_window.cpp",
+    "source_file": "Client/Source/sp2_internal_laws_window.cpp",
     "source_line": 346,
     "source_window": "Internal_Laws",
     "target_window": "Generic_Message_Window",
@@ -215,7 +215,7 @@
     "reason": "reference reverts an attempted change that would leave every language or religion illegal and displays a warning. IdentityPolicyDraft applies the same guard, GenericMessageDialog displays the reason, and the journey verifies no ActionSetCountryIdentityPolicy is sent. This is equivalent rejection feedback; no acknowledgement callback changes the gameplay result."
   },
   {
-    "source_file": "Client/Source/reference_join_multiplayer_game_window.cpp",
+    "source_file": "Client/Source/sp2_join_multiplayer_game_window.cpp",
     "source_line": 89,
     "source_window": "Join_Multiplayer_Game",
     "target_window": "Generic_Input_Window",
@@ -226,7 +226,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_join_multiplayer_game_window.cpp",
+    "source_file": "Client/Source/sp2_join_multiplayer_game_window.cpp",
     "source_line": 114,
     "source_window": "Join_Multiplayer_Game",
     "target_window": "Server_Info_Window",
@@ -237,7 +237,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_join_multiplayer_game_window.cpp",
+    "source_file": "Client/Source/sp2_join_multiplayer_game_window.cpp",
     "source_line": 126,
     "source_window": "Join_Multiplayer_Game",
     "target_window": "Load_Saved_Game",
@@ -248,7 +248,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_join_multiplayer_game_window.cpp",
+    "source_file": "Client/Source/sp2_join_multiplayer_game_window.cpp",
     "source_line": 128,
     "source_window": "Join_Multiplayer_Game",
     "target_window": "Load_Saved_Game",
@@ -259,7 +259,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_group_split_window.cpp",
+    "source_file": "Client/Source/sp2_group_split_window.cpp",
     "source_line": 115,
     "source_window": "Split_Group_Window",
     "target_window": "Unit_Split_Window",
@@ -270,13 +270,13 @@
     "reason": "The source-sized Python unit-group and split-quantity dialogs are connected to actual unit selection. Split drafts dispatch ActionSplitUnit only on apply (or on accepting the legacy quantity dialog). MilitarySystem authoritatively validates ownership, availability, combat/orders and conservation; deterministic child IDs and personnel/equipment/cost conservation are tested. Merging dispatches ActionMergeUnits and validates compatibility and exact colocation.",
     "journey_file": "tests/ui/journeys/reference-unit-split.json",
     "operation": "click",
-    "control_id": "unit.split.to_reference",
+    "control_id": "unit.split.to_original",
     "expected_region": "unit.split.quantity",
     "expected_visible": true,
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_group_split_window.cpp",
+    "source_file": "Client/Source/sp2_group_split_window.cpp",
     "source_line": 138,
     "source_window": "Split_Group_Window",
     "target_window": "Unit_Split_Window",
@@ -293,7 +293,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_start_single_player_window.cpp",
+    "source_file": "Client/Source/sp2_start_single_player_window.cpp",
     "source_line": 217,
     "source_window": "Start_Single_Player",
     "target_window": "Generic_Message_Window",
@@ -311,7 +311,7 @@
     "verification_kind": "equivalent_validation"
   },
   {
-    "source_file": "Client/Source/reference_start_single_player_window.cpp",
+    "source_file": "Client/Source/sp2_start_single_player_window.cpp",
     "source_line": 295,
     "source_window": "Start_Single_Player",
     "target_window": "Country_Profile_Window",
@@ -328,7 +328,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_start_single_player_window.cpp",
+    "source_file": "Client/Source/sp2_start_single_player_window.cpp",
     "source_line": 309,
     "source_window": "Start_Single_Player",
     "target_window": "Party_Selection_Window",
@@ -345,7 +345,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_strategic_launch_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_launch_window.cpp",
     "source_line": 169,
     "source_window": "Strategic_Launch_Window",
     "target_window": "Strategic_Target_Country_Window",
@@ -362,7 +362,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_strategic_launch_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_launch_window.cpp",
     "source_line": 169,
     "source_window": "Strategic_Launch_Window",
     "target_window": "Strategic_Launch_Window",
@@ -379,7 +379,7 @@
     "expected_present": false
   },
   {
-    "source_file": "Client/Source/reference_strategic_launch_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_launch_window.cpp",
     "source_line": 169,
     "source_window": "Strategic_Launch_Window",
     "target_window": "Strategic_Target_Multiple_Countries_Window",
@@ -396,7 +396,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_strategic_missile_list_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_missile_list_window.cpp",
     "source_line": 218,
     "source_window": "Strategic_Missile_List_Window",
     "target_window": "Strategic_Missile_List_Window",
@@ -413,7 +413,7 @@
     "expected_present": false
   },
   {
-    "source_file": "Client/Source/reference_strategic_missile_list_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_missile_list_window.cpp",
     "source_line": 182,
     "source_window": "Strategic_Missile_List_Window",
     "target_window": "Strategic_Missile_List_Window",
@@ -430,7 +430,7 @@
     "expected_present": false
   },
   {
-    "source_file": "Client/Source/reference_strategic_select_target_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_select_target_window.cpp",
     "source_line": 63,
     "source_window": "Strategic_Select_Target_Window",
     "target_window": "Strategic_Select_Target_Window",
@@ -447,7 +447,7 @@
     "expected_present": false
   },
   {
-    "source_file": "Client/Source/reference_strategic_target_country_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_target_country_window.cpp",
     "source_line": 216,
     "source_window": "Strategic_Target_Country_Window",
     "target_window": "Strategic_Launch_Window",
@@ -464,7 +464,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_strategic_target_country_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_target_country_window.cpp",
     "source_line": 361,
     "source_window": "Strategic_Target_Country_Window",
     "target_window": "Strategic_Select_Target_Window",
@@ -481,7 +481,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_strategic_target_multiple_countries_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_target_multiple_countries_window.cpp",
     "source_line": 140,
     "source_window": "Strategic_Target_Multiple_Countries_Window",
     "target_window": "Strategic_Missile_List_Window",
@@ -498,7 +498,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_strategic_target_multiple_countries_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_target_multiple_countries_window.cpp",
     "source_line": 109,
     "source_window": "Strategic_Target_Multiple_Countries_Window",
     "target_window": "Strategic_Launch_Window",
@@ -515,7 +515,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_strategic_target_multiple_countries_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_target_multiple_countries_window.cpp",
     "source_line": 134,
     "source_window": "Strategic_Target_Multiple_Countries_Window",
     "target_window": "Strategic_Target_Country_Window",
@@ -532,7 +532,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_strategic_target_multiple_countries_window.cpp",
+    "source_file": "Client/Source/sp2_strategic_target_multiple_countries_window.cpp",
     "source_line": 134,
     "source_window": "Strategic_Target_Multiple_Countries_Window",
     "target_window": "Strategic_Target_Multiple_Countries_Window",
@@ -549,7 +549,7 @@
     "expected_present": false
   },
   {
-    "source_file": "Client/Source/reference_strategic_warfare.cpp",
+    "source_file": "Client/Source/sp2_strategic_warfare.cpp",
     "source_line": 42,
     "source_window": "Strategic_Warfare",
     "target_window": "Strategic_Warfare",
@@ -566,7 +566,7 @@
     "reason": "The consolidated OpenPower strategic panel has a tested close route; per-target reference dialogs remain separate gaps."
   },
   {
-    "source_file": "Client/Source/reference_submenu_multi.cpp",
+    "source_file": "Client/Source/sp2_submenu_multi.cpp",
     "source_line": 47,
     "source_window": "Submenu_Multi",
     "target_window": "Join_Multiplayer_Game",
@@ -584,13 +584,13 @@
     "verification_kind": "literal_route"
   },
   {
-    "source_file": "Client/Source/reference_submenu_multi.cpp",
+    "source_file": "Client/Source/sp2_submenu_multi.cpp",
     "source_line": 55,
     "source_window": "Submenu_Multi",
     "target_window": "Join_Multiplayer_Game",
     "event": "OnMouseClick",
     "mode": "show",
-    "source_excerpt": "      }\n      else if(in_pCaller == m_pObjLAN)\n      {\n         g_ClientDDL.m_bLAN = true;\n         g_ClientDDL.JoinMPGameWindowSpawn();\n         g_ClientDDL.JoinMPGameWindow()->Show();\n         g_ClientDCL.JoinMultiplayerGame();\n      }\n      else if(in_pCaller == m_pObjReturnMain)\n      {\n         g_referenceClient->m_pStateMachine->SendEvent(FSM::EEvents::SubMenuBackBtn);\n      }\n   }",
+    "source_excerpt": "      {\n         g_ClientDDL.m_bLAN = true;\n         g_ClientDDL.JoinMPGameWindowSpawn();\n         g_ClientDDL.JoinMPGameWindow()->Show();\n         g_ClientDCL.JoinMultiplayerGame();\n      }\n      else if(in_pCaller == m_pObjReturnMain)",
     "status": "scenario_bound",
     "reason": "The source menu opens the matching source-sized server browser, and the journey checks its Internet/LAN state, cancel and load-game routes. Server discovery and connection remain unavailable in OpenPower.",
     "journey_file": "tests/ui/journeys/reference-main-menu-navigation.json",
@@ -602,13 +602,13 @@
     "verification_kind": "literal_route"
   },
   {
-    "source_file": "Client/Source/reference_submenu_single.cpp",
+    "source_file": "Client/Source/sp2_submenu_single.cpp",
     "source_line": 76,
     "source_window": "Submenu_Single",
     "target_window": "Load_Saved_Game",
     "event": "OnMouseClick",
     "mode": "show",
-    "source_excerpt": "      }\n      else if(in_pCaller == m_pObjLoadGame)\n      {\n         if(!g_ClientDDL.LoadGameWindow())\n            g_ClientDDL.LoadGameWindowSpawn();\n\n         g_ClientDDL.LoadGameWindow()->Show(true);\n      }\n      else if(in_pCaller == m_pObjReturnMain)\n      {\n         g_referenceClient->m_pStateMachine->SendEvent(FSM::EEvents::SubMenuBackBtn);\n      }\n   }",
+    "source_excerpt": "      {\n         if(!g_ClientDDL.LoadGameWindow())\n            g_ClientDDL.LoadGameWindowSpawn();\n\n         g_ClientDDL.LoadGameWindow()->Show(true);\n      }\n      else if(in_pCaller == m_pObjReturnMain)",
     "status": "scenario_bound",
     "reason": "OpenPower does not reproduce the reference single-player submenu, but its in-game Load control opens the same source-sized saved-game list and is verified as an equivalent entry point.",
     "journey_file": "tests/ui/journeys/reference-load-saved-game-route.json",
@@ -620,7 +620,7 @@
     "verification_kind": "equivalent_validation"
   },
   {
-    "source_file": "Client/Source/reference_treaties_window.cpp",
+    "source_file": "Client/Source/sp2_treaties_window.cpp",
     "source_line": 143,
     "source_window": "Treaties_Window",
     "target_window": "Generic_Message_Window",
@@ -637,7 +637,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_treaties_detailed_window.cpp",
+    "source_file": "Client/Source/sp2_treaties_detailed_window.cpp",
     "source_line": 289,
     "source_window": "Treaty_Details_Window",
     "target_window": "Generic_Message_Window",
@@ -654,13 +654,13 @@
     "reason": "The source control removes ineligible tags from the staged participant sides, displays the generic acknowledgement notice, and requires Apply to dispatch ActionUpdateTreatyParticipants. The journey verifies the notice, removed draft member, and saved sides."
   },
   {
-    "source_file": "Client/Source/reference_treaties_detailed_window.cpp",
+    "source_file": "Client/Source/sp2_treaties_detailed_window.cpp",
     "source_line": 157,
     "source_window": "Treaty_Details_Window",
     "target_window": "Generic_Message_Window",
     "event": "OnMouseClick",
     "mode": "show",
-    "source_excerpt": "         //Ensure the treaty name is not already used\n         GString l_sTreatyName = m_pObjNameEdt->Text();\n         {\n            if(!g_ClientDDL.GenericMessageWindow())\n               g_ClientDDL.GenericMessageWindowSpawn();\n\n            hash_map<UINT32, reference::GTreaty>::const_iterator l_It = g_ClientDAL.Treaties().begin();\n            while(l_It != g_ClientDAL.Treaties().end())\n            {\n               if(l_It->second.Name() == l_sTreatyName)\n               {\n                  m_bTreatySameName = true;\n                  g_ClientDDL.GenericMessageWindow()->Show( g_ClientDAL.GetString(EStrId::TreatyWithSameName), this );",
+    "source_excerpt": "         {\n            if(!g_ClientDDL.GenericMessageWindow())\n               g_ClientDDL.GenericMessageWindowSpawn();\n\n            hash_map<UINT32, SP2::GTreaty>::const_iterator l_It = g_ClientDAL.Treaties().begin();\n            while(l_It != g_ClientDAL.Treaties().end())\n            {",
     "status": "scenario_bound",
     "reason": "The current treaty name is reserved; acknowledgement retains the draft, then changing its name allows a single proposal. Both rules are rechecked by DiplomacySystem.",
     "journey_file": "tests/ui/journeys/reference-treaty-duplicate-name.json",
@@ -671,7 +671,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_unit_list_window.cpp",
+    "source_file": "Client/Source/sp2_unit_list_window.cpp",
     "source_line": 555,
     "source_window": "Unit_List_Window",
     "target_window": "Unit_Split_Window",
@@ -688,7 +688,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_unit_list_window.cpp",
+    "source_file": "Client/Source/sp2_unit_list_window.cpp",
     "source_line": 107,
     "source_window": "Unit_List_Window",
     "target_window": "Unit_List_Window",
@@ -705,7 +705,7 @@
     "expected_present": false
   },
   {
-    "source_file": "Client/Source/reference_create_design_window.cpp",
+    "source_file": "Client/Source/sp2_create_design_window.cpp",
     "source_line": 591,
     "source_window": "Unit_New_Design",
     "target_window": "Generic_Message_Window",
@@ -722,7 +722,7 @@
     "reason": "The native journey selects Tank, submits ActionCreateUnitDesign with gun_range=0, and asserts the source-equivalent capability rejection, draft retention, and GenericMessageDialog acknowledgement; ResearchProgramSystem verifies the same rule authoritatively."
   },
   {
-    "source_file": "Client/Source/reference_base_window.cpp",
+    "source_file": "Client/Source/sp2_base_window.cpp",
     "source_line": 101,
     "source_window": "frmBaseWindow",
     "target_window": "Save_Confirmation_Window",
@@ -740,7 +740,7 @@
     "verification_kind": "shared_component_contract"
   },
   {
-    "source_file": "Client/Source/reference_RGAPI_login.cpp",
+    "source_file": "Client/Source/sp2_RGAPI_login.cpp",
     "source_line": 184,
     "source_window": "frmBaseWindow",
     "target_window": "Connecting_Window",
@@ -751,7 +751,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_RGAPI_login.cpp",
+    "source_file": "Client/Source/sp2_RGAPI_login.cpp",
     "source_line": 188,
     "source_window": "frmBaseWindow",
     "target_window": "Connecting_Window",
@@ -762,7 +762,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_RGAPI_login.cpp",
+    "source_file": "Client/Source/sp2_RGAPI_login.cpp",
     "source_line": 203,
     "source_window": "frmBaseWindow",
     "target_window": "Connecting_Window",
@@ -773,7 +773,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_RGAPI_login.cpp",
+    "source_file": "Client/Source/sp2_RGAPI_login.cpp",
     "source_line": 203,
     "source_window": "frmBaseWindow",
     "target_window": "Generic_Message_Window",
@@ -784,7 +784,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_RGAPI_login.cpp",
+    "source_file": "Client/Source/sp2_RGAPI_login.cpp",
     "source_line": 207,
     "source_window": "frmBaseWindow",
     "target_window": "Connecting_Window",
@@ -795,7 +795,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_RGAPI_login.cpp",
+    "source_file": "Client/Source/sp2_RGAPI_login.cpp",
     "source_line": 218,
     "source_window": "frmBaseWindow",
     "target_window": "Generic_Message_Window",
@@ -806,13 +806,13 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 5217,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Small_Unit_Info_Window",
     "event": "Initialize",
     "mode": "show",
-    "source_excerpt": "}\n\nvoid GBackgroundEarth::Initialize()\n{\n   g_ClientDDL.UnitInfoSmallWindowSpawn();\n   //   g_ClientDDL.UnitInfoSmallWindow()->SendToBack();\n   g_referenceClient->DDL().MiniMapSpawn();\n   m_pMiniMap = g_referenceClient->DDL().MiniMap();\n\n\n   // Create Sphere Control Window\n   g_ClientDDL.SphereControlWindowSpawn();\n",
+    "source_excerpt": "void GBackgroundEarth::Initialize()\n{\n   g_ClientDDL.UnitInfoSmallWindowSpawn();\n   //   g_ClientDDL.UnitInfoSmallWindow()->SendToBack();\n   g_SP2Client->DDL().MiniMapSpawn();\n   m_pMiniMap = g_SP2Client->DDL().MiniMap();\n",
     "status": "scenario_bound",
     "reason": "Initialized map-attached frame remains hidden until one visible unit group is selected; exact GML composition and changing selection are exercised through UnitInteractionController.",
     "journey_file": "tests/ui/journeys/reference-map-unit-composition.json",
@@ -823,13 +823,13 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 5224,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Sphere_Control_Window",
     "event": "Initialize",
     "mode": "show",
-    "source_excerpt": "   m_pMiniMap = g_referenceClient->DDL().MiniMap();\n\n\n   // Create Sphere Control Window\n   g_ClientDDL.SphereControlWindowSpawn();\n\n   // Update initial zoom of minimap\n   g_ClientDCL.m_EarthState.m_Zoom = 0;\n   g_ClientDCL.m_EarthState.m_Latitude = 0;\n   g_ClientDCL.m_EarthState.m_Longitude = 0;\n   g_ClientDCL.UpdateWorldPosition(g_ClientDCL.m_EarthState);\n\n   UpdateCamera();",
+    "source_excerpt": "\n   // Create Sphere Control Window\n   g_ClientDDL.SphereControlWindowSpawn();\n\n   // Update initial zoom of minimap\n   g_ClientDCL.m_EarthState.m_Zoom = 0;\n   g_ClientDCL.m_EarthState.m_Latitude = 0;",
     "status": "scenario_bound",
     "reason": "Initialized frame remains hidden until Tab is held over a valid map region; key release and ocean hits hide it. Political owner and military controller are separately bound.",
     "journey_file": "tests/ui/journeys/reference-map-region-control.json",
@@ -840,7 +840,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 7977,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -859,7 +859,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 7986,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -878,7 +878,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 7994,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -897,7 +897,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8002,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -916,7 +916,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8010,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -935,7 +935,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8018,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -954,7 +954,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8026,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -973,7 +973,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8034,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -992,7 +992,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8042,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1011,7 +1011,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8050,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1030,7 +1030,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8058,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1049,7 +1049,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8066,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1068,7 +1068,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8074,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1087,7 +1087,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8082,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1106,7 +1106,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8090,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1125,7 +1125,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8098,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1144,7 +1144,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8107,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1163,7 +1163,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8119,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1182,7 +1182,7 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8131,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Treaties_Window",
@@ -1201,13 +1201,13 @@
     "openpower_surface": "PanelSpec/NEW_TREATY"
   },
   {
-    "source_file": "Client/Source/reference_background_earth.cpp",
+    "source_file": "Client/Source/sp2_background_earth.cpp",
     "source_line": 8374,
     "source_window": "BACKGROUND_EARTH",
     "target_window": "Split_Group_Window",
     "event": "HandleContextMenuMilitary",
     "mode": "show",
-    "source_excerpt": "         {\n            if( g_ClientDAL.SelectedUnitsID().size() )\n            {\n               if(!g_ClientDDL.GroupSplitWindow())\n                  g_ClientDDL.GroupSplitWindowSpawn();\n\n               reference::GUnitGroup* l_pGroup = (reference::GUnitGroup*)g_Joshua.UnitManager().UnitGroup( *g_ClientDAL.SelectedUnitsID().begin() );\n               \n               g_ClientDDL.GroupSplitWindow()->Update( l_pGroup->Id() );\n               g_ClientDDL.GroupSplitWindow()->Show();\n            }\n         }\n      }",
+    "source_excerpt": "            {\n               if(!g_ClientDDL.GroupSplitWindow())\n                  g_ClientDDL.GroupSplitWindowSpawn();\n\n               SP2::GUnitGroup* l_pGroup = (SP2::GUnitGroup*)g_Joshua.UnitManager().UnitGroup( *g_ClientDAL.SelectedUnitsID().begin() );\n               \n               g_ClientDDL.GroupSplitWindow()->Update( l_pGroup->Id() );",
     "status": "scenario_bound",
     "reason": "The source-sized Python unit-group and split-quantity dialogs are connected to actual unit selection. Split drafts dispatch ActionSplitUnit only on apply (or on accepting the legacy quantity dialog). MilitarySystem authoritatively validates ownership, availability, combat/orders and conservation; deterministic child IDs and personnel/equipment/cost conservation are tested. Merging dispatches ActionMergeUnits and validates compatibility and exact colocation.",
     "journey_file": "tests/ui/journeys/reference-unit-context-split.json",
@@ -1218,7 +1218,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_client.cpp",
+    "source_file": "Client/Source/sp2_client.cpp",
     "source_line": 258,
     "source_window": "callback:GClient",
     "target_window": "Generic_Message_Window",
@@ -1229,7 +1229,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_client.cpp",
+    "source_file": "Client/Source/sp2_client.cpp",
     "source_line": 355,
     "source_window": "callback:GClient",
     "target_window": "Save_Game_Window",
@@ -1246,7 +1246,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_client.cpp",
+    "source_file": "Client/Source/sp2_client.cpp",
     "source_line": 367,
     "source_window": "callback:GClient",
     "target_window": "Load_Saved_Game",
@@ -1263,7 +1263,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_client.cpp",
+    "source_file": "Client/Source/sp2_client.cpp",
     "source_line": 385,
     "source_window": "callback:GClient",
     "target_window": "Objectives_Window",
@@ -1280,7 +1280,7 @@
     "reason": "F5 toggles the OpenPower objectives surface."
   },
   {
-    "source_file": "Client/Source/reference_client_advisor.cpp",
+    "source_file": "Client/Source/sp2_client_advisor.cpp",
     "source_line": 199,
     "source_window": "callback:GClientAdvisor",
     "target_window": "Generic_Message_Window",
@@ -1291,7 +1291,7 @@
     "reason": "Persisted MAIL message presentation is verified through PanelRenderContext.on_notice and GameLayout.GenericMessageDialog, but OpenPower has no caller-specific producer or in-memory push queue equivalent to the source EHE advisor messages. MAIL and NEWS are separate workflows, not substitutes for that queue."
   },
   {
-    "source_file": "Client/Source/reference_client_advisor.cpp",
+    "source_file": "Client/Source/sp2_client_advisor.cpp",
     "source_line": 760,
     "source_window": "callback:GClientAdvisor",
     "target_window": "Generic_Message_Window",
@@ -1302,7 +1302,7 @@
     "reason": "This source branch reports an impossible advisor event with its dynamic reason and cancels the event. OpenPower has no matching authoritative advisor-event action or result surface; unrelated command failures are not equivalent."
   },
   {
-    "source_file": "Client/Source/reference_client_advisor.cpp",
+    "source_file": "Client/Source/sp2_client_advisor.cpp",
     "source_line": 1368,
     "source_window": "callback:GClientAdvisor",
     "target_window": "Region_Control_Change_Window",
@@ -1320,7 +1320,7 @@
     "reason": "OpenPower territory ownership events are grouped into a local inbox item; VIEW opens the 358x248 GML-sized gained/lost dialog with named regions. The journey checks the exact gained mail row and dialog content."
   },
   {
-    "source_file": "Client/Source/reference_client_advisor.cpp",
+    "source_file": "Client/Source/sp2_client_advisor.cpp",
     "source_line": 1392,
     "source_window": "callback:GClientAdvisor",
     "target_window": "Region_Control_Change_Window",
@@ -1338,7 +1338,7 @@
     "reason": "OpenPower territory ownership events are grouped into a local inbox item; VIEW opens the 358x248 GML-sized gained/lost dialog with named regions. The journey checks the exact lost mail row and dialog content."
   },
   {
-    "source_file": "Client/Source/reference_data_access_layer.cpp",
+    "source_file": "Client/Source/sp2_data_access_layer.cpp",
     "source_line": 779,
     "source_window": "callback:GDataAccessLayerClient",
     "target_window": "Event_Log",
@@ -1356,13 +1356,13 @@
     "reason": "For the Event_Log data path, source InsertPendingNews populates the event list but does not call Show; OpenPower receives authoritative news_items in state snapshots and EventFeedPresenter renders them on the next frame. The server-snapshot journey verifies that incoming news remains visible in the open feed without inventing an automatic panel pop-up. reference's separate pending-news priority queue and advisor callbacks are outside this route."
   },
   {
-    "source_file": "Client/Source/reference_data_access_layer.cpp",
+    "source_file": "Client/Source/sp2_data_access_layer.cpp",
     "source_line": 2046,
     "source_window": "callback:GDataAccessLayerClient",
     "target_window": "Mail_Window",
     "event": "AddTreatyRefusalMail",
     "mode": "show",
-    "source_excerpt": "INT32 GDataAccessLayerClient::AddTreatyRefusalMail(const reference::GTreatyRefusalDetails & in_TreatyDetails)\n{\n\t// ensure mail window available\n   if(!g_ClientDDL.MailWindow())\n      g_ClientDDL.MailWindowSpawn();\n\n\t// Retrieve our next mail id\n   INT32 l_iID = g_ClientDDL.MailWindow()->NextMailID();\n   // add into our trade mails array\n   m_TreatyRefusalMail[l_iID] = in_TreatyDetails;\n   // add the mail in mail window\n\tGString l_sName = in_TreatyDetails.TreatyName() + g_ClientDAL.GetString(102318);\n   g_ClientDDL.MailWindow()->AddMail(l_sName, GDataControlLayer::ShowTreatyRefusal, (void*)l_iID);",
+    "source_excerpt": "\t// ensure mail window available\n   if(!g_ClientDDL.MailWindow())\n      g_ClientDDL.MailWindowSpawn();\n\n\t// Retrieve our next mail id\n   INT32 l_iID = g_ClientDDL.MailWindow()->NextMailID();\n   // add into our trade mails array",
     "status": "scenario_bound",
     "reason": "Authoritative refusal preserves sponsor/title/acceptances after proposal deletion and adds exact sponsor-only dispatch; foreign refusals are excluded.",
     "journey_file": "tests/ui/journeys/reference-treaty-refusal-mail.json",
@@ -1373,13 +1373,13 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_access_layer.cpp",
+    "source_file": "Client/Source/sp2_data_access_layer.cpp",
     "source_line": 2075,
     "source_window": "callback:GDataAccessLayerClient",
     "target_window": "Mail_Window",
     "event": "AddTradeMail",
     "mode": "show",
-    "source_excerpt": "INT32 GDataAccessLayerClient::AddTradeMail(const reference::GTradeData & in_Trade)\n{\n   // ensure mail window available\n   if(!g_ClientDDL.MailWindow())\n      g_ClientDDL.MailWindowSpawn();\n   // Retrieve the trade text string to display\n   GString l_strTrade;\n   if(in_Trade.Status() == ETradeStatus::Accepted)\n   {\n      l_strTrade = g_ClientDAL.GetString(reference::TradeStrings::c_StrIdTradeAccepted);\n   }\n   else if(in_Trade.Status() == ETradeStatus::Refused)\n   {",
+    "source_excerpt": "   // ensure mail window available\n   if(!g_ClientDDL.MailWindow())\n      g_ClientDDL.MailWindowSpawn();\n   // Retrieve the trade text string to display\n   GString l_strTrade;\n   if(in_Trade.Status() == ETradeStatus::Accepted)\n   {",
     "status": "scenario_bound",
     "reason": "Authoritative trade event delivery adds the exact contextual mail row to the already-open mailbox; this source path adds mail without forcing the window open.",
     "journey_file": "tests/ui/journeys/reference-live-combat-mail.json",
@@ -1390,13 +1390,13 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_access_layer.cpp",
+    "source_file": "Client/Source/sp2_data_access_layer.cpp",
     "source_line": 2124,
     "source_window": "callback:GDataAccessLayerClient",
     "target_window": "Mail_Window",
     "event": "AddCombatOverMail",
     "mode": "show",
-    "source_excerpt": "INT32 GDataAccessLayerClient::AddCombatOverMail(const reference::GArenaInfo &in_ArenaInfo)\n{\n   // ensure mail window available\n   if(!g_ClientDDL.MailWindow())\n      g_ClientDDL.MailWindowSpawn();\n   // Retrieve the battle mail text to display\n   GString l_sBattleMail;\n   // bool to know if we won\n   bool l_bWon = false;\n   switch(in_ArenaInfo.m_eWinnerSide)\n   {\n      // attackers won\n      case ECombatSide::Attacker:",
+    "source_excerpt": "   // ensure mail window available\n   if(!g_ClientDDL.MailWindow())\n      g_ClientDDL.MailWindowSpawn();\n   // Retrieve the battle mail text to display\n   GString l_sBattleMail;\n   // bool to know if we won\n   bool l_bWon = false;",
     "status": "scenario_bound",
     "reason": "A new local combat result adds its exact mail row without interrupting gameplay with a summary; clicking that row opens that battle result. Foreign combat is excluded.",
     "journey_file": "tests/ui/journeys/reference-live-combat-mail.json",
@@ -1407,7 +1407,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 396,
     "source_window": "callback:GDataControlLayer",
     "target_window": "non-GML/GConsole",
@@ -1424,7 +1424,7 @@
     "reason": "F9 toggles the OpenPower diagnostic console; this does not implement reference console commands."
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 645,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Unit_Attack_Confirm_Window",
@@ -1441,13 +1441,13 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 841,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Battle_Window",
     "event": "DisplayCombatInfo",
     "mode": "show",
-    "source_excerpt": "   if(!in_pArena)\n      return false;\n\n\n   if(!g_ClientDDL.BattleOverviewWindowSpawn())\n      return false;\n\n\n   reference::GArenaInfo* l_pArenaInfo = (reference::GArenaInfo*)in_pArena;\n   // Set Theme\n   SetThemeFromArena(l_pArenaInfo);\n   //Advise the DAL that this combat is the displayed one\n   g_ClientDAL.DisplayedOverallCombat(l_pArenaInfo->m_iId);",
+    "source_excerpt": "\n\n   if(!g_ClientDDL.BattleOverviewWindowSpawn())\n      return false;\n\n\n   SP2::GArenaInfo* l_pArenaInfo = (SP2::GArenaInfo*)in_pArena;",
     "status": "scenario_bound",
     "reason": "A click on the real renderer's displaced battle label passes its hit test and exact battle ID through the GameLayout entry point also used by GameView. The participant frame dispatches owner-only force orders, presets and retreat.",
     "journey_file": "tests/ui/journeys/reference-battle-inspection-own.json",
@@ -1458,13 +1458,13 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 866,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Battle_Info_Window",
     "event": "DisplayCombatInfoSmall",
     "mode": "show",
-    "source_excerpt": "{\n   if(!in_pArena)\n      return false;\n\n   if(!g_ClientDDL.BattleInfoWindowSpawn())\n      return false;\n\n   //Advise the DAL that this combat is the displayed one\n   g_ClientDAL.DisplayedInfoCombat(in_pArena->m_iId);\n\n   g_ClientDDL.BattleInfoWindow()->SetArena((reference::GArenaInfo*)in_pArena);\n\n   g_ClientDDL.BattleInfoWindow()->UpdateContent();",
+    "source_excerpt": "      return false;\n\n   if(!g_ClientDDL.BattleInfoWindowSpawn())\n      return false;\n\n   //Advise the DAL that this combat is the displayed one\n   g_ClientDAL.DisplayedInfoCombat(in_pArena->m_iId);",
     "status": "scenario_bound",
     "reason": "A non-participant battle label opens the observer source frame with country flags and published category group totals. Missing or stale aggregates show a dash; foreign commands and private roster details remain unavailable.",
     "journey_file": "tests/ui/journeys/reference-battle-inspection-observed.json",
@@ -1475,7 +1475,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1291,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Treaty_Details_Window",
@@ -1492,7 +1492,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1305,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Region_Control_Change_Window",
@@ -1509,7 +1509,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1356,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Trade_Detailed_Window",
@@ -1526,7 +1526,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1371,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Battle_Summary_Window",
@@ -1543,7 +1543,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1385,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Covert_Actions_Window",
@@ -1560,7 +1560,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1401,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Covert_Actions_Mission_Outcome",
@@ -1577,7 +1577,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1410,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Covert_Actions_Mission_Outcome_Attacked",
@@ -1594,7 +1594,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1433,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Generic_Message_Window",
@@ -1611,7 +1611,7 @@
     "reason": "New local movement and naval-invasion refusals from the authoritative unit_order_feedback table open the shared message dialog; each incoming batch counts rows by refusal reason across order types, and unrelated countries are excluded."
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1694,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Generic_Message_Window",
@@ -1622,7 +1622,7 @@
     "reason": "LoadGameData only creates the generic dialog. GenericMessageWindowSpawn passes visible=false to ObjectSpawn, and no Show call occurs here; this is hidden base-window initialization, not a user-visible route."
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1703,
     "source_window": "callback:GDataControlLayer",
     "target_window": "System_Bar_Window",
@@ -1633,7 +1633,7 @@
     "reason": "LoadGameData creates the system bar with visible=false as part of base-window initialization. The spawn site does not show it and is not a user-visible route."
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1705,
     "source_window": "callback:GDataControlLayer",
     "target_window": "non-GML/GConsole",
@@ -1644,7 +1644,7 @@
     "reason": "ConsoleWindowSpawn creates the engine console hidden and LoadGameData immediately calls ConsoleWindowHide. This initialization site cannot display or navigate to the console."
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1877,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Generic_Message_Window",
@@ -1655,7 +1655,7 @@
     "reason": "Both GenericMessageWindowSpawn and Show are inside a block comment in IterateGame; this legacy call is inactive and has no runtime route."
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 2356,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Generic_Message_Window",
@@ -1672,7 +1672,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 2574,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Generic_Message_Window",
@@ -1690,7 +1690,7 @@
     "verification_kind": "equivalent_alternate_feedback"
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 2594,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Generic_Message_Window",
@@ -1708,7 +1708,7 @@
     "verification_kind": "equivalent_alternate_feedback"
   },
   {
-    "source_file": "Client/Source/reference_military_event_handler.cpp",
+    "source_file": "Client/Source/sp2_military_event_handler.cpp",
     "source_line": 204,
     "source_window": "callback:GMilitaryEventHandler",
     "target_window": "Battle_Summary_Window",
@@ -1725,7 +1725,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_RGAPI_login.cpp",
+    "source_file": "Client/Source/sp2_RGAPI_login.cpp",
     "source_line": 240,
     "source_window": "frmBaseWindow",
     "target_window": "Generic_Message_Window",
@@ -1736,7 +1736,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_RGAPI_login.cpp",
+    "source_file": "Client/Source/sp2_RGAPI_login.cpp",
     "source_line": 247,
     "source_window": "frmBaseWindow",
     "target_window": "Join_Multiplayer_Game",
@@ -1747,7 +1747,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_RGAPI_login.cpp",
+    "source_file": "Client/Source/sp2_RGAPI_login.cpp",
     "source_line": 267,
     "source_window": "frmBaseWindow",
     "target_window": "Generic_Message_Window",
@@ -1758,7 +1758,7 @@
     "reason": "No matching reference RGAPI/lobby/server-browser/password workflow is implemented in OpenPower; do not substitute a local menu click for a network callback."
   },
   {
-    "source_file": "Client/Source/reference_treaties_detailed_window.cpp",
+    "source_file": "Client/Source/sp2_treaties_detailed_window.cpp",
     "source_line": 920,
     "source_window": "Treaty_Details_Window",
     "target_window": "Generic_Message_Window",
@@ -1775,7 +1775,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_treaties_detailed_window.cpp",
+    "source_file": "Client/Source/sp2_treaties_detailed_window.cpp",
     "source_line": 1982,
     "source_window": "Treaty_Details_Window",
     "target_window": "Generic_Message_Window",
@@ -1792,7 +1792,7 @@
     "expected_present": true
   },
   {
-    "source_file": "Client/Source/reference_tutorials.cpp",
+    "source_file": "Client/Source/sp2_tutorials.cpp",
     "source_line": 656,
     "source_window": "callback:GTutorials",
     "target_window": "Relations_Window",
@@ -1809,7 +1809,7 @@
     "reason": "The OpenPower interface guide asks the player to open Relations and its journey verifies the visible panel, guide state, and close/reopen flow. reference auto-opens this panel from its callback; that automatic trigger and the full source state machine remain unsupported."
   },
   {
-    "source_file": "Client/Source/reference_tutorials.cpp",
+    "source_file": "Client/Source/sp2_tutorials.cpp",
     "source_line": 666,
     "source_window": "callback:GTutorials",
     "target_window": "Relations_Window",
@@ -1826,7 +1826,7 @@
     "reason": "The OpenPower interface guide asks the player to open Relations and its journey verifies the visible panel, guide state, and window-drag flow. reference re-shows this panel from its callback; that automatic trigger and the full source state machine remain unsupported."
   },
   {
-    "source_file": "Client/Source/reference_tutorials.cpp",
+    "source_file": "Client/Source/sp2_tutorials.cpp",
     "source_line": 676,
     "source_window": "callback:GTutorials",
     "target_window": "Relations_Window",
@@ -1843,7 +1843,7 @@
     "reason": "The OpenPower interface guide asks the player to open Relations and its journey verifies the visible panel, guide state, and close flow. reference re-shows this panel from its callback; that automatic trigger and the full source state machine remain unsupported."
   },
   {
-    "source_file": "Client/Source/reference_tutorials.cpp",
+    "source_file": "Client/Source/sp2_tutorials.cpp",
     "source_line": 693,
     "source_window": "callback:GTutorials",
     "target_window": "Country_Information_Window",
@@ -1860,7 +1860,7 @@
     "reason": "The OpenPower interface guide directs the player to More Info and verifies the Country Information panel and close flow. reference opens it from a tutorial callback; the scripted source trigger and fixed tutorial context remain unsupported."
   },
   {
-    "source_file": "Client/Source/reference_tutorials.cpp",
+    "source_file": "Client/Source/sp2_tutorials.cpp",
     "source_line": 1128,
     "source_window": "callback:GTutorials",
     "target_window": "Military_Window",
@@ -1877,7 +1877,7 @@
     "reason": "The OpenPower Military guide directs the player to the current Military panel and verifies its visibility before visiting research and unit workflows. reference auto-opens this panel and highlights Research; its fixed-country tutorial setup remains unsupported."
   },
   {
-    "source_file": "Client/Source/reference_tutorials.cpp",
+    "source_file": "Client/Source/sp2_tutorials.cpp",
     "source_line": 1189,
     "source_window": "callback:GTutorials",
     "target_window": "Military_Window",
@@ -1894,7 +1894,7 @@
     "reason": "The OpenPower Military guide uses the current campaign and verifies the Military panel within the guided flow. reference reopens it after forcing its fixed tutorial country and highlights Design; those scripted setup effects remain unsupported."
   },
   {
-    "source_file": "Client/Source/reference_tutorials.cpp",
+    "source_file": "Client/Source/sp2_tutorials.cpp",
     "source_line": 1350,
     "source_window": "callback:GTutorials",
     "target_window": "Military_Window",
@@ -1911,7 +1911,7 @@
     "reason": "The OpenPower Military guide uses the current campaign and verifies the Military panel within the guided flow. reference reopens it to point at the Unit List route; that callback-driven sequence and fixed tutorial setup remain unsupported."
   },
   {
-    "source_file": "Client/Source/reference_internal_laws_window.cpp",
+    "source_file": "Client/Source/sp2_internal_laws_window.cpp",
     "source_line": 297,
     "source_window": "Internal_Laws",
     "target_window": "Generic_Question_Window",
@@ -1927,7 +1927,7 @@
     "reason": "Configured party-count boundary opens the source Generic Question; No restores the previous choice and Yes stages an explicit authoritative constitutional target until Apply."
   },
   {
-    "source_file": "Client/Source/reference_internal_laws_window.cpp",
+    "source_file": "Client/Source/sp2_internal_laws_window.cpp",
     "source_line": 326,
     "source_window": "Internal_Laws",
     "target_window": "Generic_Question_Window",
@@ -1943,7 +1943,7 @@
     "reason": "Configured party-count boundary opens the source Generic Question; No restores the previous choice and Yes stages an explicit authoritative constitutional target until Apply."
   },
   {
-    "source_file": "Client/Source/reference_join_multiplayer_game_window.cpp",
+    "source_file": "Client/Source/sp2_join_multiplayer_game_window.cpp",
     "source_line": 89,
     "source_window": "Join_Multiplayer_Game",
     "target_window": "Generic_Question_Window",
@@ -1953,7 +1953,7 @@
     "reason": "The unofficial-mod join confirmation requires the missing multiplayer connection workflow."
   },
   {
-    "source_file": "Client/Source/reference_client_advisor.cpp",
+    "source_file": "Client/Source/sp2_client_advisor.cpp",
     "source_line": 752,
     "source_window": "callback:GClientAdvisor",
     "target_window": "Generic_Question_Window",
@@ -1963,7 +1963,7 @@
     "reason": "Source advisor-event proposals and their authoritative acceptance/rejection workflow are missing."
   },
   {
-    "source_file": "Client/Source/reference_constitutional_form_window.cpp",
+    "source_file": "Client/Source/sp2_constitutional_form_window.cpp",
     "source_line": 198,
     "source_window": "Constitutional_Form",
     "source_gml_component_path": "Constitutional_Form/frmTitle/btnApply",
@@ -1980,7 +1980,7 @@
     "reason": "The qualified non-hostile journey verifies a foreign form is editable at exactly 75% regional control, while capital, override, and martial-law controls remain disabled. Apply opens the source-sized Generic Question; No preserves the draft without dispatch, and Yes sends ActionSetGovernmentForm with confirmed_foreign_change. The server revalidates the threshold, non-hostile status and confirmation, releases controlled regions, grants military access, and sets bilateral relations to 100. OpenPower uses a documented regional-count proxy because the published reference proportion formula is absent; the separately tested below-threshold route remains disabled."
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1147,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Generic_Question_Window",
@@ -1999,7 +1999,7 @@
     "verification_kind": "equivalent_validation"
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 1196,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Generic_Question_Window",
@@ -2009,7 +2009,7 @@
     "reason": "The repeated-question branch cannot run in the supplied active source: OccupyTerritory clears the pending set, inserts only the target country, and the loop that would add occupied-region controllers is commented out. The first acknowledgement removes the only pending item, so no second question is created."
   },
   {
-    "source_file": "Client/Source/reference_data_control_layer.cpp",
+    "source_file": "Client/Source/sp2_data_control_layer.cpp",
     "source_line": 2150,
     "source_window": "callback:GDataControlLayer",
     "target_window": "Generic_Question_Window",
@@ -2026,7 +2026,7 @@
     "reason": "The selected owned group opens the source question with published OpenPower training terms; Yes sends the guarded training action and No sends none."
   },
   {
-    "source_file": "Client/Source/reference_main_menu.cpp",
+    "source_file": "Client/Source/sp2_main_menu.cpp",
     "source_line": 91,
     "source_window": "Main_Menu",
     "target_window": "Submenu_Single",
@@ -2042,7 +2042,7 @@
     "reason": "The disconnected-menu SPMenuBtn state-machine transition opens the GML-sized single-player submenu; the journey verifies the exact source button and runtime window dimensions."
   },
   {
-    "source_file": "Client/Source/reference_main_menu.cpp",
+    "source_file": "Client/Source/sp2_main_menu.cpp",
     "source_line": 104,
     "source_window": "Main_Menu",
     "target_window": "Submenu_Multi",
@@ -2058,7 +2058,7 @@
     "reason": "The disconnected-menu MPMenuBtn state-machine transition opens the source-shrunk multiplayer submenu; unsupported Internet/LAN actions are visibly disabled."
   },
   {
-    "source_file": "Client/Source/reference_join_multiplayer_game_window.cpp",
+    "source_file": "Client/Source/sp2_join_multiplayer_game_window.cpp",
     "source_line": 126,
     "source_window": "Join_Multiplayer_Game",
     "target_window": "Load_Saved_Game",
@@ -2077,7 +2077,7 @@
     "reason": "The Join Multiplayer Load Game button is a local save-browser route independent of server discovery; the journey verifies NavigationService dispatch and the GML-sized LoadGameView dialog."
   },
   {
-    "source_file": "Client/Source/reference_join_multiplayer_game_window.cpp",
+    "source_file": "Client/Source/sp2_join_multiplayer_game_window.cpp",
     "source_line": 128,
     "source_window": "Join_Multiplayer_Game",
     "target_window": "Load_Saved_Game",

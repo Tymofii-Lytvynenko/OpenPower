@@ -14,6 +14,7 @@ from src.shared.state import GameState
 logger = logging.getLogger(__name__)
 ProgressCallback = Callable[[float, str], None]
 INITIAL_STATE_TIMEOUT_SECONDS = 30.0
+SERVER_READY_TIMEOUT_SECONDS = 120.0
 
 
 class TaskCancelledError(RuntimeError):
@@ -34,21 +35,34 @@ def shutdown_session(session: ClientSessionPort | None) -> None:
         logger.exception("Failed to shut down a client session during cleanup")
 
 
+def _check_server_exit(session: ClientSessionPort) -> None:
+    process = getattr(session, "process", None)
+    exit_code = getattr(process, "exitcode", None)
+    if isinstance(exit_code, int):
+        raise RuntimeError(f"The simulation server stopped during startup (exit code {exit_code}).")
+
+
 def create_session_until_ready(
     session_factory: SessionFactory,
     config: GameConfig,
     *,
     save_name: str | None = None,
     player_tag: str | None = None,
+    player_party_id: str | None = None,
     cancel_event: Event,
     on_progress: ProgressCallback | None = None,
-    timeout: float = 120.0,
+    timeout: float = SERVER_READY_TIMEOUT_SECONDS,
 ) -> ClientSessionPort:
     """Create a session and consume boot messages without long blocking waits."""
     session: ClientSessionPort | None = None
     try:
         check_cancelled(cancel_event)
-        session = session_factory(config, save_name=save_name, player_tag=player_tag)
+        if player_party_id:
+            session = session_factory(
+                config, save_name=save_name, player_tag=player_tag, player_party_id=player_party_id
+            )
+        else:
+            session = session_factory(config, save_name=save_name, player_tag=player_tag)
         deadline = time.monotonic() + timeout
 
         while True:
@@ -60,6 +74,7 @@ def create_session_until_ready(
             try:
                 status, progress, text = session.progress_queue.get(timeout=min(0.1, remaining))
             except Empty:
+                _check_server_exit(session)
                 continue
 
             if status == "PROGRESS":
@@ -94,6 +109,7 @@ def wait_for_initial_state(
         state = session.get_state_snapshot()
         if state is not None:
             return state
+        _check_server_exit(session)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError("Timed out waiting for the initial game state.")

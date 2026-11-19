@@ -14,6 +14,19 @@ def nonnegative_integer(value: Any) -> int:
         return 0
 
 
+def trade_deadline_days_remaining(expires_at_minute: Any, current_minute: Any) -> int | None:
+    """Return the ceiling number of game days before an offer expires."""
+    try:
+        expiry = int(expires_at_minute)
+        now = int(current_minute)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if expiry < 0 or now < 0:
+        return None
+    minutes_remaining = expiry - now
+    return max(0, (minutes_remaining + (24 * 60) - 1) // (24 * 60))
+
+
 def table_rows(state, table: str) -> list[dict[str, Any]]:
     frame = state.tables.get(table)
     return [] if frame is None else frame.to_dicts()

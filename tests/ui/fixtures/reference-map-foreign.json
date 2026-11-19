@@ -1,5 +1,15 @@
 {
   "globals": {
     "ui_context_region_id": 2
+  },
+  "tables": {
+    "countries_treaties": [
+      {
+        "id": "nato",
+        "name": "North Atlantic Treaty Organization",
+        "type": "military_alliance",
+        "members": ["BEL", "CAN", "CZE", "DNK", "FRA", "DEU", "GRC", "HUN", "ISL", "ITA", "LUX", "NLD", "NOR", "POL", "PRT", "ESP", "TUR", "GBR", "USA"]
+      }
+    ]
   }
 }

@@ -6,7 +6,7 @@ from src.client.ui.layouts.game_panel_registry import build_game_panel_specs
 
 
 EXTRA_SURFACES = (
-    "game-hud", "battle-map", "map-information", "map-legend", "map-mode-navigation", "mini-map", "mini-map-tutorial", "unit-movement", "editor-hud", "map-context", "unit-context", "unit-details", "main-menu", "new-game-selection",
+    "game-hud", "battle-map", "map-information", "map-legend", "map-mode-navigation", "mini-map", "mini-map-tutorial", "unit-movement", "editor-hud", "map-context", "unit-context", "unit-details", "main-menu", "new-game-selection", "freeplay-core-loop",
     "loading-error-load", "loading-error-new",
     "multiplayer-input-dialog", "multiplayer-server-info",
 )
@@ -40,6 +40,14 @@ def build_surface(
     from src.client.ui.panels.unit_details_window import UnitDetailsWindow
 
     normalized = name.lower().replace("_", "-")
+    if normalized == "freeplay-core-loop":
+        from src.client.ui.testing.freeplay_core_loop_surface import (
+            build_freeplay_core_loop_surface,
+        )
+
+        return build_freeplay_core_loop_surface(
+            state, client, context, settings, window, navigation, viewport,
+        )
     if normalized in {"mini-map", "mini-map-tutorial"}:
         from types import SimpleNamespace
         import numpy as np
@@ -434,6 +442,7 @@ def build_surface(
         new_game._select_scenario = select_scenario
         new_game._select_country = select_country
         new_game._enter_country_setup = lambda: setattr(new_game, "setup_stage", "country")
+        new_game._return_to_freeplay_setup = lambda: setattr(new_game, "setup_stage", "freeplay")
         new_game._return_to_scenario_selection = lambda: setattr(new_game, "setup_stage", "scenario")
         new_game._return_to_main_menu = lambda: None
         new_game._open_country_profile = lambda _state: open_profile()

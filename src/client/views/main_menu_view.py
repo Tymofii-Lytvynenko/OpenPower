@@ -2,13 +2,14 @@ import arcade
 import sys
 from typing import TYPE_CHECKING
 
+from src.core.paths import resolve_region_map_path
 from src.client.views.base_view import BaseImGuiView
 from src.client.services.imgui_service import ImGuiService
 from src.client.ui.core.composer import UIComposer
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.components.settings_content import GameSettingsContent
 from src.client.ui.components.main_menu_content import MainMenuContent, build_main_menu_actions
-from src.client.renderers.map_renderer import MapRenderer
+from src.client.renderers.map_renderer import MapRenderer, renderer_matches_map
 from src.client.controllers.camera_controller import CameraController
 
 if TYPE_CHECKING:
@@ -30,11 +31,12 @@ class MainMenuView(BaseImGuiView):
                 lambda: self.nav.show_new_game_screen(self.session, self.config),
                 lambda: self.nav.show_load_game_screen(self.config),
                 self._exit_to_desktop,
+                on_scenario=lambda: self.nav.show_new_game_screen(self.session, self.config, scenario=True),
             ),
         )
 
         # --- SHARED RENDERER LOGIC ---
-        if self.window.shared_renderer is None:
+        if not renderer_matches_map(self.window.shared_renderer, session.map_data):
             print("[MainMenuView] Initializing Shared Renderer...")
 
             # BIGGER GLOBE: Set default distance closer (was 4.5, now 2.3)
@@ -49,19 +51,7 @@ class MainMenuView(BaseImGuiView):
                 map_height,
             )
 
-            map_path = None
-
-            # 1. Search in data directories (mods first)
-            for data_dir in config.get_data_dirs():
-                candidate = data_dir / "regions" / "regions.png"
-                if candidate.exists():
-                    map_path = candidate
-                    break
-
-            # 2. Hard fallback to base module if not found
-            if map_path is None:
-                map_path = config.project_root / "modules" / "base" / "data" / "regions" / "regions.png"
-
+            map_path = resolve_region_map_path(config)
             terrain_path = config.get_asset_path("map/terrain.png")
 
             self.window.shared_renderer = MapRenderer(

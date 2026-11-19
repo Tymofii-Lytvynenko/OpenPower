@@ -4,12 +4,11 @@ import json
 import math
 from typing import Any
 
-from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.gml_widgets import GMLWidgets
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.theme import GAMETHEME
-from src.client.ui.panels import trade_options
 from src.client.ui.layouts.gml_layout import (
     active_gml_layout,
     draw_gml_separator,
@@ -17,6 +16,7 @@ from src.client.ui.layouts.gml_layout import (
     resume_gml_layout,
     suspend_gml_layout,
 )
+from src.client.ui.panels import trade_options
 from src.shared.actions import (
     ActionCounterTradeDeal,
     ActionCreateTradeDeal,
@@ -564,7 +564,7 @@ class TradePanel:
                         )[0]
                         row_origin = imgui.get_item_rect_min()
                         next_row = imgui.get_cursor_screen_pos()
-                        for offset, value in zip(column_offsets, values):
+                        for offset, value in zip(column_offsets, values, strict=True):
                             imgui.set_cursor_screen_pos((row_origin.x + offset, row_origin.y + 1.0))
                             imgui.text(value)
                         imgui.set_cursor_screen_pos(next_row)
@@ -625,12 +625,33 @@ class TradePanel:
             "trade.detail.requested",
         )
         status = str(row.get("status") or "unknown").upper()
+        current_minute = getattr(getattr(state, "time", None), "total_minutes", None)
+        days_remaining = trade_options.trade_deadline_days_remaining(
+            row.get("expires_at_minute"), current_minute,
+        )
+        status_text = f"{status} · {counterpart}"
+        if status.casefold() == "pending" and current_minute is not None:
+            if days_remaining is None:
+                status_text = "PENDING · DEADLINE UNAVAILABLE"
+            elif days_remaining == 0:
+                status_text = "PENDING · DEADLINE PASSED"
+            else:
+                day_label = "DAY" if days_remaining == 1 else "DAYS"
+                status_text = f"PENDING · {days_remaining} {day_label} LEFT"
         GMLWidgets("Trade_Detailed_Window/frmInner/frmBalance").text(
-            "lblBalance", f"{status} · {counterpart}", test_id="trade.detail.status",
+            "lblBalance", status_text, test_id="trade.detail.status",
         )
 
         pending = str(row.get("status") or "") == "pending"
-        can_act = pending and context.is_own_country and context.net_client is not None
+        deadline_passed = pending and days_remaining == 0
+        deadline_unavailable = pending and current_minute is not None and days_remaining is None
+        can_act = (
+            pending
+            and not deadline_passed
+            and not deadline_unavailable
+            and context.is_own_country
+            and context.net_client is not None
+        )
         deal_id = str(row.get("id") or "")
         if incoming:
             if actions.button("btnAccept", "ACCEPT", f"trade.deal.{deal_id}.accept", enabled=can_act):

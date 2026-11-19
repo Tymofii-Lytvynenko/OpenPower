@@ -16,6 +16,9 @@ FOREIGN_GOVERNMENT_CONTROL_THRESHOLD = 0.75
 def player_controls_country(state: Any, player_id: Any, country_id: Any) -> bool:
     actor = str(player_id or "").strip()
     country = _tag(country_id)
+    if not actor or not country:
+        # Empty identifiers must never match each other as an authority grant.
+        return False
     mapping = state.globals.get("player_country_map", {})
     if isinstance(mapping, dict) and _tag(mapping.get(actor)) == country:
         return True

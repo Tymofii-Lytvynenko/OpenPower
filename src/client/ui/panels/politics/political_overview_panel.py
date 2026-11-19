@@ -36,6 +36,8 @@ class PoliticalOverviewPanel:
         imgui.separator()
         imgui.text(f"Form: {overview.government_form}")
         imgui.text(f"Ruling authority: {overview.ruling_party}")
+        if overview.player_party:
+            imgui.text_wrapped(f"Your party: {overview.player_party}")
         imgui.text(f"Election: {election}")
         self._render_election_overrides(overview, context)
         self._render_recent_elections(overview)

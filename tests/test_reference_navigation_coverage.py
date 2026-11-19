@@ -1,7 +1,7 @@
 ﻿"""Keep source callback coverage separate from destination-only smoke tests."""
-from pathlib import Path
 import csv
 import json
+from pathlib import Path
 
 from utils import reference_ui_audit as audit
 from utils.reference_paths import resolve_reference_file
@@ -16,7 +16,7 @@ def _interaction_gap_rows(gaps, component_path: str, binding: dict[str, str]) ->
     ]
 
 
-def test_country_information_audit_records_openpower_bindings_and_missing_source_data():
+def test_country_information_audit_records_historical_bindings_and_remaining_source_gaps():
     assert audit.PANEL_ALIASES["Country_Information_Window"] == ("COUNTRY_MORE_INFO", "partial")
     assert "CountryMoreInfoPanel" in audit.PARTIALLY_IMPLEMENTED_WINDOW_GAPS[
         "Country_Information_Window"
@@ -33,8 +33,10 @@ def test_country_information_audit_records_openpower_bindings_and_missing_source
         "frmInner/frmTerrain/txtWaterArea",
         "frmInner/frmClimate/frmInner/lblClimate",
     ):
-        assert bindings[path].status == "verified_unavailable"
-        assert "Em dash" in bindings[path].fallback
+        assert bindings[path].status == "verified_openpower"
+    assert "2001" in bindings["frmInner/frmLand/txtArableLand"].state_binding
+    assert "UNDP" in bindings["frmInner/frmHumanDevelopment/frmInner/lblWorld"].fallback
+    assert bindings["frmInner/frmLand/txtNationalParks"].status == "partial"
 
     interactions = audit.COUNTRY_INFO_INTERACTION_BINDINGS
     assert interactions["Country_Information_Window/frmTitle/btnExit"]["game_action"] == "none (local window close)"
@@ -225,7 +227,7 @@ def test_source_hidden_title_apply_slots_are_not_reported_as_unknown_actions():
         }
 
     assert contracts.keys() == hidden_windows
-    for window_id, contract in contracts.items():
+    for _window_id, contract in contracts.items():
         assert contract["status"] == "verified_unavailable"
         assert contract["cpp_member_binding"] == "m_pObjApplyBtn"
         assert "OnCreate hides" in contract["reference_side_effect"]
@@ -257,7 +259,7 @@ def test_standard_title_exit_controls_trace_direct_and_inherited_source_callback
         "Credits_Window",
         "Relations_Window",
     }
-    for window_id, contract in contracts.items():
+    for _window_id, contract in contracts.items():
         assert contract["status"] in {"verified_cpp", "verified_openpower"}
         assert contract["cpp_member_binding"] == "m_pObjExitBtn"
         assert "OnMouseClick" in contract["reference_callback"]
@@ -402,7 +404,7 @@ def test_politics_window_audit_classifies_all_source_meter_and_title_controls():
     ]["status"] == "verified_openpower"
 
     pressure = audit.DISPLAY_BINDINGS_BY_WINDOW["Politic_Window"]
-    assert pressure["frmInner/frmPressure/txtValue"].status == "verified_unavailable"
+    assert pressure["frmInner/frmPressure/txtValue"].status == "partial"
     assert pressure["frmInner/frmPressure/frmGradient"].status == "partial"
     assert pressure["frmInner/frmConstitutionalForm/txtValue"].status == "partial"
     assert all(pressure[path].status == "partial" for path in (
@@ -465,10 +467,10 @@ def test_treaty_details_audit_maps_source_controls_and_marks_real_parity_limits(
     ]["game_action"].startswith("ActionRespondTreaty")
     assert bindings[
         "Treaty_Details_Window/frmInner/frmPressure/btnSponsor"
-    ]["status"] == "verified_unavailable"
-    assert "pressure side" in bindings[
+    ]["status"] == "partial"
+    assert "accepting" in bindings[
         "Treaty_Details_Window/frmInner/frmPressure/btnSponsor"
-    ]["restrictions_confirmation_error"]
+    ]["openpower_effect"]
     assert bindings[
         "Treaty_Details_Window/frmInner/frmConditions/cboGeographicProximity"
     ]["status"] == "partial"
@@ -477,8 +479,8 @@ def test_treaty_details_audit_maps_source_controls_and_marks_real_parity_limits(
     ]["restrictions_confirmation_error"]
 
     display = audit.DISPLAY_BINDINGS_BY_WINDOW["Treaty_Details_Window"]
-    assert display["frmInner/frmPressure/txtValue"].status == "verified_unavailable"
-    assert display["frmInner/frmPressure/lstPressure"].status == "verified_unavailable"
+    assert display["frmInner/frmPressure/txtValue"].status == "partial"
+    assert display["frmInner/frmPressure/lstPressure"].status == "partial"
     assert display["frmInner/frmMain/lstCountriesA"].status == "partial"
     assert display["frmInner/frmConditions/cboRelations"].status == "partial"
 
@@ -732,7 +734,7 @@ def test_generic_message_callback_map_preserves_all_route_columns():
 
     header = rows[0]
     assert all(len(row) == len(header) for row in rows[1:])
-    routes = [dict(zip(header, row)) for row in rows[1:]]
+    routes = [dict(zip(header, row, strict=True)) for row in rows[1:]]
     display_routes = [route for route in routes if route["route_id"].startswith("SHOW-")]
     assert len(display_routes) == 28
     assert len({route["route_id"] for route in routes}) == len(routes)
@@ -1791,9 +1793,16 @@ def test_unit_production_gml_caption_and_eta_slots_have_explicit_bindings():
         "frmDesignList/frmEta/lblEta",
         "frmDesignList/frmDesignList/lblProducer",
         "frmDesignList/frmEta/txtEta",
+        "frmRight/frmProduction/lstProduction",
+        "frmRight/frmProduction/txtValue",
+        "frmDesignList/frmInfo/cboPriority",
+        "frmDesignList/frmUnitName/txtUnitName",
+        "frmDesignList/frmCost/txtTotalCost",
+        "frmDesignList/frmCost/lblUnitCost",
+        "frmDesignList/frmDesignList/cboCountry",
     }
     bindings = audit.DISPLAY_BINDINGS_BY_WINDOW[window]
-    assert len(bindings) == 19
+    assert len(bindings) == 27
     assert expected.issubset(bindings)
 
     with (root / "docs/ui/reference/data_contracts.csv").open(
@@ -1806,7 +1815,11 @@ def test_unit_production_gml_caption_and_eta_slots_have_explicit_bindings():
     for suffix in expected:
         binding = bindings[suffix]
         row = rows[f"{window}/{suffix}"]
-        assert binding.status == "partial"
+        expected_status = {
+            "frmRight/frmProduction/lstProduction": "verified_openpower",
+            "frmDesignList/frmUnitName/txtUnitName": "verified_openpower",
+        }.get(suffix, "partial")
+        assert binding.status == expected_status
         assert row["status"] == binding.status
         assert row["openpower_binding_status"] == binding.status
         assert row["openpower_state_binding"] == binding.state_binding
@@ -1820,7 +1833,8 @@ def test_unit_production_gml_caption_and_eta_slots_have_explicit_bindings():
         "TOTAL COST", "ETA", "BUILD IN",
     ):
         assert f'"{caption}"' in panel
-    assert "initial_production_eta_days" in panel
+    assert "PRODUCTION_ORDER_QUOTE" in panel
+    assert "quote.initial_eta_days" in panel
 
 
 def test_economic_window_gml_captions_have_explicit_openpower_bindings():
@@ -1857,6 +1871,117 @@ def test_economic_window_gml_captions_have_explicit_openpower_bindings():
         assert row["openpower_state_binding"] == binding.state_binding
         assert row["openpower_surface"] == binding.surface == "economy.panel"
         assert "localization/placeholder meaning is unresolved" not in row["what_is_displayed"]
+
+
+def test_economic_window_data_bindings_report_only_available_live_values():
+    root = Path(__file__).resolve().parents[1]
+    window = "Economic_Window"
+    expected_bindings = {
+        "frmInner/frmResources/txtValue": "resource_ledger",
+        "frmInner/frmEconomicModel/frmModelCursor": "domestic_production",
+        "frmInner/frmBudget/txtIncome": "total_annual_revenue",
+        "frmInner/frmBudget/txtExpenses": "total_annual_expense",
+        "frmInner/frmBudget/txtBalance": "total_annual_revenue - countries.total_annual_expense",
+        "frmInner/frmBudget/txtDebt": "money_reserves",
+        "frmInner/frmEconomicHealth/txtValue": "economic_health",
+    }
+    bindings = audit.DISPLAY_BINDINGS_BY_WINDOW[window]
+    assert set(expected_bindings).issubset(bindings)
+    with (root / "docs/ui/reference/data_contracts.csv").open(
+        encoding="utf-8-sig", newline=""
+    ) as source:
+        rows = {
+            row["component_path"]: row for row in csv.DictReader(source)
+            if row["window_id"] == window
+        }
+
+    for suffix, state_fragment in expected_bindings.items():
+        binding = bindings[suffix]
+        row = rows[f"{window}/{suffix}"]
+        assert binding.status == row["openpower_binding_status"] == "partial"
+        assert state_fragment in binding.state_binding
+        assert row["openpower_state_binding"] == binding.state_binding
+        assert "unmapped/missing" not in row["openpower_state_binding"]
+        assert row["openpower_surface"] == "economy.panel"
+
+    panel = (root / "src/client/ui/panels/economy_panel.py").read_text(encoding="utf-8")
+    assert "0.836" not in panel
+    assert '"--" if value is None' in panel
+
+
+def test_history_thematic_trade_and_advisor_data_are_explicitly_bound():
+    root = Path(__file__).resolve().parents[1]
+    expected = {
+        ("History_Window", "frmInner/frmHistory/frmGraph"): "partial",
+        ("History_Window", "frmInner/frmHistory/frmGraph/Container"): "partial",
+        ("History_Window", "frmInner/frmHistory/frmGraph/txtV0"): "partial",
+        ("History_Window", "frmInner/frmHistory/frmGraph/txtV1"): "partial",
+        **{
+            ("History_Window", f"frmInner/frmHistory/frmGraph/txtH{index}"): "partial"
+            for index in range(6)
+        },
+        **{
+            ("History_Window", f"frmInner/frmHistory/txtTransparentLabel{index}"): "verified_unavailable"
+            for index in (1, 2, 3, 4)
+        },
+        ("Thematic_Map_Legend", "txtTitle"): "verified_openpower",
+        ("Thematic_Map_Legend", "txtTitle1"): "partial",
+        ("Thematic_Map_Legend", "txtTitle2"): "partial",
+        ("Thematic_Map_Legend", "txtTitle3"): "partial",
+        ("Thematic_Map_Legend", "frmLegend/lblTop"): "partial",
+        ("Thematic_Map_Legend", "frmLegend/lblMiddle"): "verified_unavailable",
+        ("Thematic_Map_Legend", "frmLegend/lblBottom"): "partial",
+        ("Thematic_Map_Legend", "lstCountries"): "partial",
+        ("Trade_Window", "frmInner/frmList/lstTrade"): "verified_openpower",
+        ("Trade_Window", "frmInner/frmList/lblProposer"): "partial",
+        ("Trade_Window", "frmInner/frmList/lblRecipient"): "partial",
+        ("Trade_Window", "frmInner/frmList/lblStatus"): "partial",
+        ("Advisor_Window", "frmInner/frmProblem/txtProblem"): "verified_openpower",
+        ("Advisor_Window", "frmInner/frmResult/frmResults/txtResult"): "partial",
+        ("Advisor_Settings_Window", "frmTitle/lblTitle"): "partial",
+        ("Advisor_Settings_Window", "frmInner/frmSettings/txtManual"): "partial",
+        ("Advisor_Settings_Window", "frmInner/frmSettings/txtAutomatic"): "partial",
+        ("Advisor_Settings_Window", "frmInner/frmSettings/txtConfirmations"): "partial",
+        ("Game_Over_Window", "frmTitle/lblTitle"): "verified_openpower",
+        ("Game_Over_Window", "frmInner/frmText/txtText"): "verified_openpower",
+        ("Game_Over_Window", "frmInner/frmObjectives/lblTitle"): "partial",
+        ("Game_Over_Window", "frmInner/frmObjectives/lstObjectives"): "verified_openpower",
+        ("History_Tooltip_Window", "txtText"): "verified_openpower",
+        ("Tooltip_Window", "lblTooltip"): "verified_openpower",
+    }
+    with (root / "docs/ui/reference/data_contracts.csv").open(
+        encoding="utf-8-sig", newline=""
+    ) as source:
+        contracts = {
+            (row["window_id"], row["component_path"].removeprefix(f"{row['window_id']}/")): row
+            for row in csv.DictReader(source)
+        }
+
+    for (window, suffix), status in expected.items():
+        binding = audit.DISPLAY_BINDINGS_BY_WINDOW[window][suffix]
+        contract = contracts[(window, suffix)]
+        assert binding.status == contract["openpower_binding_status"] == status
+        assert contract["openpower_state_binding"] == binding.state_binding
+        assert "unmapped/missing" not in contract["openpower_state_binding"]
+
+    trade = audit.DISPLAY_BINDINGS_BY_WINDOW["Trade_Window"]["frmInner/frmList/lstTrade"]
+    assert "diplomatic_trade_deals" in trade.state_binding
+    assert "not historical 2001 trade flows" in trade.meaning
+    history = audit.DISPLAY_BINDINGS_BY_WINDOW["History_Window"][
+        "frmInner/frmHistory/frmGraph"
+    ]
+    assert "does not infer earlier history" in history.meaning
+    advisor = audit.DISPLAY_BINDINGS_BY_WINDOW["Advisor_Window"][
+        "frmInner/frmResult/frmResults/txtResult"
+    ]
+    assert "Pending your decision" in advisor.state_binding
+    outcome = audit.DISPLAY_BINDINGS_BY_WINDOW["Game_Over_Window"]
+    assert "outcome_reason" in outcome["frmInner/frmText/txtText"].state_binding
+    assert "completed, failed, or expired" in outcome[
+        "frmInner/frmObjectives/lstObjectives"
+    ].state_binding
+    tooltip = audit.DISPLAY_BINDINGS_BY_WINDOW["History_Tooltip_Window"]["txtText"]
+    assert "event_timeline" in tooltip.state_binding
 
 
 def test_treaties_window_gml_captions_have_explicit_openpower_bindings():
@@ -1921,7 +2046,6 @@ def test_resources_window_captions_keep_openpower_ledger_differences_explicit():
         "frmInner/frmResources/lblTrade2": ("100066", "TRADE"),
         "frmInner/frmResources/txtMarketShare": ("0", None),
         "frmInner/frmResources/txtAvailability": ("0", None),
-        "frmInner/frmResources/cboTrade": ("", None),
         "frmInner/frmResources/txtGdp": ("0", None),
     }
     bindings = audit.DISPLAY_BINDINGS_BY_WINDOW[window]
@@ -1961,9 +2085,6 @@ def test_resources_window_captions_keep_openpower_ledger_differences_explicit():
     availability = bindings["frmInner/frmResources/txtAvailability"]
     assert "balance_usd" in availability.state_binding
     assert "not stock availability" in availability.meaning
-    trade = bindings["frmInner/frmResources/cboTrade"]
-    assert "Disabled" in trade.state_binding
-    assert "no matching per-resource desired-trade command" in trade.meaning
     assert "BALANCE" in panel
 
 
@@ -2732,6 +2853,7 @@ def test_objectives_window_gml_content_slots_have_explicit_openpower_bindings():
         "frmInner/frmInner/tabInfo/Tab1/frmInner/txtDescription",
         "frmInner/frmInner/tabInfo/Tab2/frmObjectives/lblTimeLimit",
         "frmInner/frmInner/tabInfo/Tab2/frmObjectives/lblGoals",
+        "frmInner/frmInner/tabInfo/Tab2/frmObjectives/lstGoals",
         "frmInner/frmInner/tabInfo/Tab3/frmInner/txtTips",
     }
     bindings = audit.DISPLAY_BINDINGS_BY_WINDOW["Objectives_Window"]
@@ -2963,4 +3085,76 @@ def test_source_reachability_ignores_unverified_and_disconnected_transitions():
     assert reachable_windows(edges, ['root', 'a', 'b', 'disconnected'], ['root']) == {
         'root', 'a', 'b', 'outside',
     }
+
+
+def test_resources_window_audit_binds_actual_trade_and_import_export_policy():
+    bindings = audit.DISPLAY_BINDINGS_BY_WINDOW["Resources_Window"]
+    actual = bindings["frmInner/frmResources/txtActual"]
+    trade_mode = bindings["frmInner/frmResources/cboTrade"]
+
+    assert actual.state_binding == "resource_ledger.trade_usd"
+    assert actual.status == "verified_openpower"
+    assert "never substitute balance_usd" in actual.action_required
+    assert trade_mode.status == "verified_openpower"
+    assert "domestic_production.desired_trade_usd" in trade_mode.state_binding
+    assert "negative = import, positive = export" in trade_mode.state_binding
+    assert "ActionUpdateResourcePolicy" in trade_mode.meaning
+
+    apply = audit.BUDGET_RESOURCES_TITLE_INTERACTION_BINDINGS[
+        "Resources_Window/frmTitle/btnApply"
+    ]
+    assert apply["status"] == "verified_openpower"
+    assert apply["game_action"] == "ActionUpdateResourcePolicy per changed country/resource draft"
+
+    root = Path(__file__).resolve().parents[1]
+    with (root / "docs/ui/reference/data_contracts.csv").open(
+        encoding="utf-8-sig", newline=""
+    ) as source:
+        contracts = {
+            row["component_path"]: row
+            for row in csv.DictReader(source)
+            if row["window_id"] == "Resources_Window"
+        }
+    assert contracts["Resources_Window/frmInner/frmResources/txtActual"][
+        "openpower_state_binding"
+    ] == actual.state_binding
+    assert contracts["Resources_Window/frmInner/frmResources/cboTrade"][
+        "openpower_binding_status"
+    ] == "verified_openpower"
+
+
+def test_relations_and_thematic_legend_audits_bind_current_country_data():
+    relations = audit.DISPLAY_BINDINGS_BY_WINDOW["Relations_Window"]
+    assert relations["frmInner/frmRelations/cboCountryA"].status == "verified_openpower"
+    assert "countries.id/name" in relations["frmInner/frmRelations/cboCountryA"].state_binding
+    assert relations["frmInner/frmRelations/cboCountryB"].status == "verified_openpower"
+    graph = relations["frmInner/frmRelations/UIGraph"]
+    assert graph.status == "partial"
+    assert "relationship_timeline" in graph.state_binding
+    assert "directed" in graph.meaning
+
+    legend = audit.DISPLAY_BINDINGS_BY_WINDOW["Thematic_Map_Legend"]["lstCountries"]
+    assert legend.status == "partial"
+    assert "_ranked_countries" in legend.state_binding
+    assert "_empire_countries" in legend.state_binding
+    assert "finite country metric" in legend.fallback
+
+    root = Path(__file__).resolve().parents[1]
+    with (root / "docs/ui/reference/data_contracts.csv").open(
+        encoding="utf-8-sig", newline=""
+    ) as source:
+        contracts = {
+            (row["window_id"], row["component_path"]): row
+            for row in csv.DictReader(source)
+        }
+    for window, component in (
+        ("Relations_Window", "Relations_Window/frmInner/frmRelations/cboCountryA"),
+        ("Relations_Window", "Relations_Window/frmInner/frmRelations/cboCountryB"),
+        ("Relations_Window", "Relations_Window/frmInner/frmRelations/UIGraph"),
+        ("Thematic_Map_Legend", "Thematic_Map_Legend/lstCountries"),
+    ):
+        assert contracts[(window, component)]["openpower_state_binding"]
+        assert contracts[(window, component)]["openpower_binding_status"] == audit.DISPLAY_BINDINGS_BY_WINDOW[
+            window
+        ][component.removeprefix(window + "/")].status
 

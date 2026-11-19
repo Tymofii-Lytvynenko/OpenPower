@@ -213,17 +213,20 @@ class MilitaryRoutePlanner:
         return self._geographic_cost(left, right) if distance is None else distance
 
     def _geographic_cost(self, left: dict[str, Any], right: dict[str, Any]) -> float:
-        if all(key in left and key in right for key in ("latitude", "longitude")):
-            projection = EquirectangularProjection(360.0, 180.0)
-            return projection.geo_distance_km(
-                GeoCoordinate(float(left["latitude"]), float(left["longitude"])),
-                GeoCoordinate(float(right["latitude"]), float(right["longitude"])),
-            )
-        if all(key in left and key in right for key in ("center_x", "center_y")):
-            return math.hypot(
-                float(left["center_x"]) - float(right["center_x"]),
-                float(left["center_y"]) - float(right["center_y"]),
-            )
+        # Missing geometry on one edge must not abort route planning for the map.
+        for x_key, y_key in (("latitude", "longitude"), ("center_x", "center_y")):
+            try:
+                x1, y1 = float(left[x_key]), float(left[y_key])
+                x2, y2 = float(right[x_key]), float(right[y_key])
+            except (KeyError, TypeError, ValueError, OverflowError):
+                continue
+            if not all(math.isfinite(value) for value in (x1, y1, x2, y2)):
+                continue
+            if x_key == "latitude":
+                return EquirectangularProjection(360.0, 180.0).geo_distance_km(
+                    GeoCoordinate(x1, y1), GeoCoordinate(x2, y2)
+                )
+            return math.hypot(x1 - x2, y1 - y2)
         return 1.0
 
     def _valid_cost(self, value: Any) -> float:

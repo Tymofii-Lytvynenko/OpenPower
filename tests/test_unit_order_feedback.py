@@ -42,8 +42,9 @@ def test_new_local_movement_refusals_are_aggregated_by_reason_across_order_types
         feedback("u2-21-2", order_type="naval_invasion", created_at_minute=21),
         feedback("u3-20-3", owner_country_id="CAN"),
         feedback("u4-20-4", status="accepted"),
-        feedback("u5-20-5", order_type="deployment"),
-        feedback("u6-22-6", reason="The unit is unavailable.", created_at_minute=22),
+        feedback("u5-20-5", status="queued"),
+        feedback("u6-20-6", order_type="deployment"),
+        feedback("u7-22-7", reason="The unit is unavailable.", created_at_minute=22),
     ]
 
     presenter.update(rows, "USA")

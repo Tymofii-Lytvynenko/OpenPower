@@ -8,7 +8,7 @@
     {"op": "assert", "target": "unit_production.queue.priority.order-high", "visible": true, "enabled": true, "type": "combo", "relative_to": "unit_production.panel", "relative_rect": {"x": 739, "y": 70, "width": 72, "height": 16}, "relative_rect_min_viewport_width": 1280},
     {"op": "click", "target": "unit_production.select_design.design-infantry-1"},
     {"op": "assert", "target": "unit_production.manpower.value", "visible": true, "label": "20 000 000"},
-    {"op": "assert", "target": "unit_production.speed", "visible": true, "enabled": false, "type": "combo"},
+    {"op": "assert", "target": "unit_production.speed", "visible": true, "enabled": true, "type": "combo"},
     {"op": "click", "target": "unit_production.quantity.up"},
     {"op": "assert", "target": "unit_production.quantity", "value": "51"},
     {"op": "click", "target": "unit_production.quantity.down"},

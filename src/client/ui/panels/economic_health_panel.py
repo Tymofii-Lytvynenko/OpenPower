@@ -23,6 +23,9 @@ from src.client.ui.layouts.gml_layout import (
     suspend_gml_layout,
 )
 from src.client.ui.panels.economy_presenter import EconomyPresenter
+from src.client.ui.panels.historical_economic_baseline import (
+    historical_economic_tooltip,
+)
 from src.client.ui.panels.shared.panel_widgets import draw_empty_state
 from src.shared.actions import (
     ActionChangeEconomicPolicy,
@@ -190,11 +193,30 @@ class EconomicHealthPanel:
         ui.text("frmInner/frmGdp/lblTotal", "TOTAL", test_id="economic_health.label.total")
         ui.text("frmInner/frmGdp/lblCapita", "PER CAPITA", test_id="economic_health.label.per_capita", font_size=8.5)
         ui.text("frmInner/frmGdp/lblTax", "PERSONAL INCOME TAX", test_id="economic_health.label.tax", font_size=8.5)
-        ui.text("frmInner/frmGdp/txtTotal", self._fmt_money(gdp), test_id="economic_health.gdp")
+        formatted_gdp = self._fmt_money(gdp)
+        ui.text(
+            "frmInner/frmGdp/txtTotal",
+            formatted_gdp,
+            tooltip=historical_economic_tooltip(
+                country_row,
+                "historical_gdp_current_usd_2001",
+                formatted_gdp,
+                "GDP",
+                value_formatter=self._fmt_money,
+            ),
+            test_id="economic_health.gdp",
+        )
+        formatted_per_capita = self._fmt_money(per_capita) if per_capita is not None else "N/A"
         ui.text(
             "frmInner/frmGdp/txtCapita",
-            self._fmt_money(per_capita) if per_capita is not None else "N/A",
-            tooltip="GDP divided by the selected country's population across its owned regions.",
+            formatted_per_capita,
+            tooltip=historical_economic_tooltip(
+                country_row,
+                "historical_gdp_per_capita_current_usd_2001",
+                formatted_per_capita,
+                "GDP per capita, calculated using currently controlled regional population",
+                value_formatter=self._fmt_money,
+            ),
             test_id="economic_health.gdp_per_capita",
             font_size=9.0,
         )
@@ -203,7 +225,20 @@ class EconomicHealthPanel:
         ui.text("frmInner/frmPopulation/lblTitle", "POPULATION", test_id="economic_health.label.population")
         ui.text("frmInner/frmPopulation/lblUnemployment", "UNEMPLOYMENT RATE", test_id="economic_health.label.unemployment", font_size=8.5)
         ui.text("frmInner/frmPopulation/lblPoverty", "POVERTY RATE", test_id="economic_health.label.poverty", font_size=8.5)
-        ui.text("frmInner/frmPopulation/txtUnemployment", f"{unemployment * 100:.1f}%", test_id="economic_health.unemployment", font_size=9.0)
+        formatted_unemployment = f"{unemployment * 100:.1f}%"
+        ui.text(
+            "frmInner/frmPopulation/txtUnemployment",
+            formatted_unemployment,
+            tooltip=historical_economic_tooltip(
+                country_row,
+                "historical_unemployment_modeled_ilo_pct_2001",
+                formatted_unemployment,
+                "unemployment rate",
+                value_formatter=lambda value: f"{value:.1f}%",
+            ),
+            test_id="economic_health.unemployment",
+            font_size=9.0,
+        )
         ui.text("frmInner/frmPopulation/txtPoverty", f"{poverty * 100:.1f}%", test_id="economic_health.poverty", font_size=9.0)
         self._draw_population_meter(
             ui, "frmInner/frmPopulation/frmUnemployment", unemployment, "unemployment"
@@ -214,7 +249,20 @@ class EconomicHealthPanel:
 
         ui.text("frmInner/frmInflation/lblTitle", "INFLATION", test_id="economic_health.label.inflation")
         ui.text("frmInner/frmInflation/lblInterest", "INTEREST RATE", test_id="economic_health.label.interest", font_size=8.5)
-        ui.text("frmInner/frmInflation/txtInflation", f"{inflation * 100:.1f}%", test_id="economic_health.inflation", font_size=9.0)
+        formatted_inflation = f"{inflation * 100:.1f}%"
+        ui.text(
+            "frmInner/frmInflation/txtInflation",
+            formatted_inflation,
+            tooltip=historical_economic_tooltip(
+                country_row,
+                "historical_inflation_cpi_pct_2001",
+                formatted_inflation,
+                "inflation rate",
+                value_formatter=lambda value: f"{value:.1f}%",
+            ),
+            test_id="economic_health.inflation",
+            font_size=9.0,
+        )
         ui.text("frmInner/frmInflation/txtTransparentLabel3", "−12%", test_id="economic_health.inflation.low", font_size=8.5)
         ui.text("frmInner/frmInflation/txtTransparentLabel1", "3%", test_id="economic_health.inflation.mid", font_size=8.5)
         ui.text("frmInner/frmInflation/txtTransparentLabel2", "+18%", test_id="economic_health.inflation.high", font_size=8.5)
@@ -625,10 +673,13 @@ class EconomicHealthPanel:
             test_id="economic_health.interest_rate",
         )
         self._draft_interest_rate = interest_percent / 100.0
-        imgui.text_disabled("Personal income tax")
+        current_tax = self._read_float(country_row, "personal_income_tax_rate", math.nan)
+        tax_status = f"{current_tax:.1%}" if math.isfinite(current_tax) else "Unavailable"
+        imgui.text_disabled(f"Personal income tax in effect: {tax_status}")
+        tax_min, tax_max = self._policy_rate_bounds(state, "personal_income_tax_rate")
         imgui.set_next_item_width(216.0)
         _, tax_percent = imgui.slider_float(
-            "##tax-rate", self._draft_tax_rate * 100.0, 0.0, 50.0, "%.1f%%",
+            "##tax-rate", self._draft_tax_rate * 100.0, tax_min * 100.0, tax_max * 100.0, "%.1f%%",
             test_id="economic_health.tax_rate",
         )
         self._draft_tax_rate = tax_percent / 100.0
@@ -653,11 +704,28 @@ class EconomicHealthPanel:
             self._dispatch_policy_value(client, context.target_tag, "budget_health_ratio", self._draft_health_spending)
         imgui.end_disabled()
         if view.active_policies:
-            for policy in view.active_policies[:3]:
+            Prims.header("SCHEDULED CHANGES", show_bg=False)
+            for policy in view.active_policies:
                 imgui.text_wrapped(
-                    f"{policy.policy_name} → {policy.target_value:.3f}; "
-                    f"cost $ {policy.transition_cost:,.0f}; effective {policy.effective_date}"
+                    f"{self._policy_target_label(policy)} · Cost $ {policy.transition_cost:,.0f}"
+                    f" · Effective {policy.effective_date}"
                 )
+        if recent := getattr(view, "recent_applied_policies", ()):
+            Prims.header("RECENTLY APPLIED", show_bg=False)
+            for policy in recent:
+                timing = f"Applied {policy.applied_date}" if policy.applied_date else f"Scheduled for {policy.effective_date}"
+                imgui.text_wrapped(f"{self._policy_target_label(policy)} · {timing}")
+
+    @staticmethod
+    def _policy_target_label(policy) -> str:
+        label = policy.policy_name.replace("_", " ").capitalize()
+        if policy.policy_name == "minimum_wage":
+            target = f"$ {policy.target_value:,.2f}"
+        elif policy.policy_name in {"interest_rate", "personal_income_tax_rate", "budget_health_ratio"}:
+            target = f"{policy.target_value:.1%}"
+        else:
+            target = f"{policy.target_value:.3g}"
+        return f"{label} → {target}"
 
     def _current_policy_values(self) -> dict[str, float]:
         return {

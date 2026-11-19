@@ -100,6 +100,7 @@ class MarketCyclePublisher:
                 "is_storable",
                 "decay_rate",
                 "_economic_trade_modifier",
+                "_global_resource_tax_modifier",
             ]
         ]
         return market.select(final_production_columns)

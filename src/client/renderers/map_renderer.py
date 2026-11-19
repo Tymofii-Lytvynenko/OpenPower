@@ -17,6 +17,16 @@ from src.core.cache_service import CacheService
 from src.core.paths import ProjectPaths
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
 
+def renderer_matches_map(renderer, map_data: RegionMapData) -> bool:
+    """Reuse the globe across sessions only when they loaded the same map revision."""
+    current = getattr(renderer, "map_data", None)
+    revision = getattr(map_data, "source_revision", None)
+    return renderer is not None and (
+        current is map_data
+        or (revision is not None and getattr(current, "source_revision", None) == revision)
+    )
+
+
 class MapRenderer(BaseRenderer):
     """
     Interactive globe renderer.
@@ -56,7 +66,8 @@ class MapRenderer(BaseRenderer):
         self.program: Optional[arcade.gl.Program] = None
         self.sphere: Optional[SphereMesh] = None
 
-        self._init_resources(terrain_img_path, map_img_path)
+        # Cache keys must describe the image that supplied the packed region IDs.
+        self._init_resources(terrain_img_path, getattr(map_data, "source_path", map_img_path))
         self._init_glsl_globe()
 
     def _init_resources(self, terrain_path: Path, map_path: Path):

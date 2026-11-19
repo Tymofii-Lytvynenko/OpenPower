@@ -1,0 +1,2246 @@
+[[country_election_results]]
+id = "KOS_2001_assembly:pgjk_green_party_of_kosovo"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PGJK — Green Party of Kosovo"
+votes = 2325
+vote_share_pct = 0.29
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:lkck_national_movement_for_liberation_of_kosovo_lkck"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "LKÇK — National Movement for Liberation of Kosovo (LKCK)"
+votes = 8725
+vote_share_pct = 1.11
+seats = 1
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:irdk_new_democratic_initiative_of_kosovo"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "IRDK — New Democratic Initiative of Kosovo"
+votes = 3976
+vote_share_pct = 0.5
+seats = 2
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:xhr_xhevdet_rexhaj"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "XHR — Xhevdet Rexhaj"
+votes = 1330
+vote_share_pct = 0.17
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:pdashk_ashkali_albanian_democratic_party"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PDASHK — Ashkali Albanian Democratic Party"
+votes = 3411
+vote_share_pct = 0.43
+seats = 2
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:lpk_people_s_movement_of_kosovo_lpk"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "LPK — People's Movement of Kosovo (LPK)"
+votes = 4404
+vote_share_pct = 0.56
+seats = 1
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:psdk_social_democratic_party_of_kosovo"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PSDK — Social Democratic Party of Kosovo"
+votes = 1785
+vote_share_pct = 0.23
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:pndsh_albanian_national_democratic_party"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PNDSH — Albanian National Democratic Party"
+votes = 1066
+vote_share_pct = 0.14
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:lk_latif_kryeziu"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "LK — Latif Kryeziu"
+votes = 1199
+vote_share_pct = 0.15
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:bk_balli_kombetar"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "BK — Balli Kombëtar"
+votes = 2881
+vote_share_pct = 0.37
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:pdk_democratic_party_of_kosovo_pdk"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PDK — Democratic Party of Kosovo (PDK)"
+votes = 202622
+vote_share_pct = 25.7
+seats = 26
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:xc_xun_cetta"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "XÇ — Xun Çetta"
+votes = 1210
+vote_share_pct = 0.15
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:coalition_return"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "Coalition Return"
+votes = 89388
+vote_share_pct = 11.34
+seats = 22
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:ldk_democratic_league_of_kosovo_ldk"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "LDK — Democratic League of Kosovo (LDK)"
+votes = 359851
+vote_share_pct = 45.65
+seats = 47
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:prebk_united_roma_party_of_kosovo"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PREBK — United Roma Party of Kosovo"
+votes = 2717
+vote_share_pct = 0.34
+seats = 1
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:iqk_kosovo_citizens_initiative"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "IQK — Kosovo Citizens' Initiative"
+votes = 631
+vote_share_pct = 0.08
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:pqlk_liberal_centre_party_of_kosovo"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PQLK — Liberal Centre Party of Kosovo"
+votes = 2403
+vote_share_pct = 0.3
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:plsh_albanian_liberal_party"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PLSH — Albanian Liberal Party"
+votes = 428
+vote_share_pct = 0.05
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:pd_justice_party"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PD — Justice Party"
+votes = 4504
+vote_share_pct = 0.57
+seats = 1
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:aak_alliance_for_the_future_of_kosovo_aak"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "AAK — Alliance for the Future of Kosovo (AAK)"
+votes = 61688
+vote_share_pct = 7.83
+seats = 8
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:pshdk_albanian_christian_democratic_party_of_kosovo"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PSHDK — Albanian Christian Democratic Party of Kosovo"
+votes = 7701
+vote_share_pct = 0.98
+seats = 1
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:prk_republican_party_of_kosovo"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PRK — Republican Party of Kosovo"
+votes = 643
+vote_share_pct = 0.08
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:plk_liberal_party_of_kosovo"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "PLK — Liberal Party of Kosovo"
+votes = 3600
+vote_share_pct = 0.46
+seats = 0
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:vtn_vatan"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "VTN — Vatan"
+votes = 9030
+vote_share_pct = 1.15
+seats = 4
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:bsdak_bosniac_party_of_democratic_action_of_kosovo"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "BSDAK — Bosniac Party of Democratic Action of Kosovo"
+votes = 2906
+vote_share_pct = 0.37
+seats = 1
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "KOS_2001_assembly:kdtp_kosovo_turkish_democratic_party"
+event_id = "KOS_2001_assembly"
+country_id = "KOS"
+election_date = "2001-11-17"
+result_date = "2001-11-26"
+source_year = 2001
+geography = "Kosovo (UN-administered territory)"
+result_label = "KDTP — Kosovo Turkish Democratic Party"
+votes = 7879
+vote_share_pct = 1.0
+seats = 3
+result_scope = "All 26 political entities in the Kosovo Assembly election; total table covers 120 Assembly seats. Per-entity vote share and seat allocation."
+source_name = "OSCE Mission in Kosovo / Kosovo Central Election Commission"
+source_reference = "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1."
+source_url = "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf"
+source_note = "Certified table reports all 26 entities; aggregate 788,303 votes and 120 seats. Election date 17 November 2001 and final-results notice date 26 November 2001 per https://omik.osce.org/kosovo/54021."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:victory_for_montenegro_democratic_coalition_milo_djukanovic"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Victory for Montenegro-Democratic Coalition Milo Djukanovic"
+votes = 153946
+vote_share_pct = 42.044
+seats = 36
+general_seats = 33
+special_seats = 3
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:together_for_yugoslavia"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Together for Yugoslavia"
+votes = 148513
+vote_share_pct = 40.56
+seats = 33
+general_seats = 33
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:liberal_alliance_of_montenegro"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Liberal Alliance of Montenegro"
+votes = 28746
+vote_share_pct = 7.851
+seats = 6
+general_seats = 6
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:peoples_socialist_party_of_montenegro_momir_bulatovic"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Peoples’ Socialist Party of Montenegro-Momir Bulatovic"
+votes = 10702
+vote_share_pct = 2.923
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:serbian_radical_party_dr_vojislav_seselj"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Serbian Radical Party “Dr. Vojislav Seselj”"
+votes = 4275
+vote_share_pct = 1.168
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:democratic_union_of_albanians"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Democratic Union of Albanians"
+votes = 4232
+vote_share_pct = 1.156
+seats = 1
+general_seats = 0
+special_seats = 1
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:bosnian_muslim_democratic_coalition_in_montenegro"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Bosnian-Muslim Democratic Coalition in Montenegro"
+votes = 4046
+vote_share_pct = 1.105
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:democratic_alliance_in_montenegro_mehmet_bardahi"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Democratic Alliance In Montenegro - Mehmet Bardahi"
+votes = 3570
+vote_share_pct = 0.975
+seats = 1
+general_seats = 0
+special_seats = 1
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:communist_and_workers_parties_for_yugoslavia"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Communist and workers Parties-For Yugoslavia"
+votes = 1640
+vote_share_pct = 0.448
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:osman_redza_party_for_democratic_prosperity"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Osman Redza – Party for Democratic Prosperity"
+votes = 1572
+vote_share_pct = 0.429
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:party_of_foreign_currency_investors_of_montenegro"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Party of Foreign Currency Investors of Montenegro"
+votes = 639
+vote_share_pct = 0.175
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:party_of_natural_law_of_montenegro"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Party of Natural Law of Montenegro"
+votes = 512
+vote_share_pct = 0.14
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:ldp_voice_for_montenegro"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "LDP Voice for Montenegro"
+votes = 354
+vote_share_pct = 0.097
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:dr_novak_kilibarda_peoples_union_of_montenegro"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Dr. Novak Kilibarda People’s Union of Montenegro"
+votes = 268
+vote_share_pct = 0.073
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:party_for_protection_of_bank_investments_and_social_safety"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Party for Protection of Bank Investments and Social Safety"
+votes = 199
+vote_share_pct = 0.054
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "MNE_2001_parliamentary:yugoslav_left_in_montenegro"
+event_id = "MNE_2001_parliamentary"
+country_id = "MNE"
+election_date = "2001-04-22"
+result_date = "2001-05-05"
+source_year = 2001
+geography = "Montenegro (Republic of Montenegro within the Federal Republic of Yugoslavia)"
+result_label = "Yugoslav Left in Montenegro"
+votes = 190
+vote_share_pct = 0.052
+seats = 0
+general_seats = 0
+special_seats = 0
+result_scope = "Montenegro Assembly final results: 72 general seats plus 5 seats from special polling stations. Row seat count is the source-reported total; general and special allocations are retained separately."
+source_name = "OSCE/ODIHR"
+source_reference = "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001."
+source_url = "https://www.osce.org/files/f/documents/a/2/15168.pdf"
+source_note = "Percentages are source-printed (three decimal places). The report gives 366,152 votes cast; list vote totals sum to 363,404. Blank seat-allocation cells are represented as 0. The report states the threshold denominator includes invalid votes and votes cast at special stations."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:frente_revolucionaria_do_timor_leste_independente_fretilin"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Frente Revolucionária do Timor-Leste Independente (Fretilin)"
+vote_share_pct = 57.3
+seats = 43
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:partido_democratico_pd"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Partido Democrático (PD)"
+vote_share_pct = 8.7
+seats = 7
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:partido_social_democrata_psd"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Partido Social Democrata (PSD)"
+vote_share_pct = 8.1
+seats = 6
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:associacao_social_democrata_timorense_asdt"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Associação Social-Democrata Timorense (ASDT)"
+vote_share_pct = 7.8
+seats = 6
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:uniao_democratica_timorense_udt"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "União Democrática Timorense (UDT)"
+vote_share_pct = 2.3
+seats = 2
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:partido_nasionalista_timorense_pnt"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Partido Nasionalista Timorense (PNT)"
+vote_share_pct = 2.2
+seats = 2
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:klibur_oan_timor_asuwain_kota"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Klibur Oan Timor Asuwain (KOTA)"
+vote_share_pct = 2.1
+seats = 2
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:partido_do_povo_de_timor_ppt"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Partido do Povo de Timor (PPT)"
+vote_share_pct = 2.0
+seats = 2
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:partido_democrata_cristao_pdc"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Partido Democrata Cristão (PDC)"
+vote_share_pct = 1.9
+seats = 2
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:partido_socialista_de_timor_pst"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Partido Socialista de Timor (PST)"
+vote_share_pct = 1.7
+seats = 1
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:partai_liberal_pl"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Partai Liberal (PL)"
+vote_share_pct = 1.1
+seats = 1
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "TLS_2001_constituent_assembly:partido_democrata_cristao_de_timor_udc_pdc"
+event_id = "TLS_2001_constituent_assembly"
+country_id = "TLS"
+election_date = "2001-08-30"
+result_date = "2001-09-06"
+source_year = 2001
+geography = "East Timor (UNTAET-administered territory)"
+result_label = "Partido Democrata-Cristão de Timor (UDC/PDC)"
+vote_share_pct = 0.6
+seats = 1
+result_scope = "Constituent Assembly national-list ballot only: 75 proportional national seats; 13 district seats were elected separately."
+source_name = "UNTAET Independent Electoral Commission"
+source_reference = "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation."
+source_url = "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm"
+source_note = "The source reports vote shares to one decimal place but does not publish per-party vote counts in this release; votes are blank. Shares and seats refer to national results, not district seat winners."
+
+[[country_election_results]]
+id = "SRB_2000_assembly:serbian_radical_party_dr_vojislav_seselj"
+event_id = "SRB_2000_assembly"
+country_id = "SRB"
+election_date = "2000-12-23"
+additional_election_date = "2001-01-10"
+result_date = "2001-01-12"
+source_year = 2000
+geography = "Serbia (Republic of Serbia within the Federal Republic of Yugoslavia)"
+result_label = "Serbian Radical Party — Dr. Vojislav Šešelj"
+votes = 322615
+seats = 23
+result_scope = "National Assembly of the Republic of Serbia, final list results covering the 23 December 2000 election and polling held on 10 January 2001; 250 mandates."
+source_name = "Republic Election Commission of Serbia"
+source_reference = "Republic Election Commission, Report on Total Results of Elections for Deputies to the National Assembly held on 23 December 2000 and 10 January 2001, adopted 12 January 2001, pages 1–2."
+source_url = "https://arhiva.rik.parlament.gov.rs/doc/arhiva/poslanici/2000/2.%20izvestaj%20o%20ukupnim%20rezultatima%202000.pdf"
+source_note = "The official report covers results for 23 December 2000 and 10 January 2001; the first date is stored as election_date and the second as additional_election_date. The report gives votes and seats, not vote shares; vote_share_pct is blank."
+
+[[country_election_results]]
+id = "SRB_2000_assembly:serbian_renewal_movement_vuk_draskovic"
+event_id = "SRB_2000_assembly"
+country_id = "SRB"
+election_date = "2000-12-23"
+additional_election_date = "2001-01-10"
+result_date = "2001-01-12"
+source_year = 2000
+geography = "Serbia (Republic of Serbia within the Federal Republic of Yugoslavia)"
+result_label = "Serbian Renewal Movement — Vuk Drašković"
+votes = 141401
+seats = 0
+result_scope = "National Assembly of the Republic of Serbia, final list results covering the 23 December 2000 election and polling held on 10 January 2001; 250 mandates."
+source_name = "Republic Election Commission of Serbia"
+source_reference = "Republic Election Commission, Report on Total Results of Elections for Deputies to the National Assembly held on 23 December 2000 and 10 January 2001, adopted 12 January 2001, pages 1–2."
+source_url = "https://arhiva.rik.parlament.gov.rs/doc/arhiva/poslanici/2000/2.%20izvestaj%20o%20ukupnim%20rezultatima%202000.pdf"
+source_note = "The official report covers results for 23 December 2000 and 10 January 2001; the first date is stored as election_date and the second as additional_election_date. The report gives votes and seats, not vote shares; vote_share_pct is blank."
+
+[[country_election_results]]
+id = "SRB_2000_assembly:socialist_party_of_serbia_slobodan_milosevic"
+event_id = "SRB_2000_assembly"
+country_id = "SRB"
+election_date = "2000-12-23"
+additional_election_date = "2001-01-10"
+result_date = "2001-01-12"
+source_year = 2000
+geography = "Serbia (Republic of Serbia within the Federal Republic of Yugoslavia)"
+result_label = "Socialist Party of Serbia — Slobodan Milošević"
+votes = 516326
+seats = 37
+result_scope = "National Assembly of the Republic of Serbia, final list results covering the 23 December 2000 election and polling held on 10 January 2001; 250 mandates."
+source_name = "Republic Election Commission of Serbia"
+source_reference = "Republic Election Commission, Report on Total Results of Elections for Deputies to the National Assembly held on 23 December 2000 and 10 January 2001, adopted 12 January 2001, pages 1–2."
+source_url = "https://arhiva.rik.parlament.gov.rs/doc/arhiva/poslanici/2000/2.%20izvestaj%20o%20ukupnim%20rezultatima%202000.pdf"
+source_note = "The official report covers results for 23 December 2000 and 10 January 2001; the first date is stored as election_date and the second as additional_election_date. The report gives votes and seats, not vote shares; vote_share_pct is blank."
+
+[[country_election_results]]
+id = "SRB_2000_assembly:democratic_opposition_of_serbia_dos_dr_vojislav_kostunica"
+event_id = "SRB_2000_assembly"
+country_id = "SRB"
+election_date = "2000-12-23"
+additional_election_date = "2001-01-10"
+result_date = "2001-01-12"
+source_year = 2000
+geography = "Serbia (Republic of Serbia within the Federal Republic of Yugoslavia)"
+result_label = "Democratic Opposition of Serbia (DOS) — Dr. Vojislav Koštunica"
+votes = 2404758
+seats = 176
+result_scope = "National Assembly of the Republic of Serbia, final list results covering the 23 December 2000 election and polling held on 10 January 2001; 250 mandates."
+source_name = "Republic Election Commission of Serbia"
+source_reference = "Republic Election Commission, Report on Total Results of Elections for Deputies to the National Assembly held on 23 December 2000 and 10 January 2001, adopted 12 January 2001, pages 1–2."
+source_url = "https://arhiva.rik.parlament.gov.rs/doc/arhiva/poslanici/2000/2.%20izvestaj%20o%20ukupnim%20rezultatima%202000.pdf"
+source_note = "The official report covers results for 23 December 2000 and 10 January 2001; the first date is stored as election_date and the second as additional_election_date. The report gives votes and seats, not vote shares; vote_share_pct is blank."
+
+[[country_election_results]]
+id = "SRB_2000_assembly:party_of_serbian_unity_prof_borislav_pelevic"
+event_id = "SRB_2000_assembly"
+country_id = "SRB"
+election_date = "2000-12-23"
+additional_election_date = "2001-01-10"
+result_date = "2001-01-12"
+source_year = 2000
+geography = "Serbia (Republic of Serbia within the Federal Republic of Yugoslavia)"
+result_label = "Party of Serbian Unity — Prof. Borislav Pelević"
+votes = 200052
+seats = 14
+result_scope = "National Assembly of the Republic of Serbia, final list results covering the 23 December 2000 election and polling held on 10 January 2001; 250 mandates."
+source_name = "Republic Election Commission of Serbia"
+source_reference = "Republic Election Commission, Report on Total Results of Elections for Deputies to the National Assembly held on 23 December 2000 and 10 January 2001, adopted 12 January 2001, pages 1–2."
+source_url = "https://arhiva.rik.parlament.gov.rs/doc/arhiva/poslanici/2000/2.%20izvestaj%20o%20ukupnim%20rezultatima%202000.pdf"
+source_note = "The official report covers results for 23 December 2000 and 10 January 2001; the first date is stored as election_date and the second as additional_election_date. The report gives votes and seats, not vote shares; vote_share_pct is blank."
+
+[[country_election_results]]
+id = "SRB_2000_assembly:democratic_socialist_party_milorad_vucelic"
+event_id = "SRB_2000_assembly"
+country_id = "SRB"
+election_date = "2000-12-23"
+additional_election_date = "2001-01-10"
+result_date = "2001-01-12"
+source_year = 2000
+geography = "Serbia (Republic of Serbia within the Federal Republic of Yugoslavia)"
+result_label = "Democratic Socialist Party — Milorad Vučelić"
+votes = 31973
+seats = 0
+result_scope = "National Assembly of the Republic of Serbia, final list results covering the 23 December 2000 election and polling held on 10 January 2001; 250 mandates."
+source_name = "Republic Election Commission of Serbia"
+source_reference = "Republic Election Commission, Report on Total Results of Elections for Deputies to the National Assembly held on 23 December 2000 and 10 January 2001, adopted 12 January 2001, pages 1–2."
+source_url = "https://arhiva.rik.parlament.gov.rs/doc/arhiva/poslanici/2000/2.%20izvestaj%20o%20ukupnim%20rezultatima%202000.pdf"
+source_note = "The official report covers results for 23 December 2000 and 10 January 2001; the first date is stored as election_date and the second as additional_election_date. The report gives votes and seats, not vote shares; vote_share_pct is blank."
+
+[[country_election_results]]
+id = "SRB_2000_assembly:yugoslav_left_jul"
+event_id = "SRB_2000_assembly"
+country_id = "SRB"
+election_date = "2000-12-23"
+additional_election_date = "2001-01-10"
+result_date = "2001-01-12"
+source_year = 2000
+geography = "Serbia (Republic of Serbia within the Federal Republic of Yugoslavia)"
+result_label = "Yugoslav Left (JUL)"
+votes = 14324
+seats = 0
+result_scope = "National Assembly of the Republic of Serbia, final list results covering the 23 December 2000 election and polling held on 10 January 2001; 250 mandates."
+source_name = "Republic Election Commission of Serbia"
+source_reference = "Republic Election Commission, Report on Total Results of Elections for Deputies to the National Assembly held on 23 December 2000 and 10 January 2001, adopted 12 January 2001, pages 1–2."
+source_url = "https://arhiva.rik.parlament.gov.rs/doc/arhiva/poslanici/2000/2.%20izvestaj%20o%20ukupnim%20rezultatima%202000.pdf"
+source_note = "The official report covers results for 23 December 2000 and 10 January 2001; the first date is stored as election_date and the second as additional_election_date. The report gives votes and seats, not vote shares; vote_share_pct is blank."
+
+[[country_election_results]]
+id = "SRB_2000_assembly:serbian_social_democratic_party_zoran_lilic"
+event_id = "SRB_2000_assembly"
+country_id = "SRB"
+election_date = "2000-12-23"
+additional_election_date = "2001-01-10"
+result_date = "2001-01-12"
+source_year = 2000
+geography = "Serbia (Republic of Serbia within the Federal Republic of Yugoslavia)"
+result_label = "Serbian Social-Democratic Party — Zoran Lilić"
+votes = 29400
+seats = 0
+result_scope = "National Assembly of the Republic of Serbia, final list results covering the 23 December 2000 election and polling held on 10 January 2001; 250 mandates."
+source_name = "Republic Election Commission of Serbia"
+source_reference = "Republic Election Commission, Report on Total Results of Elections for Deputies to the National Assembly held on 23 December 2000 and 10 January 2001, adopted 12 January 2001, pages 1–2."
+source_url = "https://arhiva.rik.parlament.gov.rs/doc/arhiva/poslanici/2000/2.%20izvestaj%20o%20ukupnim%20rezultatima%202000.pdf"
+source_note = "The official report covers results for 23 December 2000 and 10 January 2001; the first date is stored as election_date and the second as additional_election_date. The report gives votes and seats, not vote shares; vote_share_pct is blank."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_nationalist_party_bnp"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Nationalist Party (BNP)"
+votes = 22833978
+vote_share_pct = 40.97
+seats = 193
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_awami_league"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Awami League"
+votes = 22365516
+vote_share_pct = 40.13
+seats = 62
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:islami_jatiya_oikya_front"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Islami Jatiya Oikya Front"
+votes = 4038453
+vote_share_pct = 7.25
+seats = 14
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:jamaat_e_islami_bangladesh"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Jamaat-e-Islami Bangladesh"
+votes = 2385361
+vote_share_pct = 4.28
+seats = 17
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:independent"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Independent"
+votes = 2262073
+vote_share_pct = 4.06
+seats = 6
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_jatiya_party_n_f"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Jatiya Party (N-F)"
+votes = 621772
+vote_share_pct = 1.12
+seats = 4
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:islami_oikya_jote"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Islami Oikya Jote"
+votes = 376343
+vote_share_pct = 0.68
+seats = 2
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:krisak_sramik_janata_league"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Krisak Sramik Janata League"
+votes = 261344
+vote_share_pct = 0.47
+seats = 1
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:jatiya_party_manju"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Jatiya Party (Manju)"
+votes = 243617
+vote_share_pct = 0.44
+seats = 1
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:jatiya_samajtantrik_dal"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Jatiya Samajtantrik Dal"
+votes = 119382
+vote_share_pct = 0.21
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesher_communist_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesher Communist Party"
+votes = 56991
+vote_share_pct = 0.1
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_workers_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Workers Party"
+votes = 40484
+vote_share_pct = 0.07
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_islami_front"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Islami Front"
+votes = 30761
+vote_share_pct = 0.06
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_samajtantrik_dal_basad_khalekuzzaman"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Samajtantrik Dal (BASAD-Khalekuzzaman)"
+votes = 21164
+vote_share_pct = 0.04
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:jamiate_ulamae_islam_bangladesh"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Jamiate Ulamae Islam Bangladesh"
+votes = 19256
+vote_share_pct = 0.03
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_khelafat_andolon"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Khelafat Andolon"
+votes = 13472
+vote_share_pct = 0.02
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:gono_forum"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Gono Forum"
+votes = 8494
+vote_share_pct = 0.02
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:islami_shasantantra_andolon"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Islami Shasantantra Andolon"
+votes = 5944
+vote_share_pct = 0.01
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:liberal_party_bangladesh"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Liberal Party Bangladesh"
+votes = 3976
+vote_share_pct = 0.01
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:national_awami_party_nap"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "National Awami Party (NAP)"
+votes = 3801
+vote_share_pct = 0.01
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_progressive_party_bpp"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Progressive Party (BPP)"
+votes = 3734
+vote_share_pct = 0.01
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:gonotantri_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Gonotantri Party"
+votes = 3190
+vote_share_pct = 0.01
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_samajtantrik_dal_mahbub"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Samajtantrik Dal (Mahbub)"
+votes = 2308
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_janata_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Janata Party"
+votes = 1703
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_krisak_sramik_mukti_andolon"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Krisak Sramik Mukti Andolon"
+votes = 1248
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:jaker_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Jaker Party"
+votes = 1181
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_peoples_congress"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Peoples Congress"
+votes = 1155
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:communist_kendra"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Communist Kendra"
+votes = 1042
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_sammyabadi_dal_marx_lenin"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Sammyabadi Dal (Marx-Lenin)"
+votes = 972
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_hindu_league"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Hindu League"
+votes = 922
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_gono_azadi_league_samad"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Gono Azadi League (Samad)"
+votes = 780
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:jatiyo_janata_party_adv_nurul_islam_khan"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Jatiyo Janata Party (Adv. Nurul Islam Khan)"
+votes = 657
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_muslim_league_jamir_ali"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Muslim League (Jamir Ali)"
+votes = 582
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:national_patriotic_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "National Patriotic Party"
+votes = 551
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:national_awami_party_nap_bhasani"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "National Awami Party (NAP-Bhasani)"
+votes = 442
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_jatiya_tanti_dal"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Jatiya Tanti Dal"
+votes = 441
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:samridha_bangladesh_andolon"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Samridha Bangladesh Andolon"
+votes = 429
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:sramik_krishak_samajbadi_dal"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Sramik Krishak Samajbadi Dal"
+votes = 391
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_peoples_party_bpp"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Peoples Party (BPP)"
+votes = 382
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:desh_prem_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Desh Prem Party"
+votes = 366
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:democratic_republican_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Democratic Republican Party"
+votes = 364
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_manabadhikar_dal_bamad"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Manabadhikar Dal (Bamad)"
+votes = 237
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_krisak_sramik_janata_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Krisak Sramik Janata Party"
+votes = 197
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:liberal_democrats_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Liberal Democrats Party"
+votes = 170
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:quran_darshan_sangstha_bangladesh"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Quran Darshan Sangstha Bangladesh"
+votes = 161
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:jatiya_janata_party_sheik_asad"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Jatiya Janata Party (Sheik Asad)"
+votes = 148
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:pragatishil_gonotantrik_shakti_pragash"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Pragatishil Gonotantrik Shakti (Pragash)"
+votes = 136
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:sama_samaj_gonotantri_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Sama-Samaj Gonotantri Party"
+votes = 131
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:national_awami_party_nap_vasani_mushtaq"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "National Awami Party (NAP-Vasani Mushtaq)"
+votes = 79
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:quran_and_sunnah_bastabayan_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Quran and Sunnah Bastabayan Party"
+votes = 77
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bhasani_front"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bhasani Front"
+votes = 76
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_krishak_sramik_awami_league"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Krishak Sramik Awami League"
+votes = 59
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_vasani_adarsha_bastabayan_parishad"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Vasani Adarsha Bastabayan Parishad"
+votes = 58
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:bangladesh_sarbahara_party"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Bangladesh Sarbahara Party"
+votes = 44
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "BGD_2001_parliamentary:jatiya_janata_party_hafizur"
+event_id = "BGD_2001_parliamentary"
+country_id = "BGD"
+election_date = "2001-10-01"
+source_year = 2001
+geography = "Bangladesh"
+result_label = "Jatiya Janata Party (Hafizur)"
+votes = 30
+vote_share_pct = 0.0
+seats = 0
+result_scope = "All 55 party and independent aggregate rows from the Bangladesh Election Commission table; 300 directly elected general seats, excluding reserved women seats. The source reports 55,736,625 valid votes."
+source_name = "Bangladesh Election Commission"
+source_reference = "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8."
+source_url = "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf"
+source_note = "Official table reports 55 party/independent vote totals, vote shares, and direct-seat allocations for the 1 October 2001 election; the table does not state a separate result-declaration date."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:social_democrats_a_socialdemokratiet"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Social Democrats (A. Socialdemokratiet)"
+votes = 1003323
+seats = 52
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:danish_social_liberal_party_b_det_radikale_venstre"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Danish Social Liberal Party (B. Det Radikale Venstre)"
+votes = 179023
+seats = 9
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:conservative_people_s_party_c_det_konservative_folkeparti"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Conservative People's Party (C. Det Konservative Folkeparti)"
+votes = 312770
+seats = 16
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:centre_democrats_d_centrum_demokraterne"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Centre Democrats (D. Centrum-Demokraterne)"
+votes = 61031
+seats = 0
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:socialist_people_s_party_f_socialistisk_folkeparti"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Socialist People's Party (F. Socialistisk Folkeparti)"
+votes = 219842
+seats = 12
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:danish_people_s_party_o_dansk_folkeparti"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Danish People's Party (O. Dansk Folkeparti)"
+votes = 413987
+seats = 22
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:christian_democrats_q_kristeligt_folkeparti"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Christian Democrats (Q. Kristeligt Folkeparti)"
+votes = 78793
+seats = 4
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:venstre_denmark_s_liberal_party_v_venstre_danmarks_liberale_parti"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Venstre, Denmark's Liberal Party (V. Venstre, Danmarks Liberale Parti)"
+votes = 1077858
+seats = 56
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:progress_party_z_fremskridtspartiet"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Progress Party (Z. Fremskridtspartiet)"
+votes = 19340
+seats = 0
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:red_green_alliance_enhedslisten_de_rd_grnne"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Red-Green Alliance (Ø. Enhedslisten – De Rød-Grønne)"
+votes = 82685
+seats = 4
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."
+
+[[country_election_results]]
+id = "DNK_2001_folketing:other_outside_party_lists"
+event_id = "DNK_2001_folketing"
+country_id = "DNK"
+election_date = "2001-11-20"
+source_year = 2001
+geography = "Denmark (excluding separately elected Faroe Islands and Greenland seats)"
+result_label = "Other, outside party lists"
+votes = 1016
+seats = 0
+result_scope = "Final national count for Denmark proper; 175 Folketing seats across 103 nomination districts. The source table does not include the separately elected Greenland and Faroe Islands seats."
+source_name = "Danish Ministry of the Interior and Health"
+source_reference = "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table."
+source_url = "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001"
+source_note = "The ministry states that the final count was made from district election books and gives votes and mandates for each list; it does not separately state the date when the count was published."

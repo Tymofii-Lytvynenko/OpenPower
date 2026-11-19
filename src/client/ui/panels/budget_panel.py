@@ -97,6 +97,10 @@ class BudgetPanel:
         self._local_save_confirmation_preferences = SaveConfirmationPreferences()
         self.current_tag = ""
         self._needs_state_sync = True
+        self._pending_command_id: str | None = None
+        self._draft_after_receipt: dict | None = None
+        self._send_error = ""
+        self._close_after_update = False
 
     def render(self, state, context: PanelRenderContext) -> bool:
         navigation_close = self._close_intent.consume()
@@ -107,9 +111,16 @@ class BudgetPanel:
             context.save_confirmation_preferences
             or self._local_save_confirmation_preferences
         )
-        can_apply = bool(net_client and is_own)
-
         self._sync_target_allocations(state, target_tag)
+        self._resolve_pending_update(state, target_tag)
+        # Editing defaults before the country snapshot arrives can overwrite a
+        # draft when synchronization completes or send values for the wrong state.
+        pending = self._pending_command_id is not None or self._needs_state_sync
+        can_apply = bool(net_client and is_own and not pending)
+        if self._close_after_update and not pending:
+            self._close_after_update = False
+            if self.draft_allocations == self.allocations:
+                return False
 
         with WindowManager.window(
             "BUDGET MENU",
@@ -119,10 +130,12 @@ class BudgetPanel:
             h=780,
             test_id="budget.panel",
         ) as is_open:
-            has_changes = self.draft_allocations != self.allocations
+            has_changes = not pending and self.draft_allocations != self.allocations
             close_decision = None
 
             if not is_open or navigation_close:
+                if pending and self._close_after_update:
+                    return True
                 if has_changes:
                     close_decision = self.close_confirmation.request_close(
                         preferences,
@@ -131,7 +144,7 @@ class BudgetPanel:
                 else:
                     return False
 
-            apply_enabled = has_changes and is_own and net_client is not None
+            apply_enabled = has_changes and can_apply
             imgui.begin_disabled(not apply_enabled)
             imgui.push_style_color(
                 imgui.Col_.button,
@@ -147,24 +160,30 @@ class BudgetPanel:
             imgui.pop_style_color()
             imgui.end_disabled()
 
-            self._render_content(state, target_tag, is_own)
+            if pending:
+                imgui.text_disabled("Waiting for budget data…")
+            if self._send_error:
+                imgui.text_wrapped(self._send_error)
+            self._render_content(state, target_tag, is_own and not pending)
 
             if close_decision is not None:
-                self._finish_close(close_decision, net_client, target_tag)
-                return False
+                return not self._finish_close(close_decision, net_client, target_tag)
 
             close_decision = self.close_confirmation.render(
                 preferences,
                 can_apply=can_apply,
             )
             if close_decision is not None:
-                self._finish_close(close_decision, net_client, target_tag)
-                return False
+                return not self._finish_close(close_decision, net_client, target_tag)
 
             return True
 
     def _sync_target_allocations(self, state, target_tag) -> None:
         if target_tag != self.current_tag:
+            self._pending_command_id = None
+            self._draft_after_receipt = None
+            self._send_error = ""
+            self._close_after_update = False
             self.current_tag = target_tag
             self.allocations = default_budget_allocations(
                 self.M_SECTOR_LABELS, self.PERSONAL_INCOME_TAX_KEY
@@ -176,9 +195,32 @@ class BudgetPanel:
             # Retry when snapshots arrive before the selected country row.
             # Defaults prevent showing allocations from the previously selected country.
             self._needs_state_sync = not self._sync_with_state(state, target_tag)
+            if not self._needs_state_sync and self._draft_after_receipt is not None:
+                if self.allocations != self._draft_after_receipt:
+                    self.draft_allocations = self._draft_after_receipt
+                self._draft_after_receipt = None
+
+    def _resolve_pending_update(self, state, target_tag) -> None:
+        command_id = self._pending_command_id
+        if command_id is None:
+            return
+        records = getattr(getattr(state, "journal", None), "command_results", ())
+        if any(record.get("command_id") == command_id for record in reversed(records)):
+            # A receipt is enough to refresh the form, but only the snapshot
+            # can tell us which allocations actually took effect.
+            draft = self.draft_allocations.copy()
+            self._pending_command_id = None
+            self._needs_state_sync = not self._sync_with_state(state, target_tag)
+            if self._needs_state_sync:
+                # Keep edits until a later snapshot supplies the authoritative row.
+                self._draft_after_receipt = draft
+            elif self.allocations != draft:
+                # Preserve rejected or unapplied edits so the player can correct and retry them.
+                self.draft_allocations = draft
 
     def _sync_with_state(self, state, target_tag) -> bool:
-        if "countries" not in state.tables:
+        if "countries" not in state.tables or "id" not in state.get_table("countries").columns:
+            # A partial snapshot must not crash the panel while it waits to synchronize.
             return False
         df = state.get_table("countries").filter(pl.col("id") == target_tag)
         if df.is_empty():
@@ -194,15 +236,21 @@ class BudgetPanel:
         self.draft_allocations = self.allocations.copy()
         return True
 
-    def _finish_close(self, decision, net_client, target_tag) -> None:
+    def _finish_close(self, decision, net_client, target_tag) -> bool:
         if decision is CloseDecision.APPLY and net_client:
-            self._dispatch_budget_update(net_client, target_tag)
+            if self._dispatch_budget_update(net_client, target_tag):
+                # Close only after the authoritative snapshot confirms the draft.
+                self._close_after_update = True
+            return False
         else:
             self.draft_allocations = self.allocations.copy()
+            return True
 
     def _get_player_total_demand(self, state, target_tag) -> float:
         if "resource_ledger" not in state.tables: return 0.0
-        country_ledger = state.get_table("resource_ledger").filter(pl.col("country_id") == target_tag)
+        ledger = state.get_table("resource_ledger")
+        if not {"country_id", "consumption_usd"}.issubset(ledger.columns): return 0.0
+        country_ledger = ledger.filter(pl.col("country_id") == target_tag)
         if country_ledger.is_empty(): return 0.0
         return country_ledger["consumption_usd"].sum()
 
@@ -211,7 +259,7 @@ class BudgetPanel:
 
         # Get country data for income and fixed expenses
         country_row = {}
-        if "countries" in state.tables:
+        if "countries" in state.tables and "id" in state.get_table("countries").columns:
             df = state.get_table("countries").filter(pl.col("id") == target_tag)
             if not df.is_empty():
                 country_row = df.to_dicts()[0]
@@ -454,7 +502,7 @@ class BudgetPanel:
             description = "Additional information is not available for this budget row."
         return f"{description}\nCurrent recorded amount: {self._fmt_money(value)}"
 
-    def _dispatch_budget_update(self, net_client, country_tag: str) -> None:
+    def _dispatch_budget_update(self, net_client, country_tag: str) -> bool:
         action = ActionUpdateBudget(
             player_id=net_client.player_id,
             country_tag=country_tag,
@@ -463,9 +511,14 @@ class BudgetPanel:
                 for key, value in self.draft_allocations.items()
             },
         )
-        net_client.send_action(action)
-        self.allocations = action.allocations.copy()
-        self.draft_allocations = self.allocations.copy()
+        try:
+            self._pending_command_id = net_client.send_action(action)
+        except Exception as error:
+            # Keep the editable draft when the client could not send it.
+            self._send_error = f"Could not send the budget update: {error or type(error).__name__}."
+            return False
+        self._send_error = ""
+        return True
 
     @staticmethod
     def _bounded_ratio(value, fallback: float) -> float:

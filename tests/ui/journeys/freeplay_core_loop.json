@@ -1,0 +1,97 @@
+{
+  "fixture": "tests/ui/fixtures/freeplay_core_loop.json",
+  "steps": [
+    {
+      "op": "assert_region",
+      "target": "new_game.freeplay.dialog",
+      "visible": true
+    },
+    {
+      "op": "select",
+      "target": "new_game.freeplay.country.select",
+      "value": "UKR - Ukraine"
+    },
+    {
+      "op": "assert",
+      "target": "new_game.freeplay.start",
+      "enabled": true
+    },
+    {
+      "op": "click",
+      "target": "new_game.freeplay.start"
+    },
+    {
+      "op": "assert_region",
+      "target": "hud.central_bar",
+      "visible": true
+    },
+    {
+      "op": "assert",
+      "target": "hud.date",
+      "label": "2001-01-01",
+      "visible": true
+    },
+    {
+      "op": "click",
+      "target": "hud.clock"
+    },
+    {
+      "op": "click",
+      "target": "hud.speed.3"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPaused",
+      "count": 1,
+      "fields": {
+        "is_paused": false
+      }
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetGameSpeed",
+      "fields": {
+        "speed_level": 3
+      }
+    },
+    {
+      "op": "click",
+      "target": "hud.pause"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetPaused",
+      "count": 2,
+      "index": 1,
+      "fields": {
+        "is_paused": true
+      }
+    },
+    {
+      "op": "click",
+      "target": "hud.panel.eco"
+    },
+    {
+      "op": "click",
+      "target": "economy.health_btn"
+    },
+    {
+      "op": "input",
+      "target": "economic_health.tax.value",
+      "value": 35.0
+    },
+    {
+      "op": "click",
+      "target": "economic_health.apply"
+    },
+    {
+      "op": "assert_action",
+      "type": "ActionSetTax",
+      "fields": {
+        "country_tag": "UKR",
+        "new_tax_rate": 0.35
+      },
+      "tolerance": 0.001
+    }
+  ]
+}

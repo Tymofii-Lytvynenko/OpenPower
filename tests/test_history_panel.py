@@ -4,12 +4,12 @@ from types import SimpleNamespace
 
 import polars as pl
 
-from src.client.ui.panels.service import history_panel as history_panel_module
-from src.client.ui.panels.service.history_panel import HistoryPanel
 from src.client.services.history_indicator_catalog import (
     history_indicator_sort_key,
     history_indicator_source_label,
 )
+from src.client.ui.panels.service import history_panel as history_panel_module
+from src.client.ui.panels.service.history_panel import HistoryPanel
 
 
 def test_history_indicator_catalog_uses_source_names_and_enum_order_for_shared_metrics() -> None:
@@ -27,6 +27,8 @@ def test_history_indicator_catalog_uses_source_names_and_enum_order_for_shared_m
         {"id": "country.infrastructure_index", "subject_type": "country"},
         {"id": "country.resource_production", "subject_type": "country"},
         {"id": "country.economic_health", "subject_type": "country"},
+        {"id": "country.baseline_2001.birth_rate", "subject_type": "country"},
+        {"id": "country.baseline_2000.protected_area_pct", "subject_type": "country"},
         {"id": "region.population", "subject_type": "region"},
     ]
 
@@ -45,11 +47,15 @@ def test_history_indicator_catalog_uses_source_names_and_enum_order_for_shared_m
         "country.human_dev",
         "country.infrastructure_index",
         "country.telecom_index",
+        "country.baseline_2001.birth_rate",
+        "country.baseline_2000.protected_area_pct",
         "country.gdp",
         "region.population",
     ]
     assert history_indicator_source_label("country.gdp_per_capita") == "GDP per Capita"
     assert history_indicator_source_label("country.budget_balance") == "Budget"
+    assert history_indicator_source_label("country.baseline_2001.birth_rate") == "Birth Rate (2001)"
+    assert history_indicator_source_label("country.baseline_2000.protected_area_pct") == "Protected Areas (2000)"
     assert history_indicator_source_label("country.gdp") is None
 
 

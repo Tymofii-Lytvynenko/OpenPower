@@ -7,7 +7,23 @@ from typing import Any
 
 import polars as pl
 
-from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
+from modules.base.systems.military.authority_policy import player_controls_country
+from modules.base.systems.military.capability_catalog import (
+    design_capability_error,
+    get_role_profile,
+    project_capabilities,
+)
+from modules.base.systems.military.production_policy import (
+    DEFAULT_PRODUCTION_COEFFICIENT,
+    allocate_production_capacity_frame,
+    annual_production_capacity_frame,
+    initialize_production_order_work,
+    production_order_quote,
+)
+from modules.base.systems.military.research_eligibility_policy import (
+    research_requirements_met,
+)
+from modules.base.systems.world.demilitarization_policy import DemilitarizationPolicy
 from src.shared.actions import (
     ActionCancelProductionOrder,
     ActionCreateUnitDesign,
@@ -17,27 +33,18 @@ from src.shared.actions import (
     ActionUpdateResearchFunding,
 )
 from src.shared.events import EventRealSecond
-from src.shared.state import GameState
-from src.shared.system_state import SYSTEM_STATE_HELPER
-from src.shared.research_funding import linked_research_funding_group, redistribute_linked_funding
-from modules.base.systems.military.production_policy import (
-    DEFAULT_PRODUCTION_COEFFICIENT,
+from src.shared.military_constants import (
     MAX_PRODUCTION_QUEUE_ORDERS,
     MAX_UNIT_PRODUCTION_QUANTITY,
-    allocate_production_capacity_frame,
-    annual_production_capacity_frame,
-    initial_production_eta_days,
-    initialize_production_order_work,
+    production_order_occupies_queue,
 )
-from modules.base.systems.military.capability_catalog import (
-    design_capability_error,
-    get_role_profile,
-    project_capabilities,
+from src.shared.research_funding import (
+    linked_research_funding_group,
+    redistribute_linked_funding,
 )
-from modules.base.systems.military.research_eligibility_policy import research_requirements_met
-from modules.base.systems.military.authority_policy import player_controls_country
-from modules.base.systems.world.demilitarization_policy import DemilitarizationPolicy
-
+from src.shared.state import GameState
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
+from src.shared.system_state import SYSTEM_STATE_HELPER
 
 _SECONDS_PER_YEAR = 365.25 * 24 * 60 * 60
 _RESEARCH_ACTION_TYPES = (
@@ -292,7 +299,11 @@ class ResearchProgramSystem(ISystem):
         if not self._authorized(state, action.player_id, country):
             self._reject(state, action, "The issuer does not control this country's production queue.")
             return
-        quantity = int(action.quantity)
+        try:
+            quantity = int(action.quantity)
+        except (TypeError, ValueError, OverflowError):
+            self._reject(state, action, "Production quantity must be a positive integer.")
+            return
         if quantity > MAX_UNIT_PRODUCTION_QUANTITY:
             self._reject(
                 state,
@@ -306,8 +317,10 @@ class ResearchProgramSystem(ISystem):
         ), None)
         country_row = next((row for row in countries if self._tag(row.get("id")) == country), None)
         if quantity <= 0 or design is None or country_row is None:
+            self._reject(state, action, "Select a positive quantity and an available domestic design and country.")
             return
-        if sum(self._tag(row.get("country_id")) == country for row in orders) >= MAX_PRODUCTION_QUEUE_ORDERS:
+        if sum(self._tag(row.get("country_id")) == country and production_order_occupies_queue(row.get("status"))
+               for row in orders) >= MAX_PRODUCTION_QUEUE_ORDERS:
             self._reject(
                 state,
                 action,
@@ -320,8 +333,10 @@ class ResearchProgramSystem(ISystem):
             if self._tag(row.get("country_id")) == country
         }
         if not research_requirements_met(design.get("research_requirements_json"), levels):
+            self._reject(state, action, "The design's research requirements are not met.")
             return
         if str(design.get("domain") or "land").strip().lower() not in {"land", "air", "naval", "strategic"}:
+            self._reject(state, action, "The selected design has an unsupported military domain.")
             return
         if not self._demilitarization_policy.can_add(
             state,
@@ -332,29 +347,47 @@ class ResearchProgramSystem(ISystem):
         ):
             self._reject(state, action, "The order would exceed an active demilitarization limit.")
             return
-        total_cost = max(0.0, self._number(design.get("cost"))) * quantity
+        try:
+            quote = production_order_quote(design.get("cost"), quantity, action.priority, action.production_speed)
+        except ValueError as error:
+            self._reject(state, action, str(error))
+            return
+        total_cost = quote.total_cost
         available_funds = self._number(country_row.get("money_reserves"))
         if available_funds < total_cost:
+            self._reject(state, action, "The country cannot afford this production order.")
             return
+        existing_ids = {str(order.get("id") or "") for order in orders}
+        sequence = len(orders) + 1
+        order_id = f"order-{country}-{sequence:04d}"
+        while order_id in existing_ids:
+            # Imported or pruned histories can contain gaps; never reuse an existing order ID.
+            sequence += 1
+            order_id = f"order-{country}-{sequence:04d}"
         country_row["money_reserves"] = available_funds - total_cost
         orders.append({
-            "id": f"order-{country}-{len(orders) + 1:04d}",
+            "id": order_id,
             "country_id": country,
             "design_id": design_id,
             "quantity": quantity,
             "progress": 0.0,
             "priority": max(1, int(action.priority)),
+            "production_speed": action.production_speed,
             "status": "queued",
-            "eta_days": initial_production_eta_days(action.priority),
-            "unit_cost": max(0.0, self._number(design.get("cost"))),
-            "work_required": total_cost,
-            "remaining_work": total_cost,
+            "eta_days": quote.initial_eta_days,
+            "unit_cost": quote.unit_cost,
+            "work_required": quote.work_required,
+            "remaining_work": quote.work_required,
             "assigned_capacity": 0.0,
             "requested_training_level": self._training_level(action.training_level),
             "blocking_reason": "",
             "source": "domestic",
             "updated_at_minute": 0,
         })
+        state.journal.append_command_result({"tick": int(state.globals.get("tick", 0)),
+            "player_id": str(action.player_id), "action_type": type(action).__name__,
+            "status": "applied", "reason": "The unit production order was queued.",
+            "order_id": str(orders[-1]["id"])})
     def _cancel_production(
         self,
         orders: list[dict[str, Any]],

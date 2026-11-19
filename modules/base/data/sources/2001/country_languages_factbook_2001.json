@@ -1,0 +1,24 @@
+{
+  "source": "United States Central Intelligence Agency, The World Factbook 2001",
+  "source_url": "https://www.gutenberg.org/ebooks/27638",
+  "source_text_url": "https://www.gutenberg.org/cache/epub/27638/pg27638-images.html",
+  "data_year": 2001,
+  "source_vintage_note": "The book states that information generally available as of 1 January 2001 was used; selected content may have later updates.",
+  "source_file": "factbook.txt",
+  "source_sha256": "a7bef458e703ea2ac49188f57deb3fe137e50b5d3916f46ee34ec23c2374537d",
+  "extracted_file": "country_languages_factbook_2001.tsv",
+  "records": 199,
+  "status_counts": {
+    "reported": 193,
+    "entry_without_language_field": 1,
+    "not_separate_in_2001": 5
+  },
+  "method": "Extract the country entry Languages field, preserve source wording, and collapse line wraps. Do not parse or normalize any percentages into population shares.",
+  "limitations": [
+    "Factbook language coverage ranges from named languages to explicit estimates; it is not a uniform census series.",
+    "Kosovo, Montenegro, Serbia, South Sudan, and East Timor do not have separate country entries in the 2001 source; no parent-country language field is represented as a territory-specific estimate.",
+    "Antarctica has an entry but no Languages field.",
+    "The 2001 source table supplements but does not replace the existing game language-share profiles in country_languages.toml."
+  ],
+  "extracted_file_sha256": "dccee6891245e9300010fa36de797ee74be4ab69e393dd745053f01be946f56e"
+}

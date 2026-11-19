@@ -10,12 +10,14 @@ class LoadingView(arcade.View):
     def __init__(self, 
                  task: LoadingTask, 
                  on_success: Callable[[Any], arcade.View],
-                 on_failure: Callable[[Exception], None] | None = None):
+                 on_failure: Callable[[Exception], None] | None = None, *,
+                 on_return: Callable[[], None] | None = None):
         
         super().__init__()
         self.task = task
         self.on_success = on_success
         self.on_failure = on_failure
+        self.on_return = on_return
         
         self.ui = UIComposer(GAMETHEME)
         self.status_panel = LoadingStatusPanel()
@@ -82,9 +84,18 @@ class LoadingView(arcade.View):
                 if self._completion_started:
                     return
                 self._completion_started = True
-                next_view = self.on_success(self.result)
-                if next_view:
-                    self.window.show_view(next_view)
+                try:
+                    next_view = self.on_success(self.result)
+                    if next_view:
+                        self.window.show_view(next_view)
+                except Exception as error:
+                    # View construction can fail after background loading succeeded;
+                    # keep the error screen available instead of crashing the client.
+                    self.error = error
+                    cancel = getattr(self.task, "cancel", None)
+                    if callable(cancel):
+                        cancel()
+                    return
 
     def on_resize(self, width: int, height: int):
         self.window.imgui.resize(width, height)
@@ -115,7 +126,8 @@ class LoadingView(arcade.View):
             self.task,
             self.error,
             self.window.get_size(),
-            on_return=self.window.setup,
+            on_return=self.on_return or self.window.setup,
+            return_label="GO BACK" if self.on_return else "RETURN TO START",
         )
 
         self.window.imgui.render()

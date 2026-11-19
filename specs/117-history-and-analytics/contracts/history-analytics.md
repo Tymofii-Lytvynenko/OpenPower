@@ -4,7 +4,7 @@
 
 `HistorySystem` is registered as `base.history` in `modules/base/registration.py`, runs in `POST_PROCESS`, and depends on `base.campaign`. It reads declared gameplay/source tables and writes only `history_indicator_definitions`, `history_series_state`, `history_snapshots`, and `history_events`.
 
-The recorder ensures default indicator definitions, measures configured indicators, emits an initial/change/due/missing observation when required, compacts touched series according to their retention policy, and appends previously unseen domain journal/economic-cause records. Repeated processing of unchanged state must not create duplicate observations or events.
+`HistoryStartSeedSystem` runs before the clock and, for new games only, seeds the compatible 2001 population indicators at minute zero with regional provenance references. It creates no earlier series. `HistorySystem` runs in `POST_PROCESS`, depends on `base.campaign`, ensures default indicator definitions, measures configured indicators, emits an initial/change/due/missing observation when required, compacts touched series according to their retention policy, and appends previously unseen domain journal/economic-cause records. Repeated processing of unchanged state must not create duplicate observations or events.
 
 ## Client query service
 
@@ -28,4 +28,4 @@ The query service and panel do not modify `GameState`, dispatch gameplay actions
 
 ## Persistence and synchronization
 
-All four tables use the base typed schema registry and stable primary keys. Existing snapshot IPC and save/load serializers carry these rows and recorder cursors. Loading old saves with no history starts observations at the first supported update without changing current gameplay data.
+All four tables use the base typed schema registry and stable primary keys. Existing snapshot IPC and save/load serializers carry these rows and recorder cursors. Loading old saves with no history starts observations at the first supported update without changing current gameplay data or synthesizing a minute-zero baseline.

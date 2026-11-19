@@ -9,6 +9,7 @@ from src.shared.state import GameState
 
 
 class SystemPhase(IntEnum):
+    STARTUP = 5
     CLOCK = 10
     BOOTSTRAP = 20
     POPULATION = 30

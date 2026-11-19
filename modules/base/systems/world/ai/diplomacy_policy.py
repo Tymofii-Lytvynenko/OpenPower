@@ -137,6 +137,11 @@ class DiplomacyPolicy:
 
         profiles = self._profile_frame()
         relations = relation_matrix(context)
+        accepted_members = (
+            pl.col("accepted_members").list.eval(pl.element().cast(pl.Utf8).str.to_uppercase())
+            if "accepted_members" in schema
+            else pl.lit([], dtype=pl.List(pl.Utf8))
+        )
         responses = (
             pending.filter(
                 pl.col("status").fill_null("pending").str.to_lowercase() == "pending"
@@ -148,6 +153,7 @@ class DiplomacyPolicy:
                 pl.col("source_country_id").cast(pl.Utf8).str.to_uppercase().alias("source_country"),
                 pl.col("treaty_type").cast(pl.Utf8).str.to_lowercase().alias("treaty_type"),
                 pl.col("required_responses"),
+                accepted_members.alias("_accepted_members"),
             )
             .explode("required_responses")
             .with_columns(
@@ -156,6 +162,9 @@ class DiplomacyPolicy:
                 .str.to_uppercase()
                 .alias("country_id")
             )
+            # Partial acceptance leaves the proposal pending for the other invited countries.
+            .filter(~pl.col("_accepted_members").list.contains(pl.col("country_id")).fill_null(False))
+            .drop("_accepted_members")
             .join(controlled, on="country_id", how="inner")
             .join(profiles, on="treaty_type", how="left")
             .join(

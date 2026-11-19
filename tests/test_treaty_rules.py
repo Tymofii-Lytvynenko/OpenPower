@@ -23,12 +23,12 @@ class TreatyRulesTest(unittest.TestCase):
         self._respond(state, proposal_id, "CAN")
         treaty_id = state.get_table("countries_treaties")["id"][0]
 
-        state.current_actions = [ActionJoinTreaty("player", treaty_id, "GBR")]
+        state.current_actions = [ActionJoinTreaty("GBR", treaty_id, "GBR")]
         self.system.update(state, 0.1)
         members = set(state.get_table("countries_treaties")["members"][0].to_list())
         self.assertIn("GBR", members)
 
-        state.current_actions = [ActionJoinTreaty("player", treaty_id, "FRA")]
+        state.current_actions = [ActionJoinTreaty("FRA", treaty_id, "FRA")]
         self.system.update(state, 0.1)
         members = set(state.get_table("countries_treaties")["members"][0].to_list())
         self.assertNotIn("FRA", members)
@@ -63,7 +63,7 @@ class TreatyRulesTest(unittest.TestCase):
 
     def _propose(self, state: GameState, treaty_type: str, members: list[str], conditions: dict) -> None:
         state.current_actions = [ActionCreateTreaty(
-            player_id="player",
+            player_id="USA",
             source_country_tag="USA",
             target_country_tag="CAN",
             treaty_type=treaty_type,
@@ -76,7 +76,7 @@ class TreatyRulesTest(unittest.TestCase):
         self.system.update(state, 0.1)
 
     def _respond(self, state: GameState, proposal_id: str, country_tag: str) -> None:
-        state.current_actions = [ActionRespondTreaty("player", proposal_id, country_tag, True)]
+        state.current_actions = [ActionRespondTreaty(country_tag, proposal_id, country_tag, True)]
         self.system.update(state, 0.1)
 
     def _state(self) -> GameState:

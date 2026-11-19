@@ -52,9 +52,11 @@ def test_action_builders_keep_callbacks_and_unavailable_actions_explicit():
 
     assert by_id["main_menu.singleplayer"].opens_screen == "singleplayer"
     assert by_id["main_menu.scenario"].callback is singleplayer
+    assert by_id["main_menu.custom_game"].enabled
+    assert by_id["main_menu.custom_game"].callback is singleplayer
+    assert "without a campaign scenario" in by_id["main_menu.custom_game"].tooltip
     assert by_id["main_menu.load_game"].callback is load_game
     assert by_id["main_menu.exit"].callback is exit_game
-    assert not by_id["main_menu.custom_game"].enabled
     assert by_id["main_menu.multiplayer.internet"].join_mode == "internet"
     assert by_id["main_menu.multiplayer.lan"].join_mode == "lan"
     assert by_id["main_menu.interface_tutorial"].opens_tutorial == "interface"

@@ -3,32 +3,41 @@ from typing import Any
 
 import numpy as np
 import polars as pl
-from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
-from src.shared.system_state import SYSTEM_STATE_CACHE
-from src.shared.state import GameState
-from src.shared.numeric import stable_group_sum, stable_group_sums, stable_total
-from src.shared.frames import ensure_sorted
-from modules.base.systems.world.random_event_effects import aggregate_active_effects
-from modules.base.systems.economy.consumption_fast_path import (
-    ConsumptionLayoutCache,
-    calculate_formulaic_consumption as calculate_formulaic_consumption_fast,
-)
-from modules.base.systems.economy.input_validation import validate_numeric_columns
+
 from modules.base.systems.economy.aligned_economy_fast_path import (
     AlignedEconomyLayoutCache,
     update_aligned_economy_tables,
 )
+from modules.base.systems.economy.consumption_fast_path import (
+    ConsumptionLayoutCache,
+)
+from modules.base.systems.economy.consumption_fast_path import (
+    calculate_formulaic_consumption as calculate_formulaic_consumption_fast,
+)
+from modules.base.systems.economy.input_validation import validate_numeric_columns
 from modules.base.systems.economy.production_basis_builder import ProductionBasisBuilder
+from modules.base.systems.economy.resource_market_policy import (
+    validate_market_policy_update,
+)
 from modules.base.systems.world.authority_policy import player_controls_country
-from src.shared.events import EventRealSecond, EventResourceProductionIncreased
-from src.shared.actions import ActionIncreaseResourceProduction, ActionUpdateResourcePolicy
+from modules.base.systems.world.random_event_effects import aggregate_active_effects
+from src.shared.actions import (
+    ActionIncreaseResourceProduction,
+    ActionUpdateResourcePolicy,
+)
 from src.shared.determinism import DeterministicRuntime
 from src.shared.economy_meta import RESOURCE_MAPPING
+from src.shared.events import EventRealSecond, EventResourceProductionIncreased
+from src.shared.frames import ensure_sorted
+from src.shared.numeric import stable_group_sum, stable_group_sums, stable_total
 from src.shared.resource_production_policy import (
     PRODUCTION_INCREASE_PERCENTAGES,
     estimate_production_increase_cost,
     production_increase_basis,
 )
+from src.shared.state import GameState
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
+from src.shared.system_state import SYSTEM_STATE_CACHE
 
 _RESOURCE_LEDGER_METADATA = pl.DataFrame(
     [
@@ -361,6 +370,10 @@ class InternalEconomySystem(ISystem):
             expressions.append(pl.lit(True).alias("is_legal"))
         if "tax_rate" not in df.columns:
             expressions.append(pl.lit(0.0).alias("tax_rate"))
+        if "desired_trade_usd" not in df.columns:
+            expressions.append(pl.lit(0.0).alias("desired_trade_usd"))
+        if "meet_consumption" not in df.columns:
+            expressions.append(pl.lit(True).alias("meet_consumption"))
         if expressions:
             df = df.with_columns(expressions)
 
@@ -386,6 +399,22 @@ class InternalEconomySystem(ISystem):
             .alias("tax_rate"),
         ])
         state.update_table("domestic_production", updated)
+        policy_updates = []
+        for column in ("desired_trade_usd", "meet_consumption"):
+            value = getattr(action, column)
+            if value is not None:
+                value = float(value) if column == "desired_trade_usd" else value
+                policy_updates.append(pl.when(target).then(pl.lit(value)).otherwise(pl.col(column)).alias(column))
+        if policy_updates:
+            state.update_table("domestic_production", updated.with_columns(policy_updates))
+        if action.global_tax_modifier is not None:
+            countries = state.get_table("countries")
+            if "global_resource_tax_modifier" not in countries.columns:
+                countries = countries.with_columns(pl.lit(0.02).alias("global_resource_tax_modifier"))
+            state.update_table("countries", countries.with_columns(
+                pl.when(pl.col("id").cast(pl.Utf8).str.strip_chars().str.to_uppercase() == country).then(float(action.global_tax_modifier))
+                .otherwise(pl.col("global_resource_tax_modifier")).alias("global_resource_tax_modifier"),
+            ))
         self._record_resource_policy_result(
             state,
             action,
@@ -421,6 +450,9 @@ class InternalEconomySystem(ISystem):
             return "Resource tax must be a finite ratio from 0 to 1."
         if not math.isfinite(tax_rate) or not 0.0 <= tax_rate <= 1.0:
             return "Resource tax must be a finite ratio from 0 to 1."
+        market_reason = validate_market_policy_update(action)
+        if market_reason:
+            return market_reason
 
         production = state.tables.get("domestic_production")
         if production is None or not {"country_id", "game_resource_id"}.issubset(production.columns):

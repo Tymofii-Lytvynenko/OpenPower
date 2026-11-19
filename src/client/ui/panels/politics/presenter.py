@@ -31,6 +31,7 @@ class PoliticsSummaryViewModel:
     election_risk_pct: float
     active_treaties: int
     pending_treaties: int
+    political_pressure_pct: float = 0.0
 
 
 class PoliticsPresenter:
@@ -57,6 +58,7 @@ class PoliticsPresenter:
             election_risk_pct=as_percent(government_row.get("election_risk"), 0.0),
             active_treaties=active_treaties,
             pending_treaties=pending_treaties,
+            political_pressure_pct=as_ratio(country_row.get("political_pressure"), 0.0) * 100.0,
         )
 
     def laws_for_country(self, state, country_tag: str) -> list[dict]:

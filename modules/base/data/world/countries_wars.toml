@@ -1,31 +1,41 @@
 [[countries_wars]]
-side_a = ["COD", "AGO", "NAM", "ZWE", "TCD"]
+id = "second_congo_war"
+name = "Second Congo War"
+status = "active"
+side_a = ["COD", "AGO", "NAM", "ZWE"]
 side_b = ["RWA", "UGA", "BDI"]
 
 [[countries_wars]]
+id = "second_intifada"
+name = "Second Intifada"
+status = "active"
 side_a = ["ISR"]
 side_b = ["PSE"]
 
 [[countries_wars]]
+id = "kashmir_conflict"
+name = "Kashmir Armed Conflict"
+status = "active"
 side_a = ["IND"]
 side_b = ["PAK"]
 
 [[countries_wars]]
-side_a = ["USA", "GBR"]
-side_b = ["IRQ"]
-
-[[countries_wars]]
+id = "sierra_leone_civil_war"
+name = "Sierra Leone Civil War"
+status = "active"
 side_a = ["SLE", "NGA", "GBR", "GIN"]
 side_b = ["LBR"]
 
 [[countries_wars]]
-side_a = ["ERI"]
-side_b = ["ETH"]
-
-[[countries_wars]]
+id = "mano_river_border_conflict"
+name = "Mano River Border Conflict"
+status = "active"
 side_a = ["GIN"]
 side_b = ["LBR"]
 
 [[countries_wars]]
+id = "sudan_uganda_proxy_conflict"
+name = "Sudan–Uganda Proxy Conflict"
+status = "active"
 side_a = ["SDN"]
 side_b = ["UGA"]

@@ -9,6 +9,7 @@ import polars as pl
 from src.server.io.data_load_manager import DataLoader
 from src.server.io.static_loader import StaticAssetLoader
 from src.shared.config import GameConfig
+from src.shared.state import GameState
 
 
 class TestDataLoaderModLayering(unittest.TestCase):
@@ -27,8 +28,16 @@ class TestDataLoaderModLayering(unittest.TestCase):
         tables = StaticAssetLoader(GameConfig(project_root))._load_toml_collection("world")
 
         self.assertGreater(tables["countries_treaties"].height, 0)
-        self.assertEqual(tables["countries_wars"].height, 8)
+        self.assertEqual(tables["countries_wars"].height, 6)
         self.assertTrue({"side_a", "side_b"}.issubset(tables["countries_wars"].columns))
+
+    def test_historical_world_hdi_flows_through_world_loader_and_state(self):
+        project_root = Path(__file__).resolve().parent.parent
+        tables = DataLoader(GameConfig(project_root))._load_world_tables()
+        state = GameState()
+        state.update_table("historical_world_indicators", tables["historical_world_indicators"])
+        row = state.tables["historical_world_indicators"].row(0, named=True)
+        self.assertEqual((row["id"], row["year"], row["reference_human_dev"]), ("WLD", 2001, 0.657))
 
     def test_layered_mod_data_merges_and_overrides(self):
         project_root = self.temp_root / f"loader-test-{uuid4().hex}"
@@ -43,18 +52,18 @@ class TestDataLoaderModLayering(unittest.TestCase):
 
             self._write_tsv(
                 project_root / "modules" / "base" / "data" / "regions" / "regions.tsv",
-                ["hex", "center_x", "center_y"],
-                [["AA0000", "10", "20"]],
+                ["hex", "owner", "iso_region", "center_x", "center_y"],
+                [["AA0000", "AAA", "AA-X01", "10", "20"]],
             )
             self._write_tsv(
                 project_root / "modules" / "base" / "data" / "regions" / "regions_pop.tsv",
-                ["hex", "population"],
-                [["AA0000", "1000"]],
+                ["hex", "_owner", "_iso_region", "pop_14", "pop_15_64", "pop_65"],
+                [["AA0000", "AAA", "AA-X01", "10", "20", "30"]],
             )
             self._write_tsv(
                 project_root / "modules" / "expansion" / "data" / "regions" / "regions_pop.tsv",
-                ["hex", "population"],
-                [["AA0000", "1500"]],
+                ["hex", "_owner", "_iso_region", "pop_14", "pop_15_64", "pop_65"],
+                [["AA0000", "AAA", "AA-X01", "15", "25", "35"]],
             )
 
             self._write_tsv(
@@ -115,6 +124,15 @@ class TestDataLoaderModLayering(unittest.TestCase):
             (project_root / "modules/expansion/data/countries/country_languages.toml").write_text(
                 '[country_languages.USA]\nEnglish = 90\nSpanish = 10\n', encoding="utf-8",
             )
+            self._write_tsv(
+                project_root / "modules/base/data/sources/2001/country_languages_factbook_2001.tsv",
+                ["country_id", "source_country", "source_status", "source_field", "source_note", "source_url"],
+                [[
+                    "USA", "United States", "reported", "English (official); Spanish",
+                    "Percentages are historical descriptions, not validation of game shares.",
+                    "https://example.test/factbook-2001",
+                ]],
+            )
             (project_root / "modules/base/data/countries/country_religions.toml").write_text(
                 '[country_religions.USA]\nChristian = 60\nOther = 40\n', encoding="utf-8",
             )
@@ -128,13 +146,22 @@ class TestDataLoaderModLayering(unittest.TestCase):
             )
             self.assertEqual(english.item(0, "population_share"), 90)
             self.assertEqual(english.item(0, "source_year"), 0)
+            self.assertIn("CIA World Factbook 2001", english.item(0, "source_reference"))
+            self.assertIn("English (official); Spanish", english.item(0, "source_note"))
+            self.assertIn("does not validate", english.item(0, "source_note"))
             self.assertEqual(identities.filter(pl.col("identity_type") == "religion")["population_share"].sum(), 100)
 
             self.assertEqual(config.active_mods, ["base", "expansion"])
 
             regions = state.get_table("regions")
             region_row = regions.to_dicts()[0]
-            self.assertEqual(region_row["population"], 1500)
+            self.assertEqual(region_row["owner"], "AAA")
+            self.assertEqual(
+                tuple(region_row[field] for field in ("pop_14", "pop_15_64", "pop_65")),
+                (15, 25, 35),
+            )
+            self.assertNotIn("_owner", region_row)
+            self.assertNotIn("_iso_region", region_row)
 
             countries = state.get_table("countries")
             self.assertEqual(len(countries), 2)
@@ -153,6 +180,28 @@ class TestDataLoaderModLayering(unittest.TestCase):
             self.assertEqual(treaty_rows[("USA", "FRA")]["trust"], 70)
         finally:
             shutil.rmtree(project_root, ignore_errors=True)
+
+    def test_base_2001_population_cohorts_reach_runtime_region_rows(self):
+        project_root = Path(__file__).resolve().parent.parent
+        state = DataLoader(GameConfig(project_root)).load_initial_state()
+        regions = state.get_table("regions")
+        population_path = project_root / "modules" / "base" / "data" / "regions" / "regions_pop.tsv"
+        population = pl.read_csv(
+            population_path,
+            separator="\t",
+            schema_overrides={"hex": pl.String},
+        )
+
+        self.assertEqual(regions.height, population.height)
+        self.assertEqual(regions.height, 4559)
+        self.assertTrue({"pop_14", "pop_15_64", "pop_65"}.issubset(regions.columns))
+        for field in ("pop_14", "pop_15_64", "pop_65"):
+            self.assertEqual(int(regions[field].sum()), int(population[field].sum()))
+        macquarie = regions.filter(pl.col("hex") == "#0B600A")
+        self.assertEqual(
+            macquarie.select("pop_14", "pop_15_64", "pop_65").row(0),
+            (0, 18, 0),
+        )
 
     def test_production_loader_loads_definitions_before_entities_and_world_relations(self):
         project_root = self.temp_root / f"definitions-order-{uuid4().hex}"

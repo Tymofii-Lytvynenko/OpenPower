@@ -26,6 +26,7 @@ class LiveTreatyEditorPanel:
         self._type_index = 0
         self._target_index = 0
         self._title = ""
+        self._auto_title = ""
         self._terms = ""
         self._open_membership = False
         self._minimum_relation = -100.0
@@ -48,6 +49,7 @@ class LiveTreatyEditorPanel:
         self._sponsor_tag, self._prepared_target = sponsor, target
         self._invert_sides = invert_sides
         self._title = self._terms = ""
+        self._auto_title = ""
         self._participant_sides = (set(), set())
         self._participant_seed = None
 
@@ -98,8 +100,11 @@ class LiveTreatyEditorPanel:
 
         self._sync_participant_sides(country_tag, target, treaty_type, definition)
 
-        if not self._title:
-            self._title = f"{country_tag} {treaty_label}"
+        default_title = f"{country_tag} {treaty_label}"
+        # Keep the generated name in sync while leaving a player's custom title intact.
+        if not self._title or self._title == self._auto_title:
+            self._title = default_title
+        self._auto_title = default_title
         _, self._title = imgui.input_text(
             "NAME", self._title, 160, test_id="treaty.proposal.title"
         )
@@ -179,6 +184,7 @@ class LiveTreatyEditorPanel:
                 side_a = sorted(selected_a | {country_tag, target})
                 side_b = []
                 members = side_a
+            # Keep the terms editable because the simulation can reject a dispatched proposal.
             context.net_client.send_action(
                 ActionCreateTreaty(
                     player_id=context.net_client.player_id,
@@ -202,7 +208,6 @@ class LiveTreatyEditorPanel:
                     open_to_new_members=self._open_membership,
                 )
             )
-            self._terms = ""
         imgui.end_disabled()
 
     def _sync_participant_sides(self, source: str, target: str, treaty_type: str, definition) -> None:

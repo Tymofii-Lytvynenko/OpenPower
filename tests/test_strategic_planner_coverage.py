@@ -117,7 +117,7 @@ def test_plan_skips_unassigned_multiple_targets_and_rejects_stale_payloads():
     actions, reasons = missing_target.actions(state, presenter, "player", multiple=True)
 
     assert actions == []
-    assert reasons == []
+    assert reasons == ["W1: assign a target region."]
 
     stale_payload = StrategicPlan(
         country="USA",
@@ -169,7 +169,7 @@ def test_country_selection_changes_target_and_enters_specific_or_multiple_modes(
     assert [row["id"] for row in regions] == [3]
     assert planner.plan.target_country == "MEX"
     assert planner.plan.target_region == 3
-    assert fake.combos[0][0][2] == ["CAN", "MEX", "Specific location", "Multiple countries"]
+    assert fake.combos[0][0][2] == ["Canada (CAN)", "Mexico (MEX)", "Specific location", "Multiple countries"]
 
     for choice, expected_phase, expected_multiple in (
         (2, "select", False),
@@ -183,6 +183,34 @@ def test_country_selection_changes_target_and_enters_specific_or_multiple_modes(
         assert planner.multiple is expected_multiple
         if expected_phase == "select":
             assert planner._selection_origin == 77
+
+
+def test_strategic_target_labels_resolve_live_country_names(monkeypatch):
+    monkeypatch.setattr(
+        strategic_planner,
+        "resolve_country_name",
+        lambda _state, tag: {"CAN": "Canada", "MEX": "Mexico"}.get(tag, tag),
+    )
+    fake = Imgui()
+    monkeypatch.setattr(strategic_planner, "imgui", fake)
+    monkeypatch.setattr(strategic_planner.UIPrimitives, "fit_text", staticmethod(lambda value, _width: value))
+    planner = StrategicPlanner(object())
+    planner.plan = StrategicPlan(country="USA")
+    state = state_with_regions([
+        {"id": 2, "owner": "CAN", "name": "North"},
+        {"id": 3, "owner": "MEX", "name": "South"},
+    ])
+
+    planner._render_country_selection(state, SimpleNamespace(selected_region_id=None), Ui())
+
+    assert fake.combos[0][0][2][:2] == ["Canada (CAN)", "Mexico (MEX)"]
+    fake.combo_result = (False, 0)
+    planner._render_assignment_row(
+        {"id": "W1", "ready": 1}, state.tables["regions"].rows, state,
+    )
+    assert fake.combos[1][0][2] == [
+        "Select target", "Canada (CAN): North", "Mexico (MEX): South",
+    ]
 
 
 def test_missile_row_labels_use_selected_payload_and_resolve_locations(monkeypatch):
@@ -213,7 +241,7 @@ def test_missile_row_labels_use_selected_payload_and_resolve_locations(monkeypat
 
 
 def test_assignment_row_toggles_weapon_and_stores_target_assignment(monkeypatch):
-    fake = Imgui(combo_result=(False, 1), checkbox_result=(True, True))
+    fake = Imgui(combo_result=(True, 2), checkbox_result=(True, True))
     monkeypatch.setattr(strategic_planner, "imgui", fake)
     monkeypatch.setattr(
         strategic_planner.UIPrimitives,
@@ -221,18 +249,20 @@ def test_assignment_row_toggles_weapon_and_stores_target_assignment(monkeypatch)
         staticmethod(lambda value, width: value),
     )
     planner = StrategicPlanner(object())
-    planner.plan = StrategicPlan(country="USA", target_region=2)
+    planner.plan = StrategicPlan(country="USA", assignments={"W1": 2})
     targets = [
         {"id": 2, "owner": "CAN", "name": "North"},
         {"id": 3, "owner": "MEX", "name": "South"},
     ]
 
-    planner._render_assignment_row({"id": "W1", "ready": 4}, targets)
+    planner._render_assignment_row({"id": "W1", "ready": 4}, targets, state_with_regions([]))
 
     assert planner.plan.selected_weapons == {"W1"}
     assert planner.plan.assignments == {"W1": 3}
     assert fake.checkboxes[0][0][0] == "W1##W1"
-    assert fake.combos[0][0][2] == ["CAN: North", "MEX: South"]
+    assert fake.combos[0][0][2] == [
+        "Select target", "Canada (CAN): North", "Mexico (MEX): South",
+    ]
     assert fake.texts == ["Military", "4", "1", "1"]
     assert fake.same_lines == [204, 322, 466, 549, 633]
     assert fake.item_widths == [135]
@@ -300,11 +330,10 @@ def test_window_positions_and_hides_chrome_for_source_templates(monkeypatch):
 def test_country_phase_renders_controls_and_advances_to_launch(monkeypatch):
     fake = Imgui(combo_result=(False, 0))
     monkeypatch.setattr(strategic_planner, "imgui", fake)
-    monkeypatch.setattr(strategic_planner, "GMLWidgets", lambda _root: Ui(clicked={
-        "strategic.target.suggested", "strategic.target.prepare",
-    }))
+    ui = Ui(clicked={"strategic.target.suggested", "strategic.target.prepare"})
+    monkeypatch.setattr(strategic_planner, "GMLWidgets", lambda _root: ui)
     planner = StrategicPlanner(SimpleNamespace(
-        strategic_inventory_for_country=lambda *_args: [{"id": "W1"}],
+        strategic_inventory_for_country=lambda *_args: [{"id": "W1", "ready": 4}],
         strategic_authorization_contexts=lambda *_args: ["regional"],
     ))
     planner.plan = StrategicPlan(country="USA", target_region=2, selected_weapons={"W1"})
@@ -319,6 +348,7 @@ def test_country_phase_renders_controls_and_advances_to_launch(monkeypatch):
     assert planner.phase == "launch"
     assert planner.plan.selected_weapons == {"W1"}
     assert "strategic.target.weapon" in [kwargs.get("test_id") for _, kwargs in fake.combos]
+    assert ("frmAttackStrength/txtAvailMissiles", "4") in [args[:2] for args, _kwargs in ui.texts]
 
 
 def test_country_phase_handles_empty_inventory_and_closed_or_returned_windows(monkeypatch):
@@ -345,7 +375,7 @@ def test_country_phase_handles_empty_inventory_and_closed_or_returned_windows(mo
 
 
 def test_multiple_phase_assigns_inventory_and_opens_missile_list(monkeypatch):
-    fake = Imgui(checkbox_result=(True, True), combo_result=(False, 1))
+    fake = Imgui(checkbox_result=(True, True), combo_result=(True, 2))
     monkeypatch.setattr(strategic_planner, "imgui", fake)
     monkeypatch.setattr(strategic_planner.UIPrimitives, "fit_text", staticmethod(lambda value, _width: value))
     monkeypatch.setattr(strategic_planner, "GMLWidgets", lambda _root: Ui(clicked={
@@ -384,10 +414,27 @@ def test_assignment_row_removes_disabled_weapon_when_there_is_no_target(monkeypa
     planner = StrategicPlanner(object())
     planner.plan = StrategicPlan(country="USA", selected_weapons={"W1"})
 
-    planner._render_assignment_row({"id": "W1"}, [])
+    planner._render_assignment_row({"id": "W1"}, [], state_with_regions([]))
 
     assert planner.plan.selected_weapons == set()
     assert planner.plan.assignments == {}
+
+
+def test_assignment_row_does_not_choose_first_target_without_explicit_assignment(monkeypatch):
+    fake = Imgui(combo_result=(False, 0))
+    monkeypatch.setattr(strategic_planner, "imgui", fake)
+    monkeypatch.setattr(strategic_planner.UIPrimitives, "fit_text", staticmethod(lambda value, _width: value))
+    planner = StrategicPlanner(object())
+    planner.plan = StrategicPlan(country="USA", target_region=2)
+
+    planner._render_assignment_row(
+        {"id": "W1", "ready": 3},
+        [{"id": 2, "owner": "CAN", "name": "North"}, {"id": 3, "owner": "MEX", "name": "South"}],
+        state_with_regions([]),
+    )
+
+    assert planner.plan.assignments == {}
+    assert fake.combos[0][0][2][0] == "Select target"
 
 
 def test_missile_phase_selects_weapon_payload_and_transitions(monkeypatch):

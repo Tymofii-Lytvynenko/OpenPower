@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 
 import polars as pl
 
@@ -138,6 +137,30 @@ def test_route_summary_covers_blocked_invasion_retreat_return_and_fallback():
     assert presenter._route_summary(game, route, "battle_retreating") == "Retreat to battle rear · Target"
     assert presenter._route_summary(game, route, "battle_returning") == "Return to capital: Origin → Target"
     assert presenter._route_summary(game, {"status": "active"}) == "Move: Unknown → Unknown"
+
+
+def test_unit_rows_exposes_current_blocked_movement_in_status_and_reason():
+    values = presentation_values()
+    game = state({
+        "countries": pl.DataFrame({"id": ["USA"], "name": ["United States"]}),
+        "regions": pl.DataFrame({"id": [1], "name": ["Capital"]}),
+        "units": pl.DataFrame({
+            "id": ["U1"], "owner": ["USA"], "unit_type": ["army"],
+            "strength": [10], "equipment_quantity": [8], "current_region_id": [1],
+            "unit_lifecycle": ["available"], "readiness_status": ["ready"],
+            "is_moving": [False],
+        }),
+        "unit_movement_routes": pl.DataFrame({
+            "unit_id": ["U1"], "status": ["blocked"],
+            "rejection_reason": ["Transit access was denied."],
+        }),
+    }, client_presentation=values)
+
+    row = MilitaryPresenter().unit_rows(game, "USA")[0]
+
+    assert row.status == "Movement blocked"
+    assert row.location == "Capital"
+    assert row.route_summary == "Blocked: Transit access was denied."
 
 
 def test_reserve_projection_filters_lifecycles_and_attaches_training_and_design_data():

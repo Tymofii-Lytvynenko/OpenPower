@@ -3,7 +3,9 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
-from modules.base.systems.economy.market_clearing_kernel import UnconstrainedMarketResult
+from modules.base.systems.economy.market_clearing_kernel import (
+    UnconstrainedMarketResult,
+)
 from modules.base.systems.economy.market_data import (
     _FastMarketArrays,
     _FastMarketLayout,
@@ -34,6 +36,10 @@ class FastMarketOutputPublisher:
             production_updates.append(pl.Series("is_legal", arrays.legal))
         if "tax_rate" not in production.columns:
             production_updates.append(pl.Series("tax_rate", arrays.tax_rates))
+        if "desired_trade_usd" not in production.columns and arrays.desired_trade is not None:
+            production_updates.append(pl.Series("desired_trade_usd", arrays.desired_trade))
+        if "meet_consumption" not in production.columns and arrays.meet_consumption is not None:
+            production_updates.append(pl.Series("meet_consumption", arrays.meet_consumption))
         market_output = production.with_columns(production_updates)
 
         cached_country_indices = layout.country_indices

@@ -1,21 +1,26 @@
 import json
-import polars as pl
 from typing import Any
 
-from modules.base.systems.military.capability_catalog import get_role_profile, project_capabilities
+import polars as pl
+
+from modules.base.systems.military.capability_catalog import (
+    get_role_profile,
+    project_capabilities,
+)
 from modules.base.systems.military.unit_catalog import MILITARY_UNIT_TYPES
-from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.state import GameState
+from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
+
 
 class BootstrapSystem(ISystem):
     """
-    Seeds initial gameplay content (laws, default objective tracks, designs)
+    Seeds initial gameplay content (laws, research tracks, designs)
     inside the base module. This separates content policy from the server engine.
     """
 
     access = SystemAccess(
         reads=frozenset({'countries', 'regions', 'countries_treaties', 'countries_wars', 'migration_policies', 'country_identity_distribution', 'country_identity_groups'}),
-        writes=frozenset({'country_governments', 'country_laws', 'migration_policies', 'country_identity_groups', 'messages', 'news_items', 'objectives', 'research_tracks', 'unit_designs', 'strategic_weapons'}),
+        writes=frozenset({'country_governments', 'country_laws', 'migration_policies', 'country_identity_groups', 'messages', 'news_items', 'research_tracks', 'unit_designs', 'strategic_weapons'}),
         phase=SystemPhase.BOOTSTRAP,
     )
 
@@ -135,10 +140,6 @@ class BootstrapSystem(ISystem):
         news_rows = self._build_news_items(state)
         if news_rows:
             state.update_table("news_items", pl.DataFrame(news_rows))
-            
-        obj_rows = self._build_objectives(state)
-        if obj_rows:
-            state.update_table("objectives", pl.DataFrame(obj_rows))
             
         track_rows = self._build_research_tracks(state)
         if track_rows:
@@ -332,52 +333,6 @@ class BootstrapSystem(ISystem):
                     "related_country_id": "",
                     "created_at": created_at,
                 }
-            )
-
-        return rows
-
-    def _build_objectives(self, state: GameState) -> list[dict[str, Any]]:
-        countries = state.tables.get("countries")
-        if countries is None or countries.is_empty() or "id" not in countries.columns:
-            return []
-
-        rows: list[dict[str, Any]] = []
-        for row in countries.iter_rows(named=True):
-            if not self._is_playable(row):
-                continue
-
-            country_id = str(row["id"])
-            stability = self._as_ratio(row.get("gvt_stability"), 0.5)
-            reserves = float(row.get("money_reserves") or 0.0)
-            readiness = min(1.0, max(0.0, float(row.get("military_count") or 0.0) / 500_000.0))
-
-            rows.extend(
-                [
-                    {
-                        "id": f"obj-stability-{country_id}",
-                        "country_id": country_id,
-                        "title": "Steady government approval",
-                        "description": "Keep government stability above fifty percent.",
-                        "status": "active",
-                        "progress": stability,
-                    },
-                    {
-                        "id": f"obj-reserves-{country_id}",
-                        "country_id": country_id,
-                        "title": "Maintain positive reserves",
-                        "description": "Avoid a negative reserve balance while funding core services.",
-                        "status": "active",
-                        "progress": 1.0 if reserves >= 0 else 0.0,
-                    },
-                    {
-                        "id": f"obj-readiness-{country_id}",
-                        "country_id": country_id,
-                        "title": "Keep armed forces ready",
-                        "description": "Sustain a deployable force posture and avoid hollow readiness.",
-                        "status": "active",
-                        "progress": readiness,
-                    },
-                ]
             )
 
         return rows

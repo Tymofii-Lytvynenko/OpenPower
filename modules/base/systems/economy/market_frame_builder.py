@@ -1,7 +1,9 @@
 import polars as pl
 
+from modules.base.systems.economy.missing_column_warning_registry import (
+    MissingColumnWarningRegistry,
+)
 from src.shared.state import GameState
-from modules.base.systems.economy.missing_column_warning_registry import MissingColumnWarningRegistry
 
 
 class MarketFrameBuilder:
@@ -24,6 +26,8 @@ class MarketFrameBuilder:
         trade_modifiers = countries.lazy().select(
             pl.col("id").alias("country_id"),
             trade_modifier.alias("_economic_trade_modifier"),
+            (pl.col("global_resource_tax_modifier") if "global_resource_tax_modifier" in country_columns
+             else pl.lit(0.02)).alias("_global_resource_tax_modifier"),
         )
 
         if "resource_ledger" in state.tables:

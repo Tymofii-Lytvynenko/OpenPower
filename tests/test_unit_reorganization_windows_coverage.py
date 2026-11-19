@@ -3,11 +3,17 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock
 
 import polars as pl
-import pytest
 
 from src.client.ui.panels.military import unit_reorganization_windows as windows_module
-from src.client.ui.panels.military.unit_reorganization_windows import UnitReorganizationWindows
-from src.shared.actions import ActionListUsedUnit, ActionMergeUnits, ActionSplitUnit, ActionWithdrawUsedUnitListing
+from src.client.ui.panels.military.unit_reorganization_windows import (
+    UnitReorganizationWindows,
+)
+from src.shared.actions import (
+    ActionListUsedUnit,
+    ActionMergeUnits,
+    ActionSplitUnit,
+    ActionWithdrawUsedUnitListing,
+)
 
 
 class FakeClient:
@@ -73,10 +79,12 @@ def setup(monkeypatch, *, window_open=True, child_visible=True):
     return windows, client, native
 
 
-def game_state(rows, *, listings=None):
+def game_state(rows, *, listings=None, designs=None):
     tables = {"units": pl.DataFrame(rows)} if rows is not None else {}
     if listings is not None:
         tables["unit_market_listings"] = pl.DataFrame(listings)
+    if designs is not None:
+        tables["unit_designs"] = pl.DataFrame(designs)
     return SimpleNamespace(tables=tables)
 
 
@@ -152,8 +160,9 @@ def test_render_dispatches_split_quantity_and_merge_modes(monkeypatch):
     windows._split = Mock()
     windows._quantity_window = Mock()
     windows._quantity_direction = "right"
-    windows.render(game_state(rows))
-    windows._split.assert_called_once_with(rows[0])
+    state = game_state(rows)
+    windows.render(state)
+    windows._split.assert_called_once_with(rows[0], state)
     windows._quantity_window.assert_called_once()
 
     windows._mode = "merge"
@@ -194,6 +203,33 @@ def test_split_dialog_equal_split_and_apply_action(monkeypatch):
     assert action.detached_strength == 4
     assert native.selectable.call_count == 2
     assert any(call.args[0] == "Equipment: 4" for call in native.text.call_args_list)
+
+
+def test_split_dialog_shows_owned_design_name_and_current_training_level(monkeypatch):
+    windows, _client, native = setup(monkeypatch)
+    state = game_state([unit()], designs=[{
+        "id": "d1", "country_id": "UKR", "display_name": "Mechanized Brigade",
+    }])
+
+    windows._split(unit(training_level="Veteran"), state)
+
+    assert any("Mechanized Brigade · infantry" in str(call.args[0])
+               for call in native.selectable.call_args_list)
+    assert any(call.args[0] == "Training: Veteran" for call in native.text.call_args_list)
+
+
+def test_split_dialog_does_not_expose_a_foreign_design_name(monkeypatch):
+    windows, _client, native = setup(monkeypatch)
+    state = game_state([unit()], designs=[{
+        "id": "d1", "country_id": "POL", "display_name": "Foreign Brigade",
+    }])
+
+    windows._split(unit(), state)
+
+    assert any("Unknown design · infantry" in str(call.args[0])
+               for call in native.selectable.call_args_list)
+    assert not any("Foreign Brigade" in str(call.args[0])
+                   for call in native.selectable.call_args_list)
 
 
 def test_split_dialog_handles_closed_window_unavailable_unit_and_boundary_controls(monkeypatch):

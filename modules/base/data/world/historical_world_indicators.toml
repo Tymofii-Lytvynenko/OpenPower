@@ -1,0 +1,10 @@
+[[historical_world_indicators]]
+id = "WLD"
+year = 2001
+source = "UNDP HDR 2025: 2001 observations"
+source_url = "https://hdr.undp.org/sites/default/files/2025_HDR/HDR25_Composite_indices_complete_time_series.csv"
+reference_human_dev = 0.657
+reference_life_expectancy = 67.91017422
+expected_years_schooling = 10.33057367
+mean_years_schooling = 7.12685413
+gross_national_income_per_capita_ppp = 12841.37096

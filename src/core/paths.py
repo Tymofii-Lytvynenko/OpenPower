@@ -1,6 +1,16 @@
 import sys
 from pathlib import Path
 
+
+def resolve_region_map_path(config) -> Path:
+    """Resolve the region image using the same mod order as region records."""
+    for data_dir in reversed(config.get_data_dirs()):
+        candidate = data_dir / "regions" / "regions.png"
+        if candidate.is_file():
+            return candidate
+    return config.get_asset_path("map/regions.png")
+
+
 class ProjectPaths:
     """
     Static utility to resolve project paths reliably.

@@ -3,7 +3,10 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
-from modules.base.systems.economy.market_data import _FastMarketArrays, _FastMarketLayout
+from modules.base.systems.economy.market_data import (
+    _FastMarketArrays,
+    _FastMarketLayout,
+)
 from modules.base.systems.economy.missing_column_warning_registry import (
     MissingColumnWarningRegistry,
 )
@@ -52,6 +55,14 @@ class FastMarketInputBuilder:
             tax_rates,
             trade_modifiers_by_country,
         )
+        global_tax_modifiers = self._numeric_values(context.countries, "global_resource_tax_modifier", 0.02, context.countries.height)[layout.country_indices]
+        desired_trade = self._numeric_values(context.production, "desired_trade_usd", 0.0, row_count)
+        if not np.isfinite(global_tax_modifiers).all() or ((global_tax_modifiers < 0.0) | (global_tax_modifiers > 1.0)).any():
+            raise ValueError("countries.global_resource_tax_modifier must be a finite ratio from 0 to 1.")
+        if not np.isfinite(desired_trade).all():
+            raise ValueError("domestic_production.desired_trade_usd must contain finite values.")
+        meet_consumption = (context.production["meet_consumption"].cast(pl.Boolean, strict=False).fill_null(True).to_numpy()
+                            if "meet_consumption" in context.production.columns else np.ones(row_count, dtype=np.bool_))
         return _FastMarketArrays(
             production_values=production_values,
             demand=demand,
@@ -61,6 +72,9 @@ class FastMarketInputBuilder:
             government_controlled=government_controlled,
             legal=legal,
             tax_rates=tax_rates,
+            global_tax_modifiers=global_tax_modifiers,
+            desired_trade=desired_trade,
+            meet_consumption=meet_consumption,
         )
 
     def _production_values(self, production: pl.DataFrame) -> np.ndarray | None:

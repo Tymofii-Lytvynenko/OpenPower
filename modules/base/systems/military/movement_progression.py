@@ -400,6 +400,13 @@ class MovementProgression:
         defender_geo = self.unit_geo_at(defender, context.current_minute)
         self.stop_unit_at(defender, defender_geo, context.current_minute)
         defender["engagement_mode"] = "positional"
+        defender_route = context.route_by_unit.get(str(defender.get("id") or ""))
+        if defender_route is not None and defender_route.get("status") == "in_transit":
+            # Contact stops both units; leaving the defender's route active would
+            # make its route state disagree with its stopped position.
+            defender_route["status"] = "interrupted"
+            defender_route["rejection_reason"] = "Hostile contact interrupted the route."
+            defender_route["updated_at_minute"] = context.current_minute
         return True
 
     def _complete_movement_leg(

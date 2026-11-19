@@ -51,6 +51,7 @@ class EconomicPolicyView:
     effective_date: str
     cooldown_until_minute: int
     status: str
+    applied_date: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +84,7 @@ class EconomicHealthView:
     top_causes: tuple[EconomicCauseView, ...]
     indicator_trends: tuple[EconomicIndicatorTrend, ...]
     recovery_condition: str
+    recent_applied_policies: tuple[EconomicPolicyView, ...] = ()
 
 
 class EconomyPresenter:
@@ -141,6 +143,7 @@ class EconomyPresenter:
             distress_status=str(country.get("debt_distress_status") or "current"),
             risk_thresholds=thresholds,
             active_policies=policies,
+            recent_applied_policies=self._policies(state, country_id, applied=True),
             obligations=obligations,
             top_causes=causes,
             indicator_trends=self._trends(state, country_id),
@@ -210,13 +213,21 @@ class EconomyPresenter:
             conditions=str(row.get("conditions") or ""),
         ) for row in active.iter_rows(named=True))
 
-    def _policies(self, state: Any, country_id: str) -> tuple[EconomicPolicyView, ...]:
+    def _policies(self, state: Any, country_id: str, *, applied: bool = False) -> tuple[EconomicPolicyView, ...]:
         frame = getattr(state, "tables", {}).get("economic_policy_transitions")
         if frame is None or frame.is_empty():
             return ()
         active = frame.filter(
-            (pl.col("country_id") == str(country_id)) & (pl.col("status") == "scheduled")
-        ).sort(["effective_at_minute", "id"])
+            (pl.col("country_id") == str(country_id))
+            & (pl.col("status") == ("applied" if applied else "scheduled"))
+        )
+        order = pl.col("effective_at_minute")
+        if applied and "applied_at_minute" in active.columns:
+            applied_minute = pl.col("applied_at_minute")
+            order = pl.when(applied_minute >= 0).then(applied_minute).otherwise(order)
+        active = active.sort([order, "id"], descending=applied)
+        if applied:
+            active = active.head(3)
         return tuple(EconomicPolicyView(
             policy_name=str(row.get("policy_name") or ""),
             target_value=self._finite(row.get("target_value")),
@@ -225,6 +236,11 @@ class EconomyPresenter:
             effective_date=self._date(int(row.get("effective_at_minute") or 0)),
             cooldown_until_minute=int(row.get("cooldown_until_minute") or 0),
             status=str(row.get("status") or ""),
+            applied_date=(
+                self._date(row["applied_at_minute"])
+                if row.get("applied_at_minute") is not None and row["applied_at_minute"] >= 0
+                else ""
+            ),
         ) for row in active.iter_rows(named=True))
 
     def _distress(self, state: Any, country_id: str) -> dict[str, Any] | None:

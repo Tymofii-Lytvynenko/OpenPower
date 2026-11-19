@@ -34,6 +34,7 @@ def run_server_process(
     player_tag: Optional[str] = None,
     snapshot_ack_queue: Queue | None = None,
     telemetry_queue: Queue | None = None,
+    player_party_id: str | None = None,
 ):
     from pathlib import Path
 
@@ -48,6 +49,7 @@ def run_server_process(
             progress_cb=progress_cb,
             save_name=save_name,
             player_tag=player_tag,
+            player_party_id=player_party_id,
         )
         progress_queue.put(("READY", 1.0, "Engine Started"))
     except Exception as exc:

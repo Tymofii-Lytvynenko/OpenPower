@@ -20,7 +20,7 @@
     {
       "op": "assert",
       "target": "country.info.hdi.country",
-      "label": "Ukraine: 76.0 %",
+      "label": "Ukraine: —",
       "inside": "country_more_info.panel",
       "relative_to": "country_more_info.panel",
       "relative_rect": {
@@ -38,7 +38,7 @@
     {
       "op": "assert",
       "target": "country.info.population.total",
-      "label": "40 165 000",
+      "label": "48 420 828",
       "inside": "country_more_info.panel"
     },
     {

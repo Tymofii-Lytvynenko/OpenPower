@@ -30,6 +30,9 @@ class StrategicPlan:
                 reasons.append(f"{weapon_id}: weapon system is unavailable.")
                 continue
             region_id = self.assignments.get(weapon_id) if multiple else self.target_region
+            if multiple and region_id is None:
+                reasons.append(f"{weapon_id}: assign a target region.")
+                continue
             preview = presenter.strategic_launch_preview(
                 state, self.country, weapon, region_id, self.authorization_context,
             )

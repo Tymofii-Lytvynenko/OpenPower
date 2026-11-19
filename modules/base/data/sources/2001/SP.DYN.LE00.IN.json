@@ -1,0 +1,4268 @@
+[
+  {
+    "page": 1,
+    "pages": 1,
+    "per_page": 1000,
+    "total": 266,
+    "sourceid": "2",
+    "lastupdated": "2026-11-11"
+  },
+  [
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ZH",
+        "value": "Africa Eastern and Southern"
+      },
+      "countryiso3code": "AFE",
+      "date": "2001",
+      "value": 52.8755360536287,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ZI",
+        "value": "Africa Western and Central"
+      },
+      "countryiso3code": "AFW",
+      "date": "2001",
+      "value": 50.6726047685125,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "1A",
+        "value": "Arab World"
+      },
+      "countryiso3code": "ARB",
+      "date": "2001",
+      "value": 67.2406170439926,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "S3",
+        "value": "Caribbean small states"
+      },
+      "countryiso3code": "CSS",
+      "date": "2001",
+      "value": 68.6619722928042,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "B8",
+        "value": "Central Europe and the Baltics"
+      },
+      "countryiso3code": "CEB",
+      "date": "2001",
+      "value": 73.0961481937343,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "V2",
+        "value": "Early-demographic dividend"
+      },
+      "countryiso3code": "EAR",
+      "date": "2001",
+      "value": 64.55670545203,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "Z4",
+        "value": "East Asia & Pacific"
+      },
+      "countryiso3code": "EAS",
+      "date": "2001",
+      "value": 72.0413059988772,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "4E",
+        "value": "East Asia & Pacific (excluding high income)"
+      },
+      "countryiso3code": "EAP",
+      "date": "2001",
+      "value": 71.0740923872156,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "T4",
+        "value": "East Asia & Pacific (IDA & IBRD countries)"
+      },
+      "countryiso3code": "TEA",
+      "date": "2001",
+      "value": 71.2077369930428,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XC",
+        "value": "Euro area"
+      },
+      "countryiso3code": "EMU",
+      "date": "2001",
+      "value": 78.3814988457687,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "Z7",
+        "value": "Europe & Central Asia"
+      },
+      "countryiso3code": "ECS",
+      "date": "2001",
+      "value": 73.3558243150228,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "7E",
+        "value": "Europe & Central Asia (excluding high income)"
+      },
+      "countryiso3code": "ECA",
+      "date": "2001",
+      "value": 69.0902777061194,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "T7",
+        "value": "Europe & Central Asia (IDA & IBRD countries)"
+      },
+      "countryiso3code": "TEC",
+      "date": "2001",
+      "value": 68.5080250387666,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "EU",
+        "value": "European Union"
+      },
+      "countryiso3code": "EUU",
+      "date": "2001",
+      "value": 77.4256390326754,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "F2",
+        "value": "Fragility, Conflict, and Violence (FCV) situations"
+      },
+      "countryiso3code": "FCV",
+      "date": "2001",
+      "value": 57.0560355230833,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XE",
+        "value": "Heavily indebted poor countries (HIPC)"
+      },
+      "countryiso3code": "HPC",
+      "date": "2001",
+      "value": 53.534081588322,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XD",
+        "value": "High income"
+      },
+      "countryiso3code": "",
+      "date": "2001",
+      "value": 76.314713845043,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XF",
+        "value": "IBRD only"
+      },
+      "countryiso3code": "IBD",
+      "date": "2001",
+      "value": 68.5847135093888,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ZT",
+        "value": "IDA & IBRD total"
+      },
+      "countryiso3code": "IBT",
+      "date": "2001",
+      "value": 65.9675772813036,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XH",
+        "value": "IDA blend"
+      },
+      "countryiso3code": "IDB",
+      "date": "2001",
+      "value": 55.889906446422,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XI",
+        "value": "IDA only"
+      },
+      "countryiso3code": "IDX",
+      "date": "2001",
+      "value": 57.4095843162393,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XG",
+        "value": "IDA total"
+      },
+      "countryiso3code": "IDA",
+      "date": "2001",
+      "value": 56.8798581050815,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "V3",
+        "value": "Late-demographic dividend"
+      },
+      "countryiso3code": "LTE",
+      "date": "2001",
+      "value": 71.6274933298313,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ZJ",
+        "value": "Latin America & Caribbean"
+      },
+      "countryiso3code": "LCN",
+      "date": "2001",
+      "value": 71.1505464911298,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XJ",
+        "value": "Latin America & Caribbean (excluding high income)"
+      },
+      "countryiso3code": "LAC",
+      "date": "2001",
+      "value": 70.8246679458028,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "T2",
+        "value": "Latin America & the Caribbean (IDA & IBRD countries)"
+      },
+      "countryiso3code": "TLA",
+      "date": "2001",
+      "value": 70.9952366364032,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XL",
+        "value": "Least developed countries: UN classification"
+      },
+      "countryiso3code": "LDC",
+      "date": "2001",
+      "value": 55.9858159581879,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XO",
+        "value": "Low & middle income"
+      },
+      "countryiso3code": "LMY",
+      "date": "2001",
+      "value": 65.8252012990643,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XM",
+        "value": "Low income"
+      },
+      "countryiso3code": "",
+      "date": "2001",
+      "value": 54.0977622538533,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XN",
+        "value": "Lower middle income"
+      },
+      "countryiso3code": "",
+      "date": "2001",
+      "value": 61.4468342858288,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ZQ",
+        "value": "Middle East, North Africa, Afghanistan & Pakistan"
+      },
+      "countryiso3code": "MEA",
+      "date": "2001",
+      "value": 66.597196122581,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XQ",
+        "value": "Middle East, North Africa, Afghanistan & Pakistan (excluding high income)"
+      },
+      "countryiso3code": "MNA",
+      "date": "2001",
+      "value": 65.9952073676464,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "T3",
+        "value": "Middle East, North Africa, Afghanistan & Pakistan (IDA & IBRD)"
+      },
+      "countryiso3code": "TMN",
+      "date": "2001",
+      "value": 65.9712698137957,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XP",
+        "value": "Middle income"
+      },
+      "countryiso3code": "MIC",
+      "date": "2001",
+      "value": 66.8362757800678,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XU",
+        "value": "North America"
+      },
+      "countryiso3code": "NAC",
+      "date": "2001",
+      "value": 77.0883485337654,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XY",
+        "value": "Not classified"
+      },
+      "countryiso3code": "",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "OE",
+        "value": "OECD members"
+      },
+      "countryiso3code": "OED",
+      "date": "2001",
+      "value": 77.1207466135963,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "S4",
+        "value": "Other small states"
+      },
+      "countryiso3code": "OSS",
+      "date": "2001",
+      "value": 66.6129499326785,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "S2",
+        "value": "Pacific island small states"
+      },
+      "countryiso3code": "PSS",
+      "date": "2001",
+      "value": 67.0167243338519,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "V4",
+        "value": "Post-demographic dividend"
+      },
+      "countryiso3code": "PST",
+      "date": "2001",
+      "value": 77.6340698596268,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "V1",
+        "value": "Pre-demographic dividend"
+      },
+      "countryiso3code": "PRE",
+      "date": "2001",
+      "value": 52.2506407628639,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "S1",
+        "value": "Small states"
+      },
+      "countryiso3code": "SST",
+      "date": "2001",
+      "value": 67.1751397089871,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "8S",
+        "value": "South Asia"
+      },
+      "countryiso3code": "SAS",
+      "date": "2001",
+      "value": 63.2621106390743,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "T5",
+        "value": "South Asia (IDA & IBRD)"
+      },
+      "countryiso3code": "TSA",
+      "date": "2001",
+      "value": 63.2621106390743,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ZG",
+        "value": "Sub-Saharan Africa"
+      },
+      "countryiso3code": "SSF",
+      "date": "2001",
+      "value": 51.9857897497051,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ZF",
+        "value": "Sub-Saharan Africa (excluding high income)"
+      },
+      "countryiso3code": "SSA",
+      "date": "2001",
+      "value": 51.9833195606955,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "T6",
+        "value": "Sub-Saharan Africa (IDA & IBRD countries)"
+      },
+      "countryiso3code": "TSS",
+      "date": "2001",
+      "value": 51.9857897497051,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XT",
+        "value": "Upper middle income"
+      },
+      "countryiso3code": "",
+      "date": "2001",
+      "value": 71.0574540062592,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "1W",
+        "value": "World"
+      },
+      "countryiso3code": "WLD",
+      "date": "2001",
+      "value": 67.9451852910729,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AF",
+        "value": "Afghanistan"
+      },
+      "countryiso3code": "AFG",
+      "date": "2001",
+      "value": 55.511,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AL",
+        "value": "Albania"
+      },
+      "countryiso3code": "ALB",
+      "date": "2001",
+      "value": 75.083,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "DZ",
+        "value": "Algeria"
+      },
+      "countryiso3code": "DZA",
+      "date": "2001",
+      "value": 71.025,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AS",
+        "value": "American Samoa"
+      },
+      "countryiso3code": "ASM",
+      "date": "2001",
+      "value": 71.573,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AD",
+        "value": "Andorra"
+      },
+      "countryiso3code": "AND",
+      "date": "2001",
+      "value": 82.162,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AO",
+        "value": "Angola"
+      },
+      "countryiso3code": "AGO",
+      "date": "2001",
+      "value": 47.032,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AG",
+        "value": "Antigua and Barbuda"
+      },
+      "countryiso3code": "ATG",
+      "date": "2001",
+      "value": 75.108,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AR",
+        "value": "Argentina"
+      },
+      "countryiso3code": "ARG",
+      "date": "2001",
+      "value": 74.154,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AM",
+        "value": "Armenia"
+      },
+      "countryiso3code": "ARM",
+      "date": "2001",
+      "value": 72.9756097560976,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AW",
+        "value": "Aruba"
+      },
+      "countryiso3code": "ABW",
+      "date": "2001",
+      "value": 73.044,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AU",
+        "value": "Australia"
+      },
+      "countryiso3code": "AUS",
+      "date": "2001",
+      "value": 79.6341463414634,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AT",
+        "value": "Austria"
+      },
+      "countryiso3code": "AUT",
+      "date": "2001",
+      "value": 78.5756097560976,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AZ",
+        "value": "Azerbaijan"
+      },
+      "countryiso3code": "AZE",
+      "date": "2001",
+      "value": 66.043,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BS",
+        "value": "Bahamas, The"
+      },
+      "countryiso3code": "BHS",
+      "date": "2001",
+      "value": 72.765,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BH",
+        "value": "Bahrain"
+      },
+      "countryiso3code": "BHR",
+      "date": "2001",
+      "value": 74.942,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BD",
+        "value": "Bangladesh"
+      },
+      "countryiso3code": "BGD",
+      "date": "2001",
+      "value": 62.836,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BB",
+        "value": "Barbados"
+      },
+      "countryiso3code": "BRB",
+      "date": "2001",
+      "value": 74.707,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BY",
+        "value": "Belarus"
+      },
+      "countryiso3code": "BLR",
+      "date": "2001",
+      "value": 68.5073170731707,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BE",
+        "value": "Belgium"
+      },
+      "countryiso3code": "BEL",
+      "date": "2001",
+      "value": 77.9731707317073,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BZ",
+        "value": "Belize"
+      },
+      "countryiso3code": "BLZ",
+      "date": "2001",
+      "value": 68.944,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BJ",
+        "value": "Benin"
+      },
+      "countryiso3code": "BEN",
+      "date": "2001",
+      "value": 56.654,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BM",
+        "value": "Bermuda"
+      },
+      "countryiso3code": "BMU",
+      "date": "2001",
+      "value": 78.637,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BT",
+        "value": "Bhutan"
+      },
+      "countryiso3code": "BTN",
+      "date": "2001",
+      "value": 63.323,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BO",
+        "value": "Bolivia"
+      },
+      "countryiso3code": "BOL",
+      "date": "2001",
+      "value": 62.538,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BA",
+        "value": "Bosnia and Herzegovina"
+      },
+      "countryiso3code": "BIH",
+      "date": "2001",
+      "value": 75.573,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BW",
+        "value": "Botswana"
+      },
+      "countryiso3code": "BWA",
+      "date": "2001",
+      "value": 52.21,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BR",
+        "value": "Brazil"
+      },
+      "countryiso3code": "BRA",
+      "date": "2001",
+      "value": 69.98,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "VG",
+        "value": "British Virgin Islands"
+      },
+      "countryiso3code": "VGB",
+      "date": "2001",
+      "value": 74.831,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BN",
+        "value": "Brunei Darussalam"
+      },
+      "countryiso3code": "BRN",
+      "date": "2001",
+      "value": 74.209,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BG",
+        "value": "Bulgaria"
+      },
+      "countryiso3code": "BGR",
+      "date": "2001",
+      "value": 71.7682926829268,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BF",
+        "value": "Burkina Faso"
+      },
+      "countryiso3code": "BFA",
+      "date": "2001",
+      "value": 51.188,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "BI",
+        "value": "Burundi"
+      },
+      "countryiso3code": "BDI",
+      "date": "2001",
+      "value": 48.509,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CV",
+        "value": "Cabo Verde"
+      },
+      "countryiso3code": "CPV",
+      "date": "2001",
+      "value": 68.707,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KH",
+        "value": "Cambodia"
+      },
+      "countryiso3code": "KHM",
+      "date": "2001",
+      "value": 60.457,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CM",
+        "value": "Cameroon"
+      },
+      "countryiso3code": "CMR",
+      "date": "2001",
+      "value": 53.598,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CA",
+        "value": "Canada"
+      },
+      "countryiso3code": "CAN",
+      "date": "2001",
+      "value": 79.3980487804878,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KY",
+        "value": "Cayman Islands"
+      },
+      "countryiso3code": "CYM",
+      "date": "2001",
+      "value": 74.529,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CF",
+        "value": "Central African Republic"
+      },
+      "countryiso3code": "CAF",
+      "date": "2001",
+      "value": 46.734,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TD",
+        "value": "Chad"
+      },
+      "countryiso3code": "TCD",
+      "date": "2001",
+      "value": 48.306,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "JG",
+        "value": "Channel Islands"
+      },
+      "countryiso3code": "CHI",
+      "date": "2001",
+      "value": 79,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CL",
+        "value": "Chile"
+      },
+      "countryiso3code": "CHL",
+      "date": "2001",
+      "value": 77.58,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CN",
+        "value": "China"
+      },
+      "countryiso3code": "CHN",
+      "date": "2001",
+      "value": 72.675,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CO",
+        "value": "Colombia"
+      },
+      "countryiso3code": "COL",
+      "date": "2001",
+      "value": 71.185,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KM",
+        "value": "Comoros"
+      },
+      "countryiso3code": "COM",
+      "date": "2001",
+      "value": 59.587,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CD",
+        "value": "Congo, Dem. Rep."
+      },
+      "countryiso3code": "COD",
+      "date": "2001",
+      "value": 52.205,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CG",
+        "value": "Congo, Rep."
+      },
+      "countryiso3code": "COG",
+      "date": "2001",
+      "value": 55.885,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CR",
+        "value": "Costa Rica"
+      },
+      "countryiso3code": "CRI",
+      "date": "2001",
+      "value": 77.609,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CI",
+        "value": "Cote d'Ivoire"
+      },
+      "countryiso3code": "CIV",
+      "date": "2001",
+      "value": 51.428,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "HR",
+        "value": "Croatia"
+      },
+      "countryiso3code": "HRV",
+      "date": "2001",
+      "value": 74.5129268292683,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CU",
+        "value": "Cuba"
+      },
+      "countryiso3code": "CUB",
+      "date": "2001",
+      "value": 76.429,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CW",
+        "value": "Curacao"
+      },
+      "countryiso3code": "CUW",
+      "date": "2001",
+      "value": 73.36,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CY",
+        "value": "Cyprus"
+      },
+      "countryiso3code": "CYP",
+      "date": "2001",
+      "value": 78.185,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CZ",
+        "value": "Czechia"
+      },
+      "countryiso3code": "CZE",
+      "date": "2001",
+      "value": 75.1731707317073,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "DK",
+        "value": "Denmark"
+      },
+      "countryiso3code": "DNK",
+      "date": "2001",
+      "value": 76.7926829268293,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "DJ",
+        "value": "Djibouti"
+      },
+      "countryiso3code": "DJI",
+      "date": "2001",
+      "value": 57.506,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "DM",
+        "value": "Dominica"
+      },
+      "countryiso3code": "DMA",
+      "date": "2001",
+      "value": 71.862,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "DO",
+        "value": "Dominican Republic"
+      },
+      "countryiso3code": "DOM",
+      "date": "2001",
+      "value": 70.553,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "EC",
+        "value": "Ecuador"
+      },
+      "countryiso3code": "ECU",
+      "date": "2001",
+      "value": 72.571,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "EG",
+        "value": "Egypt, Arab Rep."
+      },
+      "countryiso3code": "EGY",
+      "date": "2001",
+      "value": 67.612,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SV",
+        "value": "El Salvador"
+      },
+      "countryiso3code": "SLV",
+      "date": "2001",
+      "value": 67.965,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GQ",
+        "value": "Equatorial Guinea"
+      },
+      "countryiso3code": "GNQ",
+      "date": "2001",
+      "value": 53.827,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ER",
+        "value": "Eritrea"
+      },
+      "countryiso3code": "ERI",
+      "date": "2001",
+      "value": 58.359,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "EE",
+        "value": "Estonia"
+      },
+      "countryiso3code": "EST",
+      "date": "2001",
+      "value": 70.2585365853659,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SZ",
+        "value": "Eswatini"
+      },
+      "countryiso3code": "SWZ",
+      "date": "2001",
+      "value": 46.344,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ET",
+        "value": "Ethiopia"
+      },
+      "countryiso3code": "ETH",
+      "date": "2001",
+      "value": 51.428,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "FO",
+        "value": "Faroe Islands"
+      },
+      "countryiso3code": "FRO",
+      "date": "2001",
+      "value": 78.6017292682927,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "FJ",
+        "value": "Fiji"
+      },
+      "countryiso3code": "FJI",
+      "date": "2001",
+      "value": 66.205,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "FI",
+        "value": "Finland"
+      },
+      "countryiso3code": "FIN",
+      "date": "2001",
+      "value": 77.9658536585366,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "FR",
+        "value": "France"
+      },
+      "countryiso3code": "FRA",
+      "date": "2001",
+      "value": 79.1585365853659,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PF",
+        "value": "French Polynesia"
+      },
+      "countryiso3code": "PYF",
+      "date": "2001",
+      "value": 79.316,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GA",
+        "value": "Gabon"
+      },
+      "countryiso3code": "GAB",
+      "date": "2001",
+      "value": 61.982,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GM",
+        "value": "Gambia, The"
+      },
+      "countryiso3code": "GMB",
+      "date": "2001",
+      "value": 57.283,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GE",
+        "value": "Georgia"
+      },
+      "countryiso3code": "GEO",
+      "date": "2001",
+      "value": 70.371,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "DE",
+        "value": "Germany"
+      },
+      "countryiso3code": "DEU",
+      "date": "2001",
+      "value": 78.3292682926829,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GH",
+        "value": "Ghana"
+      },
+      "countryiso3code": "GHA",
+      "date": "2001",
+      "value": 58.403,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GI",
+        "value": "Gibraltar"
+      },
+      "countryiso3code": "GIB",
+      "date": "2001",
+      "value": 80.419,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GR",
+        "value": "Greece"
+      },
+      "countryiso3code": "GRC",
+      "date": "2001",
+      "value": 78.3878048780488,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GL",
+        "value": "Greenland"
+      },
+      "countryiso3code": "GRL",
+      "date": "2001",
+      "value": 65.0058536585366,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GD",
+        "value": "Grenada"
+      },
+      "countryiso3code": "GRD",
+      "date": "2001",
+      "value": 73.034,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GU",
+        "value": "Guam"
+      },
+      "countryiso3code": "GUM",
+      "date": "2001",
+      "value": 75.195,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GT",
+        "value": "Guatemala"
+      },
+      "countryiso3code": "GTM",
+      "date": "2001",
+      "value": 67.436,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GN",
+        "value": "Guinea"
+      },
+      "countryiso3code": "GIN",
+      "date": "2001",
+      "value": 52.669,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GW",
+        "value": "Guinea-Bissau"
+      },
+      "countryiso3code": "GNB",
+      "date": "2001",
+      "value": 51.054,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GY",
+        "value": "Guyana"
+      },
+      "countryiso3code": "GUY",
+      "date": "2001",
+      "value": 64.38,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "HT",
+        "value": "Haiti"
+      },
+      "countryiso3code": "HTI",
+      "date": "2001",
+      "value": 58.591,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "HN",
+        "value": "Honduras"
+      },
+      "countryiso3code": "HND",
+      "date": "2001",
+      "value": 68.491,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "HK",
+        "value": "Hong Kong SAR, China"
+      },
+      "countryiso3code": "HKG",
+      "date": "2001",
+      "value": 81.4192682926829,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "HU",
+        "value": "Hungary"
+      },
+      "countryiso3code": "HUN",
+      "date": "2001",
+      "value": 72.2487804878049,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "IS",
+        "value": "Iceland"
+      },
+      "countryiso3code": "ISL",
+      "date": "2001",
+      "value": 80.690243902439,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "IN",
+        "value": "India"
+      },
+      "countryiso3code": "IND",
+      "date": "2001",
+      "value": 63.158,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ID",
+        "value": "Indonesia"
+      },
+      "countryiso3code": "IDN",
+      "date": "2001",
+      "value": 66.583,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "IR",
+        "value": "Iran, Islamic Rep."
+      },
+      "countryiso3code": "IRN",
+      "date": "2001",
+      "value": 70.619,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "IQ",
+        "value": "Iraq"
+      },
+      "countryiso3code": "IRQ",
+      "date": "2001",
+      "value": 65.292,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "IE",
+        "value": "Ireland"
+      },
+      "countryiso3code": "IRL",
+      "date": "2001",
+      "value": 77.1341463414634,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "IM",
+        "value": "Isle of Man"
+      },
+      "countryiso3code": "IMN",
+      "date": "2001",
+      "value": 75.289,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2001",
+      "value": 79.4073170731707,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "IT",
+        "value": "Italy"
+      },
+      "countryiso3code": "ITA",
+      "date": "2001",
+      "value": 80.1268292682927,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "JM",
+        "value": "Jamaica"
+      },
+      "countryiso3code": "JAM",
+      "date": "2001",
+      "value": 71.287,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "JP",
+        "value": "Japan"
+      },
+      "countryiso3code": "JPN",
+      "date": "2001",
+      "value": 81.4163414634146,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "JO",
+        "value": "Jordan"
+      },
+      "countryiso3code": "JOR",
+      "date": "2001",
+      "value": 72.141,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KZ",
+        "value": "Kazakhstan"
+      },
+      "countryiso3code": "KAZ",
+      "date": "2001",
+      "value": 64.108,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KE",
+        "value": "Kenya"
+      },
+      "countryiso3code": "KEN",
+      "date": "2001",
+      "value": 56.501,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KI",
+        "value": "Kiribati"
+      },
+      "countryiso3code": "KIR",
+      "date": "2001",
+      "value": 64.918,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KP",
+        "value": "Korea, Dem. People's Rep."
+      },
+      "countryiso3code": "PRK",
+      "date": "2001",
+      "value": 60.893,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KR",
+        "value": "Korea, Rep."
+      },
+      "countryiso3code": "KOR",
+      "date": "2001",
+      "value": 76.4121951219512,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "XK",
+        "value": "Kosovo"
+      },
+      "countryiso3code": "XKX",
+      "date": "2001",
+      "value": 71.782,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KW",
+        "value": "Kuwait"
+      },
+      "countryiso3code": "KWT",
+      "date": "2001",
+      "value": 76.3843414634146,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KG",
+        "value": "Kyrgyz Republic"
+      },
+      "countryiso3code": "KGZ",
+      "date": "2001",
+      "value": 68.7073170731707,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LA",
+        "value": "Lao PDR"
+      },
+      "countryiso3code": "LAO",
+      "date": "2001",
+      "value": 58.887,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LV",
+        "value": "Latvia"
+      },
+      "countryiso3code": "LVA",
+      "date": "2001",
+      "value": 70.7609756097561,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LB",
+        "value": "Lebanon"
+      },
+      "countryiso3code": "LBN",
+      "date": "2001",
+      "value": 74.354,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LS",
+        "value": "Lesotho"
+      },
+      "countryiso3code": "LSO",
+      "date": "2001",
+      "value": 47.153,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LR",
+        "value": "Liberia"
+      },
+      "countryiso3code": "LBR",
+      "date": "2001",
+      "value": 53.109,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LY",
+        "value": "Libya"
+      },
+      "countryiso3code": "LBY",
+      "date": "2001",
+      "value": 70.653,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LI",
+        "value": "Liechtenstein"
+      },
+      "countryiso3code": "LIE",
+      "date": "2001",
+      "value": 79.2756097560976,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LT",
+        "value": "Lithuania"
+      },
+      "countryiso3code": "LTU",
+      "date": "2001",
+      "value": 71.6585365853659,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LU",
+        "value": "Luxembourg"
+      },
+      "countryiso3code": "LUX",
+      "date": "2001",
+      "value": 77.8243902439025,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MO",
+        "value": "Macao SAR, China"
+      },
+      "countryiso3code": "MAC",
+      "date": "2001",
+      "value": 80.5878048780488,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MG",
+        "value": "Madagascar"
+      },
+      "countryiso3code": "MDG",
+      "date": "2001",
+      "value": 58.674,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MW",
+        "value": "Malawi"
+      },
+      "countryiso3code": "MWI",
+      "date": "2001",
+      "value": 47.205,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MY",
+        "value": "Malaysia"
+      },
+      "countryiso3code": "MYS",
+      "date": "2001",
+      "value": 73.08,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MV",
+        "value": "Maldives"
+      },
+      "countryiso3code": "MDV",
+      "date": "2001",
+      "value": 71.659,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ML",
+        "value": "Mali"
+      },
+      "countryiso3code": "MLI",
+      "date": "2001",
+      "value": 51.3,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MT",
+        "value": "Malta"
+      },
+      "countryiso3code": "MLT",
+      "date": "2001",
+      "value": 78.8439024390244,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MH",
+        "value": "Marshall Islands"
+      },
+      "countryiso3code": "MHL",
+      "date": "2001",
+      "value": 63.735,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MR",
+        "value": "Mauritania"
+      },
+      "countryiso3code": "MRT",
+      "date": "2001",
+      "value": 61.662,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MU",
+        "value": "Mauritius"
+      },
+      "countryiso3code": "MUS",
+      "date": "2001",
+      "value": 71.7658536585366,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MX",
+        "value": "Mexico"
+      },
+      "countryiso3code": "MEX",
+      "date": "2001",
+      "value": 72.912,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "FM",
+        "value": "Micronesia, Fed. Sts."
+      },
+      "countryiso3code": "FSM",
+      "date": "2001",
+      "value": 64.801,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MD",
+        "value": "Moldova"
+      },
+      "countryiso3code": "MDA",
+      "date": "2001",
+      "value": 67.672,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MC",
+        "value": "Monaco"
+      },
+      "countryiso3code": "MCO",
+      "date": "2001",
+      "value": 82.485,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MN",
+        "value": "Mongolia"
+      },
+      "countryiso3code": "MNG",
+      "date": "2001",
+      "value": 63.3917073170732,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ME",
+        "value": "Montenegro"
+      },
+      "countryiso3code": "MNE",
+      "date": "2001",
+      "value": 73.5801951219512,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MA",
+        "value": "Morocco"
+      },
+      "countryiso3code": "MAR",
+      "date": "2001",
+      "value": 67.2,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MZ",
+        "value": "Mozambique"
+      },
+      "countryiso3code": "MOZ",
+      "date": "2001",
+      "value": 50.259,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MM",
+        "value": "Myanmar"
+      },
+      "countryiso3code": "MMR",
+      "date": "2001",
+      "value": 60.64,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "NA",
+        "value": "Namibia"
+      },
+      "countryiso3code": "NAM",
+      "date": "2001",
+      "value": 51.98,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "NR",
+        "value": "Naoero"
+      },
+      "countryiso3code": "NRU",
+      "date": "2001",
+      "value": 59.482,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "NP",
+        "value": "Nepal"
+      },
+      "countryiso3code": "NPL",
+      "date": "2001",
+      "value": 63.288,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "NL",
+        "value": "Netherlands"
+      },
+      "countryiso3code": "NLD",
+      "date": "2001",
+      "value": 78.190243902439,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "NC",
+        "value": "New Caledonia"
+      },
+      "countryiso3code": "NCL",
+      "date": "2001",
+      "value": 73.958,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "NZ",
+        "value": "New Zealand"
+      },
+      "countryiso3code": "NZL",
+      "date": "2001",
+      "value": 78.6926829268293,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "NI",
+        "value": "Nicaragua"
+      },
+      "countryiso3code": "NIC",
+      "date": "2001",
+      "value": 67.028,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "NE",
+        "value": "Niger"
+      },
+      "countryiso3code": "NER",
+      "date": "2001",
+      "value": 49.872,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "NG",
+        "value": "Nigeria"
+      },
+      "countryiso3code": "NGA",
+      "date": "2001",
+      "value": 47.549,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MK",
+        "value": "North Macedonia"
+      },
+      "countryiso3code": "MKD",
+      "date": "2001",
+      "value": 73.4365853658537,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MP",
+        "value": "Northern Mariana Islands"
+      },
+      "countryiso3code": "MNP",
+      "date": "2001",
+      "value": 75.419,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "NO",
+        "value": "Norway"
+      },
+      "countryiso3code": "NOR",
+      "date": "2001",
+      "value": 78.7853658536585,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "OM",
+        "value": "Oman"
+      },
+      "countryiso3code": "OMN",
+      "date": "2001",
+      "value": 73.979,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PK",
+        "value": "Pakistan"
+      },
+      "countryiso3code": "PAK",
+      "date": "2001",
+      "value": 62.241,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PW",
+        "value": "Palau"
+      },
+      "countryiso3code": "PLW",
+      "date": "2001",
+      "value": 64.8,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PA",
+        "value": "Panama"
+      },
+      "countryiso3code": "PAN",
+      "date": "2001",
+      "value": 73.82,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PG",
+        "value": "Papua New Guinea"
+      },
+      "countryiso3code": "PNG",
+      "date": "2001",
+      "value": 61.647,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PY",
+        "value": "Paraguay"
+      },
+      "countryiso3code": "PRY",
+      "date": "2001",
+      "value": 70.281,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PE",
+        "value": "Peru"
+      },
+      "countryiso3code": "PER",
+      "date": "2001",
+      "value": 70.315,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PH",
+        "value": "Philippines"
+      },
+      "countryiso3code": "PHL",
+      "date": "2001",
+      "value": 67.829,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PL",
+        "value": "Poland"
+      },
+      "countryiso3code": "POL",
+      "date": "2001",
+      "value": 74.2,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PT",
+        "value": "Portugal"
+      },
+      "countryiso3code": "PRT",
+      "date": "2001",
+      "value": 76.8146341463415,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PR",
+        "value": "Puerto Rico (US)"
+      },
+      "countryiso3code": "PRI",
+      "date": "2001",
+      "value": 75.972,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "QA",
+        "value": "Qatar"
+      },
+      "countryiso3code": "QAT",
+      "date": "2001",
+      "value": 75.486,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "RO",
+        "value": "Romania"
+      },
+      "countryiso3code": "ROU",
+      "date": "2001",
+      "value": 71.1609756097561,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "RU",
+        "value": "Russian Federation"
+      },
+      "countryiso3code": "RUS",
+      "date": "2001",
+      "value": 65.3834146341463,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "RW",
+        "value": "Rwanda"
+      },
+      "countryiso3code": "RWA",
+      "date": "2001",
+      "value": 49.49,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "WS",
+        "value": "Samoa"
+      },
+      "countryiso3code": "WSM",
+      "date": "2001",
+      "value": 71.028,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SM",
+        "value": "San Marino"
+      },
+      "countryiso3code": "SMR",
+      "date": "2001",
+      "value": 80.803,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ST",
+        "value": "Sao Tome and Principe"
+      },
+      "countryiso3code": "STP",
+      "date": "2001",
+      "value": 61.5,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SA",
+        "value": "Saudi Arabia"
+      },
+      "countryiso3code": "SAU",
+      "date": "2001",
+      "value": 72.951,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SN",
+        "value": "Senegal"
+      },
+      "countryiso3code": "SEN",
+      "date": "2001",
+      "value": 58.158,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "RS",
+        "value": "Serbia"
+      },
+      "countryiso3code": "SRB",
+      "date": "2001",
+      "value": 72.2341463414634,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SC",
+        "value": "Seychelles"
+      },
+      "countryiso3code": "SYC",
+      "date": "2001",
+      "value": 73.2536585365854,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SL",
+        "value": "Sierra Leone"
+      },
+      "countryiso3code": "SLE",
+      "date": "2001",
+      "value": 45.448,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SG",
+        "value": "Singapore"
+      },
+      "countryiso3code": "SGP",
+      "date": "2001",
+      "value": 78.2512195121951,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SX",
+        "value": "Sint Maarten (Dutch part)"
+      },
+      "countryiso3code": "SXM",
+      "date": "2001",
+      "value": 74.525,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SK",
+        "value": "Slovak Republic"
+      },
+      "countryiso3code": "SVK",
+      "date": "2001",
+      "value": 73.4024390243903,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SI",
+        "value": "Slovenia"
+      },
+      "countryiso3code": "SVN",
+      "date": "2001",
+      "value": 75.7585365853659,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SB",
+        "value": "Solomon Islands"
+      },
+      "countryiso3code": "SLB",
+      "date": "2001",
+      "value": 67.237,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SO",
+        "value": "Somalia, Fed. Rep."
+      },
+      "countryiso3code": "SOM",
+      "date": "2001",
+      "value": 50.829,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ZA",
+        "value": "South Africa"
+      },
+      "countryiso3code": "ZAF",
+      "date": "2001",
+      "value": 57.161,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SS",
+        "value": "South Sudan"
+      },
+      "countryiso3code": "SSD",
+      "date": "2001",
+      "value": 48.55,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ES",
+        "value": "Spain"
+      },
+      "countryiso3code": "ESP",
+      "date": "2001",
+      "value": 79.3682926829268,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LK",
+        "value": "Sri Lanka"
+      },
+      "countryiso3code": "LKA",
+      "date": "2001",
+      "value": 71.804,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "KN",
+        "value": "St. Kitts and Nevis"
+      },
+      "countryiso3code": "KNA",
+      "date": "2001",
+      "value": 69.767,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "LC",
+        "value": "St. Lucia"
+      },
+      "countryiso3code": "LCA",
+      "date": "2001",
+      "value": 71.367,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "MF",
+        "value": "St. Martin (French part)"
+      },
+      "countryiso3code": "MAF",
+      "date": "2001",
+      "value": 77.009,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "VC",
+        "value": "St. Vincent and the Grenadines"
+      },
+      "countryiso3code": "VCT",
+      "date": "2001",
+      "value": 70.382,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SD",
+        "value": "Sudan"
+      },
+      "countryiso3code": "SDN",
+      "date": "2001",
+      "value": 59.264,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SR",
+        "value": "Suriname"
+      },
+      "countryiso3code": "SUR",
+      "date": "2001",
+      "value": 64.82,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SE",
+        "value": "Sweden"
+      },
+      "countryiso3code": "SWE",
+      "date": "2001",
+      "value": 79.7951219512195,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "CH",
+        "value": "Switzerland"
+      },
+      "countryiso3code": "CHE",
+      "date": "2001",
+      "value": 80.1804878048781,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "SY",
+        "value": "Syrian Arab Republic"
+      },
+      "countryiso3code": "SYR",
+      "date": "2001",
+      "value": 71.296,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TJ",
+        "value": "Tajikistan"
+      },
+      "countryiso3code": "TJK",
+      "date": "2001",
+      "value": 64.197,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TZ",
+        "value": "Tanzania"
+      },
+      "countryiso3code": "TZA",
+      "date": "2001",
+      "value": 54.124,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TH",
+        "value": "Thailand"
+      },
+      "countryiso3code": "THA",
+      "date": "2001",
+      "value": 71.52,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TL",
+        "value": "Timor-Leste"
+      },
+      "countryiso3code": "TLS",
+      "date": "2001",
+      "value": 58.772,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TG",
+        "value": "Togo"
+      },
+      "countryiso3code": "TGO",
+      "date": "2001",
+      "value": 54.757,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TO",
+        "value": "Tonga"
+      },
+      "countryiso3code": "TON",
+      "date": "2001",
+      "value": 69.8,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TT",
+        "value": "Trinidad and Tobago"
+      },
+      "countryiso3code": "TTO",
+      "date": "2001",
+      "value": 68.874,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TN",
+        "value": "Tunisia"
+      },
+      "countryiso3code": "TUN",
+      "date": "2001",
+      "value": 72.822,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TR",
+        "value": "Turkiye"
+      },
+      "countryiso3code": "TUR",
+      "date": "2001",
+      "value": 72.271,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TM",
+        "value": "Turkmenistan"
+      },
+      "countryiso3code": "TKM",
+      "date": "2001",
+      "value": 65.325,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TC",
+        "value": "Turks and Caicos Islands"
+      },
+      "countryiso3code": "TCA",
+      "date": "2001",
+      "value": 74.409,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "TV",
+        "value": "Tuvalu"
+      },
+      "countryiso3code": "TUV",
+      "date": "2001",
+      "value": 63.709,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "UG",
+        "value": "Uganda"
+      },
+      "countryiso3code": "UGA",
+      "date": "2001",
+      "value": 50.576,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "UA",
+        "value": "Ukraine"
+      },
+      "countryiso3code": "UKR",
+      "date": "2001",
+      "value": 67.675,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "AE",
+        "value": "United Arab Emirates"
+      },
+      "countryiso3code": "ARE",
+      "date": "2001",
+      "value": 77.621,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "GB",
+        "value": "United Kingdom"
+      },
+      "countryiso3code": "GBR",
+      "date": "2001",
+      "value": 77.9926829268293,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "US",
+        "value": "United States"
+      },
+      "countryiso3code": "USA",
+      "date": "2001",
+      "value": 76.8365853658537,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "UY",
+        "value": "Uruguay"
+      },
+      "countryiso3code": "URY",
+      "date": "2001",
+      "value": 74.987,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "UZ",
+        "value": "Uzbekistan"
+      },
+      "countryiso3code": "UZB",
+      "date": "2001",
+      "value": 65.853,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "VU",
+        "value": "Vanuatu"
+      },
+      "countryiso3code": "VUT",
+      "date": "2001",
+      "value": 68.722,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "VE",
+        "value": "Venezuela, RB"
+      },
+      "countryiso3code": "VEN",
+      "date": "2001",
+      "value": 71.019,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "VN",
+        "value": "Viet Nam"
+      },
+      "countryiso3code": "VNM",
+      "date": "2001",
+      "value": 72.984,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "VI",
+        "value": "Virgin Islands (U.S.)"
+      },
+      "countryiso3code": "VIR",
+      "date": "2001",
+      "value": 77.6219512195122,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "PS",
+        "value": "West Bank and Gaza"
+      },
+      "countryiso3code": "PSE",
+      "date": "2001",
+      "value": 69.75,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "YE",
+        "value": "Yemen, Rep."
+      },
+      "countryiso3code": "YEM",
+      "date": "2001",
+      "value": 63.286,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ZM",
+        "value": "Zambia"
+      },
+      "countryiso3code": "ZMB",
+      "date": "2001",
+      "value": 47.408,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    },
+    {
+      "indicator": {
+        "id": "SP.DYN.LE00.IN",
+        "value": "Life expectancy at birth, total (years)"
+      },
+      "country": {
+        "id": "ZW",
+        "value": "Zimbabwe"
+      },
+      "countryiso3code": "ZWE",
+      "date": "2001",
+      "value": 44.525,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 0
+    }
+  ]
+]

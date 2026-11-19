@@ -31,11 +31,19 @@ def calculate_unconstrained_market(
     fraction: float,
     row_count: int,
     country_count: int,
+    global_tax_modifiers: np.ndarray | None = None,
+    desired_trade: np.ndarray | None = None,
+    meet_consumption: np.ndarray | None = None,
 ) -> UnconstrainedMarketResult:
     """Calculate market outputs from aligned, validated arrays without mutating them."""
     local_supply = production_values + stock
     export_desired = np.maximum(local_supply - demand, 0.0)
     import_desired = np.maximum(demand - local_supply, 0.0)
+    if desired_trade is not None and meet_consumption is not None:
+        manual_import = np.maximum(-desired_trade, 0.0)
+        manual_import = np.where(storable_by_resource[resource_indices], manual_import, np.minimum(manual_import, import_desired))
+        import_desired = np.where(meet_consumption, import_desired, manual_import)
+        export_desired = np.where(meet_consumption, export_desired, np.minimum(np.maximum(desired_trade, 0.0), local_supply))
     affordable_import = import_desired * trade_modifiers
     global_supply = np.bincount(
         resource_indices,
@@ -63,7 +71,7 @@ def calculate_unconstrained_market(
     )
     import_actual = affordable_import * np.minimum(1.0, import_ratio)
     export_actual = export_desired * np.minimum(1.0, export_ratio)
-    unsold_amount = export_desired - export_actual
+    unsold_amount = np.maximum(local_supply + import_actual - export_actual - demand, 0.0)
     storable = storable_by_resource[resource_indices]
     decay_rates = decay_rates_by_resource[resource_indices]
     new_stock = np.where(storable, unsold_amount * (1.0 - decay_rates * fraction), 0.0)
@@ -79,7 +87,7 @@ def calculate_unconstrained_market(
         ),
     )
     updated_production = production_values * (1.0 - production_penalty)
-    total_tax = tax_rates + 0.02
+    total_tax = np.clip(tax_rates + (0.02 if global_tax_modifiers is None else global_tax_modifiers), 0.0, 1.0)
     government_import_expense = np.where(government_controlled, import_actual * 1.5, 0.0)
     government_tax_revenue = np.where(
         government_controlled,

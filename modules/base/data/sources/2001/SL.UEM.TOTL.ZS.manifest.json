@@ -1,0 +1,9 @@
+{
+  "indicator": "SL.UEM.TOTL.ZS",
+  "scenario_year": 2001,
+  "observation_year_filter": "2001",
+  "url": "https://api.worldbank.org/v2/country/all/indicator/SL.UEM.TOTL.ZS?date=2001&format=json&per_page=1000",
+  "data_url": "https://data.worldbank.org/indicator/SL.UEM.TOTL.ZS",
+  "source_release_last_updated": "2026-11-11",
+  "sha256": "e5871d480c424b279981643e0ddc2961a98e91f5cba1764e91b40cbd4842a4e9"
+}

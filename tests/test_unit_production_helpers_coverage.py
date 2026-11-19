@@ -2,13 +2,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from modules.base.systems.military.production_policy import MAX_UNIT_PRODUCTION_QUANTITY
 from src.client.ui.panels.military.unit_production_panel import UnitProductionPanel
 from src.shared.actions import (
     ActionCancelProductionOrder,
     ActionSetProductionPaused,
     ActionSetProductionPriority,
 )
+from src.shared.military_constants import MAX_UNIT_PRODUCTION_QUANTITY
 
 
 class Table:

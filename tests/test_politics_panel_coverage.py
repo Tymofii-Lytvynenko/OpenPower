@@ -16,6 +16,7 @@ def summary():
         corruption_pct=20.0,
         active_treaties=3,
         pending_treaties=2,
+        political_pressure_pct=12.5,
     )
 
 

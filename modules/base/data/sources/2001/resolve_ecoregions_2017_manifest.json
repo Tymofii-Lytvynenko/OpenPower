@@ -1,0 +1,26 @@
+{
+  "dataset": "RESOLVE Ecoregions 2017",
+  "source_year": 2017,
+  "scenario_year": 2001,
+  "source_is_historical_2001_observation": false,
+  "classification_role": "spatial baseline applied to the 2001 scenario; not a 2001 ecological survey",
+  "attribution": "Dinerstein et al. (2017), RESOLVE Ecoregions",
+  "license": "CC-BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "source_page": "https://ecoregions2017.appspot.com/",
+  "service_url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Resolve_Ecoregions/FeatureServer/0/query",
+  "snapshot_path": "modules/base/data/sources/2001/resolve_ecoregions_2017.geojson.gz",
+  "snapshot_sha256": "99719fb2ff61032e7c29247138f4969d3617a0b44af1ca16aa956bbed9543575",
+  "ecoregion_count": 846,
+  "source_feature_count": 847,
+  "special_rock_and_ice_feature_count": 1,
+  "geometry_repaired_feature_count": 317,
+  "geometry_generalization_degrees": 0.0025,
+  "assigned_region_count": 4559,
+  "assignment_method_counts": {
+    "contained": 4294,
+    "nearest": 265
+  },
+  "assignment_method": "OpenPower equirectangular region center; RESOLVE polygon containment, then nearest WGS84 polygon for unmatched centers",
+  "output_table": "modules/base/data/regions/regions_biomes.tsv"
+}

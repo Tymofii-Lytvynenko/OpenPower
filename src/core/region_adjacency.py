@@ -32,6 +32,9 @@ class RegionAdjacencyBuilder:
                 packed = (pixels[:, :, 0] << 16) | (pixels[:, :, 1] << 8) | pixels[:, :, 2]
                 self._collect_pairs(pairs, packed[:, :-1], packed[:, 1:], valid_region_ids)
                 self._collect_pairs(pairs, packed[:-1, :], packed[1:, :], valid_region_ids)
+                # The first and last columns meet at the globe's antimeridian.
+                if width > 1:
+                    self._collect_pairs(pairs, packed[:, -1], packed[:, 0], valid_region_ids)
         rows = [
             {"region_id": first, "neighbor_region_id": second}
             for first, second in sorted(pairs)

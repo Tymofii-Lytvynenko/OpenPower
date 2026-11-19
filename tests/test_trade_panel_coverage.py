@@ -91,6 +91,74 @@ def test_country_deals_filter_and_sort_pending_then_newest_first():
 
 
 @pytest.mark.parametrize(
+    ("expires_at_minute", "current_minute", "expected"),
+    [
+        (1440, 0, 1),
+        (1441, 1, 1),
+        (1440, 1, 1),
+        (1439, 1440, 0),
+        (None, 0, None),
+        ("invalid", 0, None),
+    ],
+)
+def test_trade_deadline_days_remaining_uses_ceiling_and_handles_missing_values(
+    expires_at_minute, current_minute, expected,
+):
+    assert trade_panel_module.trade_options.trade_deadline_days_remaining(
+        expires_at_minute, current_minute,
+    ) == expected
+
+
+@pytest.mark.parametrize(
+    ("expires_at_minute", "current_minute", "expected_status", "can_act"),
+    [
+        (2 * 1440, 5, "PENDING · 2 DAYS LEFT", True),
+        (1440, 1440, "PENDING · DEADLINE PASSED", False),
+        (None, 5, "PENDING · DEADLINE UNAVAILABLE", False),
+    ],
+)
+def test_deal_detail_shows_pending_deadline_and_blocks_expired_or_malformed_offers(
+    monkeypatch, expires_at_minute, current_minute, expected_status, can_act,
+):
+    panel = TradePanel()
+    panel._requested_deal_id = "d1"
+    panel._render_deal_asset_slot = Mock()
+    widgets = []
+
+    class RecordingWidgets(_FlowWidgets):
+        def __init__(self, root):
+            super().__init__(root)
+            widgets.append(self)
+
+    monkeypatch.setattr(trade_panel_module, "GMLWidgets", RecordingWidgets)
+    state = _state({"diplomatic_trade_deals": pl.DataFrame([{
+        "id": "d1",
+        "source_country_id": "POL",
+        "target_country_id": "UKR",
+        "status": "pending",
+        "expires_at_minute": expires_at_minute,
+        "offered_assets_json": "[]",
+        "requested_assets_json": "[]",
+    }])})
+    state.time = SimpleNamespace(total_minutes=current_minute)
+    context, actions = _context()
+
+    panel._render_trade_deal_detail(state, context, "UKR")
+
+    status_call = next(
+        call for widget in widgets for call in widget.calls
+        if call[0] == "text" and call[2].get("test_id") == "trade.detail.status"
+    )
+    assert status_call[1] == ("lblBalance", expected_status)
+    accept_call = next(
+        call for widget in widgets for call in widget.calls
+        if call[0] == "button" and call[1] == "trade.deal.d1.accept"
+    )
+    assert accept_call[2]["enabled"] is can_act
+    assert actions == []
+
+
+@pytest.mark.parametrize(
     ("asset", "tables", "expected"),
     [
         ({"type": "cash", "amount": "1200.5"}, {}, "Cash 1,200"),

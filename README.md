@@ -3,7 +3,7 @@
 > **Status: Alpha / Active Prototype**
 > The project includes an asynchronous simulation runner, headless execution, tactical combat, geo-coordinate movement, mod-layered data loading, and a server-authoritative diplomacy system. Multiplayer remains future work.
 
-**OpenPower** is a high-performance, open-source grand strategy game engine built in Python. It utilizes a data-oriented design powered by **Polars** and a multi-process architecture to run intensive world simulation loops asynchronously in a background thread while keeping the **Dear ImGui / Arcade** frontend running at fluid, stutter-free framerates.
+**OpenPower** is a high-performance, open-source grand strategy game engine built in Python. It utilizes a data-oriented design powered by **Polars** and a multi-process architecture that runs intensive world simulation loops in an isolated server process while keeping the **Dear ImGui / Arcade** frontend responsive.
 
 ---
 
@@ -107,6 +107,10 @@ Or directly:
 ```bash
 python main.py
 ```
+
+### Start a game
+
+Choose **Singleplayer → Custom Game**, select a country, and choose **Start Freeplay** to start an open world. Use **Singleplayer → Scenario** to start a campaign or **Singleplayer → Load Game** to resume a saved session.
 
 ---
 

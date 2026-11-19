@@ -28,17 +28,21 @@ class ServerBootView(BaseImGuiView):
         progress = float(getattr(self.window, "boot_progress", 0.0))
         status = str(getattr(self.window, "boot_status", "Starting engine..."))
         error = getattr(self.window, "boot_error", None)
+        retry = False
 
         screen_w, screen_h = self.window.get_size()
         if self.ui.begin_centered_panel("Server Boot", screen_w, screen_h, w=460, h=170):
             self.ui.draw_title("OPENPOWER")
-            self.ui.draw_progress_bar(progress, status)
-
             if error:
-                imgui.text_colored(GAMETHEME.colors.error, str(error))
+                imgui.text_colored(GAMETHEME.colors.error, status)
+                imgui.text_wrapped(str(error))
+                retry = imgui.button("Retry", test_id="server_boot.retry")
             else:
+                self.ui.draw_progress_bar(progress, status)
                 imgui.text_disabled("Starting simulation process...")
 
             self.ui.end_panel()
 
         self.imgui.render()
+        if retry:
+            self.window.setup()

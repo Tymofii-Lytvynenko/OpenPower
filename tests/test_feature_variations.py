@@ -82,7 +82,9 @@ class TestSaveActionAndWriter(unittest.TestCase):
 
         saves = list_available_saves(config)
         self.assertEqual([entry["name"] for entry in saves], ["autosave_1"])
-        self.assertEqual(saves[0]["tick"], 0)
+        # The save captures the state after the tick advanced, so its metadata
+        # records the tick the saved world is at.
+        self.assertEqual(saves[0]["tick"], 1)
 
         writer = SaveWriter(config)
         self.assertTrue(writer.delete_save("autosave_1"))
@@ -142,7 +144,7 @@ class TestDiplomacyVariations(unittest.TestCase):
 
         state.current_actions = [
             ActionCreateTreaty(
-                player_id="tester",
+                player_id="USA",
                 source_country_tag="USA",
                 target_country_tag="USA",
                 treaty_type="trade accord",
@@ -155,7 +157,7 @@ class TestDiplomacyVariations(unittest.TestCase):
 
         state.current_actions = [
             ActionCreateTreaty(
-                player_id="tester",
+                player_id="USA",
                 source_country_tag="USA",
                 target_country_tag="CAN",
                 treaty_type="trade accord",
@@ -169,7 +171,7 @@ class TestDiplomacyVariations(unittest.TestCase):
 
         state.current_actions = [
             ActionCreateTreaty(
-                player_id="tester",
+                player_id="USA",
                 source_country_tag="USA",
                 target_country_tag="CAN",
                 treaty_type="trade accord",
@@ -182,7 +184,7 @@ class TestDiplomacyVariations(unittest.TestCase):
 
         state.current_actions = [
             ActionRespondTreaty(
-                player_id="tester",
+                player_id="USA",
                 treaty_id=proposal_id,
                 responder_country_tag="USA",
                 accept=True,
@@ -194,7 +196,7 @@ class TestDiplomacyVariations(unittest.TestCase):
 
         state.current_actions = [
             ActionRespondTreaty(
-                player_id="tester",
+                player_id="CAN",
                 treaty_id=proposal_id,
                 responder_country_tag="CAN",
                 accept=True,
@@ -207,7 +209,7 @@ class TestDiplomacyVariations(unittest.TestCase):
         treaty_id = state.get_table("countries_treaties")["id"][0]
         state.current_actions = [
             ActionLeaveTreaty(
-                player_id="tester",
+                player_id="FRA",
                 treaty_id=treaty_id,
                 country_tag="FRA",
             )
@@ -217,7 +219,7 @@ class TestDiplomacyVariations(unittest.TestCase):
 
         state.current_actions = [
             ActionLeaveTreaty(
-                player_id="tester",
+                player_id="CAN",
                 treaty_id=treaty_id,
                 country_tag="CAN",
             )
@@ -270,7 +272,7 @@ class TestDiplomacyVariations(unittest.TestCase):
 
         state.current_actions = [
             ActionDeclareWar(
-                player_id="tester",
+                player_id="USA",
                 source_country_tag="USA",
                 target_country_tag="CAN",
                 casus_belli="Border dispute",
@@ -287,7 +289,7 @@ class TestDiplomacyVariations(unittest.TestCase):
 
         state.current_actions = [
             ActionDeclareWar(
-                player_id="tester",
+                player_id="USA",
                 source_country_tag="USA",
                 target_country_tag="CAN",
                 casus_belli="Border dispute",
@@ -298,7 +300,7 @@ class TestDiplomacyVariations(unittest.TestCase):
 
         state.current_actions = [
             ActionOfferPeace(
-                player_id="tester",
+                player_id="USA",
                 war_id="war-missing",
                 source_country_tag="USA",
                 terms="No effect",

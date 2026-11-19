@@ -9,7 +9,6 @@ from src.client.ui.core.containers import WindowManager
 from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
-from src.client.ui.core.primitives import UIPrimitives as Prims
 from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.layouts.gml_layout import gml_child_frame
 from src.client.ui.layouts.gml_rows import gml_row
@@ -36,6 +35,7 @@ from src.shared.actions import (
     ActionJoinTreaty,
     ActionLeaveTreaty,
     ActionRespondTreaty,
+    ActionSetTreatyPressure,
     ActionUpdateTreatyParticipants,
 )
 from src.shared.mod_api import ClientPresentationKeys
@@ -550,7 +550,8 @@ class LiveTreatiesPanel:
                     self._open_participant_editor(treaty, state)
 
             self._render_eligibility_list(treaty, state, context)
-            self._render_pressure_fallback(ui)
+            pressure_row = {**row, "status": "closed"} if lifecycle.message else row
+            self._render_pressure(ui, state, pressure_row, context)
 
             if ui.button("frmMain/btnCancel", "Close", "treaties.details.close"):
                 self._show_details = False
@@ -617,10 +618,12 @@ class LiveTreatiesPanel:
     ) -> None:
         country_tag = str(context.target_tag or "").strip().upper()
         required = set(normalize_country_tags(proposal.get("required_responses")))
+        accepted = set(normalize_country_tags(proposal.get("accepted_members")))
         if (
             context.net_client is None
             or not context.is_own_country
             or country_tag not in required
+            or country_tag in accepted
         ):
             return
 
@@ -653,34 +656,52 @@ class LiveTreatiesPanel:
             )
 
     @staticmethod
-    def _render_pressure_fallback(ui: GMLWidgets) -> None:
-        """Preserve the treaty-pressure slots without inventing pressure data."""
+    def _render_pressure(ui: GMLWidgets, state, row, context) -> None:
+        summary = contribution_for(state, ClientPresentationKeys.TREATY_PRESSURE_SUMMARY)(state, row)
+        share = summary["share"]
         ui.frame("frmPressure")
         ui.text("frmPressure/lblTitle", "PRESSURE", test_id="treaties.details.pressure.label")
         ui.text(
             "frmPressure/txtValue",
-            "N/A",
+            f"{share:.1%}" if share is not None else "N/A",
             color=GAMETHEME.colors.text_dim,
             test_id="treaties.details.pressure.value",
         )
-        ui.meter("frmPressure/frmGradient", 0.0, GAMETHEME.colors.text_dim)
+        if share is not None:
+            ui.meter("frmPressure/frmGradient", share, GAMETHEME.colors.warning)
         with gml_child_frame(
             ui.path("frmPressure/lstPressure"),
             padding=(4.0, 2.0),
             bordered=False,
         ) as opened:
             if opened:
-                imgui.text_wrapped(
-                    "OpenPower does not track REFERENCE treaty pressure-country totals.",
-                    test_id="treaties.details.pressure.unavailable",
-                )
-        ui.button(
+                if share is None:
+                    imgui.text_disabled(
+                        "Pressure unavailable without sponsors and fielded-force data.",
+                        test_id="treaties.details.pressure.unavailable",
+                    )
+                else:
+                    for tag, country_share in summary["countries"]:
+                        imgui.text(f"{resolve_country_name(state, tag)}: {country_share:.1%}")
+                if share is not None and not summary["countries"]:
+                    imgui.text_disabled("No countries currently sponsor this agreement.")
+        country = getattr(context, "player_country_tag", None) or context.target_tag
+        supporting = country in normalize_country_tags(row.get("pressure_members"))
+        awaiting = set(normalize_country_tags(row.get("required_responses"))) - set(normalize_country_tags(row.get("accepted_members")))
+        can_change = bool(context.net_client and country
+                          and (context.is_own_country or getattr(context, "player_country_tag", None))
+                          and row.get("status") in {"pending", "active"}
+                          and (supporting or country not in awaiting))
+        if ui.button(
             "frmPressure/btnSponsor",
-            "SPONSOR",
-            "treaties.details.sponsor.unavailable",
-            enabled=False,
-            tooltip="OpenPower has no separate treaty-pressure membership action.",
-        )
+            "WITHDRAW" if supporting else "SPONSOR",
+            "treaties.details.sponsor",
+            enabled=can_change,
+            tooltip="Support or withdraw diplomatic pressure without signing the treaty.",
+        ):
+            context.net_client.send_action(ActionSetTreatyPressure(
+                context.net_client.player_id, str(row.get("id") or ""), country, not supporting,
+            ))
 
     def _render_details_member_list(
         self,

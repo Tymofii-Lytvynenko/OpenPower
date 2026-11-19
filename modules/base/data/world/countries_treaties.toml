@@ -9,12 +9,14 @@ id = "anzus"
 name = "ANZUS Security Treaty"
 type = "military_alliance"
 members = ["AUS", "NZL", "USA"]
+terms = "The United States suspended its treaty obligations as between itself and New Zealand on 1986-09-17; the treaty's parties remained Australia, New Zealand and the United States on 2001-01-01."
 
 [[countries_treaties]]
 id = "rio_pact"
 name = "Inter-American Treaty of Reciprocal Assistance"
 type = "defensive_alliance"
-members = ["ARG", "BHS", "BOL", "BRA", "CHL", "COL", "CRI", "DOM", "ECU", "GTM", "HND", "MEX", "PAN", "PRY", "PER", "SLV", "TTO", "URY", "USA", "VEN"]
+members = ["ARG", "BHS", "BOL", "BRA", "CHL", "COL", "CRI", "CUB", "DOM", "ECU", "SLV", "GTM", "HTI", "HND", "MEX", "NIC", "PAN", "PRY", "PER", "USA", "URY", "VEN"]
+terms = "Membership is cross-checked against the U.S. Department of State Treaties in Force roster dated 2001-01-01; Cuba is included because it appears on that party list."
 
 [[countries_treaties]]
 id = "csto_predecessor"
@@ -47,10 +49,20 @@ type = "military_alliance"
 members = ["PHL", "USA"]
 
 [[countries_treaties]]
-id = "us_thailand_major_ally"
-name = "United States-Thailand Security Partnership"
-type = "defensive_alliance"
-members = ["THA", "USA"]
+id = "seato_manila_pact"
+name = "Southeast Asia Collective Defense Treaty (Manila Pact)"
+type = "consultative_defence_arrangement"
+status = "active"
+members = ["AUS", "FRA", "NZL", "PHL", "THA", "GBR", "USA"]
+terms = "In force on 2001-01-01; the SEATO organization had dissolved in 1977. Pakistan's denunciation took effect in 1973 and it is excluded. Treaty obligations operate through constitutional processes; the United States understood Article IV(1) to cover communist aggression and required consultation for other attacks. The 1962 Rusk-Thanat Communique affirmed the United States' individual as well as collective commitment to Thailand under the Manila Pact; it was not a separate bilateral treaty. Historical record only; no automatic OpenPower defense effects."
+
+[[countries_treaties]]
+id = "fpda"
+name = "Five Power Defence Arrangements"
+type = "consultative_defence_arrangement"
+status = "active"
+members = ["AUS", "MYS", "NZL", "SGP", "GBR"]
+terms = "Established in 1971 between Australia, Malaysia, New Zealand, Singapore and the United Kingdom. Members consult if Malaysia or Singapore is attacked or threatened. Historical membership and consultation record only; no automatic OpenPower defense effects."
 
 [[countries_treaties]]
 id = "us_israel_security"
@@ -111,3 +123,73 @@ id = "russia_belarus_union_defense"
 name = "Russia-Belarus Union Defense Cooperation"
 type = "military_alliance"
 members = ["BLR", "RUS"]
+
+[[countries_treaties]]
+id = "china_dprk_mutual_assistance"
+name = "China-DPRK Treaty on Friendship, Cooperation and Mutual Assistance"
+type = "historical_defense_treaty"
+members = ["CHN", "PRK"]
+terms = "The 1961 treaty requires immediate military and other assistance after an armed attack and remains in force unless the parties agree to amend or terminate it. China’s official 2001 record commemorates its 40th anniversary. Historical treaty membership only; no automatic OpenPower defense effects."
+
+[[countries_treaties]]
+id = "arab_league_joint_defense"
+name = "Arab League Treaty of Joint Defense and Economic Cooperation"
+type = "historical_defense_treaty"
+members = ["EGY", "IRQ", "JOR", "LBN", "SAU", "SYR", "YEM"]
+terms = "The original seven contracting governments ratified the treaty; it entered into force on 1952-08-22. Article 2 provides for collective assistance after armed aggression, and Article 12 permits withdrawal after ten years with twelve months’ notice. Historical ratifying-party record only; no automatic OpenPower defense effects."
+
+[[countries_treaties]]
+id = "weu_modified_brussels_treaty"
+name = "Modified Brussels Treaty (Western European Union)"
+type = "historical_defense_treaty"
+members = ["BEL", "FRA", "DEU", "GRC", "ITA", "LUX", "NLD", "PRT", "ESP", "GBR"]
+terms = "The Netherlands government treaty database lists these ten parties and records termination in 2011, so the treaty was in force on 2001-01-01. Article V is the collective-defense commitment. Historical treaty membership only; no automatic OpenPower defense effects."
+
+[[countries_treaties]]
+id = "france_cameroon_defense"
+name = "France-Cameroon Special Defense Agreement"
+type = "historical_defense_treaty"
+members = ["CMR", "FRA"]
+terms = "Signed at Yaoundé on 1974-02-21; the French government’s 2008 defense white paper lists it as a bilateral defense agreement, and the replacement partnership agreement was signed in 2009. Historical agreement record only; it does not create automatic OpenPower defense effects."
+
+[[countries_treaties]]
+id = "france_central_african_defense"
+name = "France-Central African Republic Defense Agreement"
+type = "historical_defense_treaty"
+members = ["CAF", "FRA"]
+terms = "The agreement was signed in 1960 with the Central African Republic, Congo and Chad; the French government records that Congo and Chad denounced it and that it remained in force only with the Central African Republic in its 2008 defense white paper. Historical agreement record only; no automatic OpenPower defense effects."
+
+[[countries_treaties]]
+id = "france_comoros_defense_cooperation"
+name = "France-Comoros Defense Cooperation Agreement"
+type = "historical_defense_treaty"
+members = ["COM", "FRA"]
+terms = "Signed in Paris on 1978-11-10; listed by the French government as a bilateral defense cooperation agreement in its 2008 defense white paper, and cited as a Comoros military agreement in a 2000 parliamentary review. Its exact 2001 status is inferred from these records; no termination before 2001 was located. Historical agreement record only; it is not represented as a mutual-defense guarantee and has no automatic OpenPower effects."
+
+[[countries_treaties]]
+id = "france_togo_defense"
+name = "France-Togo Defense Agreement"
+type = "historical_defense_treaty"
+members = ["FRA", "TGO"]
+terms = "Signed in Paris on 1963-07-10; listed by the French government as a bilateral defense agreement in its 2008 defense white paper, before replacement by a partnership agreement signed in 2009. Historical agreement record only; no automatic OpenPower defense effects."
+
+[[countries_treaties]]
+id = "france_uae_defense_cooperation"
+name = "France-United Arab Emirates Defense Cooperation Agreement"
+type = "historical_defense_treaty"
+members = ["ARE", "FRA"]
+terms = "Signed on 1995-01-18; listed by the French government as a bilateral defense cooperation agreement in its 2008 defense white paper. Its inclusion in the 2001 scenario is inferred from the pre-epoch signature and later in-force listing; no pre-2001 termination was located. Historical agreement record only; it is not represented as a mutual-defense guarantee and has no automatic OpenPower effects."
+
+[[countries_treaties]]
+id = "france_kuwait_defense_cooperation"
+name = "France-Kuwait Defense Cooperation Agreement"
+type = "historical_defense_treaty"
+members = ["FRA", "KWT"]
+terms = "Signed in Paris on 1992-08-18; listed by the French government as a bilateral defense cooperation agreement in its 2008 defense white paper. Its inclusion in the 2001 scenario is inferred from the pre-epoch signature and later in-force listing; no pre-2001 termination was located. Historical agreement record only; it is not represented as a mutual-defense guarantee and has no automatic OpenPower effects."
+
+[[countries_treaties]]
+id = "france_qatar_defense_cooperation"
+name = "France-Qatar Defense Cooperation Agreement"
+type = "historical_defense_treaty"
+members = ["FRA", "QAT"]
+terms = "The defense cooperation agreement was signed in Doha on 1994-08-01; a technical implementation agreement followed in 1998. Both are listed by the French government in its 2008 defense white paper. Its inclusion in the 2001 scenario is inferred from the pre-epoch signatures and later in-force listing; no pre-2001 termination was located. Historical agreement record only; it is not represented as a mutual-defense guarantee and has no automatic OpenPower effects."

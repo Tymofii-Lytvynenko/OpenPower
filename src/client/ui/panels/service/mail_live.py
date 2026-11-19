@@ -101,7 +101,7 @@ class LiveMailPanel:
             self._close_if_empty(items)
 
         self._render_message_detail()
-        self._render_proposal_detail(context, country_tag)
+        self._render_proposal_detail(state, context, country_tag)
 
     def _items_for_country(self, state, country_tag: str) -> list[dict]:
         items: list[dict] = []
@@ -117,6 +117,8 @@ class LiveMailPanel:
             items.append({"inbox_kind": "message", **message})
 
         for proposal in self._pending_for_country(state, country_tag):
+            if country_tag in normalize_country_tags(proposal.get("accepted_members")):
+                continue
             if not self._inbox_state.is_dismissed("proposal", proposal.get("id")):
                 items.append({"inbox_kind": "proposal", **proposal})
         return items
@@ -146,9 +148,10 @@ class LiveMailPanel:
                 tooltip="Open this message",
             ):
                 self._view_item(item, context)
-                # REFERENCE consumes a mail row after its view callback runs.
-                self._dismiss_item(item, country_tag)
-                self._close_if_empty(items)
+                # An unanswered proposal must remain available after its popup closes.
+                if kind != "proposal":
+                    self._dismiss_item(item, country_tag)
+                    self._close_if_empty(items)
             if row.button(
                 "btnDelete",
                 "DELETE",
@@ -227,7 +230,7 @@ class LiveMailPanel:
             self._message_detail = None
         imgui.end_popup()
 
-    def _render_proposal_detail(self, context: PanelRenderContext, country_tag: str) -> None:
+    def _render_proposal_detail(self, state, context: PanelRenderContext, country_tag: str) -> None:
         proposal = self._proposal_detail
         if proposal is None:
             return
@@ -241,14 +244,20 @@ class LiveMailPanel:
             ):
                 self._open_treaty_cb(proposal_id)
 
-            required = set(normalize_country_tags(proposal.get("required_responses")))
-            accepted = set(normalize_country_tags(proposal.get("accepted_members")))
+            # The popup keeps its opening snapshot for the title, but actions need current state.
+            current = next((row for row in self._pending_for_country(state, country_tag)
+                            if str(row.get("id") or "") == proposal_id), None)
+            accepted = set(normalize_country_tags((current or {}).get("accepted_members")))
             can_respond = (
                 context.net_client is not None
                 and context.is_own_country
-                and country_tag in required
+                and current is not None
                 and country_tag not in accepted
             )
+            if current is None:
+                imgui.text_disabled("No response is pending for this country.")
+            elif country_tag in accepted:
+                imgui.text_disabled("Accepted. Awaiting other parties.")
             if can_respond:
                 if imgui.button(f"ACCEPT##mail-{proposal_id}", (110.0, 24.0),
                                 test_id=f"mail.treaty.{proposal_id}.accept"):

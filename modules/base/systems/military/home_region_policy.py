@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import polars as pl
@@ -35,13 +36,20 @@ class MilitaryHomeRegionPolicy:
         owner_key = str(owner)
         score = self._region_score(row, score_columns)
         current = selected.get(owner_key)
-        if current is None or score > current[1]:
-            selected[owner_key] = (int(region_id), score)
+        region_key = int(region_id)
+        # Equal scores must not depend on table row order across save/load.
+        if current is None or score > current[1] or (score == current[1] and region_key < current[0]):
+            selected[owner_key] = (region_key, score)
 
     def _region_score(self, row: dict[str, Any], score_columns: list[str]) -> float:
         score = 0.0
         for column in score_columns:
             value = row.get(column)
             if value is not None:
-                score += float(value)
+                try:
+                    numeric = float(value)
+                except (TypeError, ValueError, OverflowError):
+                    continue
+                if math.isfinite(numeric):
+                    score += numeric
         return score

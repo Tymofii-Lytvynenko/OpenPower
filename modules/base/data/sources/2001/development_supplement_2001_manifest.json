@@ -1,0 +1,35 @@
+{
+  "scenario_year": 2001,
+  "retrieved_at_utc": "2026-11-16T00:57:19+00:00",
+  "sources": {
+    "SE.SCH.LIFE": {
+      "url": "https://api.worldbank.org/v2/country/all/indicator/SE.SCH.LIFE?date=2001&format=json&per_page=1000",
+      "sha256": "6f18bfd3268e93c06d6cf729b90989625adc8e1f2f5b3eb248834e0a9b69b756"
+    },
+    "NY.GNP.PCAP.PP.CD": {
+      "url": "https://api.worldbank.org/v2/country/all/indicator/NY.GNP.PCAP.PP.CD?date=2001&format=json&per_page=1000",
+      "sha256": "68ca8f041c6c8ef7585c96a4c7db6cf84a83cd12145513220e0a346e64e3b9ac"
+    },
+    "barrolee": {
+      "url": "https://barrolee.github.io/BarroLeeDataSet/BLData/BL2013_MF1599_v2.2.csv",
+      "sha256": "a1e6e6fc22f0bb5ff495cbe42dab78f63e437154e3c78916069e08e58d37987c"
+    },
+    "barrolee_25plus": {
+      "url": "https://barrolee.github.io/BarroLeeDataSet/BLData/BL2013_MF2599_v2.2.csv",
+      "sha256": "4e762273d5920176d71a913085b7fbc18a8fb69603d23597a61657a77ab18d06"
+    }
+  },
+  "coverage": {
+    "historical_school_life_expectancy_wdi_years_2001": 3,
+    "historical_gni_per_capita_wdi_ppp_current_intl_dollars_2001": 3,
+    "historical_mean_schooling_barrolee_years_population_15plus_2000": 1,
+    "historical_mean_schooling_barrolee_years_population_25plus_2000": 1
+  },
+  "source_country_counts": {
+    "SE.SCH.LIFE": 152,
+    "NY.GNP.PCAP.PP.CD": 230,
+    "Barro-Lee 2000, population 15+": 146,
+    "Barro-Lee 2000, population 25+": 146
+  },
+  "note": "These adjacent or differently defined observations supplement the UNDP 2001 series; they never replace it."
+}

@@ -29,6 +29,9 @@ class MilitaryMovementOrderPolicy:
     def region_locations(self, regions) -> dict[int, GeoCoordinate]:
         return self._duration_policy.region_locations(regions)
 
+    def local_segment_minutes(self, source: GeoCoordinate, target: GeoCoordinate) -> int:
+        return self._bounded_duration(self._duration_policy.estimate_between(source, target))
+
     def route_segment_minutes_for_unit(
         self,
         source: dict[str, Any],
@@ -157,11 +160,20 @@ class MilitaryMovementOrderPolicy:
         target_region_id: int,
         region_locations: dict[int, GeoCoordinate],
     ) -> GeoCoordinate | None:
-        if action.target_latitude is not None and action.target_longitude is not None:
-            return GeoCoordinate(
-                latitude=float(action.target_latitude),
-                longitude=float(action.target_longitude),
-            )
+        if action.target_latitude is not None or action.target_longitude is not None:
+            # Partial or non-finite coordinates would otherwise corrupt movement
+            # interpolation or silently redirect the unit to the region center.
+            if action.target_latitude is None or action.target_longitude is None:
+                return None
+            try:
+                latitude = float(action.target_latitude)
+                longitude = float(action.target_longitude)
+            except (TypeError, ValueError, OverflowError):
+                return None
+            if not (math.isfinite(latitude) and math.isfinite(longitude)
+                    and -90.0 <= latitude <= 90.0 and -180.0 <= longitude <= 180.0):
+                return None
+            return GeoCoordinate(latitude=latitude, longitude=longitude)
         return region_locations.get(target_region_id)
 
     def source_geo_for_order(

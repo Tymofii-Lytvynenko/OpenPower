@@ -8,7 +8,7 @@ from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
 from src.client.ui.core.theme import GAMETHEME
-from src.client.ui.layouts.gml_layout import active_gml_layout
+from src.client.ui.layouts.gml_layout import active_gml_layout, gml_child_frame
 from src.client.ui.panels.military.presenter import MilitaryPresenter, UnitListRow
 from src.client.ui.panels.military.unit_training_confirmation import (
     training_offer,
@@ -56,6 +56,7 @@ class _UnitListEntry:
     upkeep_text: str = "—"
     status_kind: str = "ready"
     tooltip: str = ""
+    route_blocked: bool = False
 
 
 class UnitListPanel:
@@ -72,6 +73,7 @@ class UnitListPanel:
         self._selected_unit_ids: set[str] = set()
         self._training_submission_selection: frozenset[str] | None = None
         self._last_design_click: tuple[str, float] | None = None
+        self._movement_denial_open = False
 
     def render(self, state, context: PanelRenderContext) -> bool:
         viewport = imgui.get_io().display_size
@@ -84,12 +86,18 @@ class UnitListPanel:
             fit_layout_width=True,
         ) as is_open:
             if not is_open:
+                self._movement_denial_open = False
                 return False
             ui = GMLWidgets(_GML_ROOT)
             ui.frame(f"{_GML_LIST}")
             ui.frame(_GML_ROWS)
             self._render_content(state, context, ui)
-            return True
+        if self._movement_denial_open:
+            if context.is_own_country:
+                self._render_movement_denial(state, str(context.target_tag or "").strip().upper())
+            else:
+                self._movement_denial_open = False
+        return True
 
     def _render_content(self, state, context: PanelRenderContext, ui: GMLWidgets) -> None:
         country_tag = str(context.target_tag or "").strip().upper()
@@ -101,7 +109,9 @@ class UnitListPanel:
         )
         self._render_type_filter(entries, ui, state)
 
-        if not own_country:
+        if own_country:
+            self._render_personnel_reference(state, country_tag, ui)
+        else:
             self._render_accuracy(state, country_tag, ui)
 
         self._render_headers(ui, own_country=own_country)
@@ -144,6 +154,7 @@ class UnitListPanel:
                 + (" · Annual OpenPower budget estimate, not the REFERENCE formula; includes base military expense, readiness and design maintenance."
                    if upkeep_value is not None else "")
             ),
+            route_blocked=str(row.route_summary or "").startswith("Blocked:"),
         )
 
     def _foreign_entries(self, state, country_tag: str) -> list[_UnitListEntry]:
@@ -305,18 +316,37 @@ class UnitListPanel:
             for row in estimates
         ]
         confidence = sum(confidence_values) / len(confidence_values) if confidence_values else 0.0
+        tooltip = "Confidence belongs to aggregate OpenPower intelligence estimates."
+        personnel_reference = self._presenter.gameplay_personnel_estimate_for_country(
+            state,
+            country_tag,
+        )
+        if personnel_reference:
+            tooltip += "\n\n" + _gameplay_personnel_estimate_tooltip(personnel_reference)
         ui.text(f"{_GML_LIST}/lblAccuracy", "ESTIMATE CONFIDENCE", test_id="unit_list.estimate.label")
         ui.text(
             f"{_GML_LIST}/txtValue",
             f"{confidence:.0%}" if confidence_values else "—",
             right=True,
             test_id="unit_list.estimate.confidence",
-            tooltip="Confidence belongs to aggregate OpenPower intelligence estimates.",
+            tooltip=tooltip,
         )
         ui.meter(
             f"{_GML_LIST}/frmAccuracy",
             confidence,
             GAMETHEME.colors.info if confidence_values else GAMETHEME.colors.text_dim,
+        )
+
+    def _render_personnel_reference(self, state, country_tag: str, ui: GMLWidgets) -> None:
+        estimate = self._presenter.gameplay_personnel_estimate_for_country(state, country_tag)
+        if not estimate:
+            return
+        label = f"2001 GAMEPLAY ESTIMATE: {_format_quantity(estimate['value'])}"
+        ui.text(
+            f"{_GML_LIST}/lblAccuracy",
+            label,
+            tooltip=_gameplay_personnel_estimate_tooltip(estimate),
+            test_id="unit_list.personnel.2001_gameplay_estimate",
         )
 
     def _render_headers(self, ui: GMLWidgets, *, own_country: bool) -> None:
@@ -331,7 +361,7 @@ class UnitListPanel:
         )
         for sort_key, label, slot, icon_slot in headers:
             enabled = sort_key != "upkeep" or own_country
-            tooltip = f"Sort by OpenPower annual upkeep estimate" if sort_key == "upkeep" and own_country else (
+            tooltip = "Sort by OpenPower annual upkeep estimate" if sort_key == "upkeep" and own_country else (
                 "Per-unit upkeep is hidden for foreign forces."
                 if sort_key == "upkeep" else f"Sort by {label.lower()}"
             )
@@ -624,11 +654,17 @@ class UnitListPanel:
             tooltip=entry.tooltip,
             test_id=f"unit_list.row.position.{entry.unit_id or row_number}",
         )
+        denial_tooltip = entry.tooltip
+        if entry.route_blocked:
+            denial_tooltip = (denial_tooltip + "\nClick to inspect the current route rejection.").strip()
         ui.text(
             f"{row_slot}/txtStatus", entry.status,
-            color=_status_color(entry.status_kind), tooltip=entry.tooltip,
+            color=_status_color(entry.status_kind), tooltip=denial_tooltip,
             test_id=f"unit_list.row.status.{entry.unit_id or row_number}",
         )
+        if (entry.route_blocked
+                and getattr(imgui, "is_item_clicked", lambda: False)()):
+            self._movement_denial_open = True
         ui.text(
             f"{row_slot}/txtUpkeep", entry.upkeep_text,
             right=True,
@@ -646,6 +682,38 @@ class UnitListPanel:
         self._draw_row_marker(ui, f"{row_slot}/picTraining", _TRAINING_COLORS.get(entry.training_level))
         if entry.for_sale:
             self._draw_row_marker(ui, f"{row_slot}/picSell", GAMETHEME.colors.warning)
+
+    def _render_movement_denial(self, state, country_tag: str) -> None:
+        rows = [row for row in self._presenter.unit_rows(state, country_tag)
+                if str(row.route_summary or "").startswith("Blocked:")]
+        viewport = imgui.get_io().display_size
+        width, height = 200.0, 113.0
+        with WindowManager.window(
+            "MOVEMENT DENIED",
+            x=max(0.0, (float(viewport.x) - width) / 2.0),
+            y=max(0.0, (float(viewport.y) - height) / 2.0),
+            w=width,
+            h=height,
+            flags=imgui.WindowFlags_.no_title_bar,
+            test_id="unit.movement.denial",
+            gml_template="Unit_Movement_Denial",
+        ) as opened:
+            if not opened:
+                self._movement_denial_open = False
+                return
+            ui = GMLWidgets("Unit_Movement_Denial")
+            ui.text("lblRegion", "CURRENT BLOCKED ROUTES")
+            ui.text("lblNormal1", "Reason reported by the latest game state")
+            with gml_child_frame(ui.path("lstDenialList"), bordered=False) as visible:
+                if visible:
+                    if not rows:
+                        imgui.text("No current blocked movement routes.")
+                    for row in rows:
+                        imgui.text_wrapped(f"{row.unit_id} · {row.location}")
+                        reason = str(row.route_summary).partition(":")[2].strip()
+                        imgui.text_wrapped(reason or row.route_summary)
+            if ui.button("btnClose", "CLOSE", "unit.movement.denial.close"):
+                self._movement_denial_open = False
 
     @staticmethod
     def _draw_row_marker(ui: GMLWidgets, slot: str, color) -> None:
@@ -752,6 +820,70 @@ class UnitListPanel:
 
 def _format_quantity(value: int) -> str:
     return f"{int(value):,}".replace(",", " ")
+
+
+def _gameplay_personnel_estimate_tooltip(estimate: dict) -> str:
+    value = _format_quantity(estimate.get("value", 0))
+    estimate_kind = str(estimate.get("kind") or "population-rate gameplay estimate")
+    quality = str(estimate.get("quality") or "unspecified")
+    lines = [
+        f"2001 gameplay estimate — not a historical count: {value} people.",
+        f"Estimate kind: {estimate_kind}; quality: {quality}.",
+        "This scenario prior is separate from factual active-personnel records, current military_count, and deployed unit strength.",
+    ]
+    population = int(estimate.get("population") or 0)
+    if population > 0:
+        lines.append(f"Population input: {_format_quantity(population)} people.")
+    population_method = str(estimate.get("population_method") or "").strip()
+    if population_method:
+        lines.append(f"Population method: {population_method}")
+
+    rate = float(estimate.get("rate_per_1000") or 0.0)
+    peer_group = str(estimate.get("peer_group") or "").strip()
+    peer_ids = str(estimate.get("peer_iso3s") or "").strip()
+    peer_count = int(estimate.get("peer_count") or 0)
+    if rate > 0:
+        lines.append(
+            f"Regional service-rate prior: {rate:.3f} per 1,000 residents"
+            + (f" ({peer_group})" if peer_group else "")
+            + "."
+        )
+    if peer_ids:
+        lines.append(f"Peer countries ({peer_count}): {peer_ids}.")
+    rate_method = str(estimate.get("rate_method") or "").strip()
+    if rate_method:
+        lines.append(f"Estimate method: {rate_method}.")
+
+    source_release = str(estimate.get("source_release") or "").strip()
+    if source_release:
+        lines.append(f"Military source release: {source_release}.")
+    for source_label, reference_key, url_key in (
+        (
+            "Population source",
+            "population_source_reference",
+            "population_source_url",
+        ),
+        (
+            "Military peer source",
+            "military_source_reference",
+            "military_source_url",
+        ),
+    ):
+        reference = str(estimate.get(reference_key) or "").strip()
+        urls = str(estimate.get(url_key) or "").strip()
+        if reference:
+            lines.append(f"{source_label}: {reference}.")
+        if urls:
+            lines.append(f"{source_label} URL: {urls}")
+
+    note = str(estimate.get("note") or "").strip()
+    if note:
+        lines.append(f"Scope note: {note}")
+    if estimate_kind == "territorial_force_allocation_proxy":
+        lines.append(
+            "Puerto Rico entry is a territorial force-allocation proxy; it is not a count of Puerto Rico's armed forces or National Guard."
+        )
+    return "\n".join(lines)
 
 
 def _foreign_estimate_summary(status: str, quantity: str) -> str:

@@ -93,7 +93,7 @@ class GameLayout:
         self.unit_attack_confirmation = UnitAttackConfirmation(self.unit_move_orders)
         self.save_game_dialog = SaveGameDialog(
             self._list_saves,
-            lambda name: self.net.send_action(ActionSaveGame(self.net.player_id, name)),
+            self._save_game,
             self._load_save,
             self.message_dialog.enqueue,
         )
@@ -311,6 +311,14 @@ class GameLayout:
         config = getattr(self._window, "game_config", None)
         return list_available_saves(config) if config is not None else []
 
+    def _save_game(self, name: str) -> None:
+        if self.net.simulation_has_stopped():
+            self.message_dialog.enqueue(
+                "Save game", "The simulation has stopped. Load an existing save to continue.", severity="error"
+            )
+            return
+        self.net.send_action(ActionSaveGame(self.net.player_id, name))
+
     def select_battle_at(self, renderer, x, y, viewport_height) -> bool:
         battle_id = renderer.battle_at(x, y, viewport_height)
         return bool(battle_id and self.battle_inspection.open(self.net.get_state(), battle_id))
@@ -391,7 +399,7 @@ class GameLayout:
         imgui.push_style_color(imgui.Col_.title_bg_active, (0.9, 0.1, 0.1, 1.0))
         
         if imgui.begin("SIMULATION ERRORS DETECTED", True, flags):
-            imgui.text_wrapped("One or more simulation systems crashed! Check console logs for full tracebacks.")
+            imgui.text_wrapped("The simulation reported an error. Select Details for more information.")
             imgui.separator()
             for err in errors[-2:]:
                 imgui.text_colored((1, 1, 0, 1), f"[{err['system_id']}] {err['message']}")

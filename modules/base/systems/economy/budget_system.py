@@ -5,6 +5,7 @@ import polars as pl
 from src.shared.economy_meta import RESOURCE_MAPPING
 from src.shared.budget_policy import BUDGET_DEMAND_MULTIPLIER, BUDGET_SECTOR_WEIGHTS
 from modules.base.systems.world.random_event_effects import aggregate_active_effects
+from modules.base.systems.world.authority_policy import player_controls_country
 from modules.base.systems.economy.unit_upkeep import (
     BASE_UNIT_COST, readiness_upkeep_by_country, readiness_upkeep_factors,
 )
@@ -628,13 +629,45 @@ class BudgetSystem(ISystem):
 
     def _handle_update_budget(self, state: GameState, action: ActionUpdateBudget) -> None:
         if "countries" not in state.tables:
+            self._reject_budget_action(state, action, "Country data is unavailable.")
             return
         
         df = state.get_table("countries")
+        country = df.filter(pl.col("id") == action.country_tag) if "id" in df.columns else None
+        if country is None or country.height != 1:
+            self._reject_budget_action(state, action, "The selected country is unavailable or ambiguous.")
+            return
+        if not player_controls_country(state, action.player_id, action.country_tag):
+            # Budget changes must obey the same national authority as other policies.
+            self._reject_budget_action(state, action, "The actor does not control the selected country.")
+            return
+        if not isinstance(action.allocations, dict):
+            self._reject_budget_action(state, action, "Budget allocations must be a mapping of fields to values.")
+            return
+        unsupported = [str(key) for key in action.allocations
+                       if key not in df.columns or (key not in self.M_SECTOR and key != "personal_income_tax_rate")]
+        if unsupported:
+            # Partial application would falsely report that the entire draft was saved.
+            self._reject_budget_action(state, action, f"Unsupported budget fields: {', '.join(unsupported)}.")
+            return
+
         updates = []
+        supported_field_found = False
         for col, val in action.allocations.items():
-            if col in self.M_SECTOR or col == "personal_income_tax_rate":
-                clamped_val = max(0.0, min(1.0, float(val)))
+            if col in df.columns and (col in self.M_SECTOR or col == "personal_income_tax_rate"):
+                supported_field_found = True
+                try:
+                    value = float(val)
+                except (TypeError, ValueError, OverflowError):
+                    self._reject_budget_action(state, action, f"The allocation for {col} is invalid.")
+                    return
+                if not np.isfinite(value) or not 0.0 <= value <= 1.0:
+                    # Silently clamping a request makes the reported outcome misleading.
+                    self._reject_budget_action(state, action, f"The allocation for {col} must be between 0 and 1.")
+                    return
+                clamped_val = value
+                if all(current == clamped_val for current in country.get_column(col)):
+                    continue
                 updates.append(
                     pl.when(pl.col("id") == action.country_tag)
                     .then(pl.lit(clamped_val))
@@ -644,3 +677,34 @@ class BudgetSystem(ISystem):
         
         if updates:
             state.update_table("countries", df.with_columns(updates))
+            self._record_budget_result(state, action, "applied", "Budget allocations updated.")
+            return
+
+        if supported_field_found:
+            # Reapplying the current value is a valid no-op, not a failed policy change.
+            self._record_budget_result(state, action, "unchanged", "Budget allocations already match the requested values.")
+        else:
+            self._reject_budget_action(state, action, "No supported budget allocation fields were provided.")
+
+    def _reject_budget_action(
+        self,
+        state: GameState,
+        action: ActionUpdateBudget,
+        reason: str,
+    ) -> None:
+        self._record_budget_result(state, action, "rejected", reason)
+
+    def _record_budget_result(
+        self, state: GameState, action: ActionUpdateBudget, status: str, reason: str
+    ) -> None:
+        state.journal.append_command_result(
+            {
+                "tick": int(state.globals.get("tick", 0)),
+                "player_id": str(action.player_id),
+                "action_type": type(action).__name__,
+                "status": status,
+                "reason": reason,
+                "system_id": self.id,
+                "country_id": str(action.country_tag),
+            }
+        )

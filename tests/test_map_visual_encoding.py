@@ -10,7 +10,7 @@ class MapVisualEncodingTest(unittest.TestCase):
         dense_map = np.array([
             [0, 1, 1],
             [0, 1, 2],
-        ], dtype=np.uint32)
+        ], dtype=np.uint16)
 
         encoded = TextureManager.encode_map_visual(dense_map, 3, 2)
         restored = np.flipud(encoded)

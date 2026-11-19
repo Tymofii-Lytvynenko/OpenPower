@@ -7,6 +7,24 @@ from src.client.ui.components.shared.dirty_close_confirmation import CloseDecisi
 from src.client.ui.panels.politics.internal_laws_panel import InternalLawsPanel
 
 
+def test_generic_incumbent_fallback_does_not_claim_measured_support():
+    fallback = SimpleNamespace(
+        party_id="incumbent",
+        display_name="Incumbent",
+        support_pct=100.0,
+    )
+    measured = SimpleNamespace(
+        party_id="party-a",
+        display_name="Party A",
+        support_pct=42.5,
+    )
+
+    assert InternalLawsPanel._party_display_name(fallback) == "Incumbent (fallback)"
+    assert InternalLawsPanel._party_support_label(fallback) == "—"
+    assert InternalLawsPanel._party_display_name(measured) == "Party A"
+    assert InternalLawsPanel._party_support_label(measured) == "42.5%"
+
+
 def _imgui_mock(monkeypatch):
     imgui = Mock()
     imgui.StyleVar_.cell_padding = 1

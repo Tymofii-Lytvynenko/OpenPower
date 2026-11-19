@@ -29,6 +29,8 @@ def fake_imgui():
     ui.SelectableFlags_.span_all_columns = 1
     ui.HoveredFlags_.allow_when_disabled = 1
     ui.InputTextFlags_.read_only = 1
+    ui.input_float.return_value = (False, 0.0)
+    ui.checkbox.return_value = (False, True)
     return ui
 
 
@@ -133,7 +135,6 @@ def test_controls_render_live_totals_and_production_action(monkeypatch) -> None:
     panel.current_policy_key = ("USA", "grain")
     panel._sync_policy_from_state = Mock()
     panel._render_tax_control = Mock()
-    panel._render_unavailable_resource_value = Mock()
     panel._set_current_draft_value = Mock()
     panel._increase_production_dialog.open = Mock()
     ui = fake_imgui()
@@ -162,11 +163,10 @@ def test_controls_render_live_totals_and_production_action(monkeypatch) -> None:
     assert ui.text.call_args_list[2].args[0] == "20"
     assert ui.text.call_args_list[3].args[0] == "$ -20"
     assert separator.call_args.args[0].endswith("picSep")
-    assert panel._render_unavailable_resource_value.call_count == 2
     panel._render_tax_control.assert_called_once()
     panel._increase_production_dialog.open.assert_called_once_with("USA", "grain")
     assert ui.set_tooltip.call_count == 3
-    assert ui.begin_disabled.call_count == 2
+    assert ui.begin_disabled.call_count == 4
     ui.push_style_color.assert_called_once()
     ui.pop_style_color.assert_called_once()
     ui.pop_style_var.assert_called_once()
@@ -177,7 +177,6 @@ def test_controls_disable_policy_and_report_pending_production(monkeypatch) -> N
     panel._pending_production_increases[("USA", "grain")] = object()
     panel._sync_policy_from_state = Mock()
     panel._render_tax_control = Mock()
-    panel._render_unavailable_resource_value = Mock()
     ui = fake_imgui()
     ui.combo.side_effect = [(False, 0), (False, 0), (False, 0)]
     ui.is_item_hovered.return_value = True
@@ -187,33 +186,26 @@ def test_controls_disable_policy_and_report_pending_production(monkeypatch) -> N
 
     panel._render_controls(SimpleNamespace(tables={}), "USA", False)
 
-    assert ui.begin_disabled.call_count == 3
-    assert ui.end_disabled.call_count == 3
+    assert ui.begin_disabled.call_count == 5
+    assert ui.end_disabled.call_count == 5
     assert ui.is_item_hovered.call_count == 4
     assert "awaiting an authoritative result" in ui.set_tooltip.call_args.args[0]
 
 
-@pytest.mark.parametrize(
-    "key,expected",
-    [("global_tax_modifier", "Unavailable"), ("desired_trade", "N/A")],
-)
-def test_unavailable_policy_controls_show_read_only_reason(monkeypatch, key, expected) -> None:
+@pytest.mark.parametrize("key", ["global_tax_modifier", "desired_trade"])
+def test_disabled_market_number_preserves_value_and_disables_steppers(monkeypatch, key):
     panel = ResourcesPanel()
     ui = fake_imgui()
-    ui.is_item_hovered.return_value = True
+    ui.input_float.return_value = (True, 99.0)
     monkeypatch.setattr(resources_panel_module, "imgui", ui)
-    widgets = SimpleNamespace(path=Mock(side_effect=lambda value: f"gml/{value}"))
-    widgets.arrow_button = Mock(return_value=False)
-    monkeypatch.setattr(resources_panel_module, "GMLWidgets", lambda _root: widgets)
-
-    panel._render_unavailable_resource_value(key, "step", "No policy field is available.")
-
-    assert ui.input_text.call_args.args[1] == expected
-    assert ui.input_text.call_args.kwargs["gml_enabled"] is False
+    widgets = SimpleNamespace(path=lambda slot: f"gml/{slot}", arrow_button=Mock(return_value=False))
+    monkeypatch.setattr(resources_panel_module, "GMLWidgets", lambda _: widgets)
+    assert panel._render_market_number(key, "step", 8.0, 100.0, enabled=False) == (False, 8.0)
+    assert ui.input_float.call_args.kwargs["gml_id"] == "gml/step/edtText"
     assert widgets.arrow_button.call_count == 2
-    assert ui.set_tooltip.call_args.args == ("No policy field is available.",)
+    assert all(not call.kwargs["enabled"] for call in widgets.arrow_button.call_args_list)
+    ui.begin_disabled.assert_called_once_with(True)
     ui.end_disabled.assert_called_once()
-    ui.pop_style_var.assert_called_once()
 
 
 def test_tax_control_clamps_input_and_decrements_through_arrow(monkeypatch) -> None:
@@ -262,7 +254,6 @@ def test_controls_explain_missing_ledger_schema(monkeypatch) -> None:
     panel.selected_resource = "grain"
     panel._sync_policy_from_state = Mock()
     panel._render_tax_control = Mock()
-    panel._render_unavailable_resource_value = Mock()
     ui = fake_imgui()
     ui.combo.side_effect = [(False, 0), (False, 0), (False, 0)]
     monkeypatch.setattr(resources_panel_module, "imgui", ui)
@@ -276,6 +267,7 @@ def test_controls_explain_missing_ledger_schema(monkeypatch) -> None:
         panel._panel_diagnostic in call.args
         for call in ui.text_disabled.call_args_list
     )
+    assert panel._market_controls_enabled is False
 
 
 def test_metric_cards_handle_closed_table_and_show_hovered_exact_values(monkeypatch) -> None:

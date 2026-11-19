@@ -35,7 +35,8 @@ class UnitReorganization:
         for table, finished in (
             ("unit_training_orders", {"completed", "cancelled", "rejected", "failed"}),
             ("unit_pending_orders", {"completed", "cancelled", "rejected", "failed", "executed"}),
-            ("unit_movement_routes", {"completed", "cancelled", "rejected", "failed", "arrived"}),
+            # Interrupted routes are no longer active; combat itself is checked separately.
+            ("unit_movement_routes", {"completed", "cancelled", "rejected", "failed", "arrived", "interrupted"}),
             ("unit_deployment_orders", {"delivered", "cancelled", "failed", "disbanded"}),
             ("unit_market_listings", {"sold", "withdrawn", "cancelled", "expired"}),
         ):

@@ -209,6 +209,7 @@ class MilitarySystem(ISystem):
             movement_order_policy=self._movement_order_policy,
             readiness_preparer=self._readiness_system,
             unit_order_workflow=self._unit_order_workflow,
+            unit_movement=self._movement_progression,
             units_from_rows=self._units_from_rows,
             route_schema=MOVEMENT_ROUTE_SCHEMA,
         )
@@ -264,8 +265,34 @@ class MilitarySystem(ISystem):
         units = self._process_market_buy_actions(state, units)
         units = UnitReorganization.apply(state, units)
         units, deployment_moves = self._process_deployment_actions(state, units)
-        units = self._process_move_actions(state, units, [*deployment_moves, *authorized_entry_moves(state, units)], capability_speed_by_unit)
-        units = self._process_attack_actions(state, units)
+        external_actions = state.current_actions
+        orders = [action for action in external_actions if isinstance(action, (ActionMoveUnit, ActionAttackUnit))]
+        invasion_orders = [action for action in external_actions if isinstance(action, ActionInvadeTerritory)]
+        try:
+            # Validate each order against the state left by earlier orders. A rejected
+            # replacement must not erase an already valid queued order. Territory-entry
+            # authorization reads the current invasion commands, so keep those visible
+            # while resolving the movement orders they generated.
+            state.current_actions = list(invasion_orders)
+            # Readiness transitions read the authoritative table, so publish newly
+            # produced and deployed units before resolving their movement orders.
+            if not state.get_table(UNIT_TABLE).equals(units):
+                state.update_table(UNIT_TABLE, units)
+            units = self._process_move_actions(
+                state, units, [*deployment_moves, *authorized_entry_moves(state, units)], capability_speed_by_unit
+            )
+            if not state.get_table(UNIT_TABLE).equals(units):
+                state.update_table(UNIT_TABLE, units)
+            for action in orders:
+                state.current_actions = [action]
+                if isinstance(action, ActionMoveUnit):
+                    units = self._process_move_actions(state, units, (), capability_speed_by_unit)
+                else:
+                    units = self._process_attack_actions(state, units)
+                if not state.get_table(UNIT_TABLE).equals(units):
+                    state.update_table(UNIT_TABLE, units)
+        finally:
+            state.current_actions = external_actions
         units = self._update_unit_movements(state, units, state.time.total_minutes, capability_speed_by_unit)
         self._refresh_deployment_state(state, units)
         if not state.get_table(UNIT_TABLE).equals(units):
@@ -296,12 +323,27 @@ class MilitarySystem(ISystem):
         return self._contact_transition_preflight.interpolate_row_geo(row, progress)
 
     def _ensure_units_table(self, state: GameState) -> pl.DataFrame:
-        if UNIT_TABLE not in state.tables or state.tables[UNIT_TABLE].is_empty():
+        units_table = state.tables.get(UNIT_TABLE)
+        if units_table is not None and not units_table.is_empty():
+            state.globals["military_initial_units_created"] = True
+            return self._normalize_units_table(units_table, state)
+
+        initialized = bool(state.globals.get("military_initial_units_created"))
+        # Old saves lack the marker; an established game with an empty army must
+        # not regenerate disbanded or destroyed starting forces on its next tick.
+        if "military_initial_units_created" not in state.globals and int(state.globals.get("tick", 0)) > 1:
+            initialized = True
+            state.globals["military_initial_units_created"] = True
+        if (not initialized and {"regions", "countries"}.issubset(state.tables)
+                and not state.tables["regions"].is_empty() and not state.tables["countries"].is_empty()):
             units = self._create_initial_units(state)
             state.update_table(UNIT_TABLE, units)
+            state.globals["military_initial_units_created"] = True
             return units
-
-        return self._normalize_units_table(state.get_table(UNIT_TABLE), state)
+        if units_table is None:
+            units_table = self._empty_units()
+            state.update_table(UNIT_TABLE, units_table)
+        return self._normalize_units_table(units_table, state)
 
     def _create_initial_units(self, state: GameState) -> pl.DataFrame:
         if "regions" not in state.tables or "countries" not in state.tables:
@@ -312,8 +354,14 @@ class MilitarySystem(ISystem):
         if regions.is_empty() or countries.is_empty() or "id" not in countries.columns:
             return self._empty_units()
 
-        home_regions = self._home_regions_by_country(regions)
         region_locations = self._duration_policy.region_locations(regions)
+        home_regions = self._home_regions_by_country(regions)
+        if region_locations:
+            # Prefer a real map location over the default origin when a country's
+            # highest-scoring home region has incomplete coordinate data.
+            located_regions = regions.filter(pl.col("id").is_in(list(region_locations)))
+            home_regions.update(self._home_regions_by_country(located_regions))
+        home_regions = {str(owner).strip().upper(): region_id for owner, region_id in home_regions.items()}
         country_strengths = self._country_strengths(countries)
         country_units = self._country_initial_unit_types(countries, country_strengths)
         current_minute = state.time.total_minutes
@@ -321,10 +369,12 @@ class MilitarySystem(ISystem):
 
         for country_tag in countries["id"].to_list():
             clean_tag = str(country_tag)
-            if clean_tag not in home_regions:
+            region_key = clean_tag.strip().upper()
+            if region_key not in home_regions:
                 continue
 
-            home_region_id = home_regions[clean_tag]
+            # Region ownership and country IDs may differ only in case or whitespace.
+            home_region_id = home_regions[region_key]
             home_geo = region_locations.get(home_region_id, GeoCoordinate(0.0, 0.0))
             for unit_type, strength, quantity in country_units.get(clean_tag, ()):
                 if strength <= 0:

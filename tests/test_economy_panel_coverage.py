@@ -17,11 +17,11 @@ def _state(tables=None):
 @pytest.mark.parametrize(
     ("production", "expected"),
     [
-        (None, 0.0),
-        (pl.DataFrame({"country_id": ["UKR"]}), 0.0),
-        (pl.DataFrame([{"country_id": "POL", "domestic_production": 10.0}]), 0.0),
-        (pl.DataFrame([{"country_id": "UKR", "domestic_production": 0.0}]), 0.0),
-        (pl.DataFrame([{"country_id": "UKR", "domestic_production": 10.0}]), 1.0),
+        (None, None),
+        (pl.DataFrame({"country_id": ["UKR"]}), None),
+        (pl.DataFrame([{"country_id": "POL", "domestic_production": 10.0}]), None),
+        (pl.DataFrame([{"country_id": "UKR", "domestic_production": 0.0}]), None),
+        (pl.DataFrame([{"country_id": "UKR", "domestic_production": 10.0}]), None),
         (
             pl.DataFrame(
                 [
@@ -39,17 +39,18 @@ def _state(tables=None):
 )
 def test_market_model_value_handles_missing_zero_and_controlled_production(production, expected):
     tables = {} if production is None else {"domestic_production": production}
-    assert EconomyPanel()._get_market_model_value(_state(tables), "UKR") == pytest.approx(expected)
+    value = EconomyPanel()._get_market_model_value(_state(tables), "UKR")
+    assert value is None if expected is None else value == pytest.approx(expected)
 
 
 @pytest.mark.parametrize(
     ("ledger", "expected"),
     [
-        (None, 0.0),
-        (pl.DataFrame({"consumption_usd": [10.0]}), 0.0),
-        (pl.DataFrame([{"country_id": "POL", "consumption_usd": 10.0, "balance_usd": 0.0}]), 0.0),
+        (None, None),
+        (pl.DataFrame({"consumption_usd": [10.0]}), None),
+        (pl.DataFrame([{"country_id": "POL", "consumption_usd": 10.0, "balance_usd": 0.0}]), None),
         (pl.DataFrame([{"country_id": "UKR", "consumption_usd": 0.0, "balance_usd": -1.0}]), 1.0),
-        (pl.DataFrame([{"country_id": "UKR", "consumption_usd": 10.0}]), 1.0),
+        (pl.DataFrame([{"country_id": "UKR", "consumption_usd": 10.0}]), None),
         (
             pl.DataFrame(
                 [
@@ -67,7 +68,8 @@ def test_market_model_value_handles_missing_zero_and_controlled_production(produ
 )
 def test_resource_health_handles_missing_zero_and_shortage_ledgers(ledger, expected):
     tables = {} if ledger is None else {"resource_ledger": ledger}
-    assert EconomyPanel()._get_resource_health(_state(tables), "UKR") == expected
+    value = EconomyPanel()._get_resource_health(_state(tables), "UKR")
+    assert value == expected
 
 
 @pytest.mark.parametrize(
@@ -77,7 +79,7 @@ def test_resource_health_handles_missing_zero_and_shortage_ledgers(ledger, expec
         ("resource_ledger", "_get_resource_health"),
     ],
 )
-def test_economy_estimates_default_when_table_access_fails(table_name, method_name):
+def test_economy_estimates_report_unavailable_when_table_access_fails(table_name, method_name):
     def fail_to_read(_name):
         raise ValueError("table snapshot is invalid")
 
@@ -85,7 +87,7 @@ def test_economy_estimates_default_when_table_access_fails(table_name, method_na
 
     estimate = getattr(EconomyPanel(), method_name)(state, "UKR")
 
-    assert estimate == 0.0
+    assert estimate is None
 
 
 class _FakeWidgets:
@@ -158,14 +160,16 @@ def test_render_content_reads_economy_metrics_and_dispatches_enabled_shortcuts(m
 
     assert callbacks == ["health", "budget", "resources", "trade"]
     texts = [call for call in _FakeWidgets.last.calls if call[0] == "text"]
-    assert any(call[1] == "frmEconomicHealth/txtValue" and call[2] == "84%" for call in texts)
+    assert any(call[1] == "frmEconomicHealth/txtValue" and call[2] == "--" for call in texts)
     assert any(call[1] == "frmResources/txtValue" and call[2] == "70%" for call in texts)
     assert any(call[1] == "frmBudget/lblAvailable" and call[2] == "FUNDS" for call in texts)
+    assert any(call[1] == "frmBudget/txtIncome" and call[2] == "$ 100" for call in texts)
+    assert any(call[1] == "frmBudget/txtExpenses" and call[2] == "$ 120" for call in texts)
     assert any(call[1] == "frmBudget/txtBalance" and call[2] == "$ -20" for call in texts)
     assert tooltips == ["State-controlled model", "Free-market model", "Available country reserves"]
 
 
-def test_render_content_uses_defaults_for_missing_country_or_invalid_snapshot(monkeypatch):
+def test_render_content_marks_missing_country_values_unavailable(monkeypatch):
     panel = EconomyPanel()
     monkeypatch.setattr(economy_panel_module, "GMLWidgets", _FakeWidgets)
     monkeypatch.setattr(
@@ -175,11 +179,12 @@ def test_render_content_uses_defaults_for_missing_country_or_invalid_snapshot(mo
     )
     panel._render_content(_state(), "UKR", False)
     texts = [call for call in _FakeWidgets.last.calls if call[0] == "text"]
-    assert any(call[1] == "frmBudget/txtIncome" and call[2] == "$ 0" for call in texts)
+    assert any(call[1] == "frmBudget/txtIncome" and call[2] == "--" for call in texts)
     bad_state = _state({"countries": pl.DataFrame({"name": ["Ukraine"]})})
     panel._render_content(bad_state, "UKR", False)
     texts = [call for call in _FakeWidgets.last.calls if call[0] == "text"]
-    assert any(call[1] == "frmEconomicHealth/txtValue" and call[2] == "0%" for call in texts)
+    assert any(call[1] == "frmEconomicHealth/txtValue" and call[2] == "--" for call in texts)
+    assert any(call[1] == "frmBudget/txtBalance" and call[2] == "--" for call in texts)
 
 
 @pytest.mark.parametrize("open_window", [True, False])

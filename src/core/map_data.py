@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import cv2
 import numpy as np
 
@@ -7,10 +9,14 @@ class RegionMapData:
     Responsible for: Loading the image and providing ID lookups.
     """
     def __init__(self, image_path: str):
-        # cv2.imread is safe on a headless server
-        self.raw_img = cv2.imread(image_path)
+        # Map coordinates refer to stored pixels, as they do in the adjacency reader.
+        self.raw_img = cv2.imread(image_path, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION)
         if self.raw_img is None:
             raise FileNotFoundError(f"Missing map: {image_path}")
+        source = Path(image_path).resolve()
+        stat = source.stat()
+        self.source_path = source
+        self.source_revision = (source, stat.st_mtime_ns, stat.st_size)
         
         self.height, self.width, _ = self.raw_img.shape
         

@@ -2,11 +2,12 @@ from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock
 
+import polars as pl
 import pytest
 
+from src.client.ui.components.shared.dirty_close_confirmation import CloseDecision
 from src.client.ui.panels.military import unit_research_panel as module
 from src.client.ui.panels.military.unit_research_panel import UnitResearchPanel
-from src.client.ui.components.shared.dirty_close_confirmation import CloseDecision
 
 
 class Ui:
@@ -130,7 +131,7 @@ def test_research_detail_tabs_render_program_and_edit_strategic_funding(monkeypa
     monkeypatch.setattr(module, "semantic_region", lambda *_args: nullcontext())
     context = SimpleNamespace()
 
-    panel._render_detail_tabs(ui, tracks, context, True)
+    panel._render_detail_tabs(ui, tracks, {}, context, True)
 
     assert panel._selected_tab == "funding"
     assert "unit_research.tab.technology" in ui.tab_calls
@@ -143,9 +144,9 @@ def test_research_detail_tabs_render_program_and_edit_strategic_funding(monkeypa
 @pytest.mark.parametrize(
     ("tab", "expected_unavailable"),
     [
-        (("technology", "TECHNOLOGY", "Tab1"), "Per-characteristic technology ceilings are not tracked in OpenPower."),
-        (("progress", "PROGRESS", "Tab2"), "Per-characteristic progress is not tracked in OpenPower."),
-        (("funding", "FUNDING", "Tab3"), "Funding is controlled per branch in the left panel."),
+        (("technology", "TECHNOLOGY", "Tab1"), "Low-confidence 2001 modeled capability factor; this is not a measured national technology ceiling."),
+        (("progress", "PROGRESS", "Tab2"), "Progress is stored per research branch and echoed across these characteristic slots."),
+        (("funding", "FUNDING", "Tab3"), "Funding is stored per research branch and echoed across these characteristic slots."),
     ],
 )
 def test_detail_pages_keep_untracked_metrics_explicit(monkeypatch, tab, expected_unavailable):
@@ -154,7 +155,7 @@ def test_detail_pages_keep_untracked_metrics_explicit(monkeypatch, tab, expected
     ui = Ui()
     monkeypatch.setattr(module, "semantic_region", lambda *_args: nullcontext())
 
-    panel._render_detail_page(ui, _tracks(), SimpleNamespace(), False, tab)
+    panel._render_detail_page(ui, _tracks(), {}, SimpleNamespace(), False, tab)
 
     assert len(ui.meters) == 12
     assert any(kwargs.get("tooltip") == expected_unavailable for _args, kwargs in ui.texts)
@@ -174,7 +175,7 @@ def test_program_view_shows_category_summary_for_non_strategic_branch(monkeypatc
     assert "Research level: 2" in values
     assert "Branch progress: 35%" in values
     assert "Branch funding: 35%" in values
-    assert "Per-stat metrics unavailable." in values
+    assert "2001 modeled characteristic factors." in values
 
 
 def test_strategic_detail_pages_show_track_levels_and_progress(monkeypatch):
@@ -184,14 +185,14 @@ def test_strategic_detail_pages_show_track_levels_and_progress(monkeypatch):
     ui = Ui()
     monkeypatch.setattr(module, "semantic_region", lambda *_args: nullcontext())
 
-    panel._render_detail_page(ui, _tracks(), SimpleNamespace(), False, ("technology", "TECHNOLOGY", "Tab1"))
+    panel._render_detail_page(ui, _tracks(), {}, SimpleNamespace(), False, ("technology", "TECHNOLOGY", "Tab1"))
     technology_values = [args[1] for args, _kwargs in ui.text_at_calls]
     assert "LEVEL 3" in technology_values
     assert "LEVEL 2" in technology_values
     assert "LEVEL 1" in technology_values
 
     ui = Ui()
-    panel._render_detail_page(ui, _tracks(), SimpleNamespace(), False, ("progress", "PROGRESS", "Tab2"))
+    panel._render_detail_page(ui, _tracks(), {}, SimpleNamespace(), False, ("progress", "PROGRESS", "Tab2"))
     assert any(args[1] == "60%" for args, _kwargs in ui.texts)
     assert any(args[1] == "80%" for args, _kwargs in ui.texts)
     assert any(args[0].endswith("/lblValue") and args[1] == "N/A" for args, _kwargs in ui.texts)
@@ -201,7 +202,7 @@ def test_detail_tabs_stop_when_the_source_has_no_tab_slot():
     panel = UnitResearchPanel()
     ui = Ui(rects={"frmDetails/tabResearch": None})
 
-    panel._render_detail_tabs(ui, {}, SimpleNamespace(), False)
+    panel._render_detail_tabs(ui, {}, {}, SimpleNamespace(), False)
 
     assert ui.tab_calls == []
 
@@ -248,7 +249,10 @@ def test_render_coordinates_snapshot_sync_window_and_dirty_close(monkeypatch):
         net_client=Client(),
         save_confirmation_preferences=None,
     )
-    state = SimpleNamespace(journal=SimpleNamespace(command_results=[]))
+    state = SimpleNamespace(
+        journal=SimpleNamespace(command_results=[]),
+        tables={"countries": pl.DataFrame([{"id": "USA"}])},
+    )
 
     assert panel.render(state, context) is True
     assert panel._draft_country_tag == "USA"

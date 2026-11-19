@@ -15,6 +15,16 @@ def overlaps(a: dict, b: dict, tolerance: float = 1.0) -> bool:
             and min(a["y"] + a["height"], b["y"] + b["height"]) - max(a["y"], b["y"]) > tolerance)
 
 
+def _is_within_table(item: dict, regions: dict) -> bool:
+    parent_id = item.get("parent_id")
+    while parent_id in regions:
+        parent = regions[parent_id]
+        if parent.get("kind") == "table":
+            return True
+        parent_id = parent.get("parent_id")
+    return False
+
+
 def analyze_layout(snapshot: dict) -> list[dict]:
     viewport = {"x": 0, "y": 0, **snapshot["viewport"]}
     regions = {r["id"]: r for r in snapshot["regions"] if r.get("present", True)}
@@ -43,9 +53,12 @@ def analyze_layout(snapshot: dict) -> list[dict]:
         for right in controls[i + 1:]:
             if left.get("parent_id") == right.get("parent_id") and overlaps(left["rect"], right["rect"]):
                 emit("controls_overlap", left, "warning", right["id"])
-    # Text used to be excluded entirely, allowing unreadable live panels to pass.
+    # ImGui clips table-cell drawing to each column, but item rectangles can extend
+    # beyond that clip. Pairwise overlap checks on those raw bounds create false
+    # findings and quadratic work for large virtualized tables.
     texts = [w for w in snapshot["widgets"] if w.get("present", True) and w["visible"]
-             and w["type"] in {"text", "text_colored", "text_disabled", "text_unformatted", "text_wrapped"}]
+             and w["type"] in {"text", "text_colored", "text_disabled", "text_unformatted", "text_wrapped"}
+             and not _is_within_table(w, regions)]
     buttons = [w for w in snapshot["widgets"] if w.get("present", True) and w["visible"]
                and w["type"] in {"button", "small_button", "checkbox"}]
     for index, text in enumerate(texts):

@@ -35,6 +35,8 @@ class IdentityPolicyView:
             imgui.text_wrapped("Population shares are gameplay estimates. Use Details to inspect their source.")
             self.render_tabs()
             imgui.text_disabled(f"Showing: {self.identity_type.title()} groups")
+        else:
+            imgui.text_disabled("Shares are gameplay estimates.")
         frame = state.tables.get("country_identity_groups")
         rows = [] if frame is None else [
             row for row in frame.iter_rows(named=True)

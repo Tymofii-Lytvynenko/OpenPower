@@ -21,6 +21,8 @@ GEO_LANGUAGE_CHOICES: Final[tuple[tuple[str, str], ...]] = (
     ("tr", "Turkish"),
 )
 SUPPORTED_GEO_LANGUAGE_CODES: Final[tuple[str, ...]] = tuple(code for code, _ in GEO_LANGUAGE_CHOICES)
+# The world roster includes game codes outside the ISO country catalog.
+_GAME_COUNTRY_NAMES: Final = {"KOS": "Kosovo"}
 
 
 def normalize_geo_language_code(language_code: str | None) -> str:
@@ -64,7 +66,7 @@ class GeoNameResolver:
         code = country_code.strip().upper()
         country = pycountry.countries.get(alpha_3=code) or pycountry.countries.get(alpha_2=code)
         if country is None:
-            return fallback
+            return _GAME_COUNTRY_NAMES.get(code, fallback)
 
         return self._country_translation.gettext(country.name)
 

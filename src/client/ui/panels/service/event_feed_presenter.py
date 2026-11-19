@@ -230,7 +230,7 @@ class EventFeedPresenter:
                     effects_summary=effects_summary,
                     response_summary=response_summary,
                     recovery_summary=recovery_summary,
-                    response_options=options if status == "active" else (),
+                    response_options=options if status == "active" and not response_summary else (),
                 )
             )
         items.extend(self._journal_event_items(state, region_index, items))

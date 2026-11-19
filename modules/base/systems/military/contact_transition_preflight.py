@@ -7,6 +7,7 @@ from typing import Any, Protocol
 
 import polars as pl
 
+from modules.base.systems.military.authority_policy import player_controls_country
 from src.core.map.engagement_geometry import interpolate_geo
 from src.core.map.geo import GeoCoordinate
 from src.shared.actions import ActionAttackUnit
@@ -69,7 +70,7 @@ class MilitaryContactTransitionPreflight:
         owners_by_country = self._units_by_country(ordered_rows)
         contact_ids = self._attack_contact_ids(state, by_id, hostile_pairs)
         contact_ids.update(
-            self._engagement_contact_ids(ordered_rows, owners_by_country, hostile_pairs)
+            self._engagement_contact_ids(ordered_rows, owners_by_country, hostile_pairs, int(state.time.total_minutes))
         )
         contact_ids.update(
             self._moving_contact_ids(
@@ -122,6 +123,11 @@ class MilitaryContactTransitionPreflight:
         defender = by_id.get(str(action.defender_unit_id or ""))
         if not self.valid_hostile_attack(attacker, defender, hostile_pairs):
             return set()
+        if not player_controls_country(state, action.player_id, attacker.get("owner")):
+            return set()
+        region_id = int(attacker.get("current_region_id") or 0)
+        if region_id <= 0 or region_id != int(defender.get("current_region_id") or 0):
+            return set()
         attacker_id = str(attacker.get("id") or "")
         if not self._attacker_can_start_contact(state, attacker, attacker_id):
             return set()
@@ -153,6 +159,7 @@ class MilitaryContactTransitionPreflight:
         ordered_rows: list[dict[str, Any]],
         owners_by_country: dict[str, list[dict[str, Any]]],
         hostile_pairs: set[frozenset[str]],
+        current_minute: int,
     ) -> set[str]:
         contact_ids: set[str] = set()
         for row in ordered_rows:
@@ -168,9 +175,14 @@ class MilitaryContactTransitionPreflight:
                 hostile_pairs,
                 active_only=True,
             )
-            if hostile_units:
+            point = GeoCoordinate(self._row_float(row, "latitude"), self._row_float(row, "longitude"))
+            # A war elsewhere in the world is not contact with this unit.
+            contacts = [candidate for candidate in hostile_units if self._unit_movement.first_hostile_contact(
+                row, [candidate], point, point, current_minute
+            ) is not None]
+            if contacts:
                 contact_ids.add(str(row.get("id") or ""))
-                contact_ids.update(str(candidate.get("id") or "") for candidate in hostile_units)
+                contact_ids.update(str(candidate.get("id") or "") for candidate in contacts)
         return contact_ids
 
     def _moving_contact_ids(

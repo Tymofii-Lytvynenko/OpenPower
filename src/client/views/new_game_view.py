@@ -1,24 +1,31 @@
-import arcade
-import polars as pl
 from typing import TYPE_CHECKING, Optional
 
-from src.client.views.base_view import BaseImGuiView
-from src.client.services.network_client_service import NetworkClient
+import arcade
+import polars as pl
+
+from src.core.paths import resolve_region_map_path
 from src.client.services.campaign_selection import (
     filter_playable_countries,
     filter_selectable_countries,
     preview_campaign_scenario,
 )
-from src.client.ui.core.theme import GAMETHEME
-from src.client.ui.core.composer import UIComposer
-from src.shared.config import GameConfig
-from src.client.utils.coords_util import calculate_centroid
-from src.client.utils.color_generator import generate_political_colors
-from src.client.ui.panels.shared.panel_data import resolve_country_name
+from src.client.services.network_client_service import NetworkClient
+from src.client.ui.components.shared.campaign_scenario_selection_window import (
+    CampaignScenarioSelectionWindow,
+)
 from src.client.ui.components.shared.country_profile_window import CountryProfileWindow
+from src.client.ui.components.shared.freeplay_setup_window import FreeplaySetupWindow
 from src.client.ui.components.shared.party_selection_window import PartySelectionWindow
-from src.client.ui.components.shared.campaign_scenario_selection_window import CampaignScenarioSelectionWindow
-from src.client.ui.components.shared.single_player_setup_window import SinglePlayerSetupWindow
+from src.client.ui.components.shared.single_player_setup_window import (
+    SinglePlayerSetupWindow,
+)
+from src.client.ui.core.composer import UIComposer
+from src.client.ui.core.theme import GAMETHEME
+from src.client.ui.panels.shared.panel_data import resolve_country_name
+from src.client.utils.color_generator import generate_political_colors
+from src.client.utils.coords_util import calculate_centroid
+from src.client.views.base_view import BaseImGuiView
+from src.shared.config import GameConfig
 
 if TYPE_CHECKING:
     from src.shared.protocols import SessionPort
@@ -28,7 +35,7 @@ COUNTRY_SELECTION_FOCUS_DISTANCE = 1.55
 
 
 class NewGameView(BaseImGuiView):
-    def __init__(self, session: "SessionPort", config: GameConfig):
+    def __init__(self, session: "SessionPort", config: GameConfig, *, scenario: bool = False):
         super().__init__()
         self.session = session 
         self.config = config
@@ -37,22 +44,20 @@ class NewGameView(BaseImGuiView):
         
         self.net = NetworkClient(session)
         
-        self.setup_stage = "scenario"
+        self.setup_stage = "scenario" if scenario else "freeplay"
         self.scenario_selection_window = CampaignScenarioSelectionWindow()
+        self.freeplay_setup_window = FreeplaySetupWindow()
         self.single_player_setup_window = SinglePlayerSetupWindow()
         self.selected_country_id: Optional[str] = None
+        self._freeplay_country_id: Optional[str] = None
+        self._freeplay_party_id = ""
         self.country_profile_window = CountryProfileWindow(self._select_country)
         self.selected_party_id = ""
         self.party_selection_window = PartySelectionWindow(self._select_party)
         self.all_playable_countries = self._fetch_playable_countries()
         self.campaign_scenarios = self._fetch_campaign_scenarios()
-        self.selected_scenario_id: Optional[str] = (
-            str(self.campaign_scenarios[0].get("id")) if self.campaign_scenarios else None
-        )
-        self.playable_countries = filter_selectable_countries(
-            self.all_playable_countries,
-            self._selected_scenario(),
-        )
+        self.selected_scenario_id: Optional[str] = None
+        self.playable_countries = self.all_playable_countries
 
         # --- USE SHARED RENDERER ---
         if self.window.shared_renderer:
@@ -71,13 +76,13 @@ class NewGameView(BaseImGuiView):
             self.renderer.clear_highlight()
         else:
             # Fallback
-            from src.client.renderers.map_renderer import MapRenderer
             from src.client.controllers.camera_controller import CameraController
+            from src.client.renderers.map_renderer import MapRenderer
             self.cam_ctrl = CameraController()
             self.renderer = MapRenderer(
                 camera=self.cam_ctrl, 
                 map_data=session.map_data,
-                map_img_path=config.get_asset_path("map/regions.png"),
+                map_img_path=resolve_region_map_path(config),
                 terrain_img_path=config.get_asset_path("map/terrain.png")
             )
             self.renderer.set_overlay_style(enabled=True, opacity=0.0)
@@ -90,10 +95,12 @@ class NewGameView(BaseImGuiView):
         """
         try:
             state = self.net.get_state()
-            if "regions" not in state.tables: return
+            if "regions" not in state.tables:
+                return
 
             df = state.get_table("regions")
-            if "owner" not in df.columns or "id" not in df.columns: return
+            if "owner" not in df.columns or "id" not in df.columns:
+                return
 
             unique_owners = df["owner"].unique().to_list()
             tag_palette = generate_political_colors(unique_owners)
@@ -118,9 +125,11 @@ class NewGameView(BaseImGuiView):
         try:
             state = self.net.get_state()
             df = state.get_table("countries")
+            if "id" not in df.columns:
+                return pl.DataFrame(schema={"id": pl.Utf8})
             return filter_playable_countries(df).sort("id")
         except KeyError:
-            return pl.DataFrame()
+            return pl.DataFrame(schema={"id": pl.Utf8})
 
     def _fetch_campaign_scenarios(self) -> list[dict]:
         try:
@@ -180,9 +189,9 @@ class NewGameView(BaseImGuiView):
                 self.selected_scenario_id,
                 self._select_scenario,
                 self._enter_country_setup,
-                self._return_to_main_menu,
+                self._return_to_freeplay_setup,
             )
-        else:
+        elif self.setup_stage == "country":
             country_options = [
                 (
                     str(row["id"]).strip().upper(),
@@ -215,12 +224,81 @@ class NewGameView(BaseImGuiView):
                 self._start_game,
                 self._return_to_scenario_selection,
             )
+        else:
+            country_options = [
+                (
+                    str(row["id"]).strip().upper(),
+                    f"{str(row['id']).strip().upper()} - {resolve_country_name(state, str(row['id']).strip().upper())}",
+                )
+                for row in self.playable_countries.iter_rows(named=True)
+            ]
+            party_options = (
+                PartySelectionWindow.party_options(state, self.selected_country_id)
+                if self.selected_country_id else []
+            )
+            selected_party = next(
+                (
+                    row for row in party_options
+                    if str(row.get("party_id") or "").strip() == self.selected_party_id
+                ),
+                None,
+            )
+            self.freeplay_setup_window.render(
+                screen_w,
+                screen_h,
+                country_options,
+                self.selected_country_id,
+                str(selected_party.get("display_name") or self.selected_party_id) if selected_party else "",
+                bool(party_options),
+                self._select_country,
+                lambda: self._open_country_profile(state),
+                lambda: self._open_party_selection(state),
+                self._start_game,
+                self._enter_scenario_selection,
+                self._return_to_main_menu,
+            )
 
         self.country_profile_window.render(screen_w, screen_h)
         self.party_selection_window.render(screen_w, screen_h)
 
     def _enter_country_setup(self) -> None:
         self.setup_stage = "country"
+
+    def _enter_scenario_selection(self) -> None:
+        self._freeplay_country_id = self.selected_country_id
+        self._freeplay_party_id = self.selected_party_id
+        self.selected_scenario_id = (
+            str(self.campaign_scenarios[0].get("id")) if self.campaign_scenarios else None
+        )
+        self.playable_countries = filter_selectable_countries(
+            self.all_playable_countries,
+            self._selected_scenario(),
+        )
+        eligible_ids = {
+            str(value).strip().upper()
+            for value in self.playable_countries["id"].to_list()
+        } if "id" in self.playable_countries.columns else set()
+        if str(self.selected_country_id or "").strip().upper() not in eligible_ids:
+            self.selected_country_id = None
+            self.selected_party_id = ""
+        self.setup_stage = "scenario"
+
+    def _return_to_freeplay_setup(self) -> None:
+        self.setup_stage = "freeplay"
+        self.selected_scenario_id = None
+        self.playable_countries = self.all_playable_countries
+        playable_ids = {
+            str(value).strip().upper()
+            for value in self.all_playable_countries["id"].to_list()
+        } if "id" in self.all_playable_countries.columns else set()
+        self.selected_country_id = (
+            self._freeplay_country_id
+            if str(self._freeplay_country_id or "").strip().upper() in playable_ids
+            else self.selected_country_id
+        )
+        if self.selected_country_id:
+            self._select_country(self.selected_country_id)
+            self.selected_party_id = self._freeplay_party_id or self.selected_party_id
 
     def _return_to_scenario_selection(self) -> None:
         self.setup_stage = "scenario"
@@ -265,7 +343,8 @@ class NewGameView(BaseImGuiView):
 
     def _highlight_country(self, country_tag: str):
         state = self.net.get_state()
-        if "regions" not in state.tables: return
+        if "regions" not in state.tables:
+            return
 
         df = state.tables["regions"]
         try:
@@ -276,7 +355,8 @@ class NewGameView(BaseImGuiView):
 
     def _focus_camera_on_country(self, country_tag: str):
         state = self.net.get_state()
-        if "regions" not in state.tables: return
+        if "regions" not in state.tables:
+            return
 
         df = state.tables["regions"]
         owned_regions = df.filter(pl.col("owner") == country_tag)
@@ -305,28 +385,57 @@ class NewGameView(BaseImGuiView):
         )
 
     def _start_game(self):
-        if not self.selected_country_id or not self.selected_scenario_id: return
-        
-        from src.client.tasks.new_game_task import NewGameTask, NewGameContext
+        if self.setup_stage not in {"freeplay", "country"} or not self.selected_country_id:
+            return
+        if self.setup_stage == "country" and not self.selected_scenario_id:
+            return
+        if "id" not in self.playable_countries.columns or not any(
+            str(country_id or "").strip().upper() == self.selected_country_id
+            for country_id in self.playable_countries["id"]
+        ):
+            return
 
-        def on_task_complete(ctx: NewGameContext):
-            self.window.session = ctx.session
-            self.nav.show_game_view(
-                session=ctx.session,
-                config=self.config,
-                player_tag=ctx.player_tag,
-                initial_pos=ctx.start_pos
+        if self.setup_stage == "country":
+            from src.client.tasks.new_game_task import NewGameTask
+            task = NewGameTask(
+                self.window,
+                self.config,
+                self.selected_country_id,
+                self.selected_scenario_id,
+                self.selected_party_id,
             )
+        else:
+            from src.client.tasks.freeplay_start_task import FreeplayStartTask
+            task = FreeplayStartTask(
+                self.window,
+                self.config,
+                self.selected_country_id,
+                self.selected_party_id,
+            )
+
+        previous_session = self.session
+
+        def on_task_complete(ctx):
+            self.window.session = ctx.session
+            try:
+                self.nav.show_game_view(
+                    session=ctx.session,
+                    config=self.config,
+                    player_tag=ctx.player_tag,
+                    initial_pos=ctx.start_pos
+                )
+            except Exception:
+                # The loading view will dispose the new session; retain the old one.
+                self.window.session = previous_session
+                raise
+            if previous_session is not ctx.session:
+                from src.client.tasks.session_startup import shutdown_session
+                shutdown_session(previous_session)
             return None
 
-        task = NewGameTask(
-            self.window,
-            self.config,
-            self.selected_country_id,
-            self.selected_scenario_id,
-            self.selected_party_id,
+        self.nav.show_loading(
+            task, on_success=on_task_complete, on_return=lambda: self.window.show_view(self)
         )
-        self.nav.show_loading(task, on_success=on_task_complete)
 
     def on_game_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
         if buttons == arcade.MOUSE_BUTTON_LEFT:

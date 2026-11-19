@@ -45,8 +45,17 @@ class SaveGameDialog:
         if self._mode == "save":
             self._save(name)
         elif self._mode == "load":
+            if error := self._load_error():
+                self._notify("Load game", error, severity="warning")
+                return
             self._load(name)
         self._mode = ""
+
+    def _load_error(self) -> str:
+        return next(
+            (str(row.get("load_error") or "") for row in self._rows if row.get("name") == self._selected),
+            "",
+        )
 
     def render(self) -> None:
         if not self._mode:
@@ -107,7 +116,14 @@ class SaveGameDialog:
                 ui.text("frmSave/lblSaveName", "Save name")
                 _, self._name = imgui.input_text("##save_name", self._name,
                     test_id="save_game.name", gml_id=ui.path("frmSave/edtSaveName"))
+            load_error = "" if saving else self._load_error()
+            if load_error:
+                imgui.text_wrapped(load_error)
+            elif not saving and any(row.get("name") == self._selected and row.get("recovered_from_backup")
+                                    for row in self._rows):
+                # Recovery may restore an older generation than the player expects.
+                imgui.text_wrapped("The primary save is unavailable. The listed backup will be loaded.")
             if ui.button("btnSaveGame" if saving else "btnLoadGame",
                          "Save" if saving else "Load", f"{prefix}.submit",
-                         enabled=bool(self._name.strip() if saving else self._selected)):
+                         enabled=bool(self._name.strip() if saving else self._selected and not load_error)):
                 self.submit()

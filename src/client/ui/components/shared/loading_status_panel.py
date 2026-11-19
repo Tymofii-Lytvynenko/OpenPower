@@ -10,9 +10,11 @@ from src.client.ui.core.theme import GAMETHEME
 
 class LoadingStatusPanel:
     def render(self, ui: UIComposer, task, error: Exception | None,
-               screen_size: tuple[int, int], on_return: Callable[[], None]) -> None:
+               screen_size: tuple[int, int], on_return: Callable[[], None],
+               *, return_label: str = "RETURN TO START") -> None:
         screen_w, screen_h = screen_size
-        error_message = str(error) if error is not None else None
+        # Some exceptions have no message; still give the player an actionable failure.
+        error_message = (str(error).strip() or type(error).__name__) if error is not None else None
         has_error = error_message is not None
         if not has_error:
             panel_height = 150
@@ -33,7 +35,7 @@ class LoadingStatusPanel:
                 )
                 imgui.separator()
                 imgui.text_wrapped(error_message, test_id="loading.error.details")
-                if imgui.button("RETURN TO START", test_id="loading.error.return"):
+                if imgui.button(return_label, test_id="loading.error.return"):
                     on_return()
             else:
                 ui.draw_title("PROCESSING")

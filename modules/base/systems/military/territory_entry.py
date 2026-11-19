@@ -53,8 +53,10 @@ def _validate_routes(state, action, selected, regions, prospective):
                             regions, adjacency, can_enter, prepared_graph=graph)
         if not plan.is_valid:
             return plan.rejection_reason
+        # The source may fall back to the unit's own position, but every later
+        # hop and the destination itself need real map coordinates.
         if any(identity not in locations or not all(math.isfinite(v) for v in
-               (locations[identity].latitude, locations[identity].longitude)) for identity in plan.region_ids[1:-1]):
+               (locations[identity].latitude, locations[identity].longitude)) for identity in plan.region_ids[1:]):
             return "The route contains a region without valid coordinates."
     return None
 

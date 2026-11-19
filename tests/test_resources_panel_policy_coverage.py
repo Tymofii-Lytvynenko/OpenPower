@@ -7,10 +7,10 @@ import polars as pl
 import pytest
 
 from src.client.ui.components.shared.dirty_close_confirmation import CloseDecision
-from src.client.ui.panels import resources_panel as resources_panel_module
 from src.client.ui.panels.resources_panel import (
     PendingProductionIncrease,
     PendingResourcePolicy,
+    ResourceMarketValues,
     ResourcePolicyDraft,
     ResourcesPanel,
 )
@@ -127,7 +127,7 @@ def test_policy_dispatch_sends_only_dirty_unpending_drafts_for_target_country() 
 
     panel._dispatch_policy_updates(client, " usa ", state)
 
-    assert panel._pending_policy_updates[("USA", "grain")] == PendingResourcePolicy((1, 1, 25), "player-1", 2)
+    assert panel._pending_policy_updates[("USA", "grain")] == PendingResourcePolicy((1, 1, 25), "player-1", 2, ResourceMarketValues())
     assert client.send_action.call_count == 1
     action = client.send_action.call_args.args[0]
     assert action.country_tag == "USA"
@@ -163,7 +163,8 @@ def test_finish_close_applies_pending_policy_or_discards_unsubmitted_drafts(monk
     [
         (None, (0, 0, 0), "Domestic production data is unavailable."),
         ([{"country_id": "USA"}], (0, 0, 0), "Domestic production is missing columns"),
-        ([{"country_id": "CAN", "game_resource_id": "grain"}], (0, 0, 0), None),
+        ([{"country_id": "CAN", "game_resource_id": "grain"}], (0, 0, 0), "missing or ambiguous"),
+        ([policy_row(), policy_row()], (0, 0, 0), "missing or ambiguous"),
         (
             [{"country_id": " usa ", "game_resource_id": " Grain "}],
             (0, 0, 0),
@@ -171,8 +172,8 @@ def test_finish_close_applies_pending_policy_or_discards_unsubmitted_drafts(monk
         ),
         (
             [policy_row(is_gov_controlled=False, is_legal=True, tax_rate=1.5)],
-            (0, 0, 100),
-            None,
+            (0, 0, 0),
+            "Domestic production tax rate is invalid",
         ),
         (
             [policy_row(tax_rate=float("nan"))],

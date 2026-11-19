@@ -8,6 +8,7 @@ from typing import Any
 
 import polars as pl
 
+from src.client.ui.panels.service.campaign_presenter import CampaignPresenter
 from src.client.ui.panels.shared.panel_data import safe_int, safe_text
 
 MINUTES_PER_DAY = 24 * 60
@@ -90,10 +91,14 @@ class PoliticalOverviewViewModel:
     recent_causes: tuple[PoliticalCauseView, ...]
     election_override_options: tuple[PoliticalElectionOverrideOptionView, ...] = ()
     recent_elections: tuple[PoliticalElectionRecordView, ...] = ()
+    player_party: str = ""
 
 
 class PoliticalOverviewPresenter:
     """Projects political state from authoritative snapshot tables for read-only UI."""
+
+    def __init__(self) -> None:
+        self._campaigns = CampaignPresenter()
 
     def build(self, state, country_tag: str) -> PoliticalOverviewViewModel:
         country_id = _tag(country_tag)
@@ -116,6 +121,18 @@ class PoliticalOverviewPresenter:
             (ruling_row or {}).get("display_name"),
             ruling_id or "Unavailable",
         )
+        session_settings = getattr(state, "globals", {})
+        player_party = ""
+        if country_id and _tag(session_settings.get("player_tag")) == country_id:
+            campaign = self._campaigns.latest_campaign(state, country_id)
+            selected_id = _party_id(
+                campaign.get("player_party_id") if campaign is not None else session_settings.get("player_party_id")
+            )
+            if selected_id:
+                selected_party = next(
+                    (row for row in party_rows if _party_id(row.get("party_id")) == selected_id), None
+                )
+                player_party = safe_text((selected_party or {}).get("display_name"), selected_id)
 
         election_eligible = _read_bool(government.get("election_eligible"))
         next_election = _optional_positive_int(government.get("next_election_at_minute"))
@@ -234,6 +251,7 @@ class PoliticalOverviewPresenter:
             recent_causes=recent_causes,
             election_override_options=election_override_options,
             recent_elections=recent_elections,
+            player_party=player_party,
         )
 
     def _election_override_options(

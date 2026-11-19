@@ -24,7 +24,7 @@ class TestDiplomacySystem(unittest.TestCase):
         state = self._build_state()
         state.current_actions = [
             ActionCreateTreaty(
-                player_id="tester",
+                player_id="USA",
                 source_country_tag="USA",
                 target_country_tag="CAN",
                 treaty_type="trade accord",
@@ -44,7 +44,7 @@ class TestDiplomacySystem(unittest.TestCase):
         state.events.clear()
         state.current_actions = [
             ActionRespondTreaty(
-                player_id="tester",
+                player_id="CAN",
                 treaty_id=proposal_id,
                 responder_country_tag="CAN",
                 accept=True,
@@ -66,7 +66,7 @@ class TestDiplomacySystem(unittest.TestCase):
         state.events.clear()
         state.current_actions = [
             ActionLeaveTreaty(
-                player_id="tester",
+                player_id="CAN",
                 treaty_id=treaty_id,
                 country_tag="CAN",
             )
@@ -83,7 +83,7 @@ class TestDiplomacySystem(unittest.TestCase):
         state = self._build_state()
         state.current_actions = [
             ActionCreateTreaty(
-                player_id="tester",
+                player_id="USA",
                 source_country_tag="USA",
                 target_country_tag="CAN",
                 treaty_type="research accord",
@@ -97,7 +97,7 @@ class TestDiplomacySystem(unittest.TestCase):
         state.events.clear()
         state.current_actions = [
             ActionRespondTreaty(
-                player_id="tester",
+                player_id="CAN",
                 treaty_id=proposal_id,
                 responder_country_tag="CAN",
                 accept=False,
@@ -146,7 +146,7 @@ class TestDiplomacySystem(unittest.TestCase):
         )
         state.current_actions = [
             ActionDeclareWar(
-                player_id="tester",
+                player_id="USA",
                 source_country_tag="USA",
                 target_country_tag="GBR",
                 casus_belli="Maritime blockade",

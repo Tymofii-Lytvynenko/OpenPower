@@ -1,5 +1,8 @@
-import arcade 
+import arcade
+import logging
 from typing import TYPE_CHECKING, Any
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from src.shared.config import GameConfig
@@ -28,19 +31,24 @@ class NavigationService:
             self.window.session = session
             return MainMenuView(session, config)
 
-        self.show_loading(StopGameTask(self.window, config), on_success)
+        def on_failure(_error):
+            # The stop task disposes its replacement session after a failed
+            # transition, so the window must not retain that closed session.
+            self.window.session = None
 
-    def show_loading(self, task, on_success, on_failure=None):
+        self.show_loading(StopGameTask(self.window, config), on_success, on_failure)
+
+    def show_loading(self, task, on_success, on_failure=None, *, on_return=None):
         from src.client.views.loading_view import LoadingView
         print("[Nav] Switching to Loading Screen")
-        self.window.show_view(LoadingView(task, on_success, on_failure))
+        self.window.show_view(LoadingView(task, on_success, on_failure, on_return=on_return))
 
     # --- GAMEPLAY FLOW ---
 
-    def show_new_game_screen(self, session: "SessionPort", config: "GameConfig"):
+    def show_new_game_screen(self, session: "SessionPort", config: "GameConfig", *, scenario: bool = False):
         from src.client.views.new_game_view import NewGameView
         print("[Nav] Switching to New Game Selection")
-        self.window.show_view(NewGameView(session, config))
+        self.window.show_view(NewGameView(session, config, scenario=scenario))
 
     def show_load_game_screen(self, config: "GameConfig"):
         from src.client.views.load_game_view import LoadGameView
@@ -50,13 +58,34 @@ class NavigationService:
     def load_saved_game(self, config: "GameConfig", save_name: str):
         from src.client.tasks.load_game_task import LoadGameTask
 
+        previous_session = getattr(self.window, "session", None)
+        previous_view = getattr(self.window, "current_view", None)
+
         def on_success(session):
             self.window.session = session
-            state = session.get_state_snapshot()
-            player_tag = str(state.globals.get("player_tag", "USA")) if state else "USA"
-            self.show_game_view(session, config, player_tag)
+            try:
+                state = session.get_state_snapshot()
+                player_tag = str(state.globals["player_tag"]).strip().upper()
+                self.show_game_view(session, config, player_tag)
+            except Exception:
+                # Retain the previous session if constructing the loaded view fails.
+                self.window.session = previous_session
+                raise
+            if previous_session is not None and previous_session is not session:
+                try:
+                    previous_session.shutdown()
+                except Exception:
+                    # The new game is already active; cleanup must not invalidate it.
+                    logger.exception("Could not shut down the previous session")
 
-        self.show_loading(LoadGameTask(self.window, config, save_name), on_success)
+        def return_to_previous_view():
+            self.window.show_view(previous_view)
+
+        self.show_loading(
+            LoadGameTask(self.window, config, save_name),
+            on_success,
+            on_return=return_to_previous_view if previous_view is not None else None,
+        )
 
     def show_game_view(self, session: "SessionPort", config: "GameConfig", player_tag: str, initial_pos=None):
         from src.client.views.game_view import GameView

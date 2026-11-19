@@ -6,10 +6,13 @@ from unittest.mock import patch
 
 import polars as pl
 
-from modules.base.systems.military.research_program_system import ResearchProgramSystem, _finite
 from modules.base.schema import ensure_base_tables
 from modules.base.systems.military.capability_catalog import DEFAULT_ROLE_PROFILES
 from modules.base.systems.military.military_system import MilitarySystem
+from modules.base.systems.military.research_program_system import (
+    ResearchProgramSystem,
+    _finite,
+)
 from src.shared.actions import (
     ActionCancelProductionOrder,
     ActionCreateUnitDesign,
@@ -23,6 +26,47 @@ from src.shared.state import GameState
 
 
 class ResearchProgramSystemTest(unittest.TestCase):
+    def test_fast_orders_pay_overtime_and_progress_faster_without_extra_capacity(self) -> None:
+        results = {}
+        for mode in ("normal", "fast"):
+            state = self._state()
+            system = ResearchProgramSystem()
+            state.current_actions = [ActionCreateUnitDesign(
+                "player", "USA", "ground", "artillery", "Artillery", {"cost": 100.0},
+            )]
+            system.update(state, 0.0)
+            design_id = state.get_table("unit_designs")["id"][0]
+            state.current_actions = [ActionQueueUnitProduction(
+                "player", "USA", design_id, 2, production_speed=mode,
+            )]
+            system.update(state, 0.0)
+            order = state.get_table("production_orders").to_dicts()[0]
+            self.assertEqual(order["production_speed"], mode)
+            self.assertEqual(state.get_table("countries")["money_reserves"][0],
+                             700.0 if mode == "fast" else 800.0)
+            state.current_actions = []
+            system._advance_production(state, 0.01)
+            results[mode] = state.get_table("production_orders").to_dicts()[0]
+        self.assertEqual(results["normal"]["assigned_capacity"], results["fast"]["assigned_capacity"])
+        self.assertGreater(results["fast"]["progress"], results["normal"]["progress"])
+        self.assertLess(results["fast"]["eta_days"], results["normal"]["eta_days"])
+
+    def test_invalid_speed_is_rejected_before_funds_or_queue_change(self) -> None:
+        state = self._state()
+        system = ResearchProgramSystem()
+        state.current_actions = [ActionCreateUnitDesign(
+            "player", "USA", "ground", "artillery", "Artillery", {"cost": 100.0},
+        )]
+        system.update(state, 0.0)
+        design_id = state.get_table("unit_designs")["id"][0]
+        state.current_actions = [ActionQueueUnitProduction(
+            "player", "USA", design_id, 2, production_speed="instant",
+        )]
+        system.update(state, 0.0)
+        self.assertTrue(state.get_table("production_orders").is_empty())
+        self.assertEqual(state.get_table("countries")["money_reserves"][0], 1000.0)
+        self.assertEqual(state.journal.command_results[-1]["status"], "rejected")
+
     def test_rejected_design_action_returns_a_user_facing_command_result(self) -> None:
         state = self._state()
         state.current_actions = [ActionCreateUnitDesign(

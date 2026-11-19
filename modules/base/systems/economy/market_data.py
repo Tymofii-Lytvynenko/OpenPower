@@ -76,6 +76,9 @@ class _FastMarketArrays:
     government_controlled: np.ndarray
     legal: np.ndarray
     tax_rates: np.ndarray
+    global_tax_modifiers: np.ndarray | None = None
+    desired_trade: np.ndarray | None = None
+    meet_consumption: np.ndarray | None = None
 
 
 @dataclass(frozen=True)

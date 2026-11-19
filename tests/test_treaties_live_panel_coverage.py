@@ -264,26 +264,28 @@ def test_proposal_response_actions_send_accept_and_reject_only_for_required_coun
         assert untouched.buttons == []
 
 
-def test_pressure_fallback_preserves_slots_without_reporting_pressure(monkeypatch):
-    fake = install_imgui(monkeypatch)
-    ui = Ui()
+def test_pressure_panel_shows_live_share_and_dispatches_support(monkeypatch):
+    monkeypatch.setattr(treaties_live, "imgui", MagicMock())
+    ui = Ui(clicked={"treaties.details.sponsor"})
 
     @contextmanager
     def opened_child(*args, **kwargs):
         yield True
 
     monkeypatch.setattr(treaties_live, "gml_child_frame", opened_child)
-    LiveTreatiesPanel._render_pressure_fallback(ui)
-
+    values = presentation_values()
+    values[ClientPresentationKeys.TREATY_PRESSURE_SUMMARY] = lambda *_args: {"share": 0.25, "countries": ()}
+    state = client_state(tables={}, client_presentation=values)
+    client = Client()
+    context = SimpleNamespace(target_tag="USA", is_own_country=True, net_client=client)
+    row = {"id": "P1", "status": "pending", "pressure_members": []}
+    LiveTreatiesPanel._render_pressure(ui, state, row, context)
     assert ui.frames == ["frmPressure"]
-    assert any(call[0][1] == "N/A" for call in ui.texts)
-    assert ui.meters[0][0][1] == 0.0
-    assert ui.buttons[0][2] == "treaties.details.sponsor.unavailable"
-    assert ui.buttons[0][3]["enabled"] is False
-    assert fake.wrapped == [(
-        "OpenPower does not track REFERENCE treaty pressure-country totals.",
-        "treaties.details.pressure.unavailable",
-    )]
+    assert any(call[0][1] == "25.0%" for call in ui.texts)
+    assert ui.meters[0][0][1] == 0.25
+    assert client.actions[0].treaty_id == "P1"
+    assert client.actions[0].country_tag == "USA"
+    assert client.actions[0].is_supporting is True
 
 
 def participant_state(*, results=(), treaty=None):
@@ -595,7 +597,7 @@ def test_details_window_renders_active_treaty_and_closes_on_request(monkeypatch)
     panel._render_conditions = Mock()
     panel._render_details_member_list = Mock()
     panel._render_eligibility_list = Mock()
-    panel._render_pressure_fallback = Mock()
+    panel._render_pressure = Mock()
     ui = Ui(clicked={"treaties.details.close"})
     monkeypatch.setattr(treaties_live, "GMLWidgets", lambda _root: ui)
     monkeypatch.setattr(treaties_live, "draw_required_tables", lambda *_args: True)
@@ -627,7 +629,7 @@ def test_details_window_renders_active_treaty_and_closes_on_request(monkeypatch)
     assert panel._render_conditions.call_args.args == (ui, row)
     assert panel._render_details_member_list.call_count == 2
     panel._render_eligibility_list.assert_called_once_with(row, state, context)
-    panel._render_pressure_fallback.assert_called_once_with(ui)
+    panel._render_pressure.assert_called_once_with(ui, state, row, context)
 
 
 def test_details_window_skips_missing_row_when_lifecycle_is_not_initialized():
@@ -1029,7 +1031,7 @@ def test_details_window_renders_lifecycle_fallback_proposal_and_edit_paths(monke
     panel._render_conditions = Mock()
     panel._render_details_member_list = Mock()
     panel._render_eligibility_list = Mock()
-    panel._render_pressure_fallback = Mock()
+    panel._render_pressure = Mock()
     panel._render_proposal_response_actions = Mock()
     panel._open_participant_editor = Mock()
     ui = Ui(clicked={"treaties.details.edit_participants"})

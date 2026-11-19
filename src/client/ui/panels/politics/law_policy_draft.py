@@ -72,7 +72,12 @@ class LawPolicyDraft:
         actions, reason = self.prepare(state, context)
         if reason:
             return reason
-        self.pending.clear()
         for action in actions:
-            context.net_client.send_action(action)
+            try:
+                context.net_client.send_action(action)
+            except Exception as error:
+                # Keep this and subsequent drafts when the client cannot send them.
+                return f"Could not send the law change: {error or type(error).__name__}."
+            # A transport failure must leave unsent drafts available for retry.
+            self.pending.pop(action.law_id, None)
         return ""

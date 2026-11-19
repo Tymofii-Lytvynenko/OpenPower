@@ -39,6 +39,8 @@ def build_main_menu_actions(
     on_singleplayer: Callable[[], None],
     on_load_game: Callable[[], None],
     on_exit: Callable[[], None],
+    *,
+    on_scenario: Callable[[], None] | None = None,
 ) -> tuple[MainMenuAction, ...]:
     return (
         MainMenuAction(
@@ -70,13 +72,12 @@ def build_main_menu_actions(
             opens_tutorial="military",
         ),
         MainMenuAction(
-            "SCENARIO", "main_menu.scenario", on_singleplayer, "btnScenario",
+            "SCENARIO", "main_menu.scenario", on_scenario or on_singleplayer, "btnScenario",
             screen="singleplayer",
         ),
         MainMenuAction(
-            "CUSTOM GAME", "main_menu.custom_game", None, "btnCustom",
-            enabled=False,
-            tooltip="OpenPower has no equivalent custom-scenario setup workflow.",
+            "CUSTOM GAME", "main_menu.custom_game", on_singleplayer, "btnCustom",
+            tooltip="Start an open-ended game without a campaign scenario.",
             screen="singleplayer",
         ),
         MainMenuAction(

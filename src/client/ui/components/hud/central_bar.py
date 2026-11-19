@@ -13,11 +13,16 @@ from src.client.ui.components.hud.main_bar_geometry import main_bar_bounds
 from src.client.ui.components.hud.sphere_metrics import main_bar_sphere_metrics
 from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.instrumented_imgui import imgui
-from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.core.primitives import UIPrimitives
+from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.layouts.gml_layout import (
-    GMLRect, create_gml_layout_session, get_gml_layout, gml_child_frame,
-    active_gml_layout, gml_style, use_gml_layout,
+    GMLRect,
+    active_gml_layout,
+    create_gml_layout_session,
+    get_gml_layout,
+    gml_child_frame,
+    gml_style,
+    use_gml_layout,
 )
 from src.shared.actions import ActionSetGameSpeed, ActionSetPaused
 
@@ -44,6 +49,8 @@ class CentralBar:
         self.active_tag = ""
         self.country_status = CountryStatus.NEUTRAL
         self.is_own = False
+        self._sphere_metrics_cache_key = None
+        self._sphere_metrics_cache = {}
 
     def render(self, state, net, target_tag, country_status, hud_summary):
         self.active_tag = target_tag
@@ -100,7 +107,7 @@ class CentralBar:
                       imgui.get_color_u32((0.38, 0.40, 0.39, 1.0)))
 
     def _render_sphere_meters(self, state, ui):
-        metrics = main_bar_sphere_metrics(state, self.active_tag)
+        metrics = self._sphere_metrics_for(state)
         colors = {
             "frmMeterPolitic": GAMETHEME.colors.politics,
             "frmMeterMilitary": GAMETHEME.colors.military,
@@ -118,6 +125,24 @@ class CentralBar:
                     if value is None else f"{metric.label}: {value:.1f}%"
                 ),
             )
+
+    def _sphere_metrics_for(self, state):
+        globals_state = getattr(state, "globals", None)
+        revisions = getattr(state, "table_revisions", None)
+        if globals_state is None or revisions is None:
+            return main_bar_sphere_metrics(state, self.active_tag)
+
+        cache_key = (
+            globals_state.get("tick"),
+            revisions.get("countries"),
+            revisions.get("units"),
+            self.active_tag,
+        )
+        if cache_key != getattr(self, "_sphere_metrics_cache_key", None):
+            # Avoid re-filtering large tables between authoritative updates.
+            self._sphere_metrics_cache = main_bar_sphere_metrics(state, self.active_tag)
+            self._sphere_metrics_cache_key = cache_key
+        return self._sphere_metrics_cache
 
     def _render_country_section(self, state, ui):
         slot = ui.rect("btnFlag")

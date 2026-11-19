@@ -64,11 +64,6 @@ class NewGameTask:
         new_session = None
         try:
             check_cancelled(self._cancel_event)
-            self.status_text = "Stopping previous session..."
-            self.progress = 0.05
-            if getattr(self.window, "session", None):
-                self.window.session.shutdown()
-
             self.status_text = "Starting simulation server..."
             self.progress = 0.1
 

@@ -8,10 +8,15 @@ import polars as pl
 import rtoml
 from PIL import Image
 
+from src.core.paths import resolve_region_map_path
 from src.core.region_adjacency_source import load_region_adjacency
 from src.core.save_migrations import CORE_SAVE_MIGRATIONS
-from src.core.saves import save_backup_path, validate_save_name
-from src.server.io.static_loader import StaticAssetLoader
+from src.core.saves import missing_checkpoint_tables, save_backup_path, save_mod_compatibility_error, validate_save_name
+from src.server.io.static_loader import (
+    StaticAssetLoader,
+    merge_layered_records,
+    warn_unregistered_region_owners,
+)
 from src.shared.config import GameConfig
 from src.shared.migrations import MigrationRegistry
 from src.shared.schema import WorldSchemaRegistry
@@ -48,30 +53,78 @@ class DataLoader:
         save_dir = self.save_root / safe_name
         backup_dir = save_backup_path(self.save_root, safe_name)
         if not save_dir.is_dir():
-            if backup_dir.is_dir() and (backup_dir / "meta.json").exists():
+            if (backup_dir / "meta.json").is_file():
                 save_dir = backup_dir
             else:
                 raise FileNotFoundError(f"Save '{safe_name}' not found.")
-        elif not (save_dir / "meta.json").exists() and backup_dir.is_dir() and (backup_dir / "meta.json").exists():
+        elif not (save_dir / "meta.json").is_file() and (backup_dir / "meta.json").is_file():
             save_dir = backup_dir
 
         print(f"[DataLoader] Loading save '{safe_name}'...")
 
         meta_path = save_dir / "meta.json"
-        if meta_path.exists():
-            with open(meta_path, "rb") as f:
-                meta_data = orjson.loads(f.read())
-        else:
-            print(f"[DataLoader] Warning: meta.json not found for {save_name}. Using defaults.")
-            meta_data = {}
+        try:
+            meta_data = orjson.loads(meta_path.read_bytes())
+            if not isinstance(meta_data, dict):
+                raise ValueError("Expected a JSON object.")
+        except (OSError, ValueError) as error:
+            # Corrupt primary metadata should not hide an intact backup generation.
+            if save_dir == backup_dir:
+                raise ValueError(f"Save '{safe_name}' has unreadable metadata.") from error
+            try:
+                meta_data = orjson.loads((backup_dir / "meta.json").read_bytes())
+                if not isinstance(meta_data, dict):
+                    raise ValueError("Expected a JSON object.")
+            except (OSError, ValueError) as backup_error:
+                raise ValueError(f"Save '{safe_name}' has unreadable metadata.") from backup_error
+            save_dir = backup_dir
+
+        compatibility_error = save_mod_compatibility_error(meta_data, self.config.active_mods)
+        if compatibility_error:
+            raise ValueError(f"Save '{safe_name}': {compatibility_error}")
 
         loaded_tables = {}
         tables_dir = save_dir / "tables"
-        if tables_dir.exists():
-            for p_file in tables_dir.glob("*.parquet"):
-                loaded_tables[p_file.stem] = pl.read_parquet(p_file)
+        missing = missing_checkpoint_tables(save_dir, meta_data)
+        if missing:
+            # A previous generation can survive an interrupted replacement.
+            # Only use it when its metadata and own table manifest are valid.
+            try:
+                backup_meta = orjson.loads((backup_dir / "meta.json").read_bytes())
+                backup_members = backup_meta.get("dataframe_dict_members", {})
+                backup_tables = backup_members.get("tables") if isinstance(backup_members, dict) else None
+                backup_complete = (isinstance(backup_tables, list)
+                    and not missing_checkpoint_tables(backup_dir, backup_meta)
+                    and not save_mod_compatibility_error(backup_meta, self.config.active_mods))
+            except (OSError, ValueError, TypeError, AttributeError):
+                backup_complete = False
+            if not backup_complete or save_dir == backup_dir:
+                raise ValueError(f"Save '{safe_name}' is incomplete: missing checkpoint tables {missing}.")
+            save_dir, meta_data = backup_dir, backup_meta
+            tables_dir = save_dir / "tables"
+        manifest = meta_data.get("dataframe_dict_members")
+        if isinstance(manifest, dict) and isinstance(manifest.get("tables"), list):
+            # Load the exact checkpoint, not unrelated parquet files left in the directory.
+            table_files = [(table_name, tables_dir / f"{table_name}.parquet") for table_name in manifest["tables"]]
+        elif tables_dir.exists():
+            table_files = [(path.stem, path) for path in sorted(tables_dir.glob("*.parquet"))]
+        else:
+            table_files = []
+        for table_name, table_path in table_files:
+            try:
+                loaded_tables[table_name] = pl.read_parquet(table_path)
+            except (OSError, pl.exceptions.PolarsError) as error:
+                # Report the broken checkpoint component instead of presenting an empty world.
+                raise ValueError(f"Save '{safe_name}' has an unreadable table: {table_name}.") from error
 
         self.migrations.migrate(meta_data, loaded_tables)
+        regions = loaded_tables.get("regions")
+        if "region_adjacency" not in loaded_tables and regions is not None and "id" in regions.columns:
+            # Older saves omitted the graph. Checkpointed graphs remain authoritative
+            # because active routes may depend on their original topology.
+            loaded_tables["region_adjacency"] = load_region_adjacency(
+                self.config, regions["id"].drop_nulls().to_list()
+            )
         constructor_args = {}
         type_hints = get_type_hints(GameState)
 
@@ -134,6 +187,7 @@ class DataLoader:
             state.update_table("regions", pl.DataFrame())
 
         countries_df = self._load_countries(regions_df)
+        warn_unregistered_region_owners(regions_df, countries_df)
         state.update_table("countries", countries_df if not countries_df.is_empty() else pl.DataFrame())
         # The production loader bypasses compile_initial_state; identity data must
         # enter this path before schema initialization and the bootstrap system.
@@ -187,19 +241,7 @@ class DataLoader:
             raise RuntimeError(f"Failed to parse required {asset_kind} TOML: {path}") from error
 
     def _load_master_regions(self) -> pl.DataFrame:
-        layers: List[pl.DataFrame] = []
-
-        for data_dir in self.config.get_data_dirs():
-            paths = [data_dir / "regions" / "regions.tsv", data_dir / "map" / "regions.tsv"]
-            for p in paths:
-                if p.exists():
-                    df = self._read_clean_tsv(p)
-                    if "hex" in df.columns:
-                        df = df.with_columns(pl.col("hex").str.strip_prefix("#").str.to_uppercase())
-                        layers.append(df)
-                    break
-
-        return self._merge_layered_records(layers, keys=["hex"])
+        return StaticAssetLoader(self.config).load_master_regions()
 
     def _generate_int_id(self, df: pl.DataFrame) -> pl.DataFrame:
         df = df.with_columns([
@@ -249,44 +291,7 @@ class DataLoader:
         return main_df
 
     def _load_countries(self, regions_df: pl.DataFrame) -> pl.DataFrame:
-        print("[DataLoader] Loading Countries...")
-
-        master_layers: List[pl.DataFrame] = []
-        for data_dir in self.config.get_data_dirs():
-            master_path = data_dir / "countries" / "countries.tsv"
-            if master_path.exists():
-                master_layers.append(self._read_clean_tsv(master_path))
-
-        main_df = self._merge_layered_records(master_layers, keys=["id"])
-        if main_df.is_empty():
-            return pl.DataFrame()
-
-        layered_extensions: Dict[str, List[pl.DataFrame]] = {}
-        for data_dir in self.config.get_data_dirs():
-            target_dir = data_dir / "countries"
-            if not target_dir.exists():
-                continue
-
-            for file_path in target_dir.glob("countries_*.tsv"):
-                aux_df = self._read_clean_tsv(file_path)
-                if "id" not in aux_df.columns:
-                    continue
-                layered_extensions.setdefault(file_path.name, []).append(aux_df)
-
-        for file_name in sorted(layered_extensions):
-            merged_extension = self._merge_layered_records(layered_extensions[file_name], keys=["id"])
-            if merged_extension.is_empty() or merged_extension.columns == ["id"]:
-                continue
-
-            print(f"[DataLoader] Merging country data: {file_name}")
-            main_df = main_df.join(merged_extension, on="id", how="left")
-
-        num_cols = [c for c, t in main_df.schema.items() if t in (pl.Float64, pl.Int64, pl.Int32)]
-        if num_cols:
-            main_df = main_df.with_columns(pl.col(num_cols).fill_null(0))
-
-        print(f"[DataLoader] Countries loaded: {len(main_df)} rows.")
-        return main_df
+        return StaticAssetLoader(self.config)._load_countries()
 
     def _add_region_geo_columns(self, regions_df: pl.DataFrame) -> pl.DataFrame:
         if regions_df.is_empty() or not {"center_x", "center_y"}.issubset(set(regions_df.columns)):
@@ -299,12 +304,7 @@ class DataLoader:
         )
 
     def _get_region_map_dimensions(self, regions_df: pl.DataFrame) -> tuple[int, int]:
-        for data_dir in self.config.get_data_dirs():
-            candidate = data_dir / "regions" / "regions.png"
-            if candidate.exists():
-                return self._read_image_size(candidate)
-
-        fallback = self.config.get_asset_path("map/regions.png")
+        fallback = resolve_region_map_path(self.config)
         if fallback.exists():
             return self._read_image_size(fallback)
 
@@ -363,29 +363,7 @@ class DataLoader:
             return ["id"]
         return []
 
-    def _merge_layered_records(self, layers: Sequence[pl.DataFrame], keys: Sequence[str]) -> pl.DataFrame:
-        valid_layers = [df for df in layers if not df.is_empty() and set(keys).issubset(df.columns)]
-        if not valid_layers:
-            return pl.DataFrame()
-        if len(valid_layers) == 1 and not valid_layers[0].select(list(keys)).is_duplicated().any():
-            return valid_layers[0]
-        # Duplicate extension keys must not multiply master rows during joins.
-
-        tagged_layers = [
-            df.with_columns(pl.lit(priority).alias("__layer_priority"))
-            for priority, df in enumerate(valid_layers)
-        ]
-        combined = pl.concat(tagged_layers, how="diagonal_relaxed")
-
-        value_cols = [column for column in combined.columns if column not in {*keys, "__layer_priority"}]
-        if not value_cols:
-            return combined.select(list(keys)).unique(maintain_order=True)
-
-        aggregated_columns = [
-            pl.col(column).sort_by("__layer_priority").drop_nulls().last().alias(column)
-            for column in value_cols
-        ]
-        return combined.group_by(list(keys), maintain_order=True).agg(aggregated_columns)
+    _merge_layered_records = staticmethod(merge_layered_records)
 
     def _load_world_toml(self, path: Path) -> pl.DataFrame:
         data = self._read_required_toml(path, "world")

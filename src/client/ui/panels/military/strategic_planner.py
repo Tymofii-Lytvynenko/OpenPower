@@ -7,7 +7,11 @@ from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.primitives import UIPrimitives
 from src.client.ui.layouts.gml_layout import gml_child_frame
 from src.client.ui.panels.military.strategic_plan import StrategicPlan
-from src.client.ui.panels.shared.panel_data import resolve_region_name, safe_int
+from src.client.ui.panels.shared.panel_data import (
+    resolve_country_name,
+    resolve_region_name,
+    safe_int,
+)
 
 
 class StrategicPlanner:
@@ -38,6 +42,11 @@ class StrategicPlanner:
         return [row for row in self._rows(state, "regions")
                 if str(row.get("owner") or "") not in {"", "None", self.plan.country}]
 
+    @staticmethod
+    def _country_label(state, country_tag: str) -> str:
+        name = resolve_country_name(state, country_tag)
+        return f"{name} ({country_tag})" if name.casefold() != country_tag.casefold() else country_tag
+
     def render(self, state, context):
         if not self.phase:
             return
@@ -67,7 +76,8 @@ class StrategicPlanner:
         selected_region = next((row for row in targets if row["id"] == self.plan.target_region), None)
         if self.plan.target_country not in tags:
             self.plan.target_country = str(selected_region["owner"]) if selected_region else (tags[0] if tags else "")
-        labels = [*tags, "Specific location", "Multiple countries"]
+        labels = [*(self._country_label(state, tag) for tag in tags),
+                  "Specific location", "Multiple countries"]
         index = tags.index(self.plan.target_country) if self.plan.target_country in tags else 0
         ui.text("frmCountry/lblTitle", "TARGET COUNTRY")
         changed, index = imgui.combo("##strategic_country", index, labels,
@@ -102,7 +112,7 @@ class StrategicPlanner:
             _, current = imgui.combo("##strategic_weapon", current, options,
                 test_id="strategic.target.weapon", gml_id=ui.path("frmAttackStrength/cboMissileType"))
             self.plan.selected_weapons = {options[current]}
-        return options
+        return weapons
 
     def _country(self, state, context):
         root = "Strategic_Target_Country_Window"
@@ -117,9 +127,10 @@ class StrategicPlanner:
                 ["Military", "Civilian"], test_id="strategic.target.mode",
                 gml_id=ui.path("frmAttackType/cboAttackType"))
             self.plan.target_mode = ("military", "civilian")[attack]
-            options = self._render_weapon_selection(state, ui)
-            ui.text("frmAttackStrength/lblAvailMissiles", "AVAILABLE")
-            ui.text("frmAttackStrength/txtAvailMissiles", str(len(options)))
+            weapons = self._render_weapon_selection(state, ui)
+            ready_count = sum(safe_int(row.get("ready"), 0) for row in weapons)
+            ui.text("frmAttackStrength/lblAvailMissiles", "READY")
+            ui.text("frmAttackStrength/txtAvailMissiles", str(ready_count))
             ui.text("frmAttackStrength/lblMissileUsed", "SELECTED")
             ui.text("frmAttackStrength/txtMissilesUsed", str(len(self.plan.selected_weapons)))
             ui.text("frmAttackStrength/lblProjectedCasualities", "TARGET REGION")
@@ -151,7 +162,7 @@ class StrategicPlanner:
                     self.plan.target_country = str(target["owner"])
                     self.phase = "country"
 
-    def _render_assignment_row(self, row, targets) -> None:
+    def _render_assignment_row(self, row, targets, state) -> None:
         key = str(row.get("id"))
         enabled = key in self.plan.selected_weapons
         changed, enabled = imgui.checkbox(UIPrimitives.fit_text(key,170)+f"##{key}", enabled,
@@ -162,20 +173,31 @@ class StrategicPlanner:
             else:
                 self.plan.selected_weapons.discard(key)
         if targets:
-            selected = self.plan.assignments.get(key, self.plan.target_region)
-            index = next((i for i,r in enumerate(targets) if r["id"]==selected),0)
+            selected = self.plan.assignments.get(key)
+            index = next((i + 1 for i, region in enumerate(targets)
+                          if region["id"] == selected), 0)
             imgui.same_line(204)
             imgui.text(self.plan.target_mode.title())
             imgui.same_line(322)
             imgui.set_next_item_width(135)
-            _, index = imgui.combo(f"##target-{key}", index,
-                [f"{r['owner']}: {r.get('name') or r['id']}" for r in targets],
+            labels = ["Select target"] + [
+                f"{self._country_label(state, str(region.get('owner') or ''))}: "
+                f"{region.get('name') or region['id']}"
+                for region in targets
+            ]
+            _, index = imgui.combo(f"##target-{key}", index, labels,
                 test_id=f"strategic.multiple.target.{key}")
-            self.plan.assignments[key] = int(targets[index]["id"])
+            if index == 0:
+                self.plan.assignments.pop(key, None)
+            else:
+                self.plan.assignments[key] = int(targets[index - 1]["id"])
             for offset,value in ((466,int(row.get("ready") or 0)),
-                                 (549,int(enabled)),(633,int(enabled))):
+                                 (549,int(enabled)),
+                                 (633,int(enabled and key in self.plan.assignments))):
                 imgui.same_line(offset)
                 imgui.text(str(value))
+        else:
+            self.plan.assignments.pop(key, None)
 
     def _multiple(self, state, context):
         root = "Strategic_Target_Multiple_Countries_Window"
@@ -194,7 +216,7 @@ class StrategicPlanner:
             with gml_child_frame(ui.path("lstAttackList"), bordered=False) as visible:
                 if visible:
                     for row in weapons:
-                        self._render_assignment_row(row, targets)
+                        self._render_assignment_row(row, targets, state)
             ui.text("lblProjCasualities", "CASUALTIES")
             ui.text("txtCasualities", "Not estimated")
             ui.text("lblProjDamage", "DAMAGE")

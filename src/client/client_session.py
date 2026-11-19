@@ -4,6 +4,7 @@ import multiprocessing as mp
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from typing import Optional
 
 from src.client.client_state import ClientGameStateView, ClientPresentationState
@@ -12,7 +13,7 @@ from src.client.services.snapshot_inbox import SnapshotInbox
 from src.client.services.telemetry_service import TelemetryService
 from src.core.map_data import RegionMapData
 from src.shared.actions import GameAction
-from src.shared.commands import CommandEnvelope, command_id_for
+from src.shared.commands import COMMAND_PROTOCOL_ERROR, CommandEnvelope, command_id_for
 from src.shared.events import EventSystemError
 from src.shared.state import GameState, TimeData
 
@@ -42,13 +43,17 @@ class ClientSessionProxy:
         self.state_queue = state_queue
         self.progress_queue = progress_queue
         self.snapshot_ack_queue = snapshot_ack_queue
+        self._ipc_queues = (action_queue, state_queue, progress_queue, snapshot_ack_queue, telemetry_queue)
         self.process = process
+        self._shutdown_lock = Lock()
+        self._shutdown_started = False
 
         self._client_presentation = client_presentation or {}
         self.presentation_state = ClientPresentationState()
         self.state: Optional[ClientGameStateView] = None
         self.system_errors: list[dict[str, object]] = []
         self._known_system_errors: set[tuple[str, str, int]] = set()
+        self._process_exit_reported = False
         self._command_sequences: dict[str, int] = defaultdict(int)
         self.telemetry = TelemetryService(action_queue, telemetry_queue, telemetry_output_dir or Path("user_data/telemetry"), process)
         self._prepared_journal = None
@@ -84,7 +89,18 @@ class ClientSessionProxy:
             self.telemetry.refresh()
         except Exception:
             self.telemetry.collector._log_failure()
-        self._display_clock.advance(delta_time)
+        exit_code = getattr(self.process, "exitcode", None)
+        if isinstance(exit_code, int):
+            if self.state is not None and not self._process_exit_reported:
+                self._process_exit_reported = True
+                self.system_errors.append({
+                    "system_id": "server",
+                    "message": f"The simulation process stopped (exit code {exit_code}). Load a save to continue.",
+                    "traceback": "",
+                    "tick": int(self.state.globals.get("tick", 0)),
+                })
+        else:
+            self._display_clock.advance(delta_time)
         if delta_time > 0.0:
             self._state_poll_accumulator += delta_time
             if self._state_poll_accumulator < self._state_poll_interval:
@@ -115,6 +131,8 @@ class ClientSessionProxy:
         sequences = dict(self._prepared_sequences) if reuse_commands else {}
         start = len(previous.command_results) if reuse_commands else 0
         for result in view.journal.command_results[start:]:
+            if result.get("code") == COMMAND_PROTOCOL_ERROR:
+                continue
             actor = str(result.get("actor_id", ""))
             if actor:
                 sequences[actor] = max(sequences.get(actor, 0), int(result.get("sequence", 0)))
@@ -134,6 +152,8 @@ class ClientSessionProxy:
         if sequences is None:
             sequences = {}
             for result in self.state.journal.command_results:
+                if result.get("code") == COMMAND_PROTOCOL_ERROR:
+                    continue
                 actor = str(result.get("actor_id", ""))
                 if actor:
                     sequences[actor] = max(sequences.get(actor, 0), int(result.get("sequence", 0)))
@@ -170,11 +190,24 @@ class ClientSessionProxy:
         return self._display_clock.display_minutes
 
     def shutdown(self) -> None:
+        with self._shutdown_lock:
+            if self._shutdown_started:
+                return
+            self._shutdown_started = True
         self._snapshot_inbox.close()
         self.telemetry.close()
-        self.action_queue.put("SHUTDOWN")
+        if self.process.is_alive():
+            self.action_queue.put("SHUTDOWN")
         self.process.join(timeout=2.0)
         if self.process.is_alive():
             self.process.terminate()
             # Termination is asynchronous; reap the process before returning to the UI.
             self.process.join(timeout=2.0)
+        for channel in self._ipc_queues:
+            # A stopped peer cannot drain pending writes from a queue feeder.
+            cancel_join = getattr(channel, "cancel_join_thread", None)
+            if callable(cancel_join):
+                cancel_join()
+            close = getattr(channel, "close", None)
+            if callable(close):
+                close()

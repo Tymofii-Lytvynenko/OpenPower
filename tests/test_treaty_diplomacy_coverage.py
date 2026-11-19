@@ -504,7 +504,10 @@ def test_war_helpers_apply_coalition_pacts_and_handle_missing_join_targets():
         {"status": "active", "mutual_defense": True, "primary_target_country_id": "USA", "member_country_ids": ["CAN", "MEX"]},
         {"status": "active", "mutual_defense": True, "primary_target_country_id": "CAN", "member_country_ids": ["USA", "MEX"]},
     ])
-    state = GameState(tables={"coalition_pacts": pacts})
+    state = GameState(tables={
+        "countries": pl.DataFrame({"id": ["USA", "CAN", "MEX"]}),
+        "coalition_pacts": pacts,
+    })
     empty_wars = pl.DataFrame(schema=WAR_SCHEMA)
     relations = pl.DataFrame(schema=RELATIONS_SCHEMA)
     messages = pl.DataFrame(schema=MESSAGE_SCHEMA)

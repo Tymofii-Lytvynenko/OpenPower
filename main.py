@@ -34,14 +34,16 @@ def export_profile_html(profiler: Any, output_path: Path) -> Path | None:
     return output_path
 
 
-def create_local_session(config, *, save_name=None, player_tag=None):
+def create_local_session(config, *, save_name=None, player_tag=None, player_party_id=None):
     """Compose server process and client proxy at the application boundary."""
     from src.client.client_session import ClientSessionProxy
     from src.modding.client_extensions import load_client_presentation
     from src.server.launcher import spawn_local_server
 
     client_presentation = load_client_presentation(config)
-    bundle = spawn_local_server(config, save_name=save_name, player_tag=player_tag)
+    bundle = spawn_local_server(
+        config, save_name=save_name, player_tag=player_tag, player_party_id=player_party_id
+    )
     try:
         return ClientSessionProxy(
             map_data=bundle.map_data,

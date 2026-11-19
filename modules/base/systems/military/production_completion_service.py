@@ -133,6 +133,12 @@ class MilitaryProductionCompletionService:
         countries = self._ensure_country_columns(state.get_table("countries"))
         regions = state.get_table("regions")
         country_rows = countries.to_dicts()
+        locations = self._duration_policy.region_locations(regions)
+        home_regions = self._home_region_policy.home_regions_by_country(regions)
+        if locations:
+            home_regions.update(self._home_region_policy.home_regions_by_country(
+                regions.filter(pl.col("id").is_in(list(locations)))
+            ))
         return _ProductionCompletionBatch(
             state=state,
             countries=countries,
@@ -154,8 +160,8 @@ class MilitaryProductionCompletionService:
                 str(row.get("id") or ""): row
                 for row in state.get_table("unit_designs").to_dicts()
             },
-            home_regions=self._home_region_policy.home_regions_by_country(regions),
-            region_locations=self._duration_policy.region_locations(regions),
+            home_regions={str(owner).strip().upper(): region_id for owner, region_id in home_regions.items()},
+            region_locations=locations,
         )
 
     def _process_order(
@@ -175,10 +181,13 @@ class MilitaryProductionCompletionService:
             self._hold_order(order, batch)
             return
 
-        home_region_id = batch.home_regions.get(
-            str(eligible.country.get("id") or "")
-        )
+        home_region_id = batch.home_regions.get(eligible.country_tag)
         if home_region_id is None:
+            reason = "Production is complete, but no home region is available for deployment."
+            if order.get("blocking_reason") != reason:
+                # Keep the completed order retryable when territory becomes available.
+                order["blocking_reason"] = reason
+                batch.changed = True
             return
         self._create_deployment_group(order, eligible, home_region_id, batch)
 

@@ -33,5 +33,6 @@ class SessionFactory(Protocol):
         *,
         save_name: str | None = None,
         player_tag: str | None = None,
+        player_party_id: str | None = None,
     ) -> ClientSessionPort:
         ...

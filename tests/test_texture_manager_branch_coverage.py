@@ -89,7 +89,7 @@ def test_load_map_texture_uses_cache_or_generates_cpu_texture(tmp_path, cached):
     assert context.created[0][0] == (2, 2)
     assert context.created[0][1]["filter"] == (context.NEAREST, context.NEAREST)
     if cached:
-        assert cache.loads[0][1] == {}
+        assert cache.loads[0][1] == {"mmap_mode": "r"}
         assert cache.saves == []
     else:
         assert cache.saves[0][2] is True

@@ -6,7 +6,10 @@ import polars as pl
 import pytest
 
 import src.client.ui.panels.country_more_info as country_info_module
-from src.client.ui.panels.country_more_info import CountryMoreInfoPanel, CountryMoreInfoPresenter
+from src.client.ui.panels.country_more_info import (
+    CountryMoreInfoPanel,
+    CountryMoreInfoPresenter,
+)
 
 
 def game_state(tables=None):
@@ -52,15 +55,21 @@ def imgui_stub():
     draw_list = SimpleNamespace(add_rect_filled=Mock(), add_rect=Mock())
     point = SimpleNamespace(x=10.0, y=20.0)
     return SimpleNamespace(
+        button=Mock(return_value=False),
+        begin_child=Mock(return_value=True),
+        end_child=Mock(),
         get_cursor_screen_pos=Mock(return_value=point),
+        get_window_pos=Mock(return_value=SimpleNamespace(x=100.0, y=60.0)),
         get_window_draw_list=Mock(return_value=draw_list),
         get_color_u32=Mock(return_value=1),
         get_scroll_x=Mock(return_value=2.0),
         get_scroll_y=Mock(return_value=3.0),
+        get_io=Mock(return_value=SimpleNamespace(display_size=SimpleNamespace(x=1000, y=800))),
         calc_text_size=Mock(return_value=SimpleNamespace(x=80.0, y=12.0)),
         set_cursor_screen_pos=Mock(),
+        separator_text=Mock(),
+        text_wrapped=Mock(),
         text_disabled=Mock(),
-        get_io=Mock(return_value=SimpleNamespace(display_size=SimpleNamespace(x=1000, y=800))),
     )
 
 
@@ -225,3 +234,218 @@ def test_render_respects_window_state_and_centers_to_viewport(monkeypatch):
     assert positions[-1][1]["x"] == 200.0
     assert positions[-1][1]["y"] == 60.0
     panel._render_content.assert_called_once()
+
+
+def test_party_roster_presenter_keeps_source_records_and_notes_separate():
+    state = game_state(
+        {
+            "countries": pl.DataFrame({"id": ["USA"], "name": ["United States"]}),
+            "country_party_roster_2001": pl.DataFrame(
+                [{
+                    "country_id": "USA",
+                    "display_name": "Example Party",
+                    "leaders_text": "Example Leader",
+                    "leader_status": "reported",
+                    "source_entry": "Example Party [Example Leader]",
+                    "source_notes": "note - source context",
+                    "source_country": "United States",
+                    "source_reference": "Factbook 2001, United States, Political parties and leaders",
+                    "source_url": "https://www.gutenberg.org/cache/epub/27638/pg27638.txt",
+                    "source_note": "No comparable vote or support share is reported.",
+                }]
+            ),
+            "country_party_roster_coverage_2001": pl.DataFrame(
+                [{
+                    "country_id": "USA",
+                    "source_country": "United States",
+                    "status": "reported",
+                    "party_record_count": 1,
+                    "source_reference": "Factbook 2001, United States, Political parties and leaders",
+                    "source_url": "https://www.gutenberg.org/cache/epub/27638/pg27638.txt",
+                    "source_note": "No comparable vote or support share is reported.",
+                }]
+            ),
+        }
+    )
+
+    context = CountryMoreInfoPresenter().build(state, "USA").party_roster_2001
+
+    assert context.status == "reported"
+    assert context.source_country == "United States"
+    assert context.entries[0].source_entry == "Example Party [Example Leader]"
+    assert context.entries[0].leaders_text == "Example Leader"
+    assert context.source_notes == ("note - source context",)
+    assert "No comparable vote" in context.source_note
+
+
+def test_country_info_roster_dialog_shows_all_seven_explicit_coverage_statuses(monkeypatch):
+    missing = {
+        "ATA": ("party_field_not_reported", "Antarctica"),
+        "KOS": ("no_separate_country_entry", ""),
+        "MNE": ("no_separate_country_entry", ""),
+        "PSE": ("party_field_not_reported", "West Bank"),
+        "SRB": ("no_separate_country_entry", ""),
+        "SSD": ("no_separate_country_entry", ""),
+        "TLS": ("no_separate_country_entry", ""),
+    }
+    coverage = pl.DataFrame(
+        [
+            {
+                "country_id": country_id,
+                "source_country": source_country,
+                "status": status,
+                "party_record_count": 0,
+                "source_reference": "CIA World Factbook 2001",
+                "source_url": "https://www.gutenberg.org/cache/epub/27638/pg27638.txt",
+                "source_note": "No field-specific estimate year or party shares are reported.",
+            }
+            for country_id, (status, source_country) in missing.items()
+        ]
+    )
+    state = game_state({"country_party_roster_coverage_2001": coverage})
+    fake_imgui = imgui_stub()
+    monkeypatch.setattr(country_info_module, "imgui", fake_imgui)
+    panel = CountryMoreInfoPanel()
+
+    for country_id, (status, _source_country) in missing.items():
+        fake_imgui.text_wrapped.reset_mock()
+        fake_imgui.text_disabled.reset_mock()
+        model = CountryMoreInfoPresenter().build(state, country_id)
+        panel._render_party_roster_content(model)
+
+        status_labels = [call.args[0] for call in fake_imgui.text_disabled.call_args_list]
+        reasons = [call.args[0] for call in fake_imgui.text_wrapped.call_args_list]
+        assert f"Source status: {status}" in status_labels
+        assert any(country_id in reason for reason in reasons)
+        if status == "no_separate_country_entry":
+            assert any("no separate country entry" in reason for reason in reasons)
+        else:
+            assert any("does not report the Political parties and leaders field" in reason for reason in reasons)
+
+
+def test_country_info_button_opens_a_scrollable_factbook_roster_child_dialog(monkeypatch):
+    state = game_state(
+        {
+            "countries": pl.DataFrame({"id": ["USA"], "name": ["United States"]}),
+            "country_party_roster_2001": pl.DataFrame(
+                [{
+                    "country_id": "USA",
+                    "display_name": "Example Party",
+                    "leaders_text": "Example Leader",
+                    "leader_status": "reported",
+                    "source_entry": "Example Party [Example Leader]",
+                    "source_notes": "note - source context",
+                    "source_country": "United States",
+                    "source_reference": "Factbook 2001, United States, Political parties and leaders",
+                    "source_url": "https://www.gutenberg.org/cache/epub/27638/pg27638.txt",
+                    "source_note": "No comparable vote or support share is reported.",
+                }]
+            ),
+            "country_party_roster_coverage_2001": pl.DataFrame(
+                [{
+                    "country_id": "USA",
+                    "source_country": "United States",
+                    "status": "reported",
+                    "party_record_count": 1,
+                    "source_reference": "Factbook 2001, United States, Political parties and leaders",
+                    "source_url": "https://www.gutenberg.org/cache/epub/27638/pg27638.txt",
+                    "source_note": "No comparable vote or support share is reported.",
+                }]
+            ),
+        }
+    )
+    fake_imgui = imgui_stub()
+    fake_imgui.button.side_effect = [True, False]
+    monkeypatch.setattr(country_info_module, "imgui", fake_imgui)
+    monkeypatch.setattr(
+        country_info_module,
+        "get_gml_layout",
+        lambda _name: SimpleNamespace(width=519, height=431),
+    )
+    windows = []
+
+    @contextmanager
+    def window(title, **kwargs):
+        windows.append((title, kwargs))
+        yield True
+
+    monkeypatch.setattr(country_info_module.WindowManager, "window", window)
+    panel = CountryMoreInfoPanel()
+    panel._render_content = Mock()
+
+    assert panel.render(state, SimpleNamespace(target_tag="USA"))
+
+    assert len(windows) == 2
+    assert windows[1][1]["test_id"] == "country.info.party_roster.dialog"
+    assert windows[1][1]["closable"] is True
+    fake_imgui.begin_child.assert_called_once()
+    assert fake_imgui.begin_child.call_args.kwargs["test_id"] == "country.info.party_roster.list"
+    rendered_text = [call.args[0] for call in fake_imgui.text_wrapped.call_args_list]
+    assert "Example Party [Example Leader]" in rendered_text
+    assert "Leaders: Example Leader" in rendered_text
+    assert "note - source context" in rendered_text
+    assert not any("political_parties" in str(call) for call in fake_imgui.button.call_args_list)
+
+
+def test_country_info_election_results_keep_reported_metrics_and_missing_values_separate(
+    monkeypatch,
+):
+    table = pl.DataFrame(
+        [
+            {
+                "event_id": "KOS_2001_assembly",
+                "country_id": "KOS",
+                "election_date": "2001-11-17",
+                "additional_election_date": "",
+                "geography": "Kosovo (UN-administered territory)",
+                "result_label": "PGJK — Green Party of Kosovo",
+                "votes": 2325,
+                "vote_share_pct": 0.29,
+                "seats": 0,
+                "general_seats": None,
+                "special_seats": None,
+                "result_scope": "All 26 political entities; 120 Assembly seats.",
+                "source_name": "OSCE / Kosovo Central Election Commission",
+                "source_reference": "Certified Election 2001 results, page 1.",
+                "source_url": "https://example.org/kosovo-results.pdf",
+                "source_note": "Election held 17 November 2001.",
+            },
+            {
+                "event_id": "TLS_2001_assembly",
+                "country_id": "TLS",
+                "election_date": "2001-08-30",
+                "additional_election_date": "",
+                "geography": "East Timor",
+                "result_label": "FRETILIN",
+                "votes": None,
+                "vote_share_pct": 57.37,
+                "seats": 55,
+                "general_seats": 55,
+                "special_seats": 0,
+                "result_scope": "National-list ballot; 75 proportional seats.",
+                "source_name": "UNTAET Independent Electoral Commission",
+                "source_reference": "Final results announcement.",
+                "source_url": "https://example.org/timor-results.html",
+                "source_note": "Party raw vote counts were not published.",
+            },
+        ]
+    )
+    state = game_state({"country_election_results": table})
+
+    kosovo = CountryMoreInfoPresenter().build(state, "KOS")
+    timor = CountryMoreInfoPresenter().build(state, "TLS")
+
+    assert len(kosovo.election_results_2001) == 1
+    assert len(kosovo.election_results_2001[0].results) == 1
+    assert kosovo.election_results_2001[0].results[0].votes == 2325
+    assert kosovo.election_results_2001[0].results[0].seats == 0
+    assert timor.election_results_2001[0].results[0].votes is None
+
+    fake_imgui = imgui_stub()
+    monkeypatch.setattr(country_info_module, "imgui", fake_imgui)
+    CountryMoreInfoPanel._render_election_results(timor.election_results_2001)
+
+    rendered_text = [call.args[0] for call in fake_imgui.text_wrapped.call_args_list]
+    assert "FRETILIN — 57.37%, 55 seats (55 general, 0 special)" in rendered_text
+    assert "Party raw vote counts were not published." in rendered_text
+    assert not any("0 votes" in text for text in rendered_text)

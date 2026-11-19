@@ -47,7 +47,9 @@ class StopGameTask:
             check_cancelled(self._cancel_event)
             previous_session = getattr(self.window, "session", None)
             if previous_session is not None:
-                previous_session.shutdown()
+                # Failure to dispose an old session must not strand the player
+                # on the loading screen before a clean menu session starts.
+                shutdown_session(previous_session)
                 if getattr(self.window, "session", None) is previous_session:
                     self.window.session = None
 

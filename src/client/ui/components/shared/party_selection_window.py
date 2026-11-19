@@ -118,7 +118,9 @@ class PartySelectionWindow:
             for row in self._parties:
                 party_id = str(row.get("party_id") or "").strip()
                 name = str(row.get("display_name") or party_id)
-                support = _finite_number(row.get("support_share")) * 100.0
+                if _is_generic_incumbent(row):
+                    name = "Incumbent (fallback)"
+                support = _support_label(row)
                 if imgui.selectable(
                     f"{name}##party-{party_id}",
                     self._selected_party_id == party_id,
@@ -127,7 +129,7 @@ class PartySelectionWindow:
                 )[0]:
                     self._selected_party_id = party_id
                 imgui.same_line(218.0)
-                imgui.text(f"{support:.1f} %")
+                imgui.text(support)
             if not self._parties:
                 imgui.text_disabled("No political-party data available.")
         imgui.end_child()
@@ -151,3 +153,26 @@ def _finite_number(value) -> float:
     except (TypeError, ValueError, OverflowError):
         return 0.0
     return result if result == result and abs(result) != float("inf") else 0.0
+
+
+def _is_generic_incumbent(row: dict) -> bool:
+    return (
+        str(row.get("party_id") or "").strip().casefold() == "incumbent"
+        and str(row.get("display_name") or "").strip().casefold() == "incumbent"
+    )
+
+
+def _support_label(row: dict) -> str:
+    if _is_generic_incumbent(row):
+        return "—"
+    try:
+        support = float(row.get("support_share"))
+    except (TypeError, ValueError, OverflowError):
+        return "—"
+    if (
+        support != support
+        or support in (float("inf"), float("-inf"))
+        or not 0.0 <= support <= 1.0
+    ):
+        return "—"
+    return f"{support * 100.0:.1f} %"

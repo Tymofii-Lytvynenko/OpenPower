@@ -1,5 +1,4 @@
 from pathlib import Path
-from types import SimpleNamespace
 
 import polars as pl
 import pytest
@@ -158,6 +157,70 @@ Alien = 100
     assert not table.filter(pl.col("country_id") == "HUGE").height
     assert StaticAssetLoader._is_identity_other_bucket("other")
     assert not StaticAssetLoader._is_identity_other_bucket("english")
+
+
+def test_language_supplemental_context_is_separate_from_factbook_and_population_shares(tmp_path):
+    base = tmp_path / "base"
+    write_tsv(
+        base / "countries/country_languages.toml",
+        "[country_languages.KOS]\nAlbanian = 70\nSerbian = 20\nOther = 10\n",
+    )
+    write_tsv(
+        base / "sources/2001/country_languages_factbook_2001.tsv",
+        "country_id\tsource_country\tsource_status\tsource_field\tsource_note\tsource_url\n"
+        "KOS\tYugoslavia\tnot_separate_in_2001\t\t"
+        "Kosovo had no separate Factbook entry.\t"
+        "https://example.test/factbook-2001\n",
+    )
+    write_tsv(
+        base / "sources/2001/country_languages_supplemental_context_2001.tsv",
+        "country_id\tcontext_type\tsource_year\tsource_name\tsource_text\t"
+        "source_note\tsource_url\tsource_reference\n"
+        "KOS\tadministrative languages\t2000\tUNMIK direction\t"
+        "Gazette material used Albanian, Serbian and English.\t"
+        "Administrative publication context, not population shares.\t"
+        "https://example.test/unmik-2000\tSection 3.1\n",
+    )
+
+    table = StaticAssetLoader(StubConfig([base])).load_country_identity_distribution(
+        pl.DataFrame({"id": ["KOS"]})
+    )
+
+    assert table.height == 3
+    assert table["population_share"].sum() == pytest.approx(100.0)
+    assert set(table["source_year"].to_list()) == {0}
+    row = table.filter(pl.col("identity_id") == "albanian").to_dicts()[0]
+    assert "no separate 2001 Factbook entry" in row["source_reference"]
+    assert "example.test/unmik-2000" in row["source_reference"]
+    assert "not population shares" in row["source_note"]
+    assert "Gazette material used Albanian, Serbian and English" in row["source_note"]
+
+
+def test_bundled_language_supplements_only_extend_countries_without_factbook_language_fields():
+    data_dir = Path("modules/base/data")
+    factbook = pl.read_csv(
+        data_dir / "sources/2001/country_languages_factbook_2001.tsv",
+        separator="\t",
+        schema_overrides={"country_id": pl.Utf8, "source_status": pl.Utf8},
+    )
+    supplemental = pl.read_csv(
+        data_dir / "sources/2001/country_languages_supplemental_context_2001.tsv",
+        separator="\t",
+        schema_overrides={"country_id": pl.Utf8},
+    )
+    missing_factbook_ids = set(
+        factbook.filter(pl.col("source_status") != "reported")["country_id"].to_list()
+    )
+    supplemental_ids = set(supplemental["country_id"].to_list())
+    contexts = StaticAssetLoader._load_country_language_source_context(data_dir)
+
+    assert supplemental_ids == {"ATA", "KOS", "MNE", "SRB", "SSD", "TLS"}
+    assert supplemental_ids <= missing_factbook_ids
+    assert contexts["KOS"]["source_status"] == "not_separate_in_2001"
+    assert "source year 2000" in contexts["KOS"]["supplemental_context"]
+    assert "source year 1992" in contexts["MNE"]["supplemental_context"]
+    assert "no indigenous inhabitants" in contexts["ATA"]["supplemental_context"]
+    assert "multinational, temporary station population" in contexts["ATA"]["supplemental_context"]
 
 
 @pytest.mark.parametrize(

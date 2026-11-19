@@ -1,23 +1,23 @@
 from __future__ import annotations
 
-from src.client.ui.core.instrumented_imgui import imgui
-from src.client.ui.core.containers import WindowManager
-from src.client.ui.core.gml_widgets import GMLWidgets
-from src.client.ui.core.panel_close_intent import PanelCloseIntent
-from src.client.ui.core.panel_context import PanelRenderContext
-from src.client.ui.core.testability import semantic_region
 from src.client.ui.components.shared.dirty_close_confirmation import (
     CloseDecision,
     DirtyCloseConfirmation,
     SaveConfirmationPreferences,
 )
+from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.gml_widgets import GMLWidgets
+from src.client.ui.core.instrumented_imgui import imgui
+from src.client.ui.core.panel_close_intent import PanelCloseIntent
+from src.client.ui.core.panel_context import PanelRenderContext
+from src.client.ui.core.testability import semantic_region
 from src.client.ui.panels.military.presenter import MilitaryPresenter
+from src.client.ui.panels.shared.panel_data import get_country_row
+from src.shared.actions import ActionUpdateResearchFunding
 from src.shared.research_funding import (
     linked_research_funding_group,
     redistribute_linked_funding,
 )
-from src.shared.actions import ActionUpdateResearchFunding
-
 
 _RESEARCH_CATEGORIES = (
     ("ground", "GROUND", "togGround", "frmGroundFinancing"),
@@ -39,6 +39,10 @@ _RESEARCH_METRICS = (
     ("Stealth", "Stealth"),
     ("Countermeasures", "Countermeasures"),
 )
+_RESEARCH_METRIC_KEYS = {
+    metric_id: label.lower().replace(" ", "_")
+    for label, metric_id in _RESEARCH_METRICS
+}
 _DETAIL_TABS = (
     ("technology", "TECHNOLOGY", "Tab1"),
     ("progress", "PROGRESS", "Tab2"),
@@ -52,6 +56,7 @@ _STRATEGIC_TRACKS = (
 _FUNDING_COLOR = (0.28, 0.66, 0.35, 1.0)
 _PROGRESS_COLOR = (0.88, 0.70, 0.22, 1.0)
 _UNAVAILABLE_COLOR = (0.48, 0.54, 0.60, 1.0)
+_MODEL_COLOR = (0.34, 0.57, 0.78, 1.0)
 
 
 class UnitResearchPanel:
@@ -84,6 +89,7 @@ class UnitResearchPanel:
 
         draft_tag = self._draft_country_tag or target_tag
         draft_tracks = self._presenter.research_tracks_for_country(state, draft_tag)
+        country_row = get_country_row(state, draft_tag)
         tracks_by_branch = self._tracks_by_branch(draft_tracks)
         self._reconcile_funding_snapshot(draft_tag, tracks_by_branch, state)
         if not self._has_changes and draft_tag not in self._pending_funding_by_country:
@@ -122,7 +128,7 @@ class UnitResearchPanel:
                 self._render_categories(ui)
                 self._render_funding_controls(ui, tracks_by_branch, context, can_apply)
                 self._render_program_view(ui, tracks_by_branch)
-                self._render_detail_tabs(ui, tracks_by_branch, context, can_apply)
+                self._render_detail_tabs(ui, tracks_by_branch, country_row, context, can_apply)
 
             if close_decision is not None:
                 self._finish_close(close_decision, state, context, draft_tag)
@@ -219,8 +225,8 @@ class UnitResearchPanel:
             branch = self._selected_branch
             row = tracks_by_branch.get(branch)
             focus = str(row.get("focus") or self._branch_label(branch)) if row else "No research track"
-            level = max(0, int(row.get("research_level") or 0)) if row else None
-            progress = self._ratio(row.get("progress")) if row else None
+            level = self._research_level(row.get("research_level")) if row else None
+            progress = self._ratio_if_available(row.get("progress")) if row else None
             funding = self._funding_draft.get(branch, 0.0) if branch in self._funding_draft else None
 
             ui.text_at("frmView/frmModel", f"{self._branch_label(branch)} RESEARCH", offset=(14.0, 13.0), max_width=265.0)
@@ -235,8 +241,8 @@ class UnitResearchPanel:
                 next_y = 113.0
                 for track_branch, label in _STRATEGIC_TRACKS:
                     track = tracks_by_branch.get(track_branch)
-                    track_level = max(0, int(track.get("research_level") or 0)) if track else None
-                    track_progress = self._ratio(track.get("progress")) if track else None
+                    track_level = self._research_level(track.get("research_level")) if track else None
+                    track_progress = self._ratio_if_available(track.get("progress")) if track else None
                     track_text = (
                         f"{label}: LEVEL {track_level}  {track_progress:.0%}"
                         if track_level is not None and track_progress is not None
@@ -267,9 +273,10 @@ class UnitResearchPanel:
                 ui.text_at("frmView/frmModel", f"Branch funding: {funding_status}", offset=(14.0, 103.0), max_width=265.0)
                 ui.text_at(
                     "frmView/frmModel",
-                    "Per-stat metrics unavailable.",
+                    "2001 modeled characteristic factors.",
                     offset=(14.0, 127.0),
                     max_width=265.0,
+                    tooltip="Technology factors are low-confidence scenario estimates. Progress and funding are branch-level values shared across the characteristic slots.",
                 )
                 ui.text_at(
                     "frmView/frmModel",
@@ -284,6 +291,7 @@ class UnitResearchPanel:
         self,
         ui: GMLWidgets,
         tracks_by_branch: dict[str, dict],
+        country_row: dict,
         context: PanelRenderContext,
         can_apply: bool,
     ) -> None:
@@ -315,12 +323,13 @@ class UnitResearchPanel:
                 )
 
         selected = next((tab for tab in _DETAIL_TABS if tab[0] == self._selected_tab), _DETAIL_TABS[0])
-        self._render_detail_page(ui, tracks_by_branch, context, can_apply, selected)
+        self._render_detail_page(ui, tracks_by_branch, country_row, context, can_apply, selected)
 
     def _render_detail_page(
         self,
         ui: GMLWidgets,
         tracks_by_branch: dict[str, dict],
+        country_row: dict,
         context: PanelRenderContext,
         can_apply: bool,
         tab: tuple[str, str, str],
@@ -330,11 +339,11 @@ class UnitResearchPanel:
             branch = self._selected_branch
             page_root = f"frmDetails/tabResearch/{page}/frmInner"
             if tab_id == "progress":
-                unavailable = "Per-characteristic progress is not tracked in OpenPower."
+                unavailable = "Progress is stored per research branch and echoed across these characteristic slots."
             elif tab_id == "funding":
-                unavailable = "Funding is controlled per branch in the left panel."
+                unavailable = "Funding is stored per research branch and echoed across these characteristic slots."
             else:
-                unavailable = "Per-characteristic technology ceilings are not tracked in OpenPower."
+                unavailable = "Low-confidence 2001 modeled capability factor; this is not a measured national technology ceiling."
 
             can_edit = can_apply
             for index, (label, metric_id) in enumerate(_RESEARCH_METRICS):
@@ -349,13 +358,16 @@ class UnitResearchPanel:
                     display_label,
                     tooltip=(
                         f"OpenPower tracks {track_label.lower()} research as a separate branch."
-                        if strategic_track else unavailable
+                        if strategic_track and track is not None else unavailable
                     ),
                 )
                 meter_slot = f"{page_root}/frm{metric_id}"
-                if strategic_track and tab_id == "technology" and track is not None:
+                if strategic_track and tab_id == "technology":
+                    level = self._research_level(track.get("research_level")) if track else None
+                    if level is None:
+                        self._render_unavailable_meter(ui, meter_slot, tab_id, unavailable)
+                        continue
                     ui.meter(meter_slot, 0.0, _UNAVAILABLE_COLOR)
-                    level = max(0, int(track.get("research_level") or 0))
                     meter_rect = ui.rect(meter_slot)
                     if meter_rect is not None:
                         ui.text_at(
@@ -366,10 +378,42 @@ class UnitResearchPanel:
                         )
                     continue
 
-                if strategic_track and tab_id == "progress" and track is not None:
-                    progress = self._ratio(track.get("progress"))
+                if tab_id == "technology":
+                    factor_key = f"research_characteristic_{_RESEARCH_METRIC_KEYS[metric_id]}_factor_2001"
+                    factor_value = country_row.get(factor_key)
+                    if factor_value is not None:
+                        factor = self._ratio(factor_value)
+                        ui.meter(meter_slot, factor, _MODEL_COLOR)
+                        meter_rect = ui.rect(meter_slot)
+                        if meter_rect is not None:
+                            ui.text_at(
+                                meter_slot,
+                                f"~{factor:.0%}",
+                                offset=(max(0.0, meter_rect.width - 42.0), 0.0),
+                                max_width=42.0,
+                                color=_MODEL_COLOR,
+                                tooltip=unavailable,
+                            )
+                        continue
+
+                if strategic_track and tab_id == "progress":
+                    progress = self._ratio_if_available(track.get("progress")) if track else None
+                    if progress is None:
+                        self._render_unavailable_meter(ui, meter_slot, tab_id, unavailable)
+                        continue
                     ui.meter(meter_slot, progress, _PROGRESS_COLOR)
                     ui.text(f"{meter_slot}/lblValue", f"{progress:.0%}")
+                    continue
+
+                if tab_id == "progress":
+                    branch_track = tracks_by_branch.get(branch)
+                    progress = self._ratio_if_available(branch_track.get("progress")) if branch_track else None
+                    ui.meter(meter_slot, progress or 0.0, _PROGRESS_COLOR)
+                    ui.text(
+                        f"{meter_slot}/lblValue",
+                        f"{progress:.0%}" if progress is not None else "N/A",
+                        tooltip=unavailable,
+                    )
                     continue
 
                 if strategic_track and tab_id == "funding":
@@ -399,20 +443,43 @@ class UnitResearchPanel:
                         )
                     continue
 
-                ui.meter(meter_slot, 0.0, _UNAVAILABLE_COLOR)
-                if tab_id == "progress":
-                    ui.text(f"{meter_slot}/lblValue", "N/A", tooltip=unavailable)
-                else:
+                if tab_id == "funding":
+                    branch_track = tracks_by_branch.get(branch)
+                    funding = self._funding_draft.get(branch)
+                    has_funding = funding is not None and (
+                        branch_track is not None
+                        or branch in self._pending_funding_by_country.get(self._draft_country_tag, {})
+                    )
+                    ui.meter(meter_slot, self._ratio(funding), _FUNDING_COLOR)
                     meter_rect = ui.rect(meter_slot)
                     if meter_rect is not None:
                         ui.text_at(
                             meter_slot,
-                            "N/A",
-                            offset=(max(0.0, meter_rect.width - 28.0), 0.0),
-                            max_width=28.0,
-                            color=_UNAVAILABLE_COLOR,
+                            f"{self._ratio(funding):.0%}" if has_funding else "N/A",
+                            offset=(max(0.0, meter_rect.width - 34.0), 0.0),
+                            max_width=34.0,
                             tooltip=unavailable,
                         )
+                    continue
+
+                self._render_unavailable_meter(ui, meter_slot, tab_id, unavailable)
+
+    @staticmethod
+    def _render_unavailable_meter(ui, meter_slot: str, tab_id: str, tooltip: str) -> None:
+        ui.meter(meter_slot, 0.0, _UNAVAILABLE_COLOR)
+        if tab_id == "progress":
+            ui.text(f"{meter_slot}/lblValue", "N/A", tooltip=tooltip)
+            return
+        meter_rect = ui.rect(meter_slot)
+        if meter_rect is not None:
+            ui.text_at(
+                meter_slot,
+                "N/A",
+                offset=(max(0.0, meter_rect.width - 28.0), 0.0),
+                max_width=28.0,
+                color=_UNAVAILABLE_COLOR,
+                tooltip=tooltip,
+            )
 
     @staticmethod
     def _branch_label(branch: str) -> str:
@@ -424,6 +491,19 @@ class UnitResearchPanel:
             return max(0.0, min(1.0, float(value or 0.0)))
         except (TypeError, ValueError):
             return 0.0
+
+    @classmethod
+    def _ratio_if_available(cls, value: object) -> float | None:
+        return cls._ratio(value) if value is not None else None
+
+    @staticmethod
+    def _research_level(value: object) -> int | None:
+        if value is None:
+            return None
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError, OverflowError):
+            return None
 
     @staticmethod
     def _tracks_by_branch(rows: list[dict]) -> dict[str, dict]:

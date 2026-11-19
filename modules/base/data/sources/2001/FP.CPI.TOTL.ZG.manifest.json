@@ -1,0 +1,9 @@
+{
+  "indicator": "FP.CPI.TOTL.ZG",
+  "scenario_year": 2001,
+  "observation_year_filter": "2001",
+  "url": "https://api.worldbank.org/v2/country/all/indicator/FP.CPI.TOTL.ZG?date=2001&format=json&per_page=1000",
+  "data_url": "https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG",
+  "source_release_last_updated": "2026-11-11",
+  "sha256": "40dc0d2f53b32c8a7964f276a76eb9f32b8c0d182088ef22837fdfaf328fad90"
+}

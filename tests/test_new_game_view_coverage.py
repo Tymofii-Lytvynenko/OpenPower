@@ -27,8 +27,9 @@ def view_stub(state=None):
         config=Mock(),
         net=SimpleNamespace(get_state=Mock(return_value=state)),
         ui=SimpleNamespace(setup_frame=Mock()),
-        setup_stage="scenario",
+        setup_stage="freeplay",
         scenario_selection_window=Mock(),
+        freeplay_setup_window=Mock(),
         single_player_setup_window=Mock(),
         country_profile_window=Mock(),
         party_selection_window=Mock(),
@@ -37,7 +38,9 @@ def view_stub(state=None):
         campaign_scenarios=[],
         selected_scenario_id=None,
         selected_country_id=None,
+        _freeplay_country_id=None,
         selected_party_id="",
+        _freeplay_party_id="",
         renderer=Mock(),
         cam_ctrl=SimpleNamespace(
             min_distance=1.0,
@@ -58,6 +61,7 @@ def view_stub(state=None):
     )
     for method_name in (
         "_selected_scenario", "_select_scenario", "_enter_country_setup",
+        "_enter_scenario_selection", "_return_to_freeplay_setup",
         "_return_to_scenario_selection", "_return_to_main_menu", "_select_country",
         "_select_party", "_open_country_profile", "_open_party_selection",
         "_start_game", "_apply_country_selection_zoom",
@@ -93,6 +97,7 @@ def test_init_composes_shared_renderer_and_loads_initial_campaign_state(monkeypa
     monkeypatch.setattr(view_module, "UIComposer", lambda _theme: Mock())
     monkeypatch.setattr(view_module, "NetworkClient", lambda _session: network)
     monkeypatch.setattr(view_module, "CampaignScenarioSelectionWindow", Mock)
+    monkeypatch.setattr(view_module, "FreeplaySetupWindow", Mock)
     monkeypatch.setattr(view_module, "SinglePlayerSetupWindow", Mock)
     monkeypatch.setattr(view_module, "CountryProfileWindow", lambda _callback: Mock())
 
@@ -113,10 +118,10 @@ def test_init_composes_shared_renderer_and_loads_initial_campaign_state(monkeypa
 
     view = NewGameView(session, Mock())
 
-    assert view.setup_stage == "scenario"
+    assert view.setup_stage == "freeplay"
     assert view.selected_country_id is None
-    assert view.selected_scenario_id == "country"
-    assert view.playable_countries["id"].to_list() == ["USA"]
+    assert view.selected_scenario_id is None
+    assert view.playable_countries["id"].to_list() == ["CAN", "USA"]
     assert view.all_playable_countries["id"].to_list() == ["CAN", "USA"]
     shared_renderer.set_overlay_style.assert_called_once_with(enabled=True, opacity=0.0)
     shared_renderer.update_overlay.assert_called_once_with({1: (1, 2, 3), 2: (1, 2, 3)})
@@ -146,7 +151,13 @@ def test_init_uses_fallback_renderer_when_window_has_no_shared_renderer(monkeypa
     monkeypatch.setattr(map_module, "MapRenderer", lambda **_kwargs: fallback_renderer)
     monkeypatch.setattr(camera_module, "CameraController", lambda: fallback_camera)
 
-    view = NewGameView(session, Mock(get_asset_path=lambda path: f"asset:{path}"))
+    view = NewGameView(
+        session,
+        Mock(
+            get_asset_path=lambda path: f"asset:{path}",
+            get_data_dirs=lambda: [],
+        ),
+    )
 
     assert view.renderer is fallback_renderer
     assert view.cam_ctrl is fallback_camera
@@ -244,9 +255,40 @@ def test_scenario_selection_filters_countries_and_clears_invalid_selection():
     assert NewGameView._selected_scenario(view) is None
 
 
+def test_entering_optional_scenario_clears_ineligible_freeplay_country_and_restores_it():
+    view = view_stub()
+    view.all_playable_countries = pl.DataFrame({
+        "id": ["USA", "CAN"],
+        "is_playable": [True, True],
+    })
+    view.campaign_scenarios = [
+        {"id": "north", "selectable_country_ids_json": '["USA"]'},
+    ]
+    view.selected_country_id = "CAN"
+    view.selected_party_id = "party-can"
+    view._select_country = Mock()
+
+    NewGameView._enter_scenario_selection(view)
+
+    assert view.setup_stage == "scenario"
+    assert view._freeplay_country_id == "CAN"
+    assert view._freeplay_party_id == "party-can"
+    assert view.selected_country_id is None
+    assert view.selected_party_id == ""
+    assert view.playable_countries["id"].to_list() == ["USA"]
+
+    NewGameView._return_to_freeplay_setup(view)
+
+    assert view.setup_stage == "freeplay"
+    assert view.selected_country_id == "CAN"
+    assert view.selected_party_id == "party-can"
+    view._select_country.assert_called_once_with("CAN")
+
+
 def test_render_ui_routes_scenario_and_country_setup_callbacks(monkeypatch):
     state = SimpleNamespace(tables={})
     view = view_stub(state)
+    view.setup_stage = "scenario"
     view.campaign_scenarios = [{"id": "start"}]
     view.selected_scenario_id = "start"
 
@@ -258,6 +300,20 @@ def test_render_ui_routes_scenario_and_country_setup_callbacks(monkeypatch):
     args[5]()
     assert view.setup_stage == "country"
     args[6]()
+    assert view.setup_stage == "freeplay"
+    assert view.selected_scenario_id is None
+    assert view.nav.show_main_menu.call_count == 0
+
+    view = view_stub(state)
+    monkeypatch.setattr(view_module, "resolve_country_name", lambda _state, tag: tag)
+    NewGameView._render_ui(view)
+    freeplay_args = view.freeplay_setup_window.render.call_args.args
+    assert freeplay_args[:6] == (1280, 720, [("USA", "USA - USA")], None, "", False)
+    freeplay_args[10]()
+    assert view.setup_stage == "scenario"
+
+    view = view_stub(state)
+    view._return_to_main_menu()
     view.renderer.clear_highlight.assert_called_once_with()
     view.renderer.set_overlay_style.assert_called_once_with(enabled=False, opacity=0.0)
     view.nav.show_main_menu.assert_called_once_with(view.session, view.config)
@@ -294,6 +350,7 @@ def test_render_ui_routes_scenario_and_country_setup_callbacks(monkeypatch):
 
 def test_stage_and_country_party_selection_callbacks(monkeypatch):
     view = view_stub()
+    assert view.setup_stage == "freeplay"
     NewGameView._enter_country_setup(view)
     assert view.setup_stage == "country"
     NewGameView._return_to_scenario_selection(view)
@@ -378,6 +435,7 @@ def test_start_game_builds_task_and_navigates_with_success_context(monkeypatch):
     NewGameView._start_game(view)
     view.nav.show_loading.assert_not_called()
 
+    view.setup_stage = "country"
     view.selected_country_id = "USA"
     view.selected_scenario_id = "scenario-1"
     task_module = __import__("src.client.tasks.new_game_task", fromlist=["NewGameTask"])
@@ -385,13 +443,21 @@ def test_start_game_builds_task_and_navigates_with_success_context(monkeypatch):
     task_factory = Mock(return_value=task)
     monkeypatch.setattr(task_module, "NewGameTask", task_factory)
     success_callbacks = []
-    view.nav.show_loading.side_effect = lambda current, *, on_success: success_callbacks.append(on_success)
+    return_callbacks = []
+
+    def capture_loading(current, *, on_success, on_return):
+        success_callbacks.append(on_success)
+        return_callbacks.append(on_return)
+
+    view.nav.show_loading.side_effect = capture_loading
     NewGameView._start_game(view)
 
     task_factory.assert_called_once_with(
         view.window, view.config, "USA", "scenario-1", "",
     )
-    view.nav.show_loading.assert_called_once_with(task, on_success=success_callbacks[0])
+    view.nav.show_loading.assert_called_once_with(
+        task, on_success=success_callbacks[0], on_return=return_callbacks[0]
+    )
     new_session = object()
     success_callbacks[0](SimpleNamespace(
         session=new_session, player_tag="USA", start_pos=(10, 20),
@@ -403,6 +469,21 @@ def test_start_game_builds_task_and_navigates_with_success_context(monkeypatch):
         player_tag="USA",
         initial_pos=(10, 20),
     )
+
+
+def test_start_game_uses_freeplay_task_without_scenario(monkeypatch):
+    view = view_stub()
+    view.selected_country_id = "USA"
+    view.selected_party_id = "party-1"
+    task_module = __import__("src.client.tasks.freeplay_start_task", fromlist=["FreeplayStartTask"])
+    task = Mock()
+    task_factory = Mock(return_value=task)
+    monkeypatch.setattr(task_module, "FreeplayStartTask", task_factory)
+
+    NewGameView._start_game(view)
+
+    task_factory.assert_called_once_with(view.window, view.config, "USA", "party-1")
+    view.nav.show_loading.assert_called_once()
 
 
 def test_draw_and_mouse_events_forward_to_renderer_and_camera():

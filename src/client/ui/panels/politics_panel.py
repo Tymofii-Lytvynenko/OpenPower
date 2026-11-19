@@ -1,11 +1,10 @@
-from src.client.ui.core.instrumented_imgui import imgui
-
-from src.client.ui.core.theme import GAMETHEME
-from src.client.ui.core.gml_widgets import GMLWidgets
 from src.client.ui.core.containers import WindowManager
+from src.client.ui.core.gml_widgets import GMLWidgets
+from src.client.ui.core.instrumented_imgui import imgui
 from src.client.ui.core.panel_context import PanelRenderContext
-from src.client.ui.panels.politics.presenter import PoliticsPresenter
+from src.client.ui.core.theme import GAMETHEME
 from src.client.ui.layouts.main_pillar_positions import main_pillar_position
+from src.client.ui.panels.politics.presenter import PoliticsPresenter
 
 
 class PoliticsPanel:
@@ -60,11 +59,11 @@ class PoliticsPanel:
             ui.text(f"{section}/lblTitle", label)
             ui.text(f"{section}/txtValue", f"{value:.0f}%")
             ui.meter(f"{section}/frmGradient", value / 100.0, color)
-        # The simulation has no REFERENCE political-pressure field; keep its slot explicit.
+        pressure = summary.political_pressure_pct
         ui.text("frmPressure/lblTitle", "POLITICAL PRESSURE")
-        ui.text("frmPressure/txtValue", "N/A", color=GAMETHEME.colors.text_dim,
-                tooltip="Political pressure is not available in the current simulation.")
-        ui.meter("frmPressure/frmGradient", 0.0, GAMETHEME.colors.text_dim)
+        ui.text("frmPressure/txtValue", f"{pressure:.1f}%", color=GAMETHEME.colors.text_dim,
+                tooltip="Military-value pressure from countries sponsoring unanswered or suspended agreements.")
+        ui.meter("frmPressure/frmGradient", pressure / 100.0, GAMETHEME.colors.warning)
         if ui.button("btnTreaties", "TREATIES" if is_own else "DIPLOMATIC ACTIONS",
                      "politics.open_treaties", enabled=self._open_treaties_cb is not None,
                      tooltip=f"Active treaties: {summary.active_treaties}\nPending proposals: {summary.pending_treaties}"):

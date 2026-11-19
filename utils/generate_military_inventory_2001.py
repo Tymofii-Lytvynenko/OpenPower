@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import argparse
 import csv
 import math
 from pathlib import Path
-
+from typing import Iterable, Mapping
 
 ROOT = Path(__file__).resolve().parents[1]
 COUNTRY_DIR = ROOT / "modules" / "base" / "data" / "countries"
@@ -243,19 +244,24 @@ def _support_staff(personnel: int, counts: dict[str, int]) -> int:
     return support_staff
 
 
-def main() -> None:
-    military_rows = _read_tsv(MILITARY_PATH)
-    development_by_country = {
-        row["id"].strip().upper(): float(row.get("human_dev") or 0.45)
-        for row in _read_tsv(DEVELOPMENT_PATH)
-    }
-    field_names = ["id", "military_count"] + [
-        f"military_{role}_quantity_2001" for role in UNIT_ROLES
-    ]
-
-    output_rows = []
-    for source in military_rows:
+def generate_inventory_rows(
+    military_rows: Iterable[dict[str, str]],
+    development_by_country: Mapping[str, float],
+    only_country_ids: Iterable[str] | None = None,
+) -> list[dict[str, str]]:
+    """Regenerate all roles or a selected subset while preserving other source rows."""
+    selected = (
+        {country_id.strip().upper() for country_id in only_country_ids}
+        if only_country_ids is not None
+        else None
+    )
+    rewritten_rows: dict[str, dict[str, str]] = {}
+    source_rows = [dict(row) for row in military_rows]
+    for source in source_rows:
         country_id = source["id"].strip().upper()
+        if selected is not None and country_id not in selected:
+            continue
+
         personnel = max(0, int(float(source.get("military_count") or 0)))
         counts = _base_inventory(country_id, personnel, development_by_country.get(country_id, 0.45))
         for profile in (
@@ -267,24 +273,45 @@ def main() -> None:
             for role, count in profile.get(country_id, {}).items():
                 counts[role] = max(0, int(count))
         counts["infantry"] = max(0, personnel - _support_staff(personnel, counts))
-        output_rows.append(
-            {
-                "id": country_id,
-                "military_count": personnel,
-                **{
-                    f"military_{role}_quantity_2001": counts[role]
-                    for role in UNIT_ROLES
-                },
-            }
-        )
+        rewritten_rows[country_id] = {
+            "id": country_id,
+            "military_count": str(personnel),
+            **{
+                f"military_{role}_quantity_2001": str(counts[role])
+                for role in UNIT_ROLES
+            },
+        }
+
+    if selected is not None:
+        missing = selected.difference(rewritten_rows)
+        if missing:
+            raise ValueError(f"Unknown military inventory country id(s): {', '.join(sorted(missing))}.")
+    return [rewritten_rows.get(row["id"].strip().upper(), row) for row in source_rows]
+
+
+def main(only_country_ids: Iterable[str] | None = None) -> None:
+    selected_country_ids = tuple(only_country_ids) if only_country_ids is not None else None
+    military_rows = _read_tsv(MILITARY_PATH)
+    development_by_country = {
+        row["id"].strip().upper(): float(row.get("human_dev") or 0.45)
+        for row in _read_tsv(DEVELOPMENT_PATH)
+    }
+    field_names = ["id", "military_count"] + [
+        f"military_{role}_quantity_2001" for role in UNIT_ROLES
+    ]
+    output_rows = generate_inventory_rows(military_rows, development_by_country, selected_country_ids)
 
     with MILITARY_PATH.open("w", encoding="utf-8", newline="") as destination:
         writer = csv.DictWriter(destination, fieldnames=field_names, delimiter="\t", lineterminator="\n")
         writer.writeheader()
         writer.writerows(output_rows)
 
-    print(f"Wrote 2001 military inventories for {len(output_rows)} country roster entries.")
+    regenerated_count = len(output_rows) if selected_country_ids is None else len(set(selected_country_ids))
+    print(f"Wrote 2001 military inventory rows for {len(output_rows)} countries; regenerated {regenerated_count}.")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Generate the 2001 country military inventory.")
+    parser.add_argument("--country", nargs="+", help="Regenerate only these country IDs.")
+    arguments = parser.parse_args()
+    main(arguments.country)

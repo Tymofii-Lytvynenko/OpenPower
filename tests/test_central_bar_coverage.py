@@ -114,6 +114,33 @@ def test_background_and_sphere_meters_render_data_and_unavailable_values(monkeyp
     assert ui.segmented_meter.call_args_list[1].kwargs["tooltip"] == "Military: 75.0%"
 
 
+def test_sphere_metrics_cache_tracks_authoritative_revisions_and_country(monkeypatch):
+    metrics = {"frmMeterPolitic": SimpleNamespace(value=50.0, label="Politics")}
+    resolve_metrics = Mock(return_value=metrics)
+    monkeypatch.setattr(central_bar_module, "main_bar_sphere_metrics", resolve_metrics)
+    bar = object.__new__(CentralBar)
+    bar.active_tag = "UKR"
+    state = SimpleNamespace(
+        globals={"tick": 1},
+        table_revisions={"countries": 2, "units": 3},
+    )
+
+    assert bar._sphere_metrics_for(state) is metrics
+    assert bar._sphere_metrics_for(state) is metrics
+    resolve_metrics.assert_called_once_with(state, "UKR")
+
+    state.table_revisions["units"] += 1
+    bar._sphere_metrics_for(state)
+    bar.active_tag = "USA"
+    bar._sphere_metrics_for(state)
+
+    assert [call.args for call in resolve_metrics.call_args_list] == [
+        (state, "UKR"),
+        (state, "UKR"),
+        (state, "USA"),
+    ]
+
+
 def test_country_section_dispatches_focus_selector_and_optional_actions(monkeypatch):
     imgui = _imgui_mock(monkeypatch)
     imgui.get_item_rect_min.return_value = SimpleNamespace(x=10.0, y=20.0)
@@ -153,7 +180,7 @@ def test_country_section_dispatches_focus_selector_and_optional_actions(monkeypa
 
 
 def test_quick_actions_and_time_section_follow_callbacks_and_speed_state(monkeypatch):
-    imgui = _imgui_mock(monkeypatch)
+    _imgui_mock(monkeypatch)
     bar = object.__new__(CentralBar)
     advisor, history, mail = Mock(), Mock(), Mock()
     bar._open_ai_cb, bar._open_statistics_cb, bar._open_mail_cb = advisor, history, mail

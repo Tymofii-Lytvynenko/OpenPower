@@ -1,14 +1,59 @@
-import rtoml
-import polars as pl
-from pathlib import Path
-import re
-import math
 import hashlib
+import logging
+import math
+import re
 import unicodedata
-from typing import List, Dict, Any, Optional
+from pathlib import Path
+from typing import Sequence, Any, Dict, List
+
+import polars as pl
+import rtoml
 from PIL import Image
+
+from src.core.paths import resolve_region_map_path
 from src.shared.config import GameConfig
 from src.shared.state import GameState
+
+logger = logging.getLogger(__name__)
+
+
+def warn_unregistered_region_owners(regions: pl.DataFrame, countries: pl.DataFrame) -> None:
+    """Identify unresolved owner codes after all startup layers have been applied."""
+    if "owner" not in regions.columns:
+        return
+    country_ids = set(countries["id"].drop_nulls()) if "id" in countries.columns else set()
+    owner_counts = (
+        regions.filter(pl.col("owner").is_not_null() & (pl.col("owner") != ""))
+        .group_by("owner").len().sort("owner")
+    )
+    unresolved = [f"{owner} ({count})" for owner, count in owner_counts.iter_rows() if owner not in country_ids]
+    if unresolved:
+        logger.warning("Region owners missing from the country roster: %s", ", ".join(unresolved))
+
+
+def merge_layered_records(layers: Sequence[pl.DataFrame], keys: Sequence[str]) -> pl.DataFrame:
+    valid_layers = [df for df in layers if not df.is_empty() and set(keys).issubset(df.columns)]
+    if not valid_layers:
+        return pl.DataFrame()
+    if len(valid_layers) == 1 and not valid_layers[0].select(list(keys)).is_duplicated().any():
+        return valid_layers[0]
+    # Duplicate extension keys must not multiply master rows during joins.
+
+    tagged_layers = [
+        df.with_columns(pl.lit(priority).alias("__layer_priority"))
+        for priority, df in enumerate(valid_layers)
+    ]
+    combined = pl.concat(tagged_layers, how="diagonal_relaxed")
+
+    value_cols = [column for column in combined.columns if column not in {*keys, "__layer_priority"}]
+    if not value_cols:
+        return combined.select(list(keys)).unique(maintain_order=True)
+
+    aggregated_columns = [
+        pl.col(column).sort_by("__layer_priority").drop_nulls().last().alias(column)
+        for column in value_cols
+    ]
+    return combined.group_by(list(keys), maintain_order=True).agg(aggregated_columns)
 
 class StaticAssetLoader:
     """
@@ -48,6 +93,7 @@ class StaticAssetLoader:
         # These are the physical actors and locations in the game.
         state.update_table("regions", self._load_regions())
         state.update_table("countries", self._load_countries())
+        warn_unregistered_region_owners(state.get_table("regions"), state.get_table("countries"))
         state.update_table(
             "country_identity_distribution",
             self.load_country_identity_distribution(state.get_table("countries")),
@@ -71,10 +117,14 @@ class StaticAssetLoader:
     # =========================================================================
 
     def _load_regions(self) -> pl.DataFrame:
-        """
-        Aggregates region data. Mods can override regions by Hex Color ID.
-        """
-        dfs = []
+        master_df = self.load_master_regions()
+        if master_df.is_empty():
+            return master_df
+        return self._add_region_geo_columns(self._generate_runtime_ids(master_df))
+
+    def load_master_regions(self) -> pl.DataFrame:
+        """Merge region layers by normalized map color before deriving runtime IDs."""
+        layers = []
         for data_dir in self.config.get_data_dirs():
             # Support both new 'regions' folder and legacy 'map' folder
             p_new = data_dir / "regions" / "regions.tsv"
@@ -83,60 +133,55 @@ class StaticAssetLoader:
             
             if p.exists():
                 print(f"[StaticLoader] Loading regions from {p}")
-                dfs.append(self._read_tsv(p))
-        
-        if not dfs:
-            print("[StaticLoader] Warning: No region definitions found.")
-            return pl.DataFrame()
-            
-        # Vertical concatenation with deduplication ensures mod overrides work.
-        # keep='last' means the last loaded mod (highest priority) wins.
-        master_df = pl.concat(dfs, how="vertical").unique(subset=["hex"], keep="last")
-        
-        master_df = self._generate_runtime_ids(master_df)
-        return self._add_region_geo_columns(master_df)
+                frame = self._read_tsv(p)
+                if "hex" not in frame.columns:
+                    raise ValueError(f"Region data in '{p}' is missing the 'hex' column.")
+                frame = frame.with_columns(pl.col("hex").str.strip_chars().str.strip_prefix("#").str.to_uppercase())
+                invalid = frame.filter(~pl.col("hex").str.contains(r"^[0-9A-F]{6}$").fill_null(False))
+                if not invalid.is_empty():
+                    examples = ", ".join(repr(value) for value in invalid["hex"].head(3))
+                    raise ValueError(f"Invalid region colors in '{p}': {examples}. Expected six RGB hex digits.")
+                layers.append(frame)
+        return merge_layered_records(layers, keys=["hex"])
 
     def _load_countries(self) -> pl.DataFrame:
-        """
-        Aggregates country definitions. 
-        Merges the main 'countries.tsv' with any extension files (Horizontal Join).
-        """
-        main_df = pl.DataFrame()
-        
-        # 1. Master Table (Base definitions)
-        # Iterating to find the main country list. Currently, we overwrite 
-        # previous lists, assuming the last mod provides the definitive list.
+        """Load the same layered country roster for world startup and static consumers."""
+
+        master_layers: List[pl.DataFrame] = []
         for data_dir in self.config.get_data_dirs():
             master_path = data_dir / "countries" / "countries.tsv"
             if master_path.exists():
-                main_df = self._read_tsv(master_path)
-        
+                master_layers.append(self._read_tsv(master_path))
+
+        main_df = merge_layered_records(master_layers, keys=["id"])
         if main_df.is_empty():
             return pl.DataFrame()
 
-        # 2. Extensions (Adding columns via 'countries_*.tsv')
-        # This allows mods to add new mechanics (e.g., 'countries_magic.tsv')
-        # without redefining the entire country list.
+        layered_extensions: Dict[str, List[pl.DataFrame]] = {}
         for data_dir in self.config.get_data_dirs():
             target_dir = data_dir / "countries"
-            if not target_dir.exists(): continue
+            if not target_dir.exists():
+                continue
 
             for file_path in target_dir.glob("countries_*.tsv"):
-                print(f"[StaticLoader] Merging country extension: {file_path.name}")
                 aux_df = self._read_tsv(file_path)
-                
-                if "id" not in aux_df.columns: 
+                if "id" not in aux_df.columns:
                     continue
-                
-                # Left join ensures we don't lose countries if the extension is partial
-                main_df = main_df.join(aux_df, on="id", how="left")
+                layered_extensions.setdefault(file_path.name, []).append(aux_df)
 
-        # 3. Safety Fill
-        # Fill numeric NaNs with 0 to prevent crashes during math operations later.
-        num_cols = [c for c, t in main_df.schema.items() if t in (pl.Float64, pl.Int64, pl.Int32, pl.UInt32)]
+        for file_name in sorted(layered_extensions):
+            merged_extension = merge_layered_records(layered_extensions[file_name], keys=["id"])
+            if merged_extension.is_empty() or merged_extension.columns == ["id"]:
+                continue
+
+            print(f"[DataLoader] Merging country data: {file_name}")
+            main_df = main_df.join(merged_extension, on="id", how="left")
+
+        num_cols = [c for c, t in main_df.schema.items() if t in (pl.Float64, pl.Int64, pl.Int32)]
         if num_cols:
             main_df = main_df.with_columns(pl.col(num_cols).fill_null(0))
 
+        print(f"[DataLoader] Countries loaded: {len(main_df)} rows.")
         return main_df
 
     def load_country_identity_distribution(self, countries: pl.DataFrame) -> pl.DataFrame:
@@ -160,15 +205,21 @@ class StaticAssetLoader:
             str(country_id or "").strip().upper()
             for country_id in countries.get_column("id").to_list()
         }
-        profiles: dict[tuple[str, str], tuple[dict[str, float], dict[str, str], str]] = {}
+        profiles: dict[
+            tuple[str, str],
+            tuple[dict[str, float], dict[str, str], str, dict[str, str] | None],
+        ] = {}
         files = (
             ("language", "country_languages.toml", "country_languages"),
             ("religion", "country_religions.toml", "country_religions"),
         )
 
-        # Later mod layers replace the complete profile for a country, matching
-        # the precedence used for the base country's static TSV data.
-        for data_dir in self.config.get_data_dirs():
+        # Later mod layers replace profiles, while absent source notes inherit from base data.
+        data_dirs = self.config.get_data_dirs()
+        language_sources: dict[str, dict[str, str]] = {}
+        for data_dir in data_dirs:
+            language_sources.update(self._load_country_language_source_context(data_dir))
+        for data_dir in data_dirs:
             for identity_type, filename, section_name in files:
                 file_path = data_dir / "countries" / filename
                 if not file_path.is_file():
@@ -198,14 +249,62 @@ class StaticAssetLoader:
                         parsed[identity_id] = parsed.get(identity_id, 0.0) + share
                         display_names[identity_id] = name
                     if parsed:
-                        profiles[(identity_type, country)] = (parsed, display_names, filename)
+                        language_source = (
+                            language_sources.get(country)
+                            if identity_type == "language"
+                            else None
+                        )
+                        profiles[(identity_type, country)] = (
+                            parsed,
+                            display_names,
+                            filename,
+                            language_source,
+                        )
 
         rows: list[dict[str, Any]] = []
-        for (identity_type, country_id), (values, display_names, filename) in sorted(profiles.items()):
+        for (identity_type, country_id), (
+            values,
+            display_names,
+            filename,
+            language_source,
+        ) in sorted(profiles.items()):
             total = sum(values.values())
             if not math.isfinite(total) or total <= 0.0:
                 continue
             source_note = "Bundled gameplay estimate; the original census/source year is not recorded."
+            source_reference = filename
+            if language_source is not None:
+                source_country = language_source.get("source_country", "")
+                source_status = language_source.get("source_status", "")
+                source_field = language_source.get("source_field", "")
+                source_url = language_source.get("source_url", "")
+                if source_status == "not_separate_in_2001":
+                    source_reference = (
+                        f"{filename}; no separate 2001 Factbook entry for {country_id} "
+                        f"({source_url})"
+                    )
+                else:
+                    source_reference = (
+                        f"Population shares: {filename}; contextual language source: "
+                        f"CIA World Factbook 2001, {source_country or country_id} "
+                        f"({source_url})"
+                    )
+                source_note = (
+                    "The displayed population share remains an OpenPower gameplay "
+                    "estimate; this country-level source description does not validate "
+                    "the row's numeric share. The 2001 Factbook edition does not give "
+                    "a consistent observation year for language descriptions. "
+                )
+                if source_status == "reported" and source_field:
+                    source_note += f"Factbook Languages field: {source_field}"
+                else:
+                    source_note += language_source.get("source_note", "No language field is recorded.")
+                supplemental_context = language_source.get("supplemental_context", "")
+                supplemental_reference = language_source.get("supplemental_reference", "")
+                if supplemental_context:
+                    source_note += f" {supplemental_context}"
+                if supplemental_reference:
+                    source_reference += f"; {supplemental_reference}"
             for identity_id, value in sorted(values.items()):
                 display_name = display_names.get(identity_id, identity_id.replace("_", " ").title())
                 rows.append(
@@ -217,12 +316,114 @@ class StaticAssetLoader:
                         "population_share": (value / total) * 100.0,
                         "source_name": "OpenPower bundled estimate",
                         "source_year": 0,
-                        "source_reference": filename,
+                        "source_reference": source_reference,
                         "source_note": source_note,
                         "is_other_bucket": self._is_identity_other_bucket(identity_id),
                     }
                 )
         return pl.DataFrame(rows, schema=schema, strict=False)
+
+    @staticmethod
+    def _load_country_language_source_context(data_dir: Path) -> dict[str, dict[str, str]]:
+        """Read optional historical language notes without treating them as shares."""
+        source_path = data_dir / "sources" / "2001" / "country_languages_factbook_2001.tsv"
+        contexts: dict[str, dict[str, str]] = {}
+        if source_path.is_file():
+            try:
+                source_frame = pl.read_csv(
+                    source_path,
+                    separator="\t",
+                    schema_overrides={
+                        "country_id": pl.Utf8,
+                        "source_country": pl.Utf8,
+                        "source_status": pl.Utf8,
+                        "source_field": pl.Utf8,
+                        "source_note": pl.Utf8,
+                        "source_url": pl.Utf8,
+                    },
+                )
+            except Exception as error:
+                raise RuntimeError(
+                    f"Failed to read country language source context: {source_path}"
+                ) from error
+
+            contexts = {
+                str(row.get("country_id") or "").strip().upper(): {
+                    key: str(row.get(key) or "").strip()
+                    for key in (
+                        "source_country",
+                        "source_status",
+                        "source_field",
+                        "source_note",
+                        "source_url",
+                    )
+                }
+                for row in source_frame.iter_rows(named=True)
+                if str(row.get("country_id") or "").strip()
+            }
+
+        supplemental_path = data_dir / "sources" / "2001" / "country_languages_supplemental_context_2001.tsv"
+        if not supplemental_path.is_file():
+            return contexts
+
+        try:
+            supplemental_frame = pl.read_csv(
+                supplemental_path,
+                separator="\t",
+                schema_overrides={
+                    "country_id": pl.Utf8,
+                    "context_type": pl.Utf8,
+                    "source_year": pl.Int32,
+                    "source_name": pl.Utf8,
+                    "source_text": pl.Utf8,
+                    "source_note": pl.Utf8,
+                    "source_url": pl.Utf8,
+                    "source_reference": pl.Utf8,
+                },
+            )
+        except Exception as error:
+            raise RuntimeError(
+                f"Failed to read supplemental country language context: {supplemental_path}"
+            ) from error
+
+        for row in supplemental_frame.iter_rows(named=True):
+            country_id = str(row.get("country_id") or "").strip().upper()
+            if not country_id:
+                continue
+            source_year = row.get("source_year")
+            context = (
+                f"Supplementary {str(row.get('context_type') or 'historical').strip()} context "
+                f"({str(row.get('source_name') or '').strip()}, source year {source_year}): "
+                f"{str(row.get('source_text') or '').strip()} "
+                f"{str(row.get('source_note') or '').strip()}"
+            ).strip()
+            reference = (
+                f"{str(row.get('source_reference') or row.get('source_name') or '').strip()} "
+                f"({str(row.get('source_url') or '').strip()})"
+            ).strip()
+            source = contexts.setdefault(
+                country_id,
+                {
+                    key: ""
+                    for key in (
+                        "source_country",
+                        "source_status",
+                        "source_field",
+                        "source_note",
+                        "source_url",
+                    )
+                },
+            )
+            if context:
+                source["supplemental_context"] = " ".join(
+                    value for value in (source.get("supplemental_context", ""), context) if value
+                )
+            if reference:
+                source["supplemental_reference"] = "; ".join(
+                    value for value in (source.get("supplemental_reference", ""), reference) if value
+                )
+
+        return contexts
 
     @staticmethod
     def _identity_slug(display_name: str) -> str:
@@ -296,12 +497,7 @@ class StaticAssetLoader:
         )
 
     def _get_region_map_dimensions(self, regions_df: pl.DataFrame) -> tuple[int, int]:
-        for data_dir in self.config.get_data_dirs():
-            candidate = data_dir / "regions" / "regions.png"
-            if candidate.exists():
-                return self._read_image_size(candidate)
-
-        fallback = self.config.get_asset_path("map/regions.png")
+        fallback = resolve_region_map_path(self.config)
         if fallback.exists():
             return self._read_image_size(fallback)
 

@@ -1,0 +1,4268 @@
+[
+  {
+    "page": 1,
+    "pages": 1,
+    "per_page": 1000,
+    "total": 266,
+    "sourceid": "2",
+    "lastupdated": "2026-11-11"
+  },
+  [
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ZH",
+        "value": "Africa Eastern and Southern"
+      },
+      "countryiso3code": "AFE",
+      "date": "2001",
+      "value": 38.9039800957902,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ZI",
+        "value": "Africa Western and Central"
+      },
+      "countryiso3code": "AFW",
+      "date": "2001",
+      "value": 21.5031563447265,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "1A",
+        "value": "Arab World"
+      },
+      "countryiso3code": "ARB",
+      "date": "2001",
+      "value": 1.72047979289802,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "S3",
+        "value": "Caribbean small states"
+      },
+      "countryiso3code": "CSS",
+      "date": "2001",
+      "value": 90.927005032349,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "B8",
+        "value": "Central Europe and the Baltics"
+      },
+      "countryiso3code": "CEB",
+      "date": "2001",
+      "value": 32.5934628030289,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "V2",
+        "value": "Early-demographic dividend"
+      },
+      "countryiso3code": "EAR",
+      "date": "2001",
+      "value": 24.2504565517004,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "Z4",
+        "value": "East Asia & Pacific"
+      },
+      "countryiso3code": "EAS",
+      "date": "2001",
+      "value": 26.1165805012214,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "4E",
+        "value": "East Asia & Pacific (excluding high income)"
+      },
+      "countryiso3code": "EAP",
+      "date": "2001",
+      "value": 28.9976224044947,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "T4",
+        "value": "East Asia & Pacific (IDA & IBRD countries)"
+      },
+      "countryiso3code": "TEA",
+      "date": "2001",
+      "value": 28.8136956102372,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XC",
+        "value": "Euro area"
+      },
+      "countryiso3code": "EMU",
+      "date": "2001",
+      "value": 36.4893845358116,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "Z7",
+        "value": "Europe & Central Asia"
+      },
+      "countryiso3code": "ECS",
+      "date": "2001",
+      "value": 37.9265725112059,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "7E",
+        "value": "Europe & Central Asia (excluding high income)"
+      },
+      "countryiso3code": "ECA",
+      "date": "2001",
+      "value": 10.0255524102835,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "T7",
+        "value": "Europe & Central Asia (IDA & IBRD countries)"
+      },
+      "countryiso3code": "TEC",
+      "date": "2001",
+      "value": 38.8314741366388,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "EU",
+        "value": "European Union"
+      },
+      "countryiso3code": "EUU",
+      "date": "2001",
+      "value": 38.1938653464292,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "F2",
+        "value": "Fragility, Conflict, and Violence (FCV) situations"
+      },
+      "countryiso3code": "FCV",
+      "date": "2001",
+      "value": 24.1049068579141,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XE",
+        "value": "Heavily indebted poor countries (HIPC)"
+      },
+      "countryiso3code": "HPC",
+      "date": "2001",
+      "value": 32.3278243647089,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XD",
+        "value": "High income"
+      },
+      "countryiso3code": "",
+      "date": "2001",
+      "value": 35.6261007188284,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XF",
+        "value": "IBRD only"
+      },
+      "countryiso3code": "IBD",
+      "date": "2001",
+      "value": 34.3635009849183,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ZT",
+        "value": "IDA & IBRD total"
+      },
+      "countryiso3code": "IBT",
+      "date": "2001",
+      "value": 33.5061143226155,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XH",
+        "value": "IDA blend"
+      },
+      "countryiso3code": "IDB",
+      "date": "2001",
+      "value": 32.4159566711946,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XI",
+        "value": "IDA only"
+      },
+      "countryiso3code": "IDX",
+      "date": "2001",
+      "value": 30.391599561274,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XG",
+        "value": "IDA total"
+      },
+      "countryiso3code": "IDA",
+      "date": "2001",
+      "value": 30.8295946568159,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "V3",
+        "value": "Late-demographic dividend"
+      },
+      "countryiso3code": "LTE",
+      "date": "2001",
+      "value": 39.5423349552341,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ZJ",
+        "value": "Latin America & Caribbean"
+      },
+      "countryiso3code": "LCN",
+      "date": "2001",
+      "value": 50.3778080228259,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XJ",
+        "value": "Latin America & Caribbean (excluding high income)"
+      },
+      "countryiso3code": "LAC",
+      "date": "2001",
+      "value": 51.413620485883,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "T2",
+        "value": "Latin America & the Caribbean (IDA & IBRD countries)"
+      },
+      "countryiso3code": "TLA",
+      "date": "2001",
+      "value": 50.5273264951077,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XL",
+        "value": "Least developed countries: UN classification"
+      },
+      "countryiso3code": "LDC",
+      "date": "2001",
+      "value": 32.2054680836804,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XO",
+        "value": "Low & middle income"
+      },
+      "countryiso3code": "LMY",
+      "date": "2001",
+      "value": 30.0650620595332,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XM",
+        "value": "Low income"
+      },
+      "countryiso3code": "",
+      "date": "2001",
+      "value": 25.2434592722698,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XN",
+        "value": "Lower middle income"
+      },
+      "countryiso3code": "",
+      "date": "2001",
+      "value": 33.1089152116661,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ZQ",
+        "value": "Middle East, North Africa, Afghanistan & Pakistan"
+      },
+      "countryiso3code": "MEA",
+      "date": "2001",
+      "value": 2.1130182870912,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XQ",
+        "value": "Middle East, North Africa, Afghanistan & Pakistan (excluding high income)"
+      },
+      "countryiso3code": "MNA",
+      "date": "2001",
+      "value": 2.51109182928465,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "T3",
+        "value": "Middle East, North Africa, Afghanistan & Pakistan (IDA & IBRD)"
+      },
+      "countryiso3code": "TMN",
+      "date": "2001",
+      "value": 2.51168319744599,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XP",
+        "value": "Middle income"
+      },
+      "countryiso3code": "MIC",
+      "date": "2001",
+      "value": 30.9840744298016,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XU",
+        "value": "North America"
+      },
+      "countryiso3code": "NAC",
+      "date": "2001",
+      "value": 35.9568110751119,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XY",
+        "value": "Not classified"
+      },
+      "countryiso3code": "",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "OE",
+        "value": "OECD members"
+      },
+      "countryiso3code": "OED",
+      "date": "2001",
+      "value": 32.4285990338281,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "S4",
+        "value": "Other small states"
+      },
+      "countryiso3code": "OSS",
+      "date": "2001",
+      "value": 27.1058229508697,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "S2",
+        "value": "Pacific island small states"
+      },
+      "countryiso3code": "PSS",
+      "date": "2001",
+      "value": 66.7794080996885,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "V4",
+        "value": "Post-demographic dividend"
+      },
+      "countryiso3code": "PST",
+      "date": "2001",
+      "value": 31.6467246227496,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "V1",
+        "value": "Pre-demographic dividend"
+      },
+      "countryiso3code": "PRE",
+      "date": "2001",
+      "value": 31.3932922866929,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "S1",
+        "value": "Small states"
+      },
+      "countryiso3code": "SST",
+      "date": "2001",
+      "value": 65.703796576698,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "8S",
+        "value": "South Asia"
+      },
+      "countryiso3code": "SAS",
+      "date": "2001",
+      "value": 23.9659430306432,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "T5",
+        "value": "South Asia (IDA & IBRD)"
+      },
+      "countryiso3code": "TSA",
+      "date": "2001",
+      "value": 23.9659430306432,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ZG",
+        "value": "Sub-Saharan Africa"
+      },
+      "countryiso3code": "SSF",
+      "date": "2001",
+      "value": 31.4937298221195,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ZF",
+        "value": "Sub-Saharan Africa (excluding high income)"
+      },
+      "countryiso3code": "SSA",
+      "date": "2001",
+      "value": 31.49282530036,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "T6",
+        "value": "Sub-Saharan Africa (IDA & IBRD countries)"
+      },
+      "countryiso3code": "TSS",
+      "date": "2001",
+      "value": 31.4937298221195,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XT",
+        "value": "Upper middle income"
+      },
+      "countryiso3code": "",
+      "date": "2001",
+      "value": 30.0792052943988,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "1W",
+        "value": "World"
+      },
+      "countryiso3code": "WLD",
+      "date": "2001",
+      "value": 32.3366225720433,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AF",
+        "value": "Afghanistan"
+      },
+      "countryiso3code": "AFG",
+      "date": "2001",
+      "value": 1.85431519555985,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AL",
+        "value": "Albania"
+      },
+      "countryiso3code": "ALB",
+      "date": "2001",
+      "value": 28.1233576642336,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "DZ",
+        "value": "Algeria"
+      },
+      "countryiso3code": "DZA",
+      "date": "2001",
+      "value": 0.716933838286295,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AS",
+        "value": "American Samoa"
+      },
+      "countryiso3code": "ASM",
+      "date": "2001",
+      "value": 87.9,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AD",
+        "value": "Andorra"
+      },
+      "countryiso3code": "AND",
+      "date": "2001",
+      "value": 36.9574468085106,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AO",
+        "value": "Angola"
+      },
+      "countryiso3code": "AGO",
+      "date": "2001",
+      "value": 60.5623245367771,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AG",
+        "value": "Antigua and Barbuda"
+      },
+      "countryiso3code": "ATG",
+      "date": "2001",
+      "value": 21.3181818181818,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AR",
+        "value": "Argentina"
+      },
+      "countryiso3code": "ARG",
+      "date": "2001",
+      "value": 19.3923096879807,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AM",
+        "value": "Armenia"
+      },
+      "countryiso3code": "ARM",
+      "date": "2001",
+      "value": 11.6828240252898,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AW",
+        "value": "Aruba"
+      },
+      "countryiso3code": "ABW",
+      "date": "2001",
+      "value": 2.72222222222222,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AU",
+        "value": "Australia"
+      },
+      "countryiso3code": "AUS",
+      "date": "2001",
+      "value": 17.2778568918163,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AT",
+        "value": "Austria"
+      },
+      "countryiso3code": "AUT",
+      "date": "2001",
+      "value": 46.5401114881241,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AZ",
+        "value": "Azerbaijan"
+      },
+      "countryiso3code": "AZE",
+      "date": "2001",
+      "value": 12.0060771875454,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BS",
+        "value": "Bahamas, The"
+      },
+      "countryiso3code": "BHS",
+      "date": "2001",
+      "value": 50.9350649350649,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BH",
+        "value": "Bahrain"
+      },
+      "countryiso3code": "BHR",
+      "date": "2001",
+      "value": 1.92957746478873,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BD",
+        "value": "Bangladesh"
+      },
+      "countryiso3code": "BGD",
+      "date": "2001",
+      "value": 14.727817469463,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BB",
+        "value": "Barbados"
+      },
+      "countryiso3code": "BRB",
+      "date": "2001",
+      "value": 14.6511627906977,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BY",
+        "value": "Belarus"
+      },
+      "countryiso3code": "BLR",
+      "date": "2001",
+      "value": 40.9610340951667,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BE",
+        "value": "Belgium"
+      },
+      "countryiso3code": "BEL",
+      "date": "2001",
+      "value": 22.0736491609798,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BZ",
+        "value": "Belize"
+      },
+      "countryiso3code": "BLZ",
+      "date": "2001",
+      "value": 65.6001753616835,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BJ",
+        "value": "Benin"
+      },
+      "countryiso3code": "BEN",
+      "date": "2001",
+      "value": 49.0712131961688,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BM",
+        "value": "Bermuda"
+      },
+      "countryiso3code": "BMU",
+      "date": "2001",
+      "value": 14.4444444444444,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BT",
+        "value": "Bhutan"
+      },
+      "countryiso3code": "BTN",
+      "date": "2001",
+      "value": 65.7268844221106,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BO",
+        "value": "Bolivia"
+      },
+      "countryiso3code": "BOL",
+      "date": "2001",
+      "value": 54.3961506507893,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BA",
+        "value": "Bosnia and Herzegovina"
+      },
+      "countryiso3code": "BIH",
+      "date": "2001",
+      "value": 41.2255859375,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BW",
+        "value": "Botswana"
+      },
+      "countryiso3code": "BWA",
+      "date": "2001",
+      "value": 27.7520159511584,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BR",
+        "value": "Brazil"
+      },
+      "countryiso3code": "BRA",
+      "date": "2001",
+      "value": 66.6604148769942,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "VG",
+        "value": "British Virgin Islands"
+      },
+      "countryiso3code": "VGB",
+      "date": "2001",
+      "value": 66.6,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BN",
+        "value": "Brunei Darussalam"
+      },
+      "countryiso3code": "BRN",
+      "date": "2001",
+      "value": 75.0094876660342,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BG",
+        "value": "Bulgaria"
+      },
+      "countryiso3code": "BGR",
+      "date": "2001",
+      "value": 30.834312573443,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BF",
+        "value": "Burkina Faso"
+      },
+      "countryiso3code": "BFA",
+      "date": "2001",
+      "value": 22.8203947368421,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "BI",
+        "value": "Burundi"
+      },
+      "countryiso3code": "BDI",
+      "date": "2001",
+      "value": 7.55218068535826,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CV",
+        "value": "Cabo Verde"
+      },
+      "countryiso3code": "CPV",
+      "date": "2001",
+      "value": 9.5136476426799,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KH",
+        "value": "Cambodia"
+      },
+      "countryiso3code": "KHM",
+      "date": "2001",
+      "value": 60.9665760253796,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CM",
+        "value": "Cameroon"
+      },
+      "countryiso3code": "CMR",
+      "date": "2001",
+      "value": 45.5412197753379,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CA",
+        "value": "Canada"
+      },
+      "countryiso3code": "CAN",
+      "date": "2001",
+      "value": 40.2447167447987,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KY",
+        "value": "Cayman Islands"
+      },
+      "countryiso3code": "CYM",
+      "date": "2001",
+      "value": 53.7916666666667,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CF",
+        "value": "Central African Republic"
+      },
+      "countryiso3code": "CAF",
+      "date": "2001",
+      "value": 73.9189059038814,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TD",
+        "value": "Chad"
+      },
+      "countryiso3code": "TCD",
+      "date": "2001",
+      "value": 4.97972522236341,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "JG",
+        "value": "Channel Islands"
+      },
+      "countryiso3code": "CHI",
+      "date": "2001",
+      "value": 4.28787878787879,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CL",
+        "value": "Chile"
+      },
+      "countryiso3code": "CHL",
+      "date": "2001",
+      "value": 23.5174141798873,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CN",
+        "value": "China"
+      },
+      "countryiso3code": "CHN",
+      "date": "2001",
+      "value": 19.1049678010116,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CO",
+        "value": "Colombia"
+      },
+      "countryiso3code": "COL",
+      "date": "2001",
+      "value": 56.2924560612889,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KM",
+        "value": "Comoros"
+      },
+      "countryiso3code": "COM",
+      "date": "2001",
+      "value": 22.6921010209565,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CD",
+        "value": "Congo, Dem. Rep."
+      },
+      "countryiso3code": "COD",
+      "date": "2001",
+      "value": 67.5394543569837,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CG",
+        "value": "Congo, Rep."
+      },
+      "countryiso3code": "COG",
+      "date": "2001",
+      "value": 64.7818448023426,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CR",
+        "value": "Costa Rica"
+      },
+      "countryiso3code": "CRI",
+      "date": "2001",
+      "value": 55.8601645123384,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CI",
+        "value": "Cote d'Ivoire"
+      },
+      "countryiso3code": "CIV",
+      "date": "2001",
+      "value": 19.0130188679245,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "HR",
+        "value": "Croatia"
+      },
+      "countryiso3code": "HRV",
+      "date": "2001",
+      "value": 33.7762913149234,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CU",
+        "value": "Cuba"
+      },
+      "countryiso3code": "CUB",
+      "date": "2001",
+      "value": 25.6055865921788,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CW",
+        "value": "Curacao"
+      },
+      "countryiso3code": "CUW",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CY",
+        "value": "Cyprus"
+      },
+      "countryiso3code": "CYP",
+      "date": "2001",
+      "value": 18.5854978354978,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CZ",
+        "value": "Czechia"
+      },
+      "countryiso3code": "CZE",
+      "date": "2001",
+      "value": 37.1004270738967,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "DK",
+        "value": "Denmark"
+      },
+      "countryiso3code": "DNK",
+      "date": "2001",
+      "value": 14.32675,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "DJ",
+        "value": "Djibouti"
+      },
+      "countryiso3code": "DJI",
+      "date": "2001",
+      "value": 0.241587575496117,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "DM",
+        "value": "Dominica"
+      },
+      "countryiso3code": "DMA",
+      "date": "2001",
+      "value": 78.04,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "DO",
+        "value": "Dominican Republic"
+      },
+      "countryiso3code": "DOM",
+      "date": "2001",
+      "value": 44.8737321465535,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "EC",
+        "value": "Ecuador"
+      },
+      "countryiso3code": "ECU",
+      "date": "2001",
+      "value": 55.0019729425028,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "EG",
+        "value": "Egypt, Arab Rep."
+      },
+      "countryiso3code": "EGY",
+      "date": "2001",
+      "value": 0.00394796323270882,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SV",
+        "value": "El Salvador"
+      },
+      "countryiso3code": "SLV",
+      "date": "2001",
+      "value": 33.9208494208494,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GQ",
+        "value": "Equatorial Guinea"
+      },
+      "countryiso3code": "GNQ",
+      "date": "2001",
+      "value": 92.9511586452763,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ER",
+        "value": "Eritrea"
+      },
+      "countryiso3code": "ERI",
+      "date": "2001",
+      "value": 15.6983168316832,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "EE",
+        "value": "Estonia"
+      },
+      "countryiso3code": "EST",
+      "date": "2001",
+      "value": 53.0455296060392,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SZ",
+        "value": "Eswatini"
+      },
+      "countryiso3code": "SWZ",
+      "date": "2001",
+      "value": 27.271511627907,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ET",
+        "value": "Ethiopia"
+      },
+      "countryiso3code": "ETH",
+      "date": "2001",
+      "value": 27.7366,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "FO",
+        "value": "Faroe Islands"
+      },
+      "countryiso3code": "FRO",
+      "date": "2001",
+      "value": 0.0573065902578797,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "FJ",
+        "value": "Fiji"
+      },
+      "countryiso3code": "FJI",
+      "date": "2001",
+      "value": 55.4203612479474,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "FI",
+        "value": "Finland"
+      },
+      "countryiso3code": "FIN",
+      "date": "2001",
+      "value": 73.6244788075774,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "FR",
+        "value": "France"
+      },
+      "countryiso3code": "FRA",
+      "date": "2001",
+      "value": 28.5761202337879,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PF",
+        "value": "French Polynesia"
+      },
+      "countryiso3code": "PYF",
+      "date": "2001",
+      "value": 42.8233938346298,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GA",
+        "value": "Gabon"
+      },
+      "countryiso3code": "GAB",
+      "date": "2001",
+      "value": 91.977257732759,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GM",
+        "value": "Gambia, The"
+      },
+      "countryiso3code": "GMB",
+      "date": "2001",
+      "value": 34.7905138339921,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GE",
+        "value": "Georgia"
+      },
+      "countryiso3code": "GEO",
+      "date": "2001",
+      "value": 43.8175277018276,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "DE",
+        "value": "Germany"
+      },
+      "countryiso3code": "DEU",
+      "date": "2001",
+      "value": 32.5580395528805,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GH",
+        "value": "Ghana"
+      },
+      "countryiso3code": "GHA",
+      "date": "2001",
+      "value": 27.243913158126,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GI",
+        "value": "Gibraltar"
+      },
+      "countryiso3code": "GIB",
+      "date": "2001",
+      "value": 0,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GR",
+        "value": "Greece"
+      },
+      "countryiso3code": "GRC",
+      "date": "2001",
+      "value": 28.7826997672614,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GL",
+        "value": "Greenland"
+      },
+      "countryiso3code": "GRL",
+      "date": "2001",
+      "value": 0.000535997076379583,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GD",
+        "value": "Grenada"
+      },
+      "countryiso3code": "GRD",
+      "date": "2001",
+      "value": 52.0588235294118,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GU",
+        "value": "Guam"
+      },
+      "countryiso3code": "GUM",
+      "date": "2001",
+      "value": 44.4444444444444,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GT",
+        "value": "Guatemala"
+      },
+      "countryiso3code": "GTM",
+      "date": "2001",
+      "value": 39.0031728256812,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GN",
+        "value": "Guinea"
+      },
+      "countryiso3code": "GIN",
+      "date": "2001",
+      "value": 26.3114113625265,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GW",
+        "value": "Guinea-Bissau"
+      },
+      "countryiso3code": "GNB",
+      "date": "2001",
+      "value": 78.3328591749644,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GY",
+        "value": "Guyana"
+      },
+      "countryiso3code": "GUY",
+      "date": "2001",
+      "value": 94.2838709677419,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "HT",
+        "value": "Haiti"
+      },
+      "countryiso3code": "HTI",
+      "date": "2001",
+      "value": 13.9259796806967,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "HN",
+        "value": "Honduras"
+      },
+      "countryiso3code": "HND",
+      "date": "2001",
+      "value": 63.3746536777192,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "HK",
+        "value": "Hong Kong SAR, China"
+      },
+      "countryiso3code": "HKG",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "HU",
+        "value": "Hungary"
+      },
+      "countryiso3code": "HUN",
+      "date": "2001",
+      "value": 21.5765454139701,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "IS",
+        "value": "Iceland"
+      },
+      "countryiso3code": "ISL",
+      "date": "2001",
+      "value": 0.33785536159601,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "IN",
+        "value": "India"
+      },
+      "countryiso3code": "IND",
+      "date": "2001",
+      "value": 22.7975675957473,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ID",
+        "value": "Indonesia"
+      },
+      "countryiso3code": "IDN",
+      "date": "2001",
+      "value": 49.2102929451047,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "IR",
+        "value": "Iran, Islamic Rep."
+      },
+      "countryiso3code": "IRN",
+      "date": "2001",
+      "value": 6.60072693337263,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "IQ",
+        "value": "Iraq"
+      },
+      "countryiso3code": "IRQ",
+      "date": "2001",
+      "value": 1.86636028991472,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "IE",
+        "value": "Ireland"
+      },
+      "countryiso3code": "IRL",
+      "date": "2001",
+      "value": 9.28088256641022,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "IM",
+        "value": "Isle of Man"
+      },
+      "countryiso3code": "IMN",
+      "date": "2001",
+      "value": 6.36842105263158,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "IL",
+        "value": "Israel"
+      },
+      "countryiso3code": "ISR",
+      "date": "2001",
+      "value": 7.07486136783734,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "IT",
+        "value": "Italy"
+      },
+      "countryiso3code": "ITA",
+      "date": "2001",
+      "value": 28.5242359274714,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "JM",
+        "value": "Jamaica"
+      },
+      "countryiso3code": "JAM",
+      "date": "2001",
+      "value": 48.4533702677747,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "JP",
+        "value": "Japan"
+      },
+      "countryiso3code": "JPN",
+      "date": "2001",
+      "value": 68.2716049382716,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "JO",
+        "value": "Jordan"
+      },
+      "countryiso3code": "JOR",
+      "date": "2001",
+      "value": 0.801223934723482,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KZ",
+        "value": "Kazakhstan"
+      },
+      "countryiso3code": "KAZ",
+      "date": "2001",
+      "value": 1.1665962884765,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KE",
+        "value": "Kenya"
+      },
+      "countryiso3code": "KEN",
+      "date": "2001",
+      "value": 6.7161682538567,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KI",
+        "value": "Kiribati"
+      },
+      "countryiso3code": "KIR",
+      "date": "2001",
+      "value": 1.32098765432099,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KP",
+        "value": "Korea, Dem. People's Rep."
+      },
+      "countryiso3code": "PRK",
+      "date": "2001",
+      "value": 62.0019101403538,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KR",
+        "value": "Korea, Rep."
+      },
+      "countryiso3code": "KOR",
+      "date": "2001",
+      "value": 66.8503204465578,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "XK",
+        "value": "Kosovo"
+      },
+      "countryiso3code": "XKX",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KW",
+        "value": "Kuwait"
+      },
+      "countryiso3code": "KWT",
+      "date": "2001",
+      "value": 0.282267115600449,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KG",
+        "value": "Kyrgyz Republic"
+      },
+      "countryiso3code": "KGZ",
+      "date": "2001",
+      "value": 6.18086548488008,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LA",
+        "value": "Lao PDR"
+      },
+      "countryiso3code": "LAO",
+      "date": "2001",
+      "value": 60.7066724436742,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LV",
+        "value": "Latvia"
+      },
+      "countryiso3code": "LVA",
+      "date": "2001",
+      "value": 52.2941809825317,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LB",
+        "value": "Lebanon"
+      },
+      "countryiso3code": "LBN",
+      "date": "2001",
+      "value": 13.5865102639296,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LS",
+        "value": "Lesotho"
+      },
+      "countryiso3code": "LSO",
+      "date": "2001",
+      "value": 1.13702239789196,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LR",
+        "value": "Liberia"
+      },
+      "countryiso3code": "LBR",
+      "date": "2001",
+      "value": 82.7435631229236,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LY",
+        "value": "Libya"
+      },
+      "countryiso3code": "LBY",
+      "date": "2001",
+      "value": 0.121247598804233,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LI",
+        "value": "Liechtenstein"
+      },
+      "countryiso3code": "LIE",
+      "date": "2001",
+      "value": 33.75,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LT",
+        "value": "Lithuania"
+      },
+      "countryiso3code": "LTU",
+      "date": "2001",
+      "value": 32.4664964901085,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LU",
+        "value": "Luxembourg"
+      },
+      "countryiso3code": "LUX",
+      "date": "2001",
+      "value": 33.7541270149544,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MO",
+        "value": "Macao SAR, China"
+      },
+      "countryiso3code": "MAC",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MG",
+        "value": "Madagascar"
+      },
+      "countryiso3code": "MDG",
+      "date": "2001",
+      "value": 22.1954637686144,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MW",
+        "value": "Malawi"
+      },
+      "countryiso3code": "MWI",
+      "date": "2001",
+      "value": 32.2411964361476,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MY",
+        "value": "Malaysia"
+      },
+      "countryiso3code": "MYS",
+      "date": "2001",
+      "value": 59.7077461573581,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MV",
+        "value": "Maldives"
+      },
+      "countryiso3code": "MDV",
+      "date": "2001",
+      "value": 12.4,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ML",
+        "value": "Mali"
+      },
+      "countryiso3code": "MLI",
+      "date": "2001",
+      "value": 10.56585449807,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MT",
+        "value": "Malta"
+      },
+      "countryiso3code": "MLT",
+      "date": "2001",
+      "value": 1.09375,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MH",
+        "value": "Marshall Islands"
+      },
+      "countryiso3code": "MHL",
+      "date": "2001",
+      "value": 52.2222222222222,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MR",
+        "value": "Mauritania"
+      },
+      "countryiso3code": "MRT",
+      "date": "2001",
+      "value": 0.927583195886291,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MU",
+        "value": "Mauritius"
+      },
+      "countryiso3code": "MUS",
+      "date": "2001",
+      "value": 20.4778325123153,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MX",
+        "value": "Mexico"
+      },
+      "countryiso3code": "MEX",
+      "date": "2001",
+      "value": 35.7261555081149,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "FM",
+        "value": "Micronesia, Fed. Sts."
+      },
+      "countryiso3code": "FSM",
+      "date": "2001",
+      "value": 91.2714285714286,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MD",
+        "value": "Moldova"
+      },
+      "countryiso3code": "MDA",
+      "date": "2001",
+      "value": 10.56599756691,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MC",
+        "value": "Monaco"
+      },
+      "countryiso3code": "MCO",
+      "date": "2001",
+      "value": 0,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MN",
+        "value": "Mongolia"
+      },
+      "countryiso3code": "MNG",
+      "date": "2001",
+      "value": 9.21257817837954,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ME",
+        "value": "Montenegro"
+      },
+      "countryiso3code": "MNE",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MA",
+        "value": "Morocco"
+      },
+      "countryiso3code": "MAR",
+      "date": "2001",
+      "value": 12.7680259914855,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MZ",
+        "value": "Mozambique"
+      },
+      "countryiso3code": "MOZ",
+      "date": "2001",
+      "value": 49.1512881812864,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MM",
+        "value": "Myanmar"
+      },
+      "countryiso3code": "MMR",
+      "date": "2001",
+      "value": 52.8282890106191,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "NA",
+        "value": "Namibia"
+      },
+      "countryiso3code": "NAM",
+      "date": "2001",
+      "value": 9.78809411021633,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "NR",
+        "value": "Naoero"
+      },
+      "countryiso3code": "NRU",
+      "date": "2001",
+      "value": 0,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "NP",
+        "value": "Nepal"
+      },
+      "countryiso3code": "NPL",
+      "date": "2001",
+      "value": 41.3830484827346,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "NL",
+        "value": "Netherlands"
+      },
+      "countryiso3code": "NLD",
+      "date": "2001",
+      "value": 10.6901658767773,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "NC",
+        "value": "New Caledonia"
+      },
+      "countryiso3code": "NCL",
+      "date": "2001",
+      "value": 45.8408096280088,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "NZ",
+        "value": "New Zealand"
+      },
+      "countryiso3code": "NZL",
+      "date": "2001",
+      "value": 37.409175496563,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "NI",
+        "value": "Nicaragua"
+      },
+      "countryiso3code": "NIC",
+      "date": "2001",
+      "value": 49.9117500415489,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "NE",
+        "value": "Niger"
+      },
+      "countryiso3code": "NER",
+      "date": "2001",
+      "value": 1.03866740348938,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "NG",
+        "value": "Nigeria"
+      },
+      "countryiso3code": "NGA",
+      "date": "2001",
+      "value": 22.1517507164268,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MK",
+        "value": "North Macedonia"
+      },
+      "countryiso3code": "MKD",
+      "date": "2001",
+      "value": 37.6657491152182,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MP",
+        "value": "Northern Mariana Islands"
+      },
+      "countryiso3code": "MNP",
+      "date": "2001",
+      "value": 44.1739130434783,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "NO",
+        "value": "Norway"
+      },
+      "countryiso3code": "NOR",
+      "date": "2001",
+      "value": 33.3846962578441,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "OM",
+        "value": "Oman"
+      },
+      "countryiso3code": "OMN",
+      "date": "2001",
+      "value": 0.00516962843295638,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PK",
+        "value": "Pakistan"
+      },
+      "countryiso3code": "PAK",
+      "date": "2001",
+      "value": 4.28302718970527,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PW",
+        "value": "Palau"
+      },
+      "countryiso3code": "PLW",
+      "date": "2001",
+      "value": 86.2608695652174,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PA",
+        "value": "Panama"
+      },
+      "countryiso3code": "PAN",
+      "date": "2001",
+      "value": 64.2906914178101,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PG",
+        "value": "Papua New Guinea"
+      },
+      "countryiso3code": "PNG",
+      "date": "2001",
+      "value": 75.9027072384401,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PY",
+        "value": "Paraguay"
+      },
+      "countryiso3code": "PRY",
+      "date": "2001",
+      "value": 54.1976088598037,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PE",
+        "value": "Peru"
+      },
+      "countryiso3code": "PER",
+      "date": "2001",
+      "value": 57.613421875,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PH",
+        "value": "Philippines"
+      },
+      "countryiso3code": "PHL",
+      "date": "2001",
+      "value": 24.3562732669283,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PL",
+        "value": "Poland"
+      },
+      "countryiso3code": "POL",
+      "date": "2001",
+      "value": 29.6646968559209,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PT",
+        "value": "Portugal"
+      },
+      "countryiso3code": "PRT",
+      "date": "2001",
+      "value": 36.4907103825137,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PR",
+        "value": "Puerto Rico (US)"
+      },
+      "countryiso3code": "PRI",
+      "date": "2001",
+      "value": 49.0845546786922,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "QA",
+        "value": "Qatar"
+      },
+      "countryiso3code": "QAT",
+      "date": "2001",
+      "value": 0.120585701981051,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "RO",
+        "value": "Romania"
+      },
+      "countryiso3code": "ROU",
+      "date": "2001",
+      "value": 27.7780679987811,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "RU",
+        "value": "Russian Federation"
+      },
+      "countryiso3code": "RUS",
+      "date": "2001",
+      "value": 49.6537962350218,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "RW",
+        "value": "Rwanda"
+      },
+      "countryiso3code": "RWA",
+      "date": "2001",
+      "value": 16.6165383056344,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "WS",
+        "value": "Samoa"
+      },
+      "countryiso3code": "WSM",
+      "date": "2001",
+      "value": 60.5265017667845,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SM",
+        "value": "San Marino"
+      },
+      "countryiso3code": "SMR",
+      "date": "2001",
+      "value": 16.6666666666667,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ST",
+        "value": "Sao Tome and Principe"
+      },
+      "countryiso3code": "STP",
+      "date": "2001",
+      "value": 60.9270833333333,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SA",
+        "value": "Saudi Arabia"
+      },
+      "countryiso3code": "SAU",
+      "date": "2001",
+      "value": 1.28765077755397,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SN",
+        "value": "Senegal"
+      },
+      "countryiso3code": "SEN",
+      "date": "2001",
+      "value": 46.8621513530359,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "RS",
+        "value": "Serbia"
+      },
+      "countryiso3code": "SRB",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SC",
+        "value": "Seychelles"
+      },
+      "countryiso3code": "SYC",
+      "date": "2001",
+      "value": 69,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SL",
+        "value": "Sierra Leone"
+      },
+      "countryiso3code": "SLE",
+      "date": "2001",
+      "value": 40.3117206982544,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SG",
+        "value": "Singapore"
+      },
+      "countryiso3code": "SGP",
+      "date": "2001",
+      "value": 25.4925373134328,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SX",
+        "value": "Sint Maarten (Dutch part)"
+      },
+      "countryiso3code": "SXM",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SK",
+        "value": "Slovak Republic"
+      },
+      "countryiso3code": "SVK",
+      "date": "2001",
+      "value": 39.564656964657,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SI",
+        "value": "Slovenia"
+      },
+      "countryiso3code": "SVN",
+      "date": "2001",
+      "value": 61.2909632571996,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SB",
+        "value": "Solomon Islands"
+      },
+      "countryiso3code": "SLB",
+      "date": "2001",
+      "value": 90.4465880671668,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SO",
+        "value": "Somalia, Fed. Rep."
+      },
+      "countryiso3code": "SOM",
+      "date": "2001",
+      "value": 11.8584021423789,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ZA",
+        "value": "South Africa"
+      },
+      "countryiso3code": "ZAF",
+      "date": "2001",
+      "value": 17.129652375339,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SS",
+        "value": "South Sudan"
+      },
+      "countryiso3code": "SSD",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ES",
+        "value": "Spain"
+      },
+      "countryiso3code": "ESP",
+      "date": "2001",
+      "value": 34.5846906844259,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LK",
+        "value": "Sri Lanka"
+      },
+      "countryiso3code": "LKA",
+      "date": "2001",
+      "value": 35.4587785042258,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "KN",
+        "value": "St. Kitts and Nevis"
+      },
+      "countryiso3code": "KNA",
+      "date": "2001",
+      "value": 42.3076923076923,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "LC",
+        "value": "St. Lucia"
+      },
+      "countryiso3code": "LCA",
+      "date": "2001",
+      "value": 47.9672131147541,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "MF",
+        "value": "St. Martin (French part)"
+      },
+      "countryiso3code": "MAF",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "VC",
+        "value": "St. Vincent and the Grenadines"
+      },
+      "countryiso3code": "VCT",
+      "date": "2001",
+      "value": 73.1794871794872,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SD",
+        "value": "Sudan"
+      },
+      "countryiso3code": "SDN",
+      "date": "2001",
+      "value": null,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SR",
+        "value": "Suriname"
+      },
+      "countryiso3code": "SUR",
+      "date": "2001",
+      "value": 92.8179043971809,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SE",
+        "value": "Sweden"
+      },
+      "countryiso3code": "SWE",
+      "date": "2001",
+      "value": 69.1167593043349,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "CH",
+        "value": "Switzerland"
+      },
+      "countryiso3code": "CHE",
+      "date": "2001",
+      "value": 30.3633183848333,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "SY",
+        "value": "Syrian Arab Republic"
+      },
+      "countryiso3code": "SYR",
+      "date": "2001",
+      "value": 2.53504189792143,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TJ",
+        "value": "Tajikistan"
+      },
+      "countryiso3code": "TJK",
+      "date": "2001",
+      "value": 2.92940840240069,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TZ",
+        "value": "Tanzania"
+      },
+      "countryiso3code": "TZA",
+      "date": "2001",
+      "value": 60.6592910363513,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TH",
+        "value": "Thailand"
+      },
+      "countryiso3code": "THA",
+      "date": "2001",
+      "value": 39.4566345005774,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TL",
+        "value": "Timor-Leste"
+      },
+      "countryiso3code": "TLS",
+      "date": "2001",
+      "value": 72.9771351714862,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TG",
+        "value": "Togo"
+      },
+      "countryiso3code": "TGO",
+      "date": "2001",
+      "value": 23.2671446957161,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TO",
+        "value": "Tonga"
+      },
+      "countryiso3code": "TON",
+      "date": "2001",
+      "value": 12.125,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TT",
+        "value": "Trinidad and Tobago"
+      },
+      "countryiso3code": "TTO",
+      "date": "2001",
+      "value": 46.0487329434698,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TN",
+        "value": "Tunisia"
+      },
+      "countryiso3code": "TUN",
+      "date": "2001",
+      "value": 4.32157569515963,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TR",
+        "value": "Turkiye"
+      },
+      "countryiso3code": "TUR",
+      "date": "2001",
+      "value": 26.3007159284331,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TM",
+        "value": "Turkmenistan"
+      },
+      "countryiso3code": "TKM",
+      "date": "2001",
+      "value": 4.95818526163471,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TC",
+        "value": "Turks and Caicos Islands"
+      },
+      "countryiso3code": "TCA",
+      "date": "2001",
+      "value": 11.0736842105263,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "TV",
+        "value": "Tuvalu"
+      },
+      "countryiso3code": "TUV",
+      "date": "2001",
+      "value": 34.3333333333333,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "UG",
+        "value": "Uganda"
+      },
+      "countryiso3code": "UGA",
+      "date": "2001",
+      "value": 16.7693809118663,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "UA",
+        "value": "Ukraine"
+      },
+      "countryiso3code": "UKR",
+      "date": "2001",
+      "value": 16.4215068611375,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "AE",
+        "value": "United Arab Emirates"
+      },
+      "countryiso3code": "ARE",
+      "date": "2001",
+      "value": 4.44142495071811,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "GB",
+        "value": "United Kingdom"
+      },
+      "countryiso3code": "GBR",
+      "date": "2001",
+      "value": 12.2535444136734,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "US",
+        "value": "United States"
+      },
+      "countryiso3code": "USA",
+      "date": "2001",
+      "value": 33.1867556145437,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "UY",
+        "value": "Uruguay"
+      },
+      "countryiso3code": "URY",
+      "date": "2001",
+      "value": 7.84053251057022,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "UZ",
+        "value": "Uzbekistan"
+      },
+      "countryiso3code": "UZB",
+      "date": "2001",
+      "value": 6.88275817770141,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "VU",
+        "value": "Vanuatu"
+      },
+      "countryiso3code": "VUT",
+      "date": "2001",
+      "value": 79.1361771944217,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "VE",
+        "value": "Venezuela, RB"
+      },
+      "countryiso3code": "VEN",
+      "date": "2001",
+      "value": 55.7186440677966,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "VN",
+        "value": "Viet Nam"
+      },
+      "countryiso3code": "VNM",
+      "date": "2001",
+      "value": 38.3956411327912,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "VI",
+        "value": "Virgin Islands (U.S.)"
+      },
+      "countryiso3code": "VIR",
+      "date": "2001",
+      "value": 54.8571428571429,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "PS",
+        "value": "West Bank and Gaza"
+      },
+      "countryiso3code": "PSE",
+      "date": "2001",
+      "value": 1.52325581395349,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "YE",
+        "value": "Yemen, Rep."
+      },
+      "countryiso3code": "YEM",
+      "date": "2001",
+      "value": 1.03983180862549,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ZM",
+        "value": "Zambia"
+      },
+      "countryiso3code": "ZMB",
+      "date": "2001",
+      "value": 63.2483622324756,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    },
+    {
+      "indicator": {
+        "id": "AG.LND.FRST.ZS",
+        "value": "Forest area (% of land area)"
+      },
+      "country": {
+        "id": "ZW",
+        "value": "Zimbabwe"
+      },
+      "countryiso3code": "ZWE",
+      "date": "2001",
+      "value": 40.2028434793848,
+      "unit": "",
+      "obs_status": "",
+      "decimal": 1
+    }
+  ]
+]

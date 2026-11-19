@@ -1,4 +1,6 @@
 """Shared movement location and duration policy for order validation and execution."""
+import math
+
 import polars as pl
 
 from src.core.map.geo import EquirectangularProjection, GeoCoordinate, MapPixelCoordinate
@@ -44,7 +46,9 @@ class MovementDurationPolicy:
                     longitude=float(row["longitude"]),
                 )
                 for row in regions.select(["id", "latitude", "longitude"]).iter_rows(named=True)
-                if row["id"] is not None
+                # Missing or non-finite map data must not abort every move order.
+                if row["id"] is not None and row["latitude"] is not None and row["longitude"] is not None
+                and math.isfinite(float(row["latitude"])) and math.isfinite(float(row["longitude"]))
             }
 
         if {"center_x", "center_y"}.issubset(set(regions.columns)):
@@ -57,7 +61,8 @@ class MovementDurationPolicy:
                     MapPixelCoordinate(float(row["center_x"]), float(row["center_y"]))
                 )
                 for row in regions.select(["id", "center_x", "center_y"]).iter_rows(named=True)
-                if row["id"] is not None
+                if row["id"] is not None and row["center_x"] is not None and row["center_y"] is not None
+                and math.isfinite(float(row["center_x"])) and math.isfinite(float(row["center_y"]))
             }
 
         return {}

@@ -86,7 +86,7 @@ class TextureManager:
         encoded_data = None
         
         if self.cache.is_cache_valid(map_path, cache_path):
-            encoded_data = self.cache.load_numpy_array(cache_path)
+            encoded_data = self.cache.load_numpy_array(cache_path, mmap_mode="r")
 
         # 3. CPU Generation (Fallback)
         if encoded_data is None:
@@ -122,18 +122,34 @@ class TextureManager:
     @staticmethod
     def encode_map_visual(dense_map: np.ndarray, width: int, height: int) -> np.ndarray:
         """Pack dense region IDs and a precomputed border mask into one RGBA texture."""
-        dense = dense_map.reshape((height, width)).astype(np.uint32, copy=False)
-        right = np.roll(dense, -1, axis=1)
-        up = np.empty_like(dense)
-        up[:-1] = dense[1:]
-        up[-1] = dense[-1]
-        borders = ((dense != right) | (dense != up)) & (dense > 0)
+        dense = dense_map.reshape((height, width))
+        encoded = np.empty((height, width, 4), dtype=np.uint8)
+        chunk_rows = 128
 
-        red = ((dense >> 16) & 0xFF).astype(np.uint8)
-        green = ((dense >> 8) & 0xFF).astype(np.uint8)
-        blue = (dense & 0xFF).astype(np.uint8)
-        alpha = borders.astype(np.uint8) * 255
-        return np.flipud(np.dstack((red, green, blue, alpha)))
+        for row_start in range(0, height, chunk_rows):
+            row_end = min(height, row_start + chunk_rows)
+            rows = dense[row_start:row_end]
+            right = np.roll(rows, -1, axis=1)
+            below = np.empty_like(rows)
+            below[:-1] = rows[1:]
+            below[-1] = dense[row_end] if row_end < height else rows[-1]
+            borders = ((rows != right) | (rows != below)) & (rows > 0)
+
+            encoded[row_start:row_end, :, 0] = ((rows >> 16) & 0xFF).astype(
+                np.uint8,
+                copy=False,
+            )
+            encoded[row_start:row_end, :, 1] = ((rows >> 8) & 0xFF).astype(
+                np.uint8,
+                copy=False,
+            )
+            encoded[row_start:row_end, :, 2] = (rows & 0xFF).astype(
+                np.uint8,
+                copy=False,
+            )
+            encoded[row_start:row_end, :, 3] = borders.astype(np.uint8) * 255
+
+        return np.flipud(encoded)
 
     @staticmethod
     def resample_dense_map(

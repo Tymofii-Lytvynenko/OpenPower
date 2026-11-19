@@ -19,7 +19,7 @@
     {"op": "assert", "target": "treaties.details.condition.max_research_ratio", "type": "combo", "visible": true, "enabled": false, "relative_to": "treaties.details.dialog", "relative_rect": {"x": 463, "y": 142, "width": 151, "height": 16}},
     {"op": "assert", "target": "treaties.details.pressure.value", "label": "N/A", "visible": true, "relative_to": "treaties.details.dialog", "relative_rect": {"x": 392.5, "y": 317.5}},
     {"op": "assert", "target": "treaties.details.pressure.unavailable", "visible": true},
-    {"op": "assert", "target": "treaties.details.sponsor.unavailable", "visible": true, "enabled": false, "relative_to": "treaties.details.dialog", "relative_rect": {"x": 467, "y": 411, "width": 147, "height": 18}},
+    {"op": "assert", "target": "treaties.details.sponsor", "visible": true, "enabled": true, "relative_to": "treaties.details.dialog", "relative_rect": {"x": 467, "y": 411, "width": 147, "height": 18}},
     {"op": "assert", "target": "treaties.details.close", "visible": true, "enabled": true, "relative_to": "treaties.details.dialog", "relative_rect": {"x": 231, "y": 410, "width": 86, "height": 18}},
     {"op": "click", "target": "treaties.details.edit_participants"},
     {"op": "assert_region", "target": "treaty.participants.dialog", "visible": true, "min_width": 635, "min_height": 437},

@@ -1,0 +1,28 @@
+{
+  "error_batches": [],
+  "response_file": "modules/base/data/sources/2001/pip_2021_ppp_3usd_2001.json",
+  "requested_game_country_records": 199,
+  "query": {
+    "fill_gaps": false,
+    "reporting_year": 2001,
+    "reporting_level": "national"
+  },
+  "poverty_line_usd_per_person_per_day_2021_ppp": 3.0,
+  "documentation_urls": [
+    "https://pip.worldbank.org/use-pip",
+    "https://worldbank.github.io/pip/help_file.html",
+    "https://blogs.worldbank.org/en/opendata/how-use-pips-api"
+  ],
+  "exact_national_2001_survey_rows": 47,
+  "api_supported_game_ids": 171,
+  "api_endpoint": "https://api.worldbank.org/pip/v1/pip",
+  "api_unsupported_game_ids": 28,
+  "source": "World Bank Poverty and Inequality Platform (PIP)",
+  "retrieved_utc": "2026-11-15",
+  "version": "20260922_2021_01_02_PROD",
+  "checksums_sha256": {
+    "modules/base/data/sources/2001/pip_2021_ppp_3usd_2001.json": "015d0200d1311a5dbdae17e9271a333b306ff7a0348241d2cac299e5812bea11",
+    "modules/base/data/sources/2001/pip_2021_ppp_3usd_2001.tsv": "47407b4e654a75b690f3087423ce3c7f22ee6acf0cd4b08226ac6021879f551c",
+    "modules/base/data/countries/countries_poverty_international_2001.tsv": "e2d2fd8626fd64491a22d508bfcbc869111b8cee5070a1150d2cdac24cc478e3"
+  }
+}

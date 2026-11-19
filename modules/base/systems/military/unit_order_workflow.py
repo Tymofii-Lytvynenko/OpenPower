@@ -21,6 +21,8 @@ UNIT_PENDING_ORDER_SCHEMA: dict[str, pl.DataType] = {
     "target_longitude": pl.Float64,
     "target_unit_id": pl.Utf8,
     "via_region_ids": pl.List(pl.Int32),
+    "has_custom_destination": pl.Boolean,
+    "is_naval_invasion": pl.Boolean,
     "created_at_minute": pl.Int64,
     "status": pl.Utf8,
 }
@@ -34,6 +36,21 @@ UNIT_ORDER_FEEDBACK_SCHEMA: dict[str, pl.DataType] = {
     "reason": pl.Utf8,
     "created_at_minute": pl.Int64,
 }
+
+
+def sync_unit_readiness(state: GameState, unit: dict[str, Any]) -> None:
+    """Keep a working unit row aligned with readiness changes made by the preparer."""
+    units = state.tables.get("units")
+    if units is None or "id" not in units.columns:
+        return
+    rows = units.filter(pl.col("id") == str(unit.get("id") or "")).head(1).to_dicts()
+    if not rows:
+        return
+    # The caller later publishes its working row; stale fields would erase the
+    # transition just created in the authoritative units table.
+    for field in ("readiness_status", "readiness_progress", "readiness_transition_id", "readiness_eta_minute"):
+        if field in rows[0]:
+            unit[field] = rows[0][field]
 
 
 @dataclass(frozen=True)
@@ -131,6 +148,16 @@ class UnitOrderWorkflowService:
             and transitions.filter(pl.col("unit_id") == unit_id).height > 0
         )
 
+    def clear_pending_order(self, state: GameState, unit_id: str) -> None:
+        pending = state.tables.get("unit_pending_orders")
+        if pending is None or pending.is_empty() or "unit_id" not in pending.columns:
+            return
+        remaining = pending.filter(pl.col("unit_id") != str(unit_id))
+        if remaining.height != pending.height:
+            # A successfully executed replacement must not later release an older queued order.
+            state.update_table("unit_pending_orders", remaining)
+            self.attach_pending_to_transition(state, unit_id, "")
+
     def queue_move(self, state: GameState, action: ActionMoveUnit) -> str:
         pending = self.ensure_pending_table(state.tables.get("unit_pending_orders"))
         rows = [
@@ -149,6 +176,8 @@ class UnitOrderWorkflowService:
             "target_longitude": float(action.target_longitude or 0.0),
             "target_unit_id": "",
             "via_region_ids": list(action.via_region_ids),
+            "has_custom_destination": action.target_latitude is not None and action.target_longitude is not None,
+            "is_naval_invasion": action.is_naval_invasion,
             "created_at_minute": int(state.time.total_minutes),
             "status": "queued",
         })
@@ -177,6 +206,8 @@ class UnitOrderWorkflowService:
             "target_longitude": 0.0,
             "target_unit_id": str(action.defender_unit_id),
             "via_region_ids": [],
+            "has_custom_destination": False,
+            "is_naval_invasion": False,
             "created_at_minute": int(state.time.total_minutes),
             "status": "queued",
         })
@@ -195,6 +226,8 @@ class UnitOrderWorkflowService:
                 default: Any = (
                     []
                     if dtype == pl.List(pl.Int32)
+                    else None if column == "has_custom_destination"
+                    else False if dtype == pl.Boolean
                     else 0 if dtype in (pl.Int32, pl.Int64, pl.Float64) else ""
                 )
                 pending = pending.with_columns(pl.lit(default).cast(dtype).alias(column))

@@ -167,7 +167,11 @@ def test_response_and_join_ignore_missing_or_unsupported_records():
         state, response, treaties, unsupported, wars, relations, messages, news, claims
     )
     assert unchanged_treaties.is_empty()
-    assert remaining.is_empty()
+    # Unsupported legacy proposals are kept and the response is rejected with
+    # an explicit reason instead of being silently dropped.
+    assert remaining["id"].to_list() == ["legacy"]
+    assert state.journal.command_results[-1]["status"] == "rejected"
+    assert "unavailable" in state.journal.command_results[-1]["reason"]
 
     unchanged, unchanged_messages = system._join_open_treaty(
         state,

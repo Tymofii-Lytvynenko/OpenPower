@@ -14,7 +14,7 @@ One row per `(subject_type, subject_id, indicator_id)`, with deterministic `id`.
 
 ## HistorySnapshot (`history_snapshots`)
 
-An immutable observation keyed by deterministic `id`, containing subject and indicator identity, nullable numeric value, unit, game minute, tick, source boundary (`initial`, `change`, `interval`, or `entity_removed`), confidence, completeness, value kind, and schema version. Missing observations remain explicit rows with a null value unless the indicator selects `omit`.
+An immutable observation keyed by deterministic `id`, containing subject and indicator identity, nullable numeric value, unit, game minute, tick, source boundary (`initial`, `change`, `interval`, or `entity_removed`), confidence, completeness, value kind, optional `source_reference`, and schema version. Missing observations remain explicit rows with a null value unless the indicator selects `omit`. The optional reference travels with query results and CSV exports so a source-backed point remains auditable.
 
 ## HistoryEvent (`history_events`)
 
@@ -27,3 +27,4 @@ An immutable source-evidence row keyed by journal or cause identity. It contains
 - Values are never compared across different units as raw magnitudes. Relative indexing is explicit and unavailable across an unconverted unit transition.
 - Missing and stale data are not presented as zero; rankings report excluded subjects and freshness.
 - Retention and downsampling are deterministic per series and do not alter current state or later simulation outcomes.
+- A newly created game may seed one minute-zero population baseline from the 2001 regional cohort data and source-backed country indicators from `countries_historical.tsv`; this does not create earlier observations. Country values retain field-level source, URL, scenario year, observation year, and any estimate, derivation, proxy, or quality status. Adjacent-year and older estimates keep their actual observation year and an explicit indicator label. Saves without the new-game seed marker are never backfilled with these static historical indicators.

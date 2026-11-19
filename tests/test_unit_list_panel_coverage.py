@@ -10,6 +10,7 @@ from src.client.ui.panels.military.unit_list_panel import (
     UnitListPanel,
     _format_intelligence_context,
     _format_quantity,
+    _gameplay_personnel_estimate_tooltip,
     _source_position,
     _status_color,
     _status_kind,
@@ -147,11 +148,34 @@ def test_render_returns_false_without_constructing_widgets(monkeypatch):
     widgets.assert_not_called()
 
 
+def test_movement_denial_report_closes_when_panel_switches_to_foreign_country(monkeypatch):
+    monkeypatch.setattr(panel_module, "imgui", fake_imgui())
+
+    @contextmanager
+    def window(*_args, **_kwargs):
+        yield True
+
+    monkeypatch.setattr(panel_module.WindowManager, "window", window)
+    monkeypatch.setattr(panel_module, "GMLWidgets", lambda _root: Mock())
+    panel = UnitListPanel()
+    panel._movement_denial_open = True
+    panel._render_content = Mock()
+    panel._render_movement_denial = Mock()
+
+    assert panel.render(
+        object(), PanelRenderContext(target_tag="CAN", is_own_country=False)
+    ) is True
+
+    panel._render_movement_denial.assert_not_called()
+    assert panel._movement_denial_open is False
+
+
 def test_render_content_composes_owned_and_foreign_flows(monkeypatch):
     panel = UnitListPanel()
     values = [entry(str(index)) for index in range(25)]
     panel._own_entries = Mock(return_value=values)
     panel._render_type_filter = Mock()
+    panel._render_personnel_reference = Mock()
     panel._render_headers = Mock()
     panel._filtered_entries = Mock(return_value=values)
     panel._sorted_entries = Mock(return_value=values)
@@ -171,6 +195,7 @@ def test_render_content_composes_owned_and_foreign_flows(monkeypatch):
     panel._apply_wheel_scroll.assert_called_once_with(ui, 5)
     panel._render_scrollbar.assert_called_once_with(ui, 5)
     panel._render_rows.assert_called_once_with(values, True, ui, state)
+    panel._render_personnel_reference.assert_called_once_with(state, "USA", ui)
     panel._render_actions.assert_called_once()
     assert panel._first_visible_row == 5
 
@@ -281,6 +306,7 @@ def test_type_filter_ignores_invalid_combo_index_and_restores_style(monkeypatch)
 def test_accuracy_clamps_and_averages_estimate_confidence():
     panel = UnitListPanel()
     panel._presenter = Mock()
+    panel._presenter.gameplay_personnel_estimate_for_country.return_value = None
     panel._presenter.foreign_force_estimates_for_country.return_value = [
         {"confidence": -0.5}, {"confidence": 1.5},
     ]
@@ -297,6 +323,7 @@ def test_accuracy_clamps_and_averages_estimate_confidence():
 def test_accuracy_without_estimates_shows_unavailable_state():
     panel = UnitListPanel()
     panel._presenter = Mock()
+    panel._presenter.gameplay_personnel_estimate_for_country.return_value = None
     panel._presenter.foreign_force_estimates_for_country.return_value = []
     ui = FakeUI()
 
@@ -304,6 +331,75 @@ def test_accuracy_without_estimates_shows_unavailable_state():
 
     assert any(call[0] == "text" and call[1][1] == "—" for call in ui.calls)
     assert next(call for call in ui.calls if call[0] == "meter")[1][1] == 0.0
+
+
+def test_own_unit_list_shows_separate_2001_gameplay_personnel_estimate():
+    panel = UnitListPanel()
+    panel._presenter = Mock()
+    panel._presenter.gameplay_personnel_estimate_for_country.return_value = {
+        "value": 60_420,
+        "kind": "population_rate_gameplay_estimate",
+        "quality": "very_low",
+        "population": 20_613_089,
+        "population_method": "Sum WorldPop 2001 age cohorts.",
+        "rate_per_1000": 2.931132,
+        "peer_group": "south_central_asia",
+        "peer_iso3s": "BGD,IND,IRN,PAK,TJK,TKM,UZB",
+        "peer_count": 7,
+        "rate_method": "Median 2001 WDI peer count per 1,000 residents.",
+        "source_release": "2026-11-11",
+        "population_source_reference": "WorldPop 2001 population raster",
+        "population_source_url": "https://example.test/population",
+        "military_source_reference": "World Bank WDI MS.MIL.TOTL.P1",
+        "military_source_url": "https://example.test/military",
+        "display_label": "Gameplay estimate — not a historical count",
+        "note": "A scenario prior only.",
+    }
+    ui = FakeUI()
+
+    panel._render_personnel_reference(object(), "AFG", ui)
+
+    visible = next(call for call in ui.calls if call[0] == "text")
+    assert visible[1][1] == "2001 GAMEPLAY ESTIMATE: 60 420"
+    assert visible[2]["test_id"] == "unit_list.personnel.2001_gameplay_estimate"
+    tooltip = visible[2]["tooltip"]
+    assert "2001 gameplay estimate — not a historical count" in tooltip
+    assert "not a historical count" in tooltip
+    assert "current military_count" in tooltip
+    assert "WorldPop 2001 population raster" in tooltip
+    assert "World Bank WDI MS.MIL.TOTL.P1" in tooltip
+
+
+def test_foreign_estimate_confidence_tooltip_preserves_personnel_reference():
+    panel = UnitListPanel()
+    panel._presenter = Mock()
+    panel._presenter.foreign_force_estimates_for_country.return_value = [{"confidence": 0.4}]
+    panel._presenter.gameplay_personnel_estimate_for_country.return_value = {
+        "value": 18_954,
+        "kind": "population_rate_gameplay_estimate",
+        "quality": "very_low",
+        "note": "Kosovo's 2001 territory was under UN administration.",
+    }
+    ui = FakeUI()
+
+    panel._render_accuracy(object(), "KOS", ui)
+
+    confidence_call = next(call for call in ui.calls if call[0] == "text" and call[1][1] == "40%")
+    assert confidence_call[2]["tooltip"].startswith("Confidence belongs to aggregate OpenPower")
+    assert "2001 gameplay estimate — not a historical count: 18 954 people." in confidence_call[2]["tooltip"]
+    assert "Kosovo's 2001 territory was under UN administration" in confidence_call[2]["tooltip"]
+
+
+def test_puerto_rico_estimate_tooltip_explains_allocation_proxy_scope():
+    tooltip = _gameplay_personnel_estimate_tooltip({
+        "value": 15_722,
+        "kind": "territorial_force_allocation_proxy",
+        "quality": "very_low",
+        "note": "Territorial force-allocation proxy for gameplay only.",
+    })
+
+    assert "territorial_force_allocation_proxy" in tooltip
+    assert "not a count of Puerto Rico's armed forces or National Guard" in tooltip
 
 
 def test_header_click_updates_sort_and_foreign_upkeep_is_disabled():
@@ -587,6 +683,47 @@ def test_render_entry_draws_sale_marker():
     panel._render_entry(entry(for_sale=True), 1, False, ui, client_state())
 
     assert len([call for call in ui.calls if call[0] == "text"]) == 7
+
+
+def test_blocked_route_status_opens_read_only_current_denial_report(monkeypatch):
+    fake = fake_imgui(
+        is_item_clicked=Mock(return_value=True),
+        text=Mock(),
+        text_wrapped=Mock(),
+        WindowFlags_=SimpleNamespace(no_title_bar=1),
+    )
+    monkeypatch.setattr(panel_module, "imgui", fake)
+    panel = UnitListPanel()
+    panel._render_entry(
+        entry(status="Movement blocked", route_blocked=True), 1, False, FakeUI(), client_state()
+    )
+    assert panel._movement_denial_open is True
+
+    panel._presenter = Mock()
+    panel._presenter.unit_rows.return_value = [SimpleNamespace(
+        unit_id="U1", status="Movement blocked", location="Capital",
+        route_summary="Blocked: Transit access was denied.",
+    )]
+    ui = FakeUI(clicked={"unit.movement.denial.close"})
+    monkeypatch.setattr(panel_module, "GMLWidgets", lambda _root: ui)
+
+    @contextmanager
+    def window(*_args, **_kwargs):
+        yield True
+
+    @contextmanager
+    def child(_path, **_kwargs):
+        yield True
+
+    monkeypatch.setattr(panel_module.WindowManager, "window", window)
+    monkeypatch.setattr(panel_module, "gml_child_frame", child)
+
+    panel._render_movement_denial(object(), "USA")
+
+    assert panel._movement_denial_open is False
+    assert fake.text_wrapped.call_args_list[0].args[0] == "U1 · Capital"
+    assert fake.text_wrapped.call_args_list[1].args[0] == "Transit access was denied."
+    assert any(call[0] == "button" and call[3] == "unit.movement.denial.close" for call in ui.calls)
 
 
 def test_status_and_format_helpers_cover_fallbacks():

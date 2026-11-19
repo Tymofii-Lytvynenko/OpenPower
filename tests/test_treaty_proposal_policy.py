@@ -32,7 +32,7 @@ def make_state():
 
 def proposal(title="Compact", target="POL"):
     return ActionCreateTreaty(
-        player_id="player", source_country_tag="UKR", target_country_tag=target,
+        player_id="UKR", source_country_tag="UKR", target_country_tag=target,
         treaty_type="alliance", title=title, terms="",
     )
 
@@ -66,7 +66,7 @@ def test_activation_preserves_exact_proposal_context_for_client_callbacks():
     state.current_actions = [proposal()]
     system.update(state, 0.1)
     proposal_id = state.tables["pending_treaties"]["id"][0]
-    state.current_actions = [ActionRespondTreaty("player", proposal_id, "POL", True)]
+    state.current_actions = [ActionRespondTreaty("POL", proposal_id, "POL", True)]
     system.update(state, 0.1)
     event = next(event for event in state.events if isinstance(event, EventTreatyLifecycleChanged))
     assert event.proposal_id == proposal_id
@@ -84,7 +84,7 @@ def test_refusal_retains_context_after_the_proposal_has_been_deleted():
     state.current_actions = [proposal()]
     system.update(state, 0.1)
     proposal_id = state.tables["pending_treaties"]["id"][0]
-    state.current_actions = [ActionRespondTreaty("player", proposal_id, "POL", False)]
+    state.current_actions = [ActionRespondTreaty("POL", proposal_id, "POL", False)]
     system.update(state, 0.1)
     event = next(event for event in state.events if isinstance(event, EventTreatyRefused))
     assert state.tables["pending_treaties"].is_empty()

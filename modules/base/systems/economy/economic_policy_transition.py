@@ -66,6 +66,17 @@ class EconomicPolicyApplicationPlanner(Protocol):
 
 class DeterministicEconomicPolicyTransitionPlanner:
     def prepare(self, inputs: EconomicPolicyTransitionInputs) -> EconomicPolicyTransitionDraft:
+        # A slider may round-trip the current value through single precision.
+        # Charging for that rounding difference would create a false policy change.
+        if math.isclose(inputs.previous_value, inputs.target_value, rel_tol=1e-7, abs_tol=1e-9):
+            return EconomicPolicyTransitionDraft(
+                inputs=inputs,
+                transition_cost=0.0,
+                delay_minutes=0,
+                cooldown_minutes=0,
+                rejection_reason="The requested policy value is already in effect.",
+            )
+
         if inputs.cooldown_active:
             return EconomicPolicyTransitionDraft(
                 inputs=inputs,

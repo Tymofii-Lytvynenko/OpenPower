@@ -1,5 +1,5 @@
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import polars as pl
@@ -27,44 +27,18 @@ from src.client.ui.panels.resource_flows import (
     build_resource_flows,
     validate_resource_ledger,
 )
+from src.client.ui.panels.resource_policy_draft import (
+    PendingResourcePolicy,
+    ResourceMarketValues,
+    ResourcePolicyDraft,
+    read_market_values,
+    read_resource_tax_rate,
+)
 from src.client.ui.panels.shared.panel_widgets import draw_empty_state
 from src.shared.actions import (
     ActionIncreaseResourceProduction,
     ActionUpdateResourcePolicy,
 )
-
-
-@dataclass
-class ResourcePolicyDraft:
-    baseline_management: int
-    baseline_status: int
-    baseline_tax: int
-    management: int
-    status: int
-    tax: int
-
-    @property
-    def values(self) -> tuple[int, int, int]:
-        return self.management, self.status, self.tax
-
-    @property
-    def baseline(self) -> tuple[int, int, int]:
-        return self.baseline_management, self.baseline_status, self.baseline_tax
-
-    @property
-    def is_dirty(self) -> bool:
-        return self.values != self.baseline
-
-    def rebase(self, values: tuple[int, int, int]) -> None:
-        self.baseline_management, self.baseline_status, self.baseline_tax = values
-        self.management, self.status, self.tax = values
-
-
-@dataclass(frozen=True)
-class PendingResourcePolicy:
-    values: tuple[int, int, int]
-    player_id: str
-    result_cursor: int
 
 
 @dataclass(frozen=True)
@@ -100,6 +74,9 @@ class ResourcesPanel:
         self.current_policy_key = None
         # The source keeps dirty policy values per resource while the selection changes.
         self._policy_drafts: dict[tuple[str, str], ResourcePolicyDraft] = {}
+        self._global_tax_drafts: dict[str, float] = {}
+        self._trade_modes: dict[tuple[str, str], int] = {}
+        self._market_controls_enabled = True
         self._pending_policy_updates: dict[tuple[str, str], PendingResourcePolicy] = {}
         self._pending_production_increases: dict[tuple[str, str], PendingProductionIncrease] = {}
         self._flow_cache_ledger: pl.DataFrame | None = None
@@ -243,7 +220,16 @@ class ResourcesPanel:
         country = str(target_tag or "").strip().upper()
         player_id = str(net_client.player_id or "")
         result_cursor = len(getattr(getattr(state, "journal", None), "command_results", []))
-        for (draft_country, resource), draft in sorted(self._policy_drafts.items()):
+        try:
+            self._refresh_global_tax_drafts(state, country)
+        except (TypeError, ValueError) as error:
+            self._panel_diagnostic = str(error)
+            return
+        global_submitted = any(key[0] == country and pending.changes_global_tax
+                               for key, pending in self._pending_policy_updates.items())
+        # Attach a national-rate change to an already edited resource before creating a tax-only command.
+        drafts = sorted(self._policy_drafts.items(), key=lambda item: (not item[1].resource_changed, item[0]))
+        for (draft_country, resource), draft in drafts:
             key = (draft_country, resource)
             if (
                 draft_country != country
@@ -251,12 +237,25 @@ class ResourcesPanel:
                 or key in self._pending_policy_updates
             ):
                 continue
+            changes_global = (not global_submitted and draft.market_values.global_tax_modifier != draft.baseline_market.global_tax_modifier)
+            if not draft.resource_changed and not changes_global:
+                continue
             management, status, tax = draft.values
+            # An unrelated market edit must not round a fractional authoritative sector tax.
+            try:
+                tax_rate = (tax / 100.0 if tax != draft.baseline_tax
+                            else read_resource_tax_rate(state, key, tax / 100.0))
+            except (TypeError, ValueError) as error:
+                self._panel_diagnostic = str(error)
+                continue
             self._pending_policy_updates[key] = PendingResourcePolicy(
                 draft.values,
                 player_id,
                 result_cursor,
+                draft.market_values,
+                changes_global,
             )
+            global_submitted = global_submitted or changes_global
             net_client.send_action(
                 ActionUpdateResourcePolicy(
                     player_id=player_id,
@@ -264,7 +263,10 @@ class ResourcesPanel:
                     resource_id=resource,
                     is_gov_controlled=management == 1,
                     is_legal=status == 0,
-                    tax_rate=tax / 100.0,
+                    tax_rate=tax_rate,
+                    global_tax_modifier=draft.market_values.global_tax_modifier if changes_global else None,
+                    desired_trade_usd=draft.market_values.desired_trade_usd,
+                    meet_consumption=draft.market_values.meet_consumption,
                 )
             )
         self._refresh_dirty_state()
@@ -329,16 +331,20 @@ class ResourcesPanel:
                                 test_id=f"resources.category.{safe_cat.lower().replace(' ', '_')}",
                             )
 
-                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_prod_usd, abbreviate))
-                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_cons_usd, abbreviate))
-                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_trade_usd, abbreviate))
+                            imgui.table_next_column()
+                            Prims.right_align_text(self._fmt_money(cat_prod_usd, abbreviate))
+                            imgui.table_next_column()
+                            Prims.right_align_text(self._fmt_money(cat_cons_usd, abbreviate))
+                            imgui.table_next_column()
+                            Prims.right_align_text(self._fmt_money(cat_trade_usd, abbreviate))
 
                             color = (
                                 GAMETHEME.colors.negative
                                 if cat_bal_usd is not None and cat_bal_usd < 0
                                 else GAMETHEME.colors.positive
                             )
-                            imgui.table_next_column(); Prims.right_align_text(self._fmt_money(cat_bal_usd, abbreviate), color)
+                            imgui.table_next_column()
+                            Prims.right_align_text(self._fmt_money(cat_bal_usd, abbreviate), color)
 
                             if tree_open:
                                 res_df = cat_df.sort("game_resource_id")
@@ -410,32 +416,44 @@ class ResourcesPanel:
             if state is not None:
                 self._sync_policy_from_state(state, target_tag)
 
-        imgui.table_next_column(); Prims.right_align_text(self._fmt_money(p_usd, abbreviate))
-        imgui.table_next_column(); Prims.right_align_text(self._fmt_money(c_usd, abbreviate))
-        imgui.table_next_column(); Prims.right_align_text(self._fmt_money(t_usd, abbreviate))
+        imgui.table_next_column()
+        Prims.right_align_text(self._fmt_money(p_usd, abbreviate))
+        imgui.table_next_column()
+        Prims.right_align_text(self._fmt_money(c_usd, abbreviate))
+        imgui.table_next_column()
+        Prims.right_align_text(self._fmt_money(t_usd, abbreviate))
 
         color_usd = GAMETHEME.colors.negative if b_usd and b_usd < 0 else GAMETHEME.colors.positive
-        imgui.table_next_column(); Prims.right_align_text(self._fmt_money(b_usd, abbreviate), color_usd)
+        imgui.table_next_column()
+        Prims.right_align_text(self._fmt_money(b_usd, abbreviate), color_usd)
 
     def _render_controls(self, state, target_tag, is_own):
         self._sync_policy_from_state(state, target_tag)
         country = str(target_tag or "").strip().upper()
-        resource = str(self.selected_resource or "").strip().lower()
         increase_pending = bool(self._pending_production_increases)
-        controls_disabled = bool(
-            not is_own
-            or not self.selected_resource
-            or self.current_policy_key in self._pending_policy_updates
-            or increase_pending
-        )
+
         ledger = state.tables.get("resource_ledger")
         ledger_required = {"country_id", "game_resource_id", "production_usd", "balance_usd"}
         if self.selected_resource and ledger is not None:
             missing = ledger_required.difference(ledger.columns)
             if missing:
-                self._panel_diagnostic = (
+                # Set the diagnostic before deriving control state so malformed data cannot leave edits enabled.
+                ledger_diagnostic = (
                     "Resource ledger is missing columns: " + ", ".join(sorted(missing))
                 )
+                if self._panel_diagnostic:
+                    self._panel_diagnostic = f"{self._panel_diagnostic} {ledger_diagnostic}"
+                else:
+                    self._panel_diagnostic = ledger_diagnostic
+
+        controls_disabled = bool(
+            not is_own
+            or bool(self._panel_diagnostic)
+            or not self.selected_resource
+            or self.current_policy_key in self._pending_policy_updates
+            or increase_pending
+        )
+        self._market_controls_enabled = not controls_disabled
 
         imgui.push_style_var(imgui.StyleVar_.frame_padding, (8.0, 0.5))
         imgui.push_style_color(imgui.Col_.frame_bg, GAMETHEME.colors.bg_input)
@@ -534,26 +552,10 @@ class ResourcesPanel:
             "GLOBAL TAX",
             gml_id="Resources_Window/frmInner/frmResources/lblGlobalTaxMod",
         )
-        self._render_unavailable_resource_value(
-            "global_tax_modifier",
-            "frmGlobalTaxMod",
-            "OpenPower has no global resource-tax modifier field.",
-        )
+        self._render_global_tax_control(country)
 
         imgui.text_disabled("TRADE", gml_id="Resources_Window/frmInner/frmResources/lblTrade2")
-        trade_tooltip = "OpenPower has no per-resource import/export target action."
-        imgui.begin_disabled()
-        imgui.combo(
-            "##resources.trade",
-            0,
-            ("Unavailable",),
-            test_id="resources.policy.trade",
-            gml_id="Resources_Window/frmInner/frmResources/cboTrade",
-            gml_enabled=False,
-        )
-        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled):
-            imgui.set_tooltip(trade_tooltip)
-        imgui.end_disabled()
+        self._render_trade_direction()
         imgui.text_disabled("ACTUAL", gml_id="Resources_Window/frmInner/frmResources/lblActual")
         imgui.text(
             actual_trade_str,
@@ -564,23 +566,8 @@ class ResourcesPanel:
             imgui.set_tooltip("Net recorded trade value (exports minus imports), in USD.")
 
         imgui.text_disabled("DESIRED", gml_id="Resources_Window/frmInner/frmResources/lblDesired")
-        self._render_unavailable_resource_value(
-            "desired_trade",
-            "frmDesired",
-            trade_tooltip,
-        )
-
-        imgui.begin_disabled()
-        imgui.checkbox(
-            "##resources.policy.meet_consumption",
-            False,
-            test_id="resources.policy.meet_consumption",
-            gml_id="Resources_Window/frmInner/frmResources/togMeetConsumption",
-            gml_enabled=False,
-        )
-        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled):
-            imgui.set_tooltip("OpenPower has no per-resource meet-consumption policy field.")
-        imgui.end_disabled()
+        self._render_desired_trade_control()
+        self._render_meet_consumption_control()
         imgui.text_disabled(
             "Meet consumption",
             gml_id="Resources_Window/frmInner/frmResources/lblMeetConsumption",
@@ -601,47 +588,108 @@ class ResourcesPanel:
         imgui.pop_style_color()
         imgui.pop_style_var()
 
-    def _render_unavailable_resource_value(
-        self,
-        key: str,
-        gml_stepper: str,
-        tooltip: str,
-    ) -> None:
+    def _refresh_global_tax_drafts(self, state, country: str) -> None:
+        observed = read_market_values(state, country, "").global_tax_modifier
+        desired = self._global_tax_drafts.get(country)
+        if desired is None:
+            desired = next((draft.market_values.global_tax_modifier for key, draft in self._policy_drafts.items()
+                            if key[0] == country and draft.market_values.global_tax_modifier != draft.baseline_market.global_tax_modifier), observed)
+        if desired == observed:
+            self._global_tax_drafts.pop(country, None)
+        else:
+            self._global_tax_drafts[country] = desired
+        for key, draft in self._policy_drafts.items():
+            if key[0] == country:
+                draft.baseline_market = replace(draft.baseline_market, global_tax_modifier=observed)
+                draft.market_values = replace(draft.market_values, global_tax_modifier=desired)
+
+    def _set_market_policy_value(self, field: str, value) -> None:
+        key = self.current_policy_key
+        draft = self._policy_drafts.get(key)
+        if draft is None or key in self._pending_policy_updates or not self._market_controls_enabled:
+            return
+        if field == "global_tax_modifier":
+            if any(other[0] == key[0] and pending.changes_global_tax
+                   for other, pending in self._pending_policy_updates.items()):
+                return
+            self._global_tax_drafts[key[0]] = float(value)
+            # The global rate is one national draft even while the player browses different resources.
+            for other, item in self._policy_drafts.items():
+                if other[0] == key[0]:
+                    item.market_values = replace(item.market_values, global_tax_modifier=float(value))
+        else:
+            draft.market_values = replace(draft.market_values, **{field: value})
+        self._refresh_dirty_state()
+
+    def _market_draft(self) -> tuple[ResourcePolicyDraft | None, ResourceMarketValues]:
+        draft = self._policy_drafts.get(self.current_policy_key)
+        return draft, draft.market_values if draft else ResourceMarketValues()
+
+    def _render_market_number(self, key, slot, value, maximum, *, enabled=True, format="%.3f") -> tuple[bool, float]:
         widgets = GMLWidgets("Resources_Window/frmInner/frmResources")
-        field_gml_id = widgets.path(f"{gml_stepper}/edtText")
-        imgui.push_style_var(imgui.StyleVar_.frame_padding, (2.0, 1.0))
-        imgui.begin_disabled()
-        try:
-            unavailable_text = "N/A" if key == "desired_trade" else "Unavailable"
-            widgets.arrow_button(
-                f"{gml_stepper}/btnDown",
-                "down",
-                f"resources.policy.{key}.decrement",
-                enabled=False,
-                tooltip=tooltip,
-                gml_id=widgets.path(f"{gml_stepper}/btnDown"),
-            )
-            imgui.input_text(
-                f"##resources.policy.{key}",
-                unavailable_text,
-                flags=imgui.InputTextFlags_.read_only,
-                test_id=f"resources.policy.{key}",
-                gml_id=field_gml_id,
-                gml_enabled=False,
-            )
-            if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled):
-                imgui.set_tooltip(tooltip)
-            widgets.arrow_button(
-                f"{gml_stepper}/btnUp",
-                "up",
-                f"resources.policy.{key}.increment",
-                enabled=False,
-                tooltip=tooltip,
-                gml_id=widgets.path(f"{gml_stepper}/btnUp"),
-            )
-        finally:
-            imgui.end_disabled()
-            imgui.pop_style_var()
+        imgui.begin_disabled(not enabled)
+        changed, number = imgui.input_float(
+            f"##resources.policy.{key}", float(value), 0.0, 0.0, format,
+            test_id=f"resources.policy.{key}", gml_id=widgets.path(f"{slot}/edtText"),
+        )
+        for direction, increment in (("Down", -1.0), ("Up", 1.0)):
+            if widgets.arrow_button(f"{slot}/btn{direction}", direction.lower(),
+                                    f"resources.policy.{key}.{'decrement' if increment < 0 else 'increment'}",
+                                    enabled=enabled):
+                number = (number if changed else value) + increment
+                changed = True
+        imgui.end_disabled()
+        if not enabled or not changed or not math.isfinite(float(number)):
+            return False, value
+        return True, max(0.0, min(maximum, float(number)))
+
+    def _render_global_tax_control(self, country: str) -> None:
+        draft, values = self._market_draft()
+        pending = any(key[0] == country and item.changes_global_tax
+                      for key, item in self._pending_policy_updates.items())
+        changed, value = self._render_market_number("global_tax_modifier", "frmGlobalTaxMod",
+                                                   values.global_tax_modifier * 100.0, 100.0,
+                                                   enabled=draft is not None and not pending and self._market_controls_enabled,
+                                                   format="%.3f%%")
+        if changed:
+            self._set_market_policy_value("global_tax_modifier", value / 100.0)
+        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled):
+            imgui.set_tooltip("National percentage added to every resource's sector tax; the effective rate is capped at 100%.")
+
+    def _render_trade_direction(self) -> None:
+        draft, values = self._market_draft()
+        enabled = draft is not None and not values.meet_consumption and self._market_controls_enabled
+        mode = self._trade_modes.get(self.current_policy_key, int(values.desired_trade_usd < 0.0))
+        imgui.begin_disabled(not enabled)
+        changed, mode = imgui.combo("##resources.trade", mode, ("Export", "Import"),
+                                    test_id="resources.policy.trade",
+                                    gml_id="Resources_Window/frmInner/frmResources/cboTrade")
+        imgui.end_disabled()
+        if changed and enabled:
+            self._trade_modes[self.current_policy_key] = mode
+            self._set_market_policy_value("desired_trade_usd", abs(values.desired_trade_usd) * (-1 if mode else 1))
+
+    def _render_desired_trade_control(self) -> None:
+        draft, values = self._market_draft()
+        changed, amount = self._render_market_number("desired_trade", "frmDesired",
+            abs(values.desired_trade_usd) / 1e6, 1e9,
+            enabled=draft is not None and not values.meet_consumption and self._market_controls_enabled,
+            format="%.3f M")
+        if changed:
+            mode = self._trade_modes.get(self.current_policy_key, int(values.desired_trade_usd < 0.0))
+            self._set_market_policy_value("desired_trade_usd", amount * 1e6 * (-1 if mode else 1))
+        if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled):
+            imgui.set_tooltip("Annual trade target in millions of USD. Enable manual targets by turning off Meet consumption.")
+
+    def _render_meet_consumption_control(self) -> None:
+        draft, values = self._market_draft()
+        imgui.begin_disabled(draft is None or not self._market_controls_enabled)
+        changed, automatic = imgui.checkbox("##resources.policy.meet_consumption", values.meet_consumption,
+            test_id="resources.policy.meet_consumption",
+            gml_id="Resources_Window/frmInner/frmResources/togMeetConsumption")
+        imgui.end_disabled()
+        if changed and draft is not None and self._market_controls_enabled:
+            self._set_market_policy_value("meet_consumption", bool(automatic))
 
     def _render_tax_control(self) -> None:
         widgets = GMLWidgets("Resources_Window/frmInner/frmResources")
@@ -686,31 +734,43 @@ class ResourcesPanel:
         country = str(target_tag or "").strip().upper()
         key = (country, str(self.selected_resource or "").strip().lower())
         values = self._read_policy_values(state, key)
+        try:
+            market = read_market_values(state, *key)
+            self._refresh_global_tax_drafts(state, country)
+        except (TypeError, ValueError) as error:
+            self._panel_diagnostic = str(error)
+            market = ResourceMarketValues()
         draft = self._policy_drafts.get(key)
         pending = self._pending_policy_updates.get(key)
 
         if pending is not None:
             rejection = self._find_policy_rejection(state, key, pending)
-            if values == pending.values:
+            if pending.matches(values, market):
                 self._pending_policy_updates.pop(key, None)
                 draft = self._policy_drafts[key]
-                draft.rebase(values)
+                draft.rebase(values, market)
             elif rejection is not None:
                 self._pending_policy_updates.pop(key, None)
                 draft = self._policy_drafts[key]
                 draft.baseline_management, draft.baseline_status, draft.baseline_tax = values
                 draft.management, draft.status, draft.tax = pending.values
+                draft.baseline_market = market
+                draft.market_values = pending.market_values or market
             elif draft is None:
-                draft = ResourcePolicyDraft(*values, *pending.values)
+                draft = ResourcePolicyDraft(*values, *pending.values, market, pending.market_values or market)
                 self._policy_drafts[key] = draft
         elif draft is None:
-            draft = ResourcePolicyDraft(*values, *values)
+            draft = ResourcePolicyDraft(*values, *values, market, market)
             self._policy_drafts[key] = draft
         elif not draft.is_dirty:
-            draft.rebase(values)
+            draft.rebase(values, market)
 
         if draft is not None:
+            if country in self._global_tax_drafts:
+                draft.market_values = replace(draft.market_values, global_tax_modifier=self._global_tax_drafts[country])
             self.draft_management, self.draft_status, self.draft_tax = draft.values
+            if draft.market_values.desired_trade_usd:
+                self._trade_modes[key] = int(draft.market_values.desired_trade_usd < 0.0)
         self.current_policy_key = key
         self._refresh_dirty_state()
 
@@ -731,20 +791,19 @@ class ResourcesPanel:
             & (pl.col("game_resource_id").cast(pl.Utf8, strict=False).str.strip_chars().str.to_lowercase() == resource)
         )
         if row.height != 1:
+            # Zero defaults must not look like a real editable policy when the source row is absent or duplicated.
+            self._panel_diagnostic = (
+                "Domestic production policy row is missing or ambiguous."
+            )
             return 0, 0, 0
 
         controlled = bool(row["is_gov_controlled"][0]) if "is_gov_controlled" in row.columns else False
         legal = bool(row["is_legal"][0]) if "is_legal" in row.columns else True
-        tax_rate = 0.0
-        if "tax_rate" in row.columns:
-            try:
-                raw_tax = row["tax_rate"][0]
-                tax_rate = float(raw_tax) if raw_tax is not None else 0.0
-                if not math.isfinite(tax_rate):
-                    raise ValueError("tax_rate must be finite")
-            except (TypeError, ValueError, OverflowError) as exc:
-                self._panel_diagnostic = f"Domestic production tax rate is invalid: {exc}"
-                tax_rate = 0.0
+        try:
+            tax_rate = read_resource_tax_rate(state, key, 0.0)
+        except (TypeError, ValueError, OverflowError) as exc:
+            self._panel_diagnostic = f"Domestic production tax rate is invalid: {exc}"
+            tax_rate = 0.0
         return 1 if controlled else 0, 0 if legal else 1, max(0, min(100, int(round(tax_rate * 100.0))))
 
     def _find_policy_rejection(self, state, key, pending) -> dict | None:
@@ -796,6 +855,8 @@ class ResourcesPanel:
             for key, draft in self._policy_drafts.items()
             if key in self._pending_policy_updates
         }
+        pending_countries = {key[0] for key, pending in self._pending_policy_updates.items() if pending.changes_global_tax}
+        self._global_tax_drafts = {country: rate for country, rate in self._global_tax_drafts.items() if country in pending_countries}
         self.current_policy_key = None
         self._refresh_dirty_state()
 

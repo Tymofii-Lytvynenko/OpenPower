@@ -6,7 +6,7 @@ from typing import Any
 
 import polars as pl
 
-from modules.base.systems.military.battle_public_counts import public_battle_counts
+from modules.base.systems.military.battle_public_counts import COUNT_SCHEMA, public_battle_counts
 from modules.base.systems.military.battle_region_processor import BattleRegionScanResult
 from modules.base.systems.military.combat_round_resolver import normalize_country_tag
 from src.shared.events import EventOccupationChanged
@@ -56,11 +56,11 @@ class CombatStatePublisher:
             BATTLE_PARTICIPANTS_TABLE,
             pl.DataFrame(schema=self._participants_schema),
         )
-        self._update_table_if_changed(
-            state,
-            OCCUPATIONS_TABLE,
-            pl.DataFrame(schema=self._occupation_schema),
-        )
+        # Counts are also a battle projection; retaining them would expose stale
+        # forces after their associated battle rows have been cleared.
+        self._update_table_if_changed(state, PUBLIC_COUNTS_TABLE, pl.DataFrame(schema=COUNT_SCHEMA))
+        # Occupation is persistent world state, not a transient battle projection.
+        # Missing combat inputs must not erase previously controlled territory.
 
     def publish_tick(
         self,
@@ -241,7 +241,9 @@ class CombatStatePublisher:
         return countries.with_columns(
             pl.col("id")
             .map_elements(
-                lambda country_id: int(strength_by_owner.get(str(country_id), 0)),
+                # Owners are normalized above; country identifiers must use the
+                # same key or mixed-case data silently loses its military total.
+                lambda country_id: int(strength_by_owner.get(normalize_country_tag(country_id), 0)),
                 return_dtype=pl.Int64,
             )
             .alias("military_count")

@@ -24,10 +24,9 @@ class LoadGameView(BaseImGuiView):
             # Closing this standalone view's source frame must restore its menu.
             on_close=self._return_to_main_menu,
         )
-        self.load_dialog.toggle("load")
-
     def on_show_view(self):
         self.window.background_color = arcade.color.BLACK
+        self.load_dialog.toggle("load")
         if not self.imgui:
             self.setup_imgui()
 

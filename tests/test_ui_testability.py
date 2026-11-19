@@ -223,6 +223,26 @@ def test_layout_diagnostics_detect_text_over_disabled_actions():
     assert not analyze_layout(snapshot)
 
 
+def test_layout_diagnostics_ignore_unclipped_text_bounds_inside_tables():
+    snapshot = {
+        "viewport": {"width": 200, "height": 200},
+        "regions": [
+            {"id": "window", "kind": "window", "visible": True,
+             "rect": Rect(0, 0, 200, 200).to_dict()},
+            {"id": "table", "kind": "table", "visible": True, "parent_id": "window",
+             "rect": Rect(10, 10, 180, 180).to_dict()},
+        ],
+        "widgets": [
+            {"id": "left-cell", "type": "text", "visible": True, "enabled": True,
+             "parent_id": "table", "rect": Rect(10, 30, 120, 14).to_dict()},
+            {"id": "right-cell", "type": "text_colored", "visible": True, "enabled": True,
+             "parent_id": "table", "rect": Rect(100, 30, 90, 14).to_dict()},
+        ],
+    }
+
+    assert not any(finding["code"] == "text_overlap" for finding in analyze_layout(snapshot))
+
+
 def test_layout_diagnostics_cover_clipping_zero_size_overlaps_and_native_ids():
     snapshot = {
         "viewport": {"width": 100, "height": 100},

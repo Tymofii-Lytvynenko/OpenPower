@@ -195,6 +195,32 @@ def test_render_lists_parties_and_confirms_selection(monkeypatch):
     assert any(call[0] == "button" and call[3] == "new_game.party_selection.confirm" for call in widgets.calls)
 
 
+def test_render_marks_generic_incumbent_fallback_and_missing_support_unavailable(monkeypatch):
+    imgui = _FakeImgui()
+    _install_ui(monkeypatch, imgui=imgui)
+    window = PartySelectionWindow(Mock())
+    window.show(
+        _state(
+            political_parties=pl.DataFrame(
+                {
+                    "country_id": ["USA", "USA"],
+                    "party_id": ["incumbent", "LOCAL"],
+                    "display_name": ["Incumbent", "Local List"],
+                    "support_share": [1.0, None],
+                }
+            )
+        ),
+        "USA",
+    )
+
+    window.render(1280, 720)
+
+    selectable_labels = [call[1] for call in imgui.calls if call[0] == "selectable"]
+    support_labels = [call[1] for call in imgui.calls if call[0] == "text"]
+    assert any(label.startswith("Incumbent (fallback)##") for label in selectable_labels)
+    assert support_labels == ["—", "—"]
+
+
 def test_empty_and_closed_lists_and_window_cancel_paths(monkeypatch):
     imgui = _FakeImgui(list_open=True)
     _install_ui(

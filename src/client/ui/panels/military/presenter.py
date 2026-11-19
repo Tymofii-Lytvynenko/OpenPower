@@ -265,6 +265,11 @@ class MilitaryPresenter:
                 progress = self._movement_progress(row, presentation_total_minutes)
                 progress_pct = max(0.0, min(100.0, progress * 100.0))
                 location = resolve_region_name(state, safe_int(row.get("current_region_id"), 0))
+            elif safe_text(
+                route_by_unit.get(safe_text(row.get("id"), ""), {}).get("status"), ""
+            ).lower() == "blocked":
+                status, progress_pct = "Movement blocked", 0.0
+                location = resolve_region_name(state, safe_int(row.get("current_region_id"), 0))
             else:
                 status = readiness.title()
                 progress_pct = 100.0 if readiness in {"ready", "fortified"} else 0.0
@@ -1589,6 +1594,41 @@ class MilitaryPresenter:
             + f" | Reserves ${reserves:,.0f}".replace(",", " ")
             + f" | Research {research * 100:.1f}%"
         )
+
+    def gameplay_personnel_estimate_for_country(self, state, country_tag: str) -> dict | None:
+        """Return the separate 2001 scenario estimate without changing active personnel state."""
+        country_row = get_country_row(state, country_tag)
+        prefix = "gameplay_military_personnel_estimate_2001"
+        available = safe_text(country_row.get(f"{prefix}_available"), "").strip().lower()
+        if available not in {"true", "1", "yes"}:
+            return None
+
+        estimate = safe_int(country_row.get(prefix), 0)
+        if estimate <= 0:
+            return None
+        return {
+            "value": estimate,
+            "kind": safe_text(country_row.get(f"{prefix}_kind"), ""),
+            "quality": safe_text(country_row.get(f"{prefix}_quality"), ""),
+            "population": safe_int(country_row.get(f"{prefix}_population"), 0),
+            "population_method": safe_text(country_row.get(f"{prefix}_population_method"), ""),
+            "rate_per_1000": safe_float(country_row.get(f"{prefix}_rate_per_1000"), 0.0),
+            "peer_group": safe_text(country_row.get(f"{prefix}_peer_group"), ""),
+            "peer_iso3s": safe_text(country_row.get(f"{prefix}_peer_iso3s"), ""),
+            "peer_count": safe_int(country_row.get(f"{prefix}_peer_count"), 0),
+            "rate_method": safe_text(country_row.get(f"{prefix}_rate_method"), ""),
+            "source_release": safe_text(country_row.get(f"{prefix}_source_release"), ""),
+            "population_source_reference": safe_text(
+                country_row.get(f"{prefix}_population_source_reference"), ""
+            ),
+            "population_source_url": safe_text(country_row.get(f"{prefix}_population_source_url"), ""),
+            "military_source_reference": safe_text(
+                country_row.get(f"{prefix}_military_source_reference"), ""
+            ),
+            "military_source_url": safe_text(country_row.get(f"{prefix}_military_source_url"), ""),
+            "display_label": safe_text(country_row.get(f"{prefix}_display_label"), ""),
+            "note": safe_text(country_row.get(f"{prefix}_note"), ""),
+        }
 
     def _country_units(self, state, country_tag: str) -> list[dict]:
         units = state.tables.get("units")

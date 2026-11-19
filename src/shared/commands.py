@@ -7,6 +7,8 @@ from src.shared.actions import GameAction
 
 
 COMMAND_SCHEMA_VERSION = 1
+LOCAL_SESSION_ACTOR_ID = "local_admin"
+COMMAND_PROTOCOL_ERROR = "protocol_error"
 
 
 def command_id_for(actor_id: str, sequence: int) -> str:

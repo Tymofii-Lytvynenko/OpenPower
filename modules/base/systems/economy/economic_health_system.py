@@ -519,12 +519,35 @@ class EconomicHealthSystem(ISystem):
             EconomicPolicyApplicationInputs(
                 country_exists=current_country is not None,
                 policy_name=policy,
-                supported_policies=supported_policies,
+                # A policy may be known to the game but absent from this world's country schema.
+                supported_policies=supported_policies.intersection(current_country or {}),
             )
         )
         if not application.should_apply:
             transition["status"] = "rejected"
             transition["reason"] = application.reason
+            self._reject(
+                state,
+                EconomicRejectionRequest(
+                    country_id=country_id,
+                    source_id=str(transition["id"]),
+                    indicator=policy,
+                    value=self._number(transition.get("target_value")),
+                    reason=application.reason,
+                    at_minute=now,
+                ),
+            )
+            player_id = str(transition.get("player_id") or "")
+            if player_id:
+                state.journal.append_command_result({
+                    "tick": int(state.globals.get("tick", 0)),
+                    "player_id": player_id,
+                    "action_type": "ActionChangeEconomicPolicy",
+                    "status": "rejected",
+                    "reason": f"Scheduled {policy.replace('_', ' ')} change failed. {application.reason}",
+                    "country_id": country_id,
+                    "policy_name": policy,
+                })
             return transition
 
         assert current_country is not None
@@ -532,6 +555,7 @@ class EconomicHealthSystem(ISystem):
         target = self._number(transition.get("target_value"))
         self._country_values(state, country_id, {policy: SetCountryValue(target)})
         transition["status"] = "applied"
+        transition["applied_at_minute"] = now
         transition["reason"] = application.reason
         source_id = str(transition["id"])
         self._record_cause(

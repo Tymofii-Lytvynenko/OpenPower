@@ -9,22 +9,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from utils.reference_audit_navigation import reachable_windows
-from utils.reference_audit_output import write_csv_tables
-from utils.reference_paths import resolve_reference_file
-from utils.reference_cpp_parser import cpp_functions, find_matching as _find_matching
-from utils.reference_gml_validation import _validate_gml, _walk
-from utils.reference_source_index import _source_index
-from utils.reference_audit_geometry import (
-    _layout_geometry_crosswalk as _build_layout_geometry_crosswalk,
-    _route_evidence_snapshot,
-)
-
 from src.client.ui.components.reference_credit_roster import (
     REFERENCE_CREDIT_SUPPLEMENTAL_TEXT,
     REFERENCE_STEAM_CREDIT_GROUPS,
 )
-
+from utils.reference_audit_geometry import (
+    _layout_geometry_crosswalk as _build_layout_geometry_crosswalk,
+)
+from utils.reference_audit_geometry import (
+    _route_evidence_snapshot as _route_evidence_snapshot,
+)
+from utils.reference_audit_navigation import reachable_windows
+from utils.reference_audit_output import write_csv_tables
+from utils.reference_cpp_parser import cpp_functions
+from utils.reference_cpp_parser import find_matching as _find_matching
+from utils.reference_gml_validation import _validate_gml, _walk
+from utils.reference_paths import resolve_reference_file
+from utils.reference_source_index import _source_index
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_REPOSITORY = "docs/ui/reference/source_links.md"
@@ -119,6 +120,7 @@ LAYOUT_SURFACES: dict[str, tuple[str, str]] = {
     "Battle_Summary_Window": ("GameLayout/BattleSummaryDialog", "partial"),
     "Battle_Window": ("GameLayout/BattleInspectionWindows", "partial"),
     "Battle_Info_Window": ("GameLayout/BattleInspectionWindows", "verified_openpower"),
+    "Advisor_Advise_Window": ("No one-to-one source free-text advice popup; OpenPower uses structured AdvisorRecommendationWindow", "verified_unavailable"),
     "Small_Unit_Info_Window": ("GameView/MapInformationWindows", "partial"),
     "Sphere_Control_Window": ("GameView/MapInformationWindows", "verified_openpower"),
     "Unit_Attack_Confirm_Window": ("GameLayout/UnitAttackConfirmation", "verified_openpower"),
@@ -338,9 +340,9 @@ PARTIALLY_IMPLEMENTED_WINDOW_GAPS: dict[str, dict[str, str]] = {
         "current_implementation": "ConstitutionalFormPanel with GMLWidgets slots, inherited titlebar runtime positioning, domestic capital/martial-law/override controls, qualified confirmed foreign-form change with region release/access effects, DirtyCloseConfirmation, ActionSetGovernmentForm, and ActionSetCountryCapital",
     },
     "Country_Information_Window": {
-        "reason": "The 519x431 Python panel uses source GML frames and slot coordinates, reads OpenPower country HDI/infrastructure/telecom and regional population/area, and marks missing land-cover, climate, water/total-area, birth/death-rate values unavailable. Source C++ confirms the world comparator is not an average of country HDI: GDataControlLayer::AverageHumanDevelopment aggregates life expectancy, mean/expected schooling and GDP per capita, then applies GCountryData::FindHumanDevelopment. OpenPower lacks the birth-rate and schooling inputs, so the prior unweighted mean was removed and the panel now shows World: — with an explanation; the adjacent source meter remains empty. The Country Information journey passes at 800x600, 1024x768, 1280x720 and 1920x1080, with 4 reviewed screenshots and 0 geometry errors. The country map journey separately confirms all 27 Ukraine regions across those viewports. Source code sets the selected country title and closes on btnExit; it hides btnApply and togLockWindow during creation, matching Python titlebar close behavior.",
-        "action_required": "Keep world HDI unavailable until authoritative source inputs or a world aggregate are added; resolve the source localization token and keep source-only metrics unavailable until OpenPower equivalents exist.",
-        "missing_action": "Authoritative world-HDI input data, localized caption parity, and OpenPower equivalents for source-only country metrics",
+        "reason": "The 519x431 Python panel uses source GML frames and slot coordinates. It displays dated 2001 WDI/CIA land cover, climate, area and demographic observations, country HDI, and the official UNDP world HDI aggregate. The world comparison is explicitly a historical 2001 baseline, not a live simulation metric. The national-parks slot now shows the UNSD 2000 share of nationally designated terrestrial protected areas, with its year, broader category definition and total-surface denominator disclosed; it is not an exact national-parks-only 2001 measure. The unusable-land share remains unavailable because no comparable source measure exists. The Country Information journey passes at 800x600, 1024x768, 1280x720 and 1920x1080, with 4 reviewed screenshots and 0 geometry errors. The country map journey separately confirms all 27 Ukraine regions across those viewports. Source code sets the selected country title and closes on btnExit; it hides btnApply and togLockWindow during creation, matching Python titlebar close behavior.",
+        "action_required": "Retain source-year, category and denominator disclosure; provide exact 2001 national-parks-only and unusable-land sources before claiming source parity.",
+        "missing_action": "Exact 2001 national-parks-only and unusable-land data; exact source localization parity",
         "current_implementation": "CountryMoreInfoPanel with GMLWidgets slots, CountryMoreInfoPresenter and CountryRegionMapTextureCache",
     },
     "History_Window": {
@@ -386,8 +388,8 @@ PARTIALLY_IMPLEMENTED_WINDOW_GAPS: dict[str, dict[str, str]] = {
         "current_implementation": "UnitMarketPanel with GMLWidgets source slots, OpenPower listings and capability values, and ActionBuyMarketUnit",
     },
     "Unit_Production_Window": {
-        "reason": "UnitProductionPanel reproduces the source 842x462 window, category filters, builder selector, design tree and detail slots, quantity/priority controls, production queue row geometry, and foreign-order and deployment routes. Quantity arrows use the shared 1/10/100 source hold thresholds and accelerated cadence; the Python field retains its 0..1,000,000 bound because OpenPower does not publish the recruitable-manpower value used for REFERENCE's infantry-specific maximum. The domestic UI and authoritative action handler enforce REFERENCE's 50-row production queue limit, and the handler rejects quantities above the UI's 1,000,000 bound. Domestic orders, queue priority/pause/cancel, seller acceptance, foreign requests/contracts, and deployment dispatch/split are verified through fixture-backed journeys. Domestic new-order ETA now previews the exact provisional priority rule shared with ActionQueueUnitProduction; capacity allocation recalculates that value during simulation. The infantry slot displays OpenPower working-age population from regions.pop_15_64 or countries.total_core_manpower, labeled POP. 15-64; this is not recruitable manpower and does not cap orders. Foreign-order ETA stays N/A until the seller accepts. The source Fast option remains disabled because ActionQueueUnitProduction has no speed field and the supplied reference does not include the fast-production cost multiplier.",
-        "action_required": "Keep ETA and queue submission on the shared production policy; preserve the explicitly labeled 15-64 population metric without treating it as an enlistment allowance; keep Fast disabled until OpenPower has authoritative speed and cost rules.",
+        "reason": "UnitProductionPanel reproduces the source 842x462 window, category filters, builder selector, design tree and detail slots, quantity/priority controls, production queue row geometry, and foreign-order and deployment routes. Quantity arrows use the shared 1/10/100 source hold thresholds and accelerated cadence; the Python field retains its 0..1,000,000 bound because OpenPower does not publish the recruitable-manpower value used for REFERENCE's infantry-specific maximum. The domestic UI and authoritative action handler enforce REFERENCE's 50-row production queue limit, and the handler rejects quantities above the UI's 1,000,000 bound. Domestic orders, queue priority/pause/cancel, seller acceptance, foreign requests/contracts, and deployment dispatch/split are verified through fixture-backed journeys. Domestic new-order ETA now previews the exact provisional priority rule shared with ActionQueueUnitProduction; capacity allocation recalculates that value during simulation. The infantry slot displays OpenPower working-age population from regions.pop_15_64 or countries.total_core_manpower, labeled POP. 15-64; this is not recruitable manpower and does not cap orders. Foreign-order ETA stays N/A until the seller accepts. Domestic FAST is server-validated and uses the shared quote: 50% additional cash and 25% less factory work. These are explicit OpenPower tuning choices; exact REFERENCE multiplier parity remains unverified.",
+        "action_required": "Keep ETA and queue submission on the shared production policy; preserve the explicitly labeled 15-64 population metric without treating it as an enlistment allowance; keep speed selection and cost/work quotes aligned with the authoritative production policy.",
         "missing_action": "REFERENCE Fast speed and cost semantics, recruitable infantry manpower and quantity cap, and exact localized unit-category labels",
         "current_implementation": "UnitProductionPanel with GMLWidgets slots, lstUnitProductionItem GML rows, MilitaryPresenter data projections, and guarded OpenPower production/foreign-order/deployment actions",
     },
@@ -536,6 +538,18 @@ class NavigationJourneyBinding:
 ADDITIONAL_NAVIGATION_JOURNEY_MAP: dict[
     tuple[str, str, str], NavigationJourneyBinding
 ] = {
+    (
+        "Main_Menu/frmInner/btnSingle", "Submenu_Single", "show",
+    ): NavigationJourneyBinding(
+        "reference-main-menu-navigation.json", "click", "main_menu.singleplayer",
+        "main_menu.singleplayer.window",
+    ),
+    (
+        "Main_Menu/frmInner/btnMulti", "Submenu_Multi", "show",
+    ): NavigationJourneyBinding(
+        "reference-main-menu-navigation.json", "click", "main_menu.multiplayer",
+        "main_menu.multiplayer.window",
+    ),
     (
         "handler:GDataAccessLayerClient::AddTreatyRefusalMail", "Mail_Window", "show",
     ): NavigationJourneyBinding(
@@ -796,7 +810,7 @@ def _covert_caption_binding(token: str, caption: str, surface: str) -> DisplayBi
         token,
         caption,
         surface,
-        "src/client/ui/panels/military/covert_ops_panel.py; .codex/layout_catalog.gml",
+        "src/client/ui/panels/military/covert_ops_panel.py; .codex/dialogs.gml",
         f"OpenPower renders {caption!r} in this source caption slot; exact token translation remains unavailable.",
         "Keep the current English caption in its GML slot; use the exact source translation only if its language tables are recovered.",
     )
@@ -877,9 +891,113 @@ def _economy_caption_binding(token: str, caption: str, meaning: str) -> DisplayB
         token,
         caption,
         "economy.panel",
-        "src/client/ui/panels/economy_panel.py; .codex/layout_catalog.gml",
+        "src/client/ui/panels/economy_panel.py; .codex/dialogs.gml",
         f"EconomyPanel renders {caption!r} in the corresponding source caption slot; exact token translation remains unavailable.",
         "Keep the current English caption in its GML slot; use the exact source translation only if its language tables are recovered.",
+    )
+
+
+def _economy_data_binding(
+    state_binding: str,
+    units: str,
+    fallback: str,
+    update_rule: str,
+    meaning: str,
+    action_required: str,
+) -> DisplayBinding:
+    return DisplayBinding(
+        state_binding,
+        units,
+        fallback,
+        update_rule,
+        "src/client/ui/panels/economy_panel.py; modules/base/schema.py; modules/base/systems/economy/budget_system.py; .codex/dialogs.gml",
+        meaning,
+        status="partial",
+        action_required=action_required,
+        surface="economy.panel",
+    )
+
+
+def _history_caption_binding(token: str, caption: str, meaning: str) -> DisplayBinding:
+    return _explicit_gml_caption_binding(
+        token,
+        caption,
+        "history.panel",
+        "src/client/ui/panels/service/history_panel.py; .codex/dialogs.gml",
+        f"HistoryPanel renders {caption!r} for {meaning.lower()}; exact source translation remains unavailable.",
+        "Keep the English OpenPower caption in its matching source slot; use exact source localization only if its language tables are recovered.",
+    )
+
+
+def _history_axis_value_binding(axis: str) -> DisplayBinding:
+    return DisplayBinding(
+        f"HistoryPanel._axis_value({axis}(selected_series.value))",
+        f"{axis} displayed value in the active indicator's declared unit",
+        f"— when the selected series has no recorded {axis}; the tooltip identifies the missing bound.",
+        "Recomputed for the selected indicator, subject, and time range.",
+        "src/client/ui/panels/service/history_panel.py; src/client/services/history_query_service.py; .codex/dialogs.gml",
+        "OpenPower displays a numeric axis value for the chosen indicator. The source history window may format scale endpoints by domain-specific category, so only the live numeric series is mapped.",
+        status="partial",
+        action_required="Keep the unit tied to the selected indicator definition and preserve the em dash for missing observations.",
+        surface="history.panel",
+    )
+
+
+def _history_time_tick_binding() -> DisplayBinding:
+    return DisplayBinding(
+        "HistoryPanel._render_time_ticks(range_days, current_game_minute)",
+        "selected-range time-axis label in elapsed game days or approximate 30-day months",
+        "Uses 'now' at the current game minute; earlier ticks show the elapsed-day or month offset.",
+        "Recomputed from the selected time range and current game minute.",
+        "src/client/ui/panels/service/history_panel.py; .codex/Client/Source/sp2_history_window.cpp; .codex/dialogs.gml",
+        "OpenPower positions six time ticks over its selected range. Source calendar-month markers and OpenPower elapsed-game-time labels use different axis conventions.",
+        status="partial",
+        action_required="Keep tick labels aligned with the rendered game-minute axis and do not label elapsed months as exact calendar dates.",
+        surface="history.panel",
+    )
+
+
+def _trade_caption_binding(token: str, caption: str, meaning: str) -> DisplayBinding:
+    return _explicit_gml_caption_binding(
+        token,
+        caption,
+        "trade.panel",
+        "src/client/ui/panels/trade_panel.py; .codex/dialogs.gml",
+        f"TradePanel renders {caption!r} for {meaning.lower()}; exact source translation remains unavailable.",
+        "Keep the English OpenPower caption in its matching offer-list slot; use exact source localization only if its language tables are recovered.",
+    )
+
+
+def _thematic_legend_caption_binding(token: str, caption: str, meaning: str) -> DisplayBinding:
+    return _explicit_gml_caption_binding(
+        token,
+        caption,
+        "GameLayout/ThematicMapLegend",
+        "src/client/ui/components/hud/thematic_map_legend.py; .codex/dialogs.gml",
+        f"ThematicMapLegend renders {caption!r} for {meaning.lower()}; exact source translation remains unavailable.",
+        "Keep the current English legend heading and preserve the active map-mode metric semantics.",
+    )
+
+
+def _advisor_recommendation_caption_binding(token: str, caption: str, meaning: str) -> DisplayBinding:
+    return _explicit_gml_caption_binding(
+        token,
+        caption,
+        "advisor.recommendation.window",
+        "src/client/ui/components/shared/advisor_recommendation_window.py; .codex/dialogs.gml",
+        f"AdvisorRecommendationWindow renders {caption!r} for {meaning.lower()}; exact source translation remains unavailable.",
+        "Keep the English heading in its source section and retain the authoritative recommendation record as the data source.",
+    )
+
+
+def _advisor_settings_caption_binding(token: str, caption: str, meaning: str) -> DisplayBinding:
+    return _explicit_gml_caption_binding(
+        token,
+        caption,
+        "advisor.settings.panel",
+        "src/client/ui/panels/service/advisor_settings_panel.py; .codex/dialogs.gml",
+        f"AdvisorSettingsPanel renders {caption!r} for {meaning.lower()}; exact source translation remains unavailable.",
+        "Keep the English OpenPower setting label in its source slot and preserve the supported-policy boundary.",
     )
 
 
@@ -1326,7 +1444,7 @@ for _budget_meter_name, (_budget_column, _budget_label, _budget_source_ratio) in
             _budget_meter_decoration_binding(_budget_column, _budget_color.lower())
         )
 _RESOURCES_POLICY_UPDATE = (
-    "ResourcesPanel reads the selected row from domestic_production. Combo edits update the local draft; Apply or close-confirmation Apply sends ActionUpdateResourcePolicy, handled by InternalEconomySystem."
+    "ResourcesPanel reads the selected row from domestic_production and exposes shared countrywide tax, signed annual-USD trade targets and meet-consumption policy. Local drafts submit through ActionUpdateResourcePolicy, handled by InternalEconomySystem and the same clearing policy used by both market paths."
 )
 _RESOURCES_POLICY_SOURCE = (
     "src/client/ui/panels/resources_panel.py; src/shared/actions.py; "
@@ -1358,6 +1476,20 @@ RESOURCES_BINDINGS: dict[str, DisplayBinding] = {
         meaning="Actual net resource trade value; this is distinct from resource balance.",
         status="verified_openpower",
         action_required="Keep this field bound to trade_usd; never substitute balance_usd.",
+    ),
+    "frmInner/frmResources/cboTrade": DisplayBinding(
+        "domestic_production.desired_trade_usd (negative = import, positive = export); "
+        "domestic_production.meet_consumption controls whether a manual target is active",
+        "Import/export direction; signed target amount is annual USD",
+        "No manual target at zero; disabled when meet_consumption is enabled, the policy row is absent, "
+        "or the selected country is not controlled by the player.",
+        _RESOURCES_POLICY_UPDATE,
+        _RESOURCES_POLICY_SOURCE,
+        "The selected direction is represented by the sign of OpenPower's per-resource annual USD target. "
+        "The value is staged locally and submitted through ActionUpdateResourcePolicy.",
+        status="verified_openpower",
+        action_required="Preserve the negative-import/positive-export sign and annual USD units; "
+        "manual targets stay inactive while meet_consumption is enabled.",
     ),
 }
 _COUNTRY_INFO_SOURCE = (
@@ -1394,25 +1526,24 @@ def _country_info_binding(
 
 _COUNTRY_INFO_SLOTS: dict[str, DisplayBinding] = {
     "frmLand/txtArableLand": _country_info_binding(
-        "unavailable: no OpenPower arable-land share field",
+        "countries.arable_land_pct (WDI AG.LND.ARBL.ZS, observation 2001)",
         "percent of land area",
-        "Em dash; the OpenPower region schema has no arable-land share field.",
-        "REFERENCE displays m_fArableLand × 100; this source-only metric is not derived from unrelated OpenPower fields.",
-        status="verified_unavailable",
+        "2001 World Bank arable land as percentage of land area; unavailable observations show an em dash.",
+        "Dated source observation; not recalculated from current controlled regions.",
     ),
     "frmLand/txtForests": _country_info_binding(
-        "unavailable: no OpenPower forest-land share field",
+        "countries.forest_area_pct (WDI AG.LND.FRST.ZS, observation 2001)",
         "percent of land area",
-        "Em dash; the OpenPower region schema has no forest-land share field.",
-        "REFERENCE displays m_fForestLand × 100; this source-only metric is not derived from unrelated OpenPower fields.",
-        status="verified_unavailable",
+        "2001 World Bank forest area as percentage of land area; unavailable observations show an em dash.",
+        "Dated source observation; not recalculated from current controlled regions.",
     ),
     "frmLand/txtNationalParks": _country_info_binding(
-        "unavailable: no OpenPower national-parks share field",
-        "percent of land area",
-        "Em dash; the OpenPower region schema has no national-parks share field.",
-        "REFERENCE displays m_fParksLand × 100; this source-only metric is not derived from unrelated OpenPower fields.",
-        status="verified_unavailable",
+        "countries.terrestrial_protected_area_pct_2000 (UNSD table last updated 2010; observation 2000)",
+        "percent of total country surface area, including inland waters",
+        "UNSD nationally designated terrestrial protected-area share for 2000; em dash when no country observation is published.",
+        "REFERENCE displays a national-parks-only share. The sourced UNSD series includes broader nationally designated protected-area categories and is explicitly labeled with its 2000 observation year.",
+        status="partial",
+        action_required="Keep the 2000 year and broader category definition visible; do not present the value as national-parks-only or as a 2001 observation.",
     ),
     "frmLand/txtUnusable": _country_info_binding(
         "unavailable: no OpenPower unusable-land share field",
@@ -1428,24 +1559,24 @@ _COUNTRY_INFO_SLOTS: dict[str, DisplayBinding] = {
         "Selected country's OpenPower human-development index and country name.",
     ),
     "frmHumanDevelopment/frmInner/lblWorld": _country_info_binding(
-        "literal: English 'World:' label followed by the source-index fallback",
+        "literal English 'World (2001):' caption and historical_world_indicators.reference_human_dev",
         "caption and HDI availability marker",
-        "World: — because the authoritative REFERENCE world-HDI inputs are unavailable in OpenPower.",
+        "UNDP HDR 2025 official world aggregate for observation year 2001; label includes the historical year.",
         "REFERENCE leaves this localized GML caption static; the adjacent picWorld bar carries HumanDevelopmentAvg. "
         "The exact localized caption is unavailable because the REFERENCE language tables are not in this repository.",
         status="partial",
-        action_required="Add the verified localization for GML text token 101022 when the REFERENCE language tables are available.",
+        action_required="Keep the historical year visible; resolve exact source localization only when the language bundle is available.",
     ),
     "frmHumanDevelopment/frmInner/picWorld": _country_info_binding(
-        "unavailable: REFERENCE world HDI requires world birth-rate, schooling, population, and GDP inputs not present in OpenPower",
+        "historical_world_indicators.reference_human_dev for WLD, year 2001 (UNDP HDR 2025 aggregate)",
         "HDI ratio [0, 1] represented by bar width",
-        "Empty bar and 'World: —'; do not substitute an average of country.human_dev.",
+        "UNDP official world HDI 0.657 for observation year 2001; the meter shows 65.7%.",
         "REFERENCE sets bar width from m_fHumanDevAverage. GDataControlLayer::AverageHumanDevelopment aggregates "
         "world life expectancy, mean/expected schooling and GDP per capita, then applies GCountryData::FindHumanDevelopment. "
         "See docs/ui/reference/source_links.md "
         "and docs/ui/reference/source_links.md",
-        status="verified_unavailable",
-        action_required="Provide authoritative world-HDI inputs or a server aggregate; do not derive it from country.human_dev.",
+        status="partial",
+        action_required="Preserve official aggregate provenance and the fixed historical baseline semantics.",
     ),
     "frmHumanDevelopment/txtInfrastructure": _country_info_binding(
         "countries.infrastructure_index",
@@ -1463,63 +1594,61 @@ _COUNTRY_INFO_SLOTS: dict[str, DisplayBinding] = {
         "sum(regions.pop_14) for the selected country's controlled regions",
         "people",
         "Em dash when regional rows or the population column are unavailable.",
-        "OpenPower 0–14 age band.",
+        "Retrospective WorldPop 2001 age cohort where raster coverage is mapped; uncovered regions retain the documented legacy baseline.",
     ),
     "frmPopulation/txt1565": _country_info_binding(
         "sum(regions.pop_15_64) for the selected country's controlled regions",
         "people",
         "Em dash when regional rows or the population column are unavailable.",
-        "OpenPower 15–64 age band.",
+        "WorldPop 2001 working-age estimate derived from total population minus the 0–14 and 65+ cohorts where raster coverage is mapped.",
     ),
     "frmPopulation/txt65": _country_info_binding(
         "sum(regions.pop_65) for the selected country's controlled regions",
         "people",
         "Em dash when regional rows or the population column are unavailable.",
-        "OpenPower 65+ age band.",
+        "Retrospective WorldPop 2001 age cohort where raster coverage is mapped; uncovered regions retain the documented legacy baseline.",
     ),
     "frmPopulation/txtTotal": _country_info_binding(
         "derived: sum of regions.pop_14 + pop_15_64 + pop_65",
         "people",
         "Em dash when regional rows or any age-band column are unavailable.",
-        "Total population summed across the selected country's controlled regions.",
+        "Total across controlled regions; may include explicitly documented legacy rows where WorldPop coverage is absent.",
     ),
     "frmPopulation/txt15Ratio": _country_info_binding(
         "derived: regions.pop_14 / total population × 100",
         "percent of population",
         "Em dash when regional rows or population columns are unavailable.",
-        "OpenPower 0–14 population share.",
+        "Share of the displayed total from the covered 2001 child cohort and any documented legacy rows.",
     ),
     "frmPopulation/txt1565Ratio": _country_info_binding(
         "derived: regions.pop_15_64 / total population × 100",
         "percent of population",
         "Em dash when regional rows or population columns are unavailable.",
-        "OpenPower 15–64 population share.",
+        "Share of the displayed total from the 2001 working-age cohort and any documented legacy rows.",
     ),
     "frmPopulation/txt65Ratio": _country_info_binding(
         "derived: regions.pop_65 / total population × 100",
         "percent of population",
         "Em dash when regional rows or population columns are unavailable.",
-        "OpenPower 65+ population share.",
+        "Share of the displayed total from the covered 2001 older cohort and any documented legacy rows.",
     ),
     "frmPopulation/txtTotalRatio": _country_info_binding(
         "literal: 100.0% when regional population data is available",
         "percent of population",
         "Em dash when regional rows or population columns are unavailable.",
-        "Total population share.",
+        "Total share across the displayed regional population estimate, including documented legacy rows if present.",
     ),
     "frmPopulation/txtBirthRate": _country_info_binding(
-        "unavailable: no OpenPower birth-rate field",
-        "percent rate",
-        "Em dash; the OpenPower country and region schemas have no birth-rate field.",
-        "REFERENCE displays m_fBirthRate × 100; this rate is unavailable in OpenPower.",
-        status="verified_unavailable",
+        "countries.birth_rate (WDI SP.DYN.CBRT.IN, observation 2001)",
+        "births per 1,000 residents",
+        "Dated World Bank 2001 birth rate; unavailable observations show an em dash.",
+        "Historical national rate, not recomputed by the simulation.",
     ),
     "frmPopulation/txtDeathRate": _country_info_binding(
-        "unavailable: no OpenPower death-rate field",
-        "percent rate",
-        "Em dash; the OpenPower country and region schemas have no death-rate field.",
-        "REFERENCE displays m_fDeathRate × 100; this rate is unavailable in OpenPower.",
-        status="verified_unavailable",
+        "countries.death_rate (WDI SP.DYN.CDRT.IN, observation 2001)",
+        "deaths per 1,000 residents",
+        "Dated World Bank 2001 death rate; unavailable observations show an em dash.",
+        "Historical national rate, not recomputed by the simulation.",
     ),
     "frmTerrain/txtLandArea": _country_info_binding(
         "sum(regions.area_km2) for the selected country's controlled regions",
@@ -1528,25 +1657,22 @@ _COUNTRY_INFO_SLOTS: dict[str, DisplayBinding] = {
         "Land area summed from OpenPower regions controlled by the selected country.",
     ),
     "frmTerrain/txtWaterArea": _country_info_binding(
-        "unavailable: no OpenPower water-area field",
+        "countries_historical.reference_water_area_km2 (WDI surface area minus land area, 2001)",
         "km²",
-        "Em dash; the OpenPower region schema has no water-area field.",
-        "REFERENCE displays m_fWaterArea; water area is unavailable in OpenPower.",
-        status="verified_unavailable",
+        "2001 inland water area derived from total surface area minus land area; unavailable observations show an em dash.",
+        "Dated national reference geography, not player-controlled water territory.",
     ),
     "frmTerrain/txtTotalArea": _country_info_binding(
-        "unavailable: no OpenPower total-area field",
+        "countries_historical.reference_total_area_km2 (WDI AG.SRF.TOTL.K2, observation 2001)",
         "km²",
-        "Em dash; the OpenPower region schema has no total-area field.",
-        "REFERENCE displays m_fTotalArea; total area is unavailable in OpenPower.",
-        status="verified_unavailable",
+        "2001 national total surface area; unavailable observations show an em dash.",
+        "Historical national boundary reference, distinct from the land area under current control.",
     ),
     "frmClimate/frmInner/lblClimate": _country_info_binding(
-        "unavailable: no OpenPower climate identifier field",
-        "localized climate name",
-        "Em dash; OpenPower region and country schemas have no climate identifier.",
-        "REFERENCE resolves m_iClimateStid to a localized climate name; OpenPower has no climate identifier.",
-        status="verified_unavailable",
+        "countries_historical.climate_description (CIA World Factbook 2001)",
+        "historical national climate description",
+        "2001 Factbook climate summary; not a regional biome classification.",
+        "National-level historical description; no claim of per-region classification.",
     ),
 }
 COUNTRY_INFO_BINDINGS: dict[str, DisplayBinding] = {
@@ -1973,7 +2099,7 @@ DISPLAY_BINDINGS_BY_WINDOW = {
     },
     "Unit_Production_Window": {
         "frmDesignList/frmEta/txtEta": DisplayBinding(
-            "derived: initial_production_eta_days(selected domestic ActionQueueUnitProduction priority)",
+            "derived: production_order_quote(selected domestic design, quantity, priority, production_speed).initial_eta_days",
             "days",
             "N/A without a selected domestic design; foreign orders remain N/A until the producer accepts the request.",
             "Recomputed from the selected build priority on each render; the shared production policy recalculates accepted-order ETA as capacity is allocated.",
@@ -2653,7 +2779,7 @@ for _side_path, _side_name in (("frmSideA", "offered"), ("frmSideB", "requested"
         action_required="Keep this selector restricted to supported research assets; add other categories only with authoritative trade actions and models.",
     )
     TRADE_DETAILED_BINDINGS[f"{_trade_tabs}/Tab2/cboTechnology"] = _trade_detail_binding(
-        f"TradePanel._technology_options(state, giver, receiver): research_tracks.branch",
+        "TradePanel._technology_options(state, giver, receiver): research_tracks.branch",
         "research branch names",
         "No transferable technology when the giver has no branch level above the receiver.",
         "Recomputed from both countries' research_tracks on each proposal render.",
@@ -2662,7 +2788,7 @@ for _side_path, _side_name in (("frmSideA", "offered"), ("frmSideB", "requested"
         action_required="Keep branches and transfer eligibility tied to both countries' authoritative research levels; confirm source category/name semantics before claiming exact parity.",
     )
     TRADE_DETAILED_BINDINGS[f"{_trade_tabs}/Tab2/cboLevel"] = _trade_detail_binding(
-        f"TradePanel._technology_options(state, giver, receiver): levels receiver_level + 1 through giver_level",
+        "TradePanel._technology_options(state, giver, receiver): levels receiver_level + 1 through giver_level",
         "research levels",
         "No selection when the giver has no higher transferable level.",
         "Recomputed when the country pair or selected research branch changes.",
@@ -2747,6 +2873,83 @@ DISPLAY_BINDINGS_BY_WINDOW["Host_Multiplayer_Game"].update({
         for index in range(1, 6)
     },
 })
+
+_COVERT_ACTION_WINDOW_SOURCE = (
+    "src/client/ui/panels/military/covert_action_windows.py; "
+    "src/client/ui/layouts/gml_layout.py; .codex/dialogs.gml"
+)
+DISPLAY_BINDINGS_BY_WINDOW["Covert_Actions_Cell_Creation"] = {
+    "frmTitle/lblTitle": DisplayBinding(
+        "CovertActionWindows._WINDOWS['create'][1]",
+        "transient popup title",
+        "Create Covert Cell while the creation form is open.",
+        "Uses the active modal's configured title; it is not campaign or 2001 scenario data.",
+        _COVERT_ACTION_WINDOW_SOURCE,
+        "OpenPower creates a covert cell only through a player-submitted creation action.",
+        status="partial",
+        action_required="Keep the title tied to the active creation workflow and never seed it as a pre-existing cell.",
+        surface="CovertActionWindows._modal_window('create')",
+    ),
+    **{
+        path: _covert_caption_binding(token, caption, "CovertActionWindows._render_create")
+        for path, token, caption in (
+            ("frmInner/frmCell/lblCellName", "101036", "Cell name"),
+            ("frmInner/frmCell/lblCountry", "101035", "Target country"),
+            ("frmInner/frmCell/lblTraining", "101055", "Training level"),
+            ("frmInner/frmCell/lblSetupCost", "101056", "Setup cost"),
+            ("frmInner/frmCell/lblUpkeep", "101057", "Upkeep / day"),
+            ("frmInner/frmCell/lblTime", "101058", "Deployment time"),
+        )
+    },
+}
+DISPLAY_BINDINGS_BY_WINDOW["Covert_Actions_Cell_Training"] = {
+    "frmTitle/lblTitle": DisplayBinding(
+        "CovertActionWindows._WINDOWS['train'][1]",
+        "transient popup title",
+        "Train Covert Cell while the training form is open.",
+        "Uses the active modal's configured title; it is not campaign or 2001 scenario data.",
+        _COVERT_ACTION_WINDOW_SOURCE,
+        "OpenPower training changes only after the player submits a training action.",
+        status="partial",
+        action_required="Keep the title tied to the active training workflow and do not imply a training order has already been issued.",
+        surface="CovertActionWindows._modal_window('train')",
+    ),
+    "frmInner/frmCell/lblCellName": DisplayBinding(
+        "CovertActionWindows._training_cell_ids and the current owned active-cell roster",
+        "selected cell label or selected-cell count",
+        "Cell for a single-cell selector, N cells selected for a multi-selection, and an explicit stale-selection message when selected cells disappear.",
+        "Rendered from current owned active/idle covert cells when the training modal opens.",
+        _COVERT_ACTION_WINDOW_SOURCE,
+        "The source slot remains associated with player-owned covert cells; the current OpenPower form does not expose foreign cell names.",
+        status="partial",
+        action_required="Keep the selector scoped to current owned active/idle cells and preserve the stale-selection message.",
+        surface="CovertActionWindows._render_train",
+    ),
+    "frmInner/frmCell/lblTraining": _explicit_gml_caption_binding(
+        "101055", "Training points", "CovertActionWindows._render_train",
+        _COVERT_ACTION_WINDOW_SOURCE,
+        "Caption for the training-points slider.",
+        "Keep the caption adjacent to the explicit player-selected training amount.",
+    ),
+    **{
+        path: DisplayBinding(
+            f"unavailable: {field} is not part of the OpenPower covert-training form",
+            "source-only form field",
+            "The source control exists in GML, but the OpenPower training workflow does not render this field.",
+            "No OpenPower value is refreshed or submitted for this source-only field.",
+            _COVERT_ACTION_WINDOW_SOURCE,
+            f"No OpenPower runtime equivalent for the source {field.lower()} field.",
+            status="verified_unavailable",
+            action_required="Keep this field unavailable unless the OpenPower training workflow gains an explicit, validated equivalent.",
+            surface="CovertActionWindows._render_train",
+        )
+        for path, field in (
+            ("frmInner/frmCell/lblUpkeep", "upkeep"),
+            ("frmInner/frmCell/lblSetupCost", "setup cost"),
+            ("frmInner/frmCell/lblTime", "deployment time"),
+        )
+    },
+}
 
 DISPLAY_BINDINGS_BY_WINDOW["Covert_Actions_New_Mission"] = {
     "frmTitle/lblTitle": _covert_mission_form_caption_binding(
@@ -3504,7 +3707,7 @@ DISPLAY_BINDINGS_BY_WINDOW["Unit_Production_Window"].update({
         "100881", "BUILD IN", "UnitProductionPanel._render_builder_selector"
     ),
     "frmDesignList/frmEta/txtEta": DisplayBinding(
-        "initial_production_eta_days(selected domestic design priority) or foreign order N/A",
+        "production_order_quote(selected domestic design, quantity, priority, production_speed).initial_eta_days or foreign order N/A",
         "initial production estimate in days",
         "Initial domestic ETA from the selected priority; N/A for foreign requests or no selected design.",
         "Recomputed when design, producer, or priority selection changes; production allocation can revise it during simulation.",
@@ -3512,6 +3715,17 @@ DISPLAY_BINDINGS_BY_WINDOW["Unit_Production_Window"].update({
         "OpenPower presents an initial queue estimate and explicitly identifies foreign ETA as unavailable until seller acceptance.",
         status="partial",
         action_required="Keep this labeled as an initial estimate; do not present the foreign-request fallback as a confirmed delivery date.",
+        surface="UnitProductionPanel._render_design_details",
+    ),
+    "frmDesignList/frmInfo/cboSpeed": DisplayBinding(
+        "ActionQueueUnitProduction.production_speed; production_orders.production_speed",
+        "normal/fast",
+        "Normal by default; foreign requests use seller terms.",
+        "Updated on domestic draft selection and persisted when the server accepts the order.",
+        "src/client/ui/panels/military/unit_production_panel.py; modules/base/systems/military/production_policy.py; src/shared/actions.py; modules/base/schema.py",
+        "OpenPower FAST uses a 50% cash premium and 25% factory-work reduction; exact REFERENCE multiplier parity is unverified.",
+        status="partial",
+        action_required="Keep UI and authoritative server quotes on the shared policy.",
         surface="UnitProductionPanel._render_design_details",
     ),
 })
@@ -3570,6 +3784,7 @@ DISPLAY_BINDINGS_BY_WINDOW["Unit_Ground_Deployment_Window"] = {
         for slot, category in zip(
             ("txtQty", "txtQty1", "txtQty2", "txtQty3"),
             ("Ground", "Air", "Naval", "Strategic"),
+            strict=True,
         )
     },
     "frmInner/tabGroups/Tab4/lstDeploy": _unit_reserve_category_display("Ground", "Tab4"),
@@ -4532,12 +4747,12 @@ _RESOURCE_POLICY_INTERACTION = {
     "openpower_effect": _RESOURCES_POLICY_UPDATE,
     "game_action": "ActionUpdateResourcePolicy on Apply or close-confirmation Apply",
     "read_only_or_state_changing": "local draft until Apply; then authoritative state-changing action",
-    "validation_condition": "Resource must be selected and the active country must be the player's own country.",
-    "country_scope_restriction": "Controls and Apply are disabled for foreign countries or without a selected resource.",
+    "validation_condition": "Resource must be selected, the active country must be the player's own country, and policy values must pass finite/range checks.",
+    "country_scope_restriction": "Edits are disabled for foreign countries; the global tax modifier is shared by all resource drafts for the controlled country.",
     "confirmation_state": "DirtyCloseConfirmation offers Apply, Discard, and Remember when the policy draft is dirty.",
     "error_state": "Authoritative rejections are surfaced through CommandFeedback and GenericMessageDialog; the rejected resource draft remains available for correction and retry.",
-    "restrictions_confirmation_error": "The panel gates edits by ownership and selected resource; InternalEconomySystem validates country authority, resource identity, policy values, and the domestic-production row.",
-    "action_required": "Keep per-country, per-resource drafts until an authoritative acceptance or rejection resolves the pending update.",
+    "restrictions_confirmation_error": "Desired trade is signed annual USD; meet-consumption disables discretionary targets; the countrywide tax is bounded to 100%.",
+    "action_required": "Keep countrywide tax shared across resource drafts and preserve desired-trade units until snapshot acknowledgement.",
     "status": "verified_openpower",
 }
 RESOURCE_POLICY_INTERACTION_BINDINGS = {
@@ -4550,20 +4765,20 @@ RESOURCE_POLICY_INTERACTION_BINDINGS = {
     "Resources_Window/frmInner/frmResources/frmSectorTax/btnDown",
     )
 }
-_RESOURCE_UNAVAILABLE_INTERACTION = {
-    "openpower_effect": "Keep the source control visible in its GML slot and disabled with a reason because OpenPower has no matching authoritative field or action.",
-    "game_action": "none (no matching OpenPower resource-policy action)",
-    "read_only_or_state_changing": "disabled; no local state is changed",
-    "validation_condition": "The control remains unavailable for every country until OpenPower exposes its domain contract.",
-    "country_scope_restriction": "No country may submit this source-only policy.",
-    "confirmation_state": "No confirmation or dirty state is created.",
-    "error_state": "A tooltip explains the missing OpenPower field or action.",
-    "restrictions_confirmation_error": "Do not substitute unrelated resource, budget, or trade values.",
-    "action_required": "Enable only after an authoritative OpenPower model field or GameAction exists.",
-    "status": "verified_unavailable",
+_RESOURCE_MARKET_INTERACTION = {
+    "openpower_effect": "Edits a countrywide resource-tax modifier, desired signed annual trade, or meet-consumption policy through a local draft.",
+    "game_action": "ActionUpdateResourcePolicy with global_tax_modifier, desired_trade_usd, and meet_consumption",
+    "read_only_or_state_changing": "local draft until Apply; then authoritative state-changing action",
+    "validation_condition": "Controlled country, selected resource, finite in-range policy values, and no conflicting pending submission.",
+    "country_scope_restriction": "Disabled for foreign countries; global tax draft is shared across the controlled country's resource rows.",
+    "confirmation_state": "Included in dirty draft and close Apply/Discard confirmation.",
+    "error_state": "Rejection retains the draft for correction; acknowledged snapshots clear pending changes.",
+    "restrictions_confirmation_error": "Automatic trade targets are disabled while meet-consumption is enabled; desired trade is annual USD.",
+    "action_required": "Keep tax countrywide, preserve signed target units, and wait for snapshot acknowledgement.",
+    "status": "verified_openpower",
 }
-RESOURCE_UNAVAILABLE_INTERACTION_BINDINGS = {
-    path: dict(_RESOURCE_UNAVAILABLE_INTERACTION)
+RESOURCE_MARKET_INTERACTION_BINDINGS = {
+    path: dict(_RESOURCE_MARKET_INTERACTION)
     for path in (
         "Resources_Window/frmInner/frmResources/cboTrade",
         "Resources_Window/frmInner/frmResources/togMeetConsumption",
@@ -4686,16 +4901,16 @@ BUDGET_RESOURCES_TITLE_INTERACTION_BINDINGS = {
             "waits for authoritative acceptance or rejection."
         ),
         action="ActionUpdateResourcePolicy per changed country/resource draft",
-        status="partial",
+        status="verified_openpower",
         validation="Apply is enabled only with a connected client, controlled country, and unsubmitted dirty resource policies.",
         constraints="Only the controlled country's policy drafts may be submitted.",
         confirmation="Title Apply commits supported drafts directly; dirty close separately asks Apply or Discard.",
         error="A rejection preserves the affected resource draft for correction or retry.",
         mapping_notes=(
-            "OpenPower has no authoritative equivalent for the source global tax modifier, which remains disabled; "
-            "Apply therefore commits only supported per-resource fields."
+            "A countrywide modifier is shared across resource drafts and included once in a submitted policy; "
+            "signed targets use annual USD."
         ),
-        action_required="Keep supported resource payloads exact and retain the explicit unavailable boundary for global tax.",
+        action_required="Keep shared countrywide-tax state and desired-trade units explicit in the submission.",
         read_only_or_state_changing="authoritative state-changing country/resource action",
     ),
 }
@@ -5824,15 +6039,15 @@ UNIT_PRODUCTION_INTERACTION_BINDINGS = {
     "Unit_Production_Window/frmDesignList/frmInfo/cboSpeed": _unit_production_interaction(
         reference="The NORMAL/FAST selection updates displayed price and ETA and is passed as m_iProductionSpeed with the build request.",
         surface="UnitProductionPanel._render_design_details",
-        effect="The source-shaped combo is disabled because OpenPower's production action and order schema do not yet represent speed; the source cost modifier is also unavailable in the supplied reference files.",
-        action="No action; ActionQueueUnitProduction has no production_speed field.",
+        effect="Domestic NORMAL/FAST selection updates the shared quote and sends production_speed with the order. FAST costs 50% more and requires 25% less factory work under explicit OpenPower tuning.",
+        action="ActionQueueUnitProduction.production_speed on submit",
         status="partial",
-        validation="The control remains disabled for both domestic and foreign builders.",
-        constraints="Do not enable FAST until an authoritative speed and cost policy is available.",
-        confirmation="No order can be submitted with a speed selection.",
-        error="None; unsupported speed cannot be selected.",
-        mapping_notes="The source ETA formula shows a speed level of 0 or 1 and applies (speed + 1) to unit throughput, but the source production cost multiplier value is absent from the supplied C++ mirror and OpenPower has no matching authoritative policy.",
-        action_required="Add a server-validated speed field, source-compatible cost policy, and queue ETA/throughput behavior before enabling the source combo.",
+        validation="The authoritative handler accepts normal/fast only, validates funds, and stores mode and quoted work on the order.",
+        constraints="Enabled for an owned domestic design with a connected command client; foreign producers set their own terms.",
+        confirmation="The queued order retains the selected production mode.",
+        error="Invalid mode rejects the action without spending funds or creating an order.",
+        mapping_notes="OpenPower overtime multipliers are explicit game-balance choices; exact REFERENCE cost parity remains unverified.",
+        action_required="Preserve shared UI/server quotes and capacity conservation; reconcile exact reference multipliers if evidence becomes available.",
     ),
     "Unit_Production_Window/frmDesignList/btnBuild": _unit_production_interaction(
         reference="GUnitProductionWindow::OnMouseClick calls RequestBuildOrder for a domestic build or foreign request.",
@@ -9091,14 +9306,13 @@ POLITICS_INTERACTION_BINDINGS = {
 }
 
 _POLITICS_METERS = {
-    "frmPressure/frmGradient": ("political pressure", True, "unavailable: no equivalent OpenPower country field"),
+    "frmPressure/frmGradient": ("treaty pressure", False, "countries.political_pressure (derived from active/pending treaties and fielded military value)"),
     "frmCorruption/frmGradient": ("government corruption", True, "countries.gvt_corruption"),
     "frmIdeology/frmIdeologyCursor": ("political ideology", False, "country_governments.ideology_balance"),
     "frmStability/frmGradient": ("government stability", True, "countries.gvt_stability"),
     "frmApproval/frmGradient": ("government approval", True, "countries.gvt_approval"),
 }
 for _meter_path, (_meter_name, _drag_enabled, _binding) in _POLITICS_METERS.items():
-    _pressure_unavailable = _meter_path.startswith("frmPressure/")
     for _fragment in ("btnFill", "btnUnfilled"):
         _source_drag_enabled = _drag_enabled and _fragment == "btnFill"
         _interaction_binding = _politics_meter_interaction(
@@ -9106,19 +9320,9 @@ for _meter_path, (_meter_name, _drag_enabled, _binding) in _POLITICS_METERS.item
             meter_name=_meter_name,
             source_drag_enabled=_source_drag_enabled,
             openpower_binding=_binding,
-            openpower_status="partial" if _pressure_unavailable else "verified_openpower",
+            openpower_status=("partial" if _meter_path.startswith("frmPressure/")
+                              else "verified_openpower"),
         )
-        if _pressure_unavailable:
-            _interaction_binding.update({
-                "openpower_effect": (
-                    "The source pressure track is retained as an empty disabled rail with an adjacent N/A label; "
-                    "OpenPower has no authoritative pressure value, so no numeric fill is fabricated."
-                ),
-                "action_required": (
-                    "Keep the source-sized empty rail and explicit N/A fallback until an authoritative pressure field exists."
-                ),
-                "status": "partial",
-            })
         POLITICS_INTERACTION_BINDINGS[
             f"Politic_Window/frmInner/{_meter_path}/{_fragment}"
         ] = _interaction_binding
@@ -9590,38 +9794,38 @@ TREATY_DETAILS_INTERACTION_BINDINGS = {
     "Treaty_Details_Window/frmInner/frmPressure/frmGradient/btnFill": _treaty_detail_interaction(
         reference="The source pressure gradient fill is a display fragment updated from pressure totals; it has no independent click action.",
         surface="LiveTreatiesPanel._render_pressure_fallback / GMLWidgets.meter",
-        effect="Shows an empty source-sized meter because OpenPower has no treaty-pressure total field.",
-        action="none (display-only meter; source pressure value unavailable)",
+        effect="Renders the live share of world fielded military value represented by treaty sponsors.",
+        action="none (display-only live pressure meter)",
         validation="The treaty details window is visible.",
-        limitation="Keep the meter empty and pair it with the explicit N/A value; do not infer pressure from ordinary members.",
-        status="verified_unavailable",
+        limitation="Sponsor shares use fielded equipment value; source formula parity is unverified.",
+        status="partial",
     ),
     "Treaty_Details_Window/frmInner/frmPressure/frmGradient/btnUnfilled": _treaty_detail_interaction(
         reference="The source pressure gradient unfilled segment is a display fragment updated from pressure totals; it has no independent click action.",
         surface="LiveTreatiesPanel._render_pressure_fallback / GMLWidgets.meter",
-        effect="Shows the empty remainder of the source-sized meter because OpenPower has no treaty-pressure total field.",
-        action="none (display-only meter; source pressure value unavailable)",
+        effect="Shows the remaining share of the live pressure meter.",
+        action="none (display-only live pressure meter)",
         validation="The treaty details window is visible.",
-        limitation="Keep the meter empty and pair it with the explicit N/A value; do not infer pressure from ordinary members.",
-        status="verified_unavailable",
+        limitation="Sponsor shares use fielded equipment value; source formula parity is unverified.",
+        status="partial",
     ),
     "Treaty_Details_Window/frmInner/frmPressure/btnSponsor": _treaty_detail_interaction(
         reference="The source sponsor button sends GTreatyJoin or GTreatyLeave with special pressure side 3.",
         surface="LiveTreatiesPanel._render_pressure_fallback",
-        effect="Preserves the source button slot as disabled and explains that pressure sponsorship is not modeled.",
-        action="none (pressure sponsorship unavailable)",
-        validation="OpenPower has no separate treaty pressure-membership side or total.",
-        limitation="Ordinary ActionJoinTreaty membership is not a substitute for the source pressure side; keep this control disabled.",
-        status="verified_unavailable",
+        effect="Adds the controlled country to pressure_members without accepting the proposal; another press withdraws support.",
+        action="ActionSetTreatyPressure(treaty_id, country_tag, is_supporting)",
+        validation="The country is controlled by the player and the treaty is pending or active.",
+        limitation="Pressure support and treaty acceptance are independent; foreign membership cannot be changed.",
+        status="partial",
     ),
     "Treaty_Details_Window/frmInner/frmPressure/lstPressure": _treaty_detail_interaction(
         reference="The source pressure list displays countries sponsoring a treaty outside its ordinary membership sides.",
         surface="LiveTreatiesPanel._render_pressure_fallback",
-        effect="Shows an explicit no-data explanation in the source list slot.",
-        action="none (read-only list; pressure-country data unavailable)",
+        effect="Lists pressure sponsors and their live shares of world fielded military value.",
+        action="none (read-only live sponsor list)",
         validation="The treaty details window is visible.",
-        limitation="OpenPower does not store source pressure-country totals or membership; keep the list explicitly unavailable.",
-        status="verified_unavailable",
+        limitation="Shares are derived from current fielded equipment values; unknown design values contribute zero.",
+        status="partial",
     ),
     "Treaty_Details_Window/frmInner/frmMain/frmModify/btnRefuse": _treaty_detail_interaction(
         reference="The source Refuse button sends GTreatyLeave for the controlled country in refusal-capable treaty states.",
@@ -9886,31 +10090,31 @@ DISPLAY_BINDINGS_BY_WINDOW["Treaty_Details_Window"].update({
         action_required="Keep the ratio clearly identified as OpenPower-native; exact source research categories are unavailable.",
     ),
     "frmInner/frmPressure/txtValue": _treaty_detail_display(
-        "unavailable: no treaty pressure total in OpenPower state",
-        "source pressure percentage unavailable",
-        "N/A; OpenPower does not track REFERENCE treaty pressure-country totals.",
-        "Constant unavailable fallback while treaty details are open.",
-        "Pressure total; no authoritative OpenPower source field.",
-        status="verified_unavailable",
-        action_required="Retain N/A until an authoritative pressure model exists; do not derive it from regular members.",
+        "derived: fielded equipment value of pressure_members / world fielded equipment value",
+        "share of world fielded military value",
+        "Live sponsor percentage; empty sponsor list yields 0%.",
+        "Recomputed from the current treaty sponsors and fielded designs when the panel renders.",
+        "OpenPower-derived treaty pressure; source formula parity remains unverified.",
+        status="partial",
+        action_required="Preserve the distinction between treaty pressure sponsors and ordinary members.",
     ),
     "frmInner/frmPressure/frmGradient": _treaty_detail_display(
-        "unavailable: no treaty pressure total in OpenPower state",
-        "source gradient meter unavailable",
-        "Empty source-sized meter paired with N/A.",
-        "Constant empty fallback while treaty details are open.",
-        "Visual pressure total meter; no authoritative OpenPower source field.",
-        status="verified_unavailable",
-        action_required="Keep the source geometry but leave the meter empty until pressure totals are modeled.",
+        "derived: treaty pressure share normalized to 0–1",
+        "share meter",
+        "Live sponsor share of world fielded military value.",
+        "Recomputed from current treaty supporters and unit/design records.",
+        "OpenPower-derived treaty pressure; source formula parity remains unverified.",
+        status="partial",
+        action_required="Keep source formula parity unverified and show the live OpenPower value.",
     ),
     "frmInner/frmPressure/lstPressure": _treaty_detail_display(
-        "unavailable: no pressure-country membership set in OpenPower state",
-        "country list unavailable",
-        "Explicit no-data explanation in the source list slot.",
-        "Constant unavailable fallback while treaty details are open.",
-        "Countries sponsoring the treaty on REFERENCE pressure side 3.",
-        status="verified_unavailable",
-        action_required="Keep the no-data explanation; ordinary membership rows are not pressure sponsors.",
+        "countries_treaties.pressure_members / pending_treaties.pressure_members",
+        "country list with per-sponsor pressure share",
+        "Live names and shares for current pressure sponsors.",
+        "Recomputed from the current treaty row and military valuation tables.",
+    "OpenPower treaty-pressure sponsors with current equipment-value shares.",
+        status="partial",
+        action_required="Keep pressure_members distinct from ordinary treaty membership.",
     ),
 })
 
@@ -9919,7 +10123,7 @@ def _economic_health_caption(text: str, meaning: str) -> DisplayBinding:
     return DisplayBinding(
         f"literal source-style caption: {text}",
         "caption",
-        f"English caption; the verified REFERENCE localization string for token text is unavailable.",
+        "English caption; the verified REFERENCE localization string for token text is unavailable.",
         "Constant while the source economic-health panel is visible.",
         "src/client/ui/panels/economic_health_panel.py; .codex/layout_catalog.gml",
         meaning,
@@ -9948,10 +10152,79 @@ DISPLAY_BINDINGS_BY_WINDOW["Economic_Window"] = {
     "frmInner/frmEconomicHealth/lblTitle": _economy_caption_binding(
         "100166", "ECONOMIC HEALTH", "Economic-health section title."
     ),
+    "frmInner/frmResources/txtValue": _economy_data_binding(
+        "clamp(1 - total shortage_usd / total consumption_usd, 0, 1) from the selected country's resource_ledger",
+        "percent resource-demand coverage estimate",
+        "-- when a complete selected-country ledger is unavailable; the meter remains visually empty.",
+        "Recomputed from current resource-ledger balances and consumption while the panel is visible.",
+        "OpenPower estimates demand coverage from net ledger balances. The source ratio uses production plus imports over demand plus exports, so these values are not asserted equivalent or historical.",
+        "Keep this labeled as an OpenPower coverage estimate; add an explicit source formula only if the matching production/import/export inputs are implemented.",
+    ),
+    "frmInner/frmEconomicModel/frmModelCursor": _economy_data_binding(
+        "1 - government-controlled domestic_production / total domestic_production for the selected country",
+        "fraction of domestic production treated as free market (0–1)",
+        "-- when production, ownership flags, or a positive production total is unavailable; the meter remains visually empty.",
+        "Recomputed from current domestic-production policy rows while the panel is visible.",
+        "OpenPower derives a production-ownership share. The source displays the country's economic-model setting; the metrics are not direct equivalents or a historical 2001 observation.",
+        "Retain the OpenPower production-share meaning and do not present it as a sourced national 2001 economic-model value.",
+    ),
+    "frmInner/frmBudget/lblIncome": _economy_caption_binding(
+        "100043", "INCOME", "Annual revenue label in the budget summary."
+    ),
+    "frmInner/frmBudget/txtIncome": _economy_data_binding(
+        "countries.total_annual_revenue",
+        "annual simulated revenue (USD)",
+        "-- when the selected country or current revenue value is unavailable.",
+        "Updated from the selected country's current budget simulation state.",
+        "Current OpenPower budget revenue; it is not a source-verified 2001 national fiscal observation.",
+        "Keep the displayed value tied to current simulated revenue and source it historically only through a separate documented baseline series.",
+    ),
+    "frmInner/frmBudget/lblExpenses": _economy_caption_binding(
+        "100044", "EXPENSES", "Annual expense label in the budget summary."
+    ),
+    "frmInner/frmBudget/txtExpenses": _economy_data_binding(
+        "countries.total_annual_expense",
+        "annual simulated expenses (USD)",
+        "-- when the selected country or current expense value is unavailable.",
+        "Updated from the selected country's current budget simulation state.",
+        "Current OpenPower budget expenses; they are not source-verified 2001 national fiscal observations.",
+        "Keep the displayed value tied to current simulated expenses and source it historically only through a separate documented baseline series.",
+    ),
+    "frmInner/frmBudget/lblBalance": _economy_caption_binding(
+        "100045", "BALANCE", "Annual revenue minus annual expenses label."
+    ),
+    "frmInner/frmBudget/txtBalance": _economy_data_binding(
+        "countries.total_annual_revenue - countries.total_annual_expense",
+        "annual simulated net budget balance (USD)",
+        "-- when either revenue or expense is unavailable.",
+        "Calculated from the selected country's current annual revenue and expense values.",
+        "OpenPower's current simulated budget balance; it is not a source-verified 2001 fiscal balance.",
+        "Preserve the derived relationship and distinguish the live simulation balance from historical fiscal data.",
+    ),
+    "frmInner/frmBudget/lblAvailable": _economy_caption_binding(
+        "100067", "FUNDS", "Available-reserves label; OpenPower uses a shorter caption to fit the source slot."
+    ),
+    "frmInner/frmBudget/txtDebt": _economy_data_binding(
+        "countries.money_reserves",
+        "current country reserves (USD)",
+        "-- when the selected country's reserve value is unavailable.",
+        "Updated from the selected country's current simulation state.",
+        "OpenPower money_reserves is used in the source's available-money slot. Its treatment of debt and available monetary supply is not asserted equivalent.",
+        "Preserve the explicit reserves meaning; do not interpret negative reserves as a historical debt series.",
+    ),
+    "frmInner/frmEconomicHealth/txtValue": _economy_data_binding(
+        "countries.economic_health",
+        "current OpenPower economic-health score (0–100 percent)",
+        "-- when the current score is missing or outside the valid 0–1 range; no hardcoded health estimate is substituted.",
+        "Updated by the current economic-health simulation policy.",
+        "OpenPower's current simulation score, not a directly observed 2001 economic-health statistic.",
+        "Keep missing values visibly unavailable and do not substitute an unsourced historical score.",
+    ),
 }
 
 
 DISPLAY_BINDINGS_BY_WINDOW["Resources_Window"] = {
+    **RESOURCES_BINDINGS,
     "frmTitle/lblTitle": _resources_caption_binding(
         "100047", "RESOURCES MENU", "Window title."
     ),
@@ -9959,10 +10232,10 @@ DISPLAY_BINDINGS_BY_WINDOW["Resources_Window"] = {
         "100343", "MKT SHARE", "Market-share percentage label."
     ),
     "frmInner/frmResources/lblGlobalTaxMod": _resources_caption_binding(
-        "100341", "GLOBAL TAX", "Global resource-tax label; the associated modifier has no OpenPower field."
+        "100341", "GLOBAL TAX", "Countrywide resource-market tax modifier."
     ),
     "frmInner/frmResources/lblDesired": _resources_caption_binding(
-        "100345", "DESIRED", "Desired import/export amount label; its input stays unavailable in OpenPower."
+        "100345", "DESIRED", "Signed annual desired import or export in USD."
     ),
     "frmInner/frmResources/lblTrade": _resources_caption_binding(
         "100066", "MARKET FLOW", "Resource-ledger trade-value column header."
@@ -9977,7 +10250,7 @@ DISPLAY_BINDINGS_BY_WINDOW["Resources_Window"] = {
         "100078", "RESOURCE TAX", "Per-resource tax label."
     ),
     "frmInner/frmResources/lblMeetConsumption": _resources_caption_binding(
-        "100347", "Meet consumption", "Source policy caption; OpenPower keeps the unsupported toggle disabled."
+        "100347", "Meet consumption", "Automatically cover consumption before discretionary trade targets."
     ),
     "frmInner/frmResources/lblStatus": _resources_caption_binding(
         "100077", "LEGAL STATUS", "Per-resource legal-status label."
@@ -10017,7 +10290,7 @@ DISPLAY_BINDINGS_BY_WINDOW["Resources_Window"] = {
         "100342", "SHARE OF GDP", "Resource production as a share of country GDP label."
     ),
     "frmInner/frmResources/lblTrade2": _resources_caption_binding(
-        "100066", "TRADE", "Import/export target label; OpenPower has no matching target action."
+        "100066", "TRADE", "Label for the signed import/export target control."
     ),
     "frmInner/frmResources/txtMarketShare": DisplayBinding(
         "resource_ledger.production_usd for the selected resource / world production_usd for that resource * 100",
@@ -10039,17 +10312,6 @@ DISPLAY_BINDINGS_BY_WINDOW["Resources_Window"] = {
         "REFERENCE displays m_fMarketAvailability as an available-stock quantity. OpenPower's balance_usd is a net flow, not stock availability.",
         status="partial",
         action_required="Keep the net balance label and missing-data fallback; do not claim stock equivalence.",
-        surface="resources.panel",
-    ),
-    "frmInner/frmResources/cboTrade": DisplayBinding(
-        "Disabled OpenPower trade selector; no per-resource import/export target action exists.",
-        "Unavailable option; selector is disabled.",
-        "Unavailable on all OpenPower resource rows.",
-        "Rendered disabled while the selected-resource controls are visible.",
-        "src/client/ui/panels/resources_panel.py; src/shared/actions.py; .codex/layout_catalog.gml",
-        "REFERENCE offers import/export targets. OpenPower records trade flows but has no matching per-resource desired-trade command.",
-        status="partial",
-        action_required="Keep the selector disabled until an authoritative per-resource trade-target action exists.",
         surface="resources.panel",
     ),
     "frmInner/frmResources/txtGdp": DisplayBinding(
@@ -10096,6 +10358,347 @@ DISPLAY_BINDINGS_BY_WINDOW["Relations_Window"] = {
     ),
     "frmInner/frmRelations/lblCountryB": _relations_caption_binding(
         "101030", "Country B", "second selected country control label"
+    ),
+    "frmInner/frmRelations/cboCountryA": DisplayBinding(
+        "countries.id/name from RelationsPresenter.countries(state)",
+        "current country label as name (tag)",
+        "Disabled selection with a message when fewer than two valid country records exist; "
+        "missing names fall back to country tags.",
+        "Built from the current country snapshot on each render. Country A initializes from the target country "
+        "when present, otherwise from the first country in name/tag order; selection remains local to the panel.",
+        "src/client/ui/panels/politics/relations_panel.py; "
+        "src/client/ui/panels/politics/relations_presenter.py; modules/base/schema.py; .codex/layout_catalog.gml",
+        "The selector is populated from the current OpenPower country catalog and chooses the first end of a directed relation pair.",
+        status="verified_openpower",
+        action_required="Keep both selections distinct and preserve the country-tag fallback for missing names.",
+        surface="relations.panel",
+    ),
+    "frmInner/frmRelations/cboCountryB": DisplayBinding(
+        "countries.id/name from RelationsPresenter.countries(state)",
+        "current country label as name (tag)",
+        "Disabled selection with a message when fewer than two valid country records exist; "
+        "missing names fall back to country tags.",
+        "Built from the current country snapshot on each render. Country B initializes to the first different "
+        "country in name/tag order and stays distinct from Country A.",
+        "src/client/ui/panels/politics/relations_panel.py; "
+        "src/client/ui/panels/politics/relations_presenter.py; modules/base/schema.py; .codex/layout_catalog.gml",
+        "The selector is populated from the current OpenPower country catalog and chooses the second end of a directed relation pair.",
+        status="verified_openpower",
+        action_required="Keep both selections distinct and preserve the country-tag fallback for missing names.",
+        surface="relations.panel",
+    ),
+    "frmInner/frmRelations/UIGraph": DisplayBinding(
+        "HistoryQueryService.relationship_timeline(state, country_a, country_b), filtered to relation_value rows; "
+        "x=game_minute/1440 and y=value",
+        "directed relation points over elapsed simulation days",
+        "Displays 'No relation history recorded.' for an empty timeline; missing current pair data is reported as unavailable.",
+        "Recomputed from the selected directed country pair each render; history points come from the authoritative event timeline.",
+        "src/client/ui/panels/politics/relations_panel.py; "
+        "src/client/ui/panels/politics/relations_presenter.py; src/client/services/history_query_service.py; .codex/layout_catalog.gml",
+        "OpenPower plots its directed relation-value timeline. Its numeric scale is not asserted to match the source relation formula.",
+        status="partial",
+        action_required="Keep the directed A-to-B pair and OpenPower relation-point units explicit; do not treat missing timeline samples as zero or as a 2001 history baseline.",
+        surface="relations.panel",
+    ),
+}
+
+
+DISPLAY_BINDINGS_BY_WINDOW["History_Window"] = {
+    "frmTitle/lblTitle": _history_caption_binding("100797", "HISTORY", "Window title."),
+    "frmInner/frmHistory/frmGraph": DisplayBinding(
+        "HistoryQueryService.series(state, subject_type, subject_id, indicator_id, start_minute, end_minute, granularity_minutes)",
+        "selected historical indicator values with game-minute time coordinates and definition-provided units",
+        "Shows the empty-state message when no indicator, subject, or recorded sample is available; no zero line or fabricated history is implied.",
+        "Queried again from persisted history observations for the selected indicator and subject whenever the snapshot or range changes.",
+        "src/client/ui/panels/service/history_panel.py; src/client/services/history_query_service.py; modules/base/systems/world/history_system.py; .codex/Client/Source/sp2_history_window.cpp; .codex/dialogs.gml",
+        "OpenPower plots its own persisted simulation observations. A 2001 start point is shown only if a compatible source-backed observation is seeded; the panel does not infer earlier history.",
+        status="partial",
+        action_required="Preserve indicator units and missing-sample gaps; add a 2001 baseline only for indicators with compatible, provenance-backed inputs.",
+        surface="history.panel",
+    ),
+    "frmInner/frmHistory/frmGraph/Container": DisplayBinding(
+        "HistoryPanel._draw_trend renders HistoryQueryService.series values in the active GML graph container",
+        "selected indicator history series over game-minute coordinates",
+        "No historical samples in the selected range; no zero line is implied.",
+        "Drawn from the selected subject, indicator, range, and current persisted observation snapshot.",
+        "src/client/ui/panels/service/history_panel.py; src/client/services/history_query_service.py; .codex/dialogs.gml",
+        "OpenPower uses persisted observations in its current simulation timeline; missing samples remain visible gaps.",
+        status="partial",
+        action_required="Keep the graph tied to selected history observations, with no zero-series fallback.",
+        surface="history.panel",
+    ),
+    "frmInner/frmHistory/frmGraph/txtV0": _history_axis_value_binding("min"),
+    "frmInner/frmHistory/frmGraph/txtV1": _history_axis_value_binding("max"),
+    **{
+        f"frmInner/frmHistory/frmGraph/txtH{index}": _history_time_tick_binding()
+        for index in range(6)
+    },
+    "frmInner/frmHistory/txtTransparentLabel1": DisplayBinding(
+        "not rendered; source GHistoryWindow hides its one-month toggle and label during OnCreate",
+        "hidden source range label",
+        "No separate label is rendered; OpenPower exposes the supported range in the History Analytics selector.",
+        "Remains unused while the source one-month toggle and label are hidden.",
+        ".codex/Client/Source/sp2_history_window.cpp; src/client/ui/panels/service/history_panel.py; .codex/dialogs.gml",
+        "This is not a missing historical value: OpenPower routes range selection through the analytics popup instead of this hidden source label.",
+        status="verified_unavailable",
+        action_required="Keep the hidden source label unused; retain the explicit HistoryPanel time-range selector.",
+        surface="history.panel",
+    ),
+    "frmInner/frmHistory/txtTransparentLabel3": DisplayBinding(
+        "not rendered; source GHistoryWindow hides its six-month toggle and label during OnCreate",
+        "hidden source range label",
+        "No separate label is rendered; OpenPower exposes the supported range in the History Analytics selector.",
+        "Remains unused while the source six-month toggle and label are hidden.",
+        ".codex/Client/Source/sp2_history_window.cpp; src/client/ui/panels/service/history_panel.py; .codex/dialogs.gml",
+        "This is not a missing historical value: OpenPower routes range selection through the analytics popup instead of this hidden source label.",
+        status="verified_unavailable",
+        action_required="Keep the hidden source label unused; retain the explicit HistoryPanel time-range selector.",
+        surface="history.panel",
+    ),
+    "frmInner/frmHistory/txtTransparentLabel2": DisplayBinding(
+        "not rendered; source GHistoryWindow hides its one-year toggle and label during OnCreate",
+        "hidden source range label",
+        "No separate label is rendered; OpenPower exposes the supported range in the History Analytics selector.",
+        "Remains unused while the source one-year toggle and label are hidden.",
+        ".codex/Client/Source/sp2_history_window.cpp; src/client/ui/panels/service/history_panel.py; .codex/dialogs.gml",
+        "This is not a missing historical value: OpenPower routes range selection through the analytics popup instead of this hidden source label.",
+        status="verified_unavailable",
+        action_required="Keep the hidden source label unused; retain the explicit HistoryPanel time-range selector.",
+        surface="history.panel",
+    ),
+    "frmInner/frmHistory/txtTransparentLabel4": DisplayBinding(
+        "not rendered; source GHistoryWindow hides its two-year toggle and label during OnCreate",
+        "hidden source range label",
+        "No separate label is rendered; OpenPower exposes the supported range in the History Analytics selector.",
+        "Remains unused while the source two-year toggle and label are hidden.",
+        ".codex/Client/Source/sp2_history_window.cpp; src/client/ui/panels/service/history_panel.py; .codex/dialogs.gml",
+        "This is not a missing historical value: OpenPower routes range selection through the analytics popup instead of this hidden source label.",
+        status="verified_unavailable",
+        action_required="Keep the hidden source label unused; retain the explicit HistoryPanel time-range selector.",
+        surface="history.panel",
+    ),
+}
+
+
+DISPLAY_BINDINGS_BY_WINDOW["Thematic_Map_Legend"] = {
+    "txtTitle": DisplayBinding(
+        "viewport.current_mode_key resolved through viewport.map_modes[mode_key].name, falling back to the mode key",
+        "active thematic map-mode title",
+        "Uses the map-mode key when a display name is unavailable.",
+        "Updated when the active thematic map mode changes.",
+        "src/client/ui/components/hud/thematic_map_legend.py; src/client/controllers/viewport_controller.py; .codex/dialogs.gml",
+        "The title names the current OpenPower map mode; it does not use a fixed REFERENCE title token.",
+        status="verified_openpower",
+        action_required="Keep the title bound to the active map mode and omit the legend for political and terrain modes.",
+        surface="GameLayout/ThematicMapLegend",
+    ),
+    "txtTitle2": _thematic_legend_caption_binding("102354", "RANK", "Rank column header."),
+    "txtTitle3": _thematic_legend_caption_binding("100309", "COUNTRY", "Country column header."),
+    "txtTitle1": _thematic_legend_caption_binding("102353", "REL", "Relation column header."),
+    "frmLegend/lblTop": DisplayBinding(
+        "ThematicMapLegend._draw_gradient_key(mode) high endpoint or _draw_empire_key() category labels",
+        "active thematic scale's high endpoint or current empire categories",
+        "Shows HIGH for gradient modes; empire mode lists its active alliance, selected, occupied, and claim categories.",
+        "Recomputed from the current map mode and empire membership each time the legend renders.",
+        "src/client/ui/components/hud/thematic_map_legend.py; src/client/visualization/map_modes/empire_mode.py; .codex/dialogs.gml",
+        "OpenPower supplies mode-aware labels. The source's Ally/Good/High label is not a single invariant caption across modes.",
+        status="partial",
+        action_required="Keep the legend label synchronized with the current map mode and do not display a fixed category across other modes.",
+        surface="GameLayout/ThematicMapLegend",
+    ),
+    "frmLegend/lblMiddle": DisplayBinding(
+        "not rendered as a separate label; empire categories are placed through lblTop and gradient modes use only top and bottom endpoints",
+        "no separate middle-key label",
+        "No separate middle label is drawn.",
+        "Remains unused in all current OpenPower map modes.",
+        "src/client/ui/components/hud/thematic_map_legend.py; .codex/dialogs.gml",
+        "The source label does not have a one-to-one OpenPower display slot; category labels are drawn through other legend locations.",
+        status="verified_unavailable",
+        action_required="Do not add a fixed middle label that could disagree with the active map mode.",
+        surface="GameLayout/ThematicMapLegend",
+    ),
+    "frmLegend/lblBottom": DisplayBinding(
+        "ThematicMapLegend._draw_gradient_key(mode) low endpoint; unused by _draw_empire_key()",
+        "active thematic scale's low endpoint",
+        "Shows LOW for gradient modes and no separate bottom label in empire mode.",
+        "Recomputed from the current map mode each time the legend renders.",
+        "src/client/ui/components/hud/thematic_map_legend.py; .codex/dialogs.gml",
+        "OpenPower supplies mode-aware scale endpoints; the source's Enemy/Bad/Low label is not invariant across modes.",
+        status="partial",
+        action_required="Keep the bottom endpoint tied to the active map mode and omit it when the empire key is shown.",
+        surface="GameLayout/ThematicMapLegend",
+    ),
+    "lstCountries": DisplayBinding(
+        "ThematicMapLegend._ranked_countries(state, player_tag, selected_tag, current_map_mode) "
+        "or _empire_countries(state, selected_tag, player_tag)",
+        "active country rank, flag/tag/name, and directed relation value where available",
+        "Shows 'No country data' when the selected thematic mode has no finite country metric; "
+        "empire mode requires a selected country and lists only that country plus active military allies.",
+        "Recomputed from current country/region metrics, map mode, treaties, relations, and viewport selection; "
+        "clicking a row focuses the map on that country.",
+        "src/client/ui/components/hud/thematic_map_legend.py; "
+        "src/client/visualization/map_modes/empire_mode.py; modules/base/systems/world/treaty_diplomacy.py; "
+        "modules/base/schema.py; .codex/dialogs.gml",
+        "The list ranks the current OpenPower metric (or current empire membership) and shows available "
+        "directed relation values. It does not claim to reproduce the source ranking formula or missing metrics.",
+        status="partial",
+        action_required="Keep ranking tied to the active map mode, exclude inactive countries and non-finite metrics, "
+        "and do not substitute a missing metric with a historical or unrelated value.",
+        surface="GameLayout/ThematicMapLegend",
+    ),
+}
+
+
+DISPLAY_BINDINGS_BY_WINDOW["Trade_Window"] = {
+    "frmTitle/lblTitle": _trade_caption_binding("101483", "BILATERAL TRADE", "Window title."),
+    "frmInner/frmList/lblRecipient": _trade_caption_binding(
+        "101484", "RECIPIENT", "Offer-list recipient column header."
+    ),
+    "frmInner/frmList/lblProposer": _trade_caption_binding(
+        "101485", "PROPOSER", "Offer-list proposer column header."
+    ),
+    "frmInner/frmList/lblStatus": _trade_caption_binding(
+        "100077", "STATUS", "Offer-list status column header."
+    ),
+    "frmInner/frmList/lstTrade": DisplayBinding(
+        "TradePanel._country_deals(state, selected_country) from state.tables['diplomatic_trade_deals']",
+        "current bilateral offer rows: proposer, recipient, and live status",
+        "Shows 'No bilateral trade offers yet.' when the selected country has no offers.",
+        "Refreshed from the live diplomatic_trade_deals table while the offer page is open.",
+        "src/client/ui/panels/trade_panel.py; modules/base/schema.py; .codex/Client/Source/sp2_trade_window.cpp; .codex/dialogs.gml",
+        "These are player-created runtime proposals, not historical 2001 trade flows or seeded historical deals.",
+        status="verified_openpower",
+        action_required="Keep list rows bound to live bilateral offers; do not seed fictional proposals as 2001 country data.",
+        surface="trade.panel",
+    ),
+}
+
+
+DISPLAY_BINDINGS_BY_WINDOW["Advisor_Window"] = {
+    "frmTitle/lblTitle": _advisor_recommendation_caption_binding(
+        "100719", "ADVISOR RECOMMENDATION", "Window title."
+    ),
+    "frmInner/frmProblem/lblTitle": _advisor_recommendation_caption_binding(
+        "100720", "PROBLEM", "Recommendation problem section title."
+    ),
+    "frmInner/frmProblem/txtProblem": DisplayBinding(
+        "CampaignPresenter.build_overview(state, country_tag).recommendations[id].title plus recommendation reason",
+        "current authoritative advisor recommendation and rationale",
+        "The recommendation window is not opened when no actionable recommendation is available.",
+        "Rebuilt from the selected country's current campaign/recommendation state before display.",
+        "src/client/ui/components/shared/advisor_recommendation_window.py; src/client/ui/panels/service/campaign_presenter.py; .codex/dialogs.gml",
+        "OpenPower displays a current actionable recommendation and its rationale; it does not inject a fabricated 2001 historical event.",
+        status="verified_openpower",
+        action_required="Keep the title and reason sourced from the authoritative recommendation record; do not synthesize a historical event.",
+        surface="advisor.recommendation.window",
+    ),
+    "frmInner/frmPlan/lblTitle": _advisor_recommendation_caption_binding(
+        "100721", "PLAN", "Recommendation plan section title."
+    ),
+    "frmInner/frmResult/lblTitle": _advisor_recommendation_caption_binding(
+        "100722", "RESULT", "Recommendation outcome section title."
+    ),
+    "frmInner/frmResult/frmResults/txtResult": DisplayBinding(
+        "AdvisorRecommendationWindow current review state: 'Pending your decision. The proposed action has not been applied.'",
+        "explicit recommendation decision status",
+        "Shows pending status until the player accepts or declines the recommendation.",
+        "Rendered for the selected recommendation before ActionResolveAdvisorRecommendation is submitted.",
+        "src/client/ui/components/shared/advisor_recommendation_window.py; src/shared/actions.py; .codex/dialogs.gml",
+        "This is an action status rather than a completed simulation outcome; no result is invented before authoritative processing.",
+        status="partial",
+        action_required="Keep the pre-action status explicit and add a completed result only when an authoritative command outcome is available.",
+        surface="advisor.recommendation.window",
+    ),
+}
+
+
+DISPLAY_BINDINGS_BY_WINDOW["Advisor_Settings_Window"] = {
+    "frmTitle/lblTitle": _advisor_settings_caption_binding(
+        "101556", "ADVISOR SETTINGS", "Window title."
+    ),
+    "frmInner/frmSettings/txtManual": _advisor_settings_caption_binding(
+        "100215", "Manual", "Manual advisor mode label."
+    ),
+    "frmInner/frmSettings/txtAutomatic": _advisor_settings_caption_binding(
+        "100774", "Automatic", "Automatic advisor mode label."
+    ),
+    "frmInner/frmSettings/txtConfirmations": _advisor_settings_caption_binding(
+        "100775", "Confirmations", "Advisor confirmation mode label."
+    ),
+}
+
+
+DISPLAY_BINDINGS_BY_WINDOW["Game_Over_Window"] = {
+    "frmTitle/lblTitle": DisplayBinding(
+        "GameOverDialog title selected from the latest campaign outcome: SCENARIO COMPLETED for victory, GAME OVER otherwise",
+        "terminal campaign outcome title",
+        "The dialog is absent until a non-sandbox campaign has a terminal victory, defeat, or draw outcome.",
+        "Updated from the latest selected-country campaign outcome.",
+        "src/client/ui/components/shared/game_over_dialog.py; src/client/ui/panels/service/campaign_presenter.py; .codex/dialogs.gml",
+        "The title reflects the authoritative terminal campaign record; it is not a preset 2001 event.",
+        status="verified_openpower",
+        action_required="Keep the dialog gated on a terminal non-sandbox campaign outcome.",
+        surface="game_over.dialog",
+    ),
+    "frmInner/frmText/txtText": DisplayBinding(
+        "CampaignPresenter.latest_campaign(state, country_tag).outcome_reason",
+        "campaign outcome summary text",
+        "Shows 'The campaign has ended.' when the outcome record has no reason text.",
+        "Rendered from the selected country's latest terminal campaign record.",
+        "src/client/ui/components/shared/game_over_dialog.py; src/client/ui/panels/service/campaign_presenter.py; .codex/dialogs.gml",
+        "This is the recorded campaign reason, not a generated historical narrative.",
+        status="verified_openpower",
+        action_required="Keep the summary tied to outcome_reason and retain the explicit fallback when absent.",
+        surface="game_over.dialog",
+    ),
+    "frmInner/frmObjectives/lblTitle": _explicit_gml_caption_binding(
+        "101162",
+        "OBJECTIVES",
+        "game_over.dialog",
+        "src/client/ui/components/shared/game_over_dialog.py; .codex/dialogs.gml",
+        "GameOverDialog renders 'OBJECTIVES' above recorded terminal objective rows; exact source translation remains unavailable.",
+        "Keep the current English heading and display only objective records from the completed campaign.",
+    ),
+    "frmInner/frmObjectives/lstObjectives": DisplayBinding(
+        "CampaignPresenter.build_overview(state, country_tag).objectives filtered to completed, failed, or expired",
+        "objective title, elapsed duration in days, and terminal status",
+        "Shows 'No completed or timed-out objectives.' when no terminal objective rows exist.",
+        "Rendered from the current campaign objective records and campaign start minute.",
+        "src/client/ui/components/shared/game_over_dialog.py; src/client/ui/panels/service/campaign_presenter.py; .codex/dialogs.gml",
+        "Rows use recorded OpenPower campaign goals and status; durations come from their game-minute deadlines.",
+        status="verified_openpower",
+        action_required="Keep objective rows limited to the selected campaign's recorded terminal objectives.",
+        surface="game_over.dialog",
+    ),
+}
+
+
+DISPLAY_BINDINGS_BY_WINDOW["History_Tooltip_Window"] = {
+    "txtText": DisplayBinding(
+        "HistoryEventMarkerLayer._marker_text(grouped HistoryQueryService event_timeline rows)",
+        "up to four recorded event titles and game minutes, with recorded cause IDs and a grouped-event count",
+        "No tooltip is rendered until the player hovers a visible event marker.",
+        "Updated from the selected subject's event timeline and displayed only while an event marker is hovered.",
+        "src/client/ui/panels/service/history_panel.py; src/client/ui/panels/service/history_event_marker_layer.py; src/client/ui/components/shared/history_tooltip_window.py; src/client/services/history_query_service.py; .codex/dialogs.gml",
+        "Tooltip text is built from persisted OpenPower events; it does not invent pre-simulation 2001 events.",
+        status="verified_openpower",
+        action_required="Keep event titles, minutes, and causes sourced from the visible event records.",
+        surface="history.panel",
+    ),
+}
+
+
+DISPLAY_BINDINGS_BY_WINDOW["Tooltip_Window"] = {
+    "lblTooltip": DisplayBinding(
+        "current hover-tooltip text supplied by the active OpenPower control",
+        "transient UI help text",
+        "No tooltip is drawn when no active control supplies hover text.",
+        "Measured and positioned from the current hover text and cursor for each tooltip display.",
+        "src/client/ui/core/gml_tooltip.py; src/client/ui/core/instrumented_imgui.py; .codex/Client/Source/sp2_tooltip_window.cpp; .codex/dialogs.gml",
+        "This slot carries component-specific UI help text; it is not a missing country or scenario data field.",
+        status="verified_openpower",
+        action_required="Keep tooltip text attached to the active control and use the source-sized placement rules.",
+        surface="shared GML tooltip renderer",
     ),
 }
 
@@ -10673,7 +11276,7 @@ def _politics_caption_binding(token: str, caption: str) -> DisplayBinding:
         "static English caption",
         f"{caption}; the reference REFERENCE localization table is not present in the source mirror.",
         "Rendered from the Python politics panel while the panel is open.",
-        "src/client/ui/panels/politics_panel.py; .codex/layout_catalog.gml",
+        "src/client/ui/panels/politics_panel.py; .codex/dialogs.gml",
         f"Current English caption for the source {caption.lower()} slot; exact localized wording is unavailable.",
         status="partial",
         action_required="Use the exact reference localization only if the REFERENCE language tables are recovered.",
@@ -10781,25 +11384,694 @@ DISPLAY_BINDINGS_BY_WINDOW["Politic_Window"] = {
         action_required="Keep the corruption meter bound to authoritative state and preserve the calculation-parity note.",
     ),
     "frmInner/frmPressure/txtValue": DisplayBinding(
-        "unavailable: OpenPower has no political-pressure field equivalent to GDataPoliticWindow.Pressure",
-        "REFERENCE political-pressure percent",
-        "N/A; do not substitute zero or infer pressure from another political metric.",
-        "The REFERENCE pressure value comes from the politic update; OpenPower explicitly presents N/A while no equivalent field exists.",
+        "countries.political_pressure: sponsor fielded-equipment value / target fielded-equipment value; capped at 100%",
+        "OpenPower national external-treaty pressure percent",
+        "0% when the current country has no active opposing treaty sponsors.",
+        "PoliticsPresenter reads the authoritative pressure ratio refreshed from active treaties, pending responses and fielded unit values.",
         _POLITICS_SOURCE,
-        "OpenPower preserves the source value slot and fallback, but the simulation does not provide an authoritative political-pressure value.",
-        status="verified_unavailable",
-        action_required="Keep the N/A fallback until OpenPower gains an authoritative equivalent field.",
+        "OpenPower treaty pressure represents external military coercion and is distinct from domestic approval or dissent.",
+        status="partial",
+        action_required="Retain the distinction from domestic political sentiment and note that source formula parity is unverified.",
     ),
     "frmInner/frmPressure/frmGradient": DisplayBinding(
-        "unavailable: OpenPower has no political-pressure field equivalent to GDataPoliticWindow.Pressure",
-        "REFERENCE political-pressure meter ratio",
-        "Empty disabled rail beside N/A; never represent missing pressure as a measured zero.",
-        "The source-sized track is drawn without a cursor or fill because no OpenPower pressure value is available.",
+        "countries.political_pressure (authoritative ratio normalized to 0–1)",
+        "OpenPower treaty-pressure ratio",
+        "Live meter; zero only when no opposing sponsor pressure is active.",
+        "PoliticsPresenter supplies the snapshot value for the selected country.",
         _POLITICS_SOURCE,
-        "The empty track preserves source geometry while the adjacent N/A label communicates missing data.",
+        "Displays external treaty pressure derived from military value; it is not domestic approval.",
         status="partial",
-        action_required="Keep the empty source-sized track and N/A fallback until an authoritative equivalent field exists.",
+        action_required="Keep the external-pressure semantics explicit and source-formula parity marked unverified.",
     ),
+}
+
+
+_CONSTITUTIONAL_FORM_SOURCE = (
+    "src/client/ui/panels/politics/constitutional_form_panel.py; "
+    "src/client/ui/panels/politics/presenter.py; .codex/dialogs.gml"
+)
+DISPLAY_BINDINGS_BY_WINDOW["Constitutional_Form"] = {
+    "frmTitle/lblTitle": _explicit_gml_caption_binding(
+        "100013", "CONSTITUTIONAL FORM", "ConstitutionalFormPanel",
+        _CONSTITUTIONAL_FORM_SOURCE,
+        "Static title for the government and capital controls.",
+        "Keep the title in the source GML slot; use exact REFERENCE localization only if its language tables are recovered.",
+    ),
+    "frmInner/frmCapital/lblTitle": _explicit_gml_caption_binding(
+        "100058", "CAPITAL", "ConstitutionalFormPanel",
+        _CONSTITUTIONAL_FORM_SOURCE,
+        "Caption for the current capital selector.",
+        "Keep the caption adjacent to the live capital selector; do not infer a capital from the caption.",
+    ),
+    "frmInner/frmNextElection/lblTitle": _explicit_gml_caption_binding(
+        "100059", "NEXT ELECTION", "ConstitutionalFormPanel",
+        _CONSTITUTIONAL_FORM_SOURCE,
+        "Caption for the country's next-election value.",
+        "Keep the caption adjacent to the live election-date value; source localization remains unavailable.",
+    ),
+}
+
+
+_MAIN_MENU_SOURCE = "src/client/ui/components/main_menu_content.py; .codex/dialogs.gml"
+DISPLAY_BINDINGS_BY_WINDOW["Main_Menu"] = {
+    "frmTitle/lblTitle": _explicit_gml_caption_binding(
+        "100393", "MAIN MENU", "MainMenuContent",
+        _MAIN_MENU_SOURCE,
+        "Title for the disconnected main-menu actions.",
+        "Keep the title in the main-menu window; exact REFERENCE localization is unavailable.",
+    ),
+}
+DISPLAY_BINDINGS_BY_WINDOW["Submenu_Single"] = {
+    "frmTitle/lblTitle": _explicit_gml_caption_binding(
+        "102216", "SINGLEPLAYER", "MainMenuContent/SinglePlayerSubmenu",
+        _MAIN_MENU_SOURCE,
+        "Title for scenario, tutorial and saved-game navigation.",
+        "Keep single-player navigation separate from multiplayer routes.",
+    ),
+}
+DISPLAY_BINDINGS_BY_WINDOW["Submenu_Multi"] = {
+    "frmTitle/lblTitle": _explicit_gml_caption_binding(
+        "102217", "MULTIPLAYER", "MainMenuContent/MultiplayerSubmenu",
+        _MAIN_MENU_SOURCE,
+        "Title for join, host and return actions.",
+        "Keep the title while multiplayer session discovery remains explicitly unavailable.",
+    ),
+}
+
+
+_SAVE_CONFIRMATION_SOURCE = (
+    "src/client/ui/components/shared/dirty_close_confirmation.py; .codex/dialogs.gml"
+)
+DISPLAY_BINDINGS_BY_WINDOW["Save_Confirmation_Window"] = {
+    "lblText1": _explicit_gml_caption_binding(
+        "100334", "Apply changes before", "DirtyCloseConfirmation",
+        _SAVE_CONFIRMATION_SOURCE,
+        "First line of the shared unsaved-changes confirmation question.",
+        "Keep the question split across the source's two label slots and pass the caller-specific context through its tooltip.",
+    ),
+    "lblText2": _explicit_gml_caption_binding(
+        "100335", "closing?", "DirtyCloseConfirmation",
+        _SAVE_CONFIRMATION_SOURCE,
+        "Second line of the shared unsaved-changes confirmation question.",
+        "Keep the question split across the source's two label slots and pass the caller-specific context through its tooltip.",
+    ),
+    "lblText3": _explicit_gml_caption_binding(
+        "100337", "Remember this choice", "DirtyCloseConfirmation",
+        _SAVE_CONFIRMATION_SOURCE,
+        "Caption for remembering the Apply or Discard decision within the current game layout.",
+        "Keep this caption attached to the session-scoped remember preference.",
+    ),
+}
+
+
+DISPLAY_BINDINGS_BY_WINDOW["Sphere_Control_Window"].update({
+    "lblPolitical": _explicit_gml_caption_binding(
+        "100267", "Political", "MapInformationWindows",
+        "src/client/ui/panels/military/map_information_windows.py; .codex/dialogs.gml",
+        "Labels the political owner shown for the current map-hit region.",
+        "Keep political ownership distinct from military control and occupation.",
+    ),
+    "lblMilitary": _explicit_gml_caption_binding(
+        "100307", "Military", "MapInformationWindows",
+        "src/client/ui/panels/military/map_information_windows.py; .codex/dialogs.gml",
+        "Labels the military controller shown for the current map-hit region.",
+        "Keep military control distinct from political ownership.",
+    ),
+})
+
+
+def _source_caption_binding(
+    token: str,
+    caption: str,
+    surface: str,
+    source_files: str,
+    meaning: str,
+) -> DisplayBinding:
+    return _explicit_gml_caption_binding(
+        token,
+        caption,
+        surface,
+        source_files,
+        meaning,
+        "Keep the current OpenPower caption in its source slot; exact REFERENCE localization remains unavailable.",
+    )
+
+
+_BATTLE_INSPECTION_SOURCE = (
+    "src/client/ui/panels/military/battle_inspection_windows.py; "
+    "src/client/ui/panels/military/battle_public_counts.py; "
+    "modules/base/systems/military/battle_public_counts.py; .codex/dialogs.gml"
+)
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Battle_Window", {}).update({
+    "lblTitle": DisplayBinding(
+        "selected battles.region_id -> regions.id/name via resolve_region_name",
+        "current battle region title",
+        "Unknown when the selected battle or region is missing from the current snapshot.",
+        "Resolved from the selected live battle row when the inspection window renders.",
+        _BATTLE_INSPECTION_SOURCE,
+        "OpenPower labels the battle inspection with its current region; it does not fabricate a historical battle location.",
+        status="verified_openpower",
+        action_required="Keep the title tied to the selected current battle and preserve the unknown-region fallback.",
+        surface="BattleInspectionWindows._render_battle",
+    ),
+    "lstFlagsEnemy": DisplayBinding(
+        "current battle participant country ids and names for the enemy side, resolved through countries and FlagRenderer",
+        "current participant flags and country tags",
+        "Show only known participant country identifiers; display Unknown when the current battle has no public participant country.",
+        "Recomputed from the selected battle's live participants each render.",
+        _BATTLE_INSPECTION_SOURCE,
+        "Current battle participant identity is not a full foreign unit roster or intelligence estimate.",
+        status="verified_openpower",
+        action_required="Keep participant flags scoped to currently published battle-side country identifiers.",
+        surface="BattleInspectionWindows._render_battle",
+    ),
+    "lstFlagsYou": DisplayBinding(
+        "current battle participant country ids and names for the local side, resolved through countries and FlagRenderer",
+        "current participant flags and country tags",
+        "Show only known participant country identifiers; display Unknown when the current battle has no public participant country.",
+        "Recomputed from the selected battle's live participants each render.",
+        _BATTLE_INSPECTION_SOURCE,
+        "Current battle participant identity is not a full foreign unit roster or intelligence estimate.",
+        status="verified_openpower",
+        action_required="Keep participant flags scoped to currently published battle-side country identifiers.",
+        surface="BattleInspectionWindows._render_battle",
+    ),
+    "frmBattle/cboStrategies": DisplayBinding(
+        "BattleInspectionWindows.selection.STRATEGIES",
+        "supported battle strategy options",
+        "No selectable strategy when there is no active battle or no owned participating group.",
+        "Read from the current battle selection model; selection is submitted only for an owned participating group.",
+        _BATTLE_INSPECTION_SOURCE,
+        "OpenPower exposes the supported strategy choices against the current battle; source localization is not asserted.",
+        status="verified_openpower",
+        action_required="Retain the active-battle and owned-group gates before sending the strategy action.",
+        surface="BattleInspectionWindows._render_battle",
+    ),
+})
+
+DISPLAY_BINDINGS_BY_WINDOW["Battle_Info_Window"].update({
+    "frmTitle/lblTitle": _source_caption_binding(
+        "100403", "BATTLE INFO", "BattleInspectionWindows._render_battle",
+        _BATTLE_INSPECTION_SOURCE, "Title for current battle information and observed public totals.",
+    ),
+    "frmInner/frmInner/frmBattleInfo/lblSideA": _source_caption_binding(
+        "100398", "DEFENDERS", "BattleInspectionWindows._render_battle",
+        _BATTLE_INSPECTION_SOURCE, "Label for the defender-side aggregate.",
+    ),
+    "frmInner/frmInner/frmBattleInfo/lblSideB": _source_caption_binding(
+        "100400", "ATTACKERS", "BattleInspectionWindows._render_battle",
+        _BATTLE_INSPECTION_SOURCE, "Label for the attacker-side aggregate.",
+    ),
+    **{
+        f"frmInner/frmInner/frmBattleInfo/lbl{category}{side}": _source_caption_binding(
+            token,
+            category,
+            "BattleInspectionWindows._render_battle",
+            _BATTLE_INSPECTION_SOURCE,
+            f"Static source category marker {category} for the {side_name} public total.",
+        )
+        for side, side_name in (("A", "defender"), ("B", "attacker"))
+        for category, token in (("I", "100394"), ("G", "100268"), ("A", "100269"), ("N", "100270"))
+    },
+})
+
+DISPLAY_BINDINGS_BY_WINDOW["Small_Unit_Info_Window"].update({
+    f"lbl{category}": _source_caption_binding(
+        token,
+        category,
+        "MapInformationWindows.render_small_unit_info",
+        "src/client/ui/panels/military/map_information_windows.py; src/client/ui/panels/military/map_information.py; .codex/dialogs.gml",
+        f"Static OpenPower category marker {category}; exact REFERENCE token wording is unavailable.",
+    )
+    for category, token in (("I", "100394"), ("G", "100268"), ("A", "100269"), ("N", "100270"))
+})
+
+_STRATEGIC_PLANNER_SOURCE = (
+    "src/client/ui/panels/military/strategic_planner.py; "
+    "src/client/ui/panels/military/strategic_plan.py; "
+    "src/client/ui/panels/military/presenter.py; .codex/dialogs.gml"
+)
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Strategic_Target_Country_Window", {}).update({
+    "frmAttackType/lblTitle": _source_caption_binding(
+        "100070", "TARGET TYPE", "StrategicPlanner._render_country_target",
+        _STRATEGIC_PLANNER_SOURCE, "Caption for the selected strategic target mode.",
+    ),
+    "frmAttackType/cboAttackType": DisplayBinding(
+        "StrategicPlanner.plan.target_mode",
+        "current target mode",
+        "Military is the default; Civilian is the alternative target mode.",
+        "Updated from the active strategic-planning draft; preparing a launch requires a valid explicit target.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "OpenPower's Military/Civilian target mode is a player-selected planner value.",
+        status="verified_openpower",
+        action_required="Keep the mode draft local until the launch plan passes current validation.",
+        surface="StrategicPlanner._render_country_target",
+    ),
+    "frmAttackStrength/lblTitle": _source_caption_binding(
+        "100069", "WEAPON SYSTEM", "StrategicPlanner._render_country_target",
+        _STRATEGIC_PLANNER_SOURCE, "Caption for the selected strategic weapon system.",
+    ),
+    "frmAttackStrength/lblMissileUsed": _source_caption_binding(
+        "100292", "SELECTED", "StrategicPlanner._render_country_target",
+        _STRATEGIC_PLANNER_SOURCE, "Caption for the number of selected ready weapons.",
+    ),
+    "frmAttackStrength/lblProjectedCasualities": _source_caption_binding(
+        "101290", "TARGET REGION", "StrategicPlanner._render_country_target",
+        _STRATEGIC_PLANNER_SOURCE, "OpenPower uses this source caption slot to identify the explicit target region, not a casualty estimate.",
+    ),
+    "frmAttackStrength/txtNbTargets": DisplayBinding(
+        "StrategicPlanner.plan.target_region -> current regions.id/name",
+        "target region name or id",
+        "Em dash when no region is selected or its name is unavailable.",
+        "Updated from the explicit target selected on the current map or from the validated target draft.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "This slot shows the chosen target region; it is not a projected casualty count.",
+        status="partial",
+        action_required="Keep target-region semantics explicit and never interpret this value as an attack count or projected casualties.",
+        surface="StrategicPlanner._render_country_target",
+    ),
+    "frmAttackStrength/lblAvailMissiles": _source_caption_binding(
+        "100295", "READY", "StrategicPlanner._render_country_target",
+        _STRATEGIC_PLANNER_SOURCE, "Caption for ready strategic-weapon inventory.",
+    ),
+    "frmAttackStrength/txtMissilesUsed": DisplayBinding(
+        "len(StrategicPlanner.plan.selected_weapons)",
+        "selected ready weapon systems",
+        "Zero when the current launch draft has no selected weapon systems.",
+        "Recomputed from the local strategic launch draft each render.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "Displays the selected weapon count; it is not a projected missile expenditure after launch.",
+        status="verified_openpower",
+        action_required="Keep the selection count tied to the active draft and separate from authoritative inventory until launch resolution.",
+        surface="StrategicPlanner._render_country_target",
+    ),
+    "frmAttackStrength/txtAvailMissiles": DisplayBinding(
+        "sum(ready_quantity) from MilitaryPresenter.strategic_inventory_for_country for the acting country",
+        "ready strategic-weapon systems",
+        "Zero when no ready weapon is available in the current owned-country inventory.",
+        "Recomputed from the current snapshot before the launch draft renders.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "Current ready inventory only; stored, deployed, spent, or unavailable systems are not counted as ready.",
+        status="verified_openpower",
+        action_required="Keep stock counts tied to the selected acting country and the latest authoritative inventory.",
+        surface="StrategicPlanner._render_country_target",
+    ),
+    "frmAttackStrength/cboMissileType": DisplayBinding(
+        "strategic_inventory_for_country current weapon-system ids and profiles for the acting country",
+        "owned strategic-weapon options",
+        "Empty options when the current country has no selectable strategic weapons.",
+        "Rebuilt from current owned-country inventory when the weapon selector renders.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "Selectable systems reflect current OpenPower inventory and source-backed payload profiles.",
+        status="verified_openpower",
+        action_required="Only offer currently owned systems with ready quantity; preserve the explicit-target validation before preparation.",
+        surface="StrategicPlanner._render_country_target",
+    ),
+    "frmAttackStrength/frmAttackStrengthValue": DisplayBinding(
+        "StrategicPlanner._render_weapon_selection uses this GML meter rectangle for the authorization-context combo",
+        "authorization-context selector occupying a source attack-strength meter slot",
+        "Available contexts reflect the current acting-country authority and target mode.",
+        "Rendered from the active strategic planner draft; this is not a numeric attack-strength meter.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "The source meter slot is repurposed for selecting launch authorization context.",
+        status="partial",
+        action_required="Keep the control labeled as authorization context and do not display it as a strike-strength estimate.",
+        surface="StrategicPlanner._render_weapon_selection",
+    ),
+    "frmAttackStrength/frmAttackStrengthValue/lblValue": DisplayBinding(
+        "unavailable: OpenPower does not calculate a launch-time attack-strength scalar",
+        "source attack-strength scalar",
+        "No scalar is shown; the meter rectangle is used for authorization context.",
+        "No attack-strength value is calculated or refreshed.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "No equivalent scalar exists in the OpenPower launch planner.",
+        status="verified_unavailable",
+        action_required="Keep the scalar unavailable unless an authoritative, validated combat projection is implemented.",
+        surface="StrategicPlanner._render_weapon_selection",
+    ),
+    "frmCountry/lblTitle": _source_caption_binding(
+        "100068", "TARGET COUNTRY", "StrategicPlanner._render_country_target",
+        _STRATEGIC_PLANNER_SOURCE, "Caption for the selected target country.",
+    ),
+    "frmCountry/cboCountry": DisplayBinding(
+        "current foreign region owners plus valid specific-location and multiple-country target options",
+        "country target options",
+        "Only countries with a valid current region target are offered.",
+        "Recomputed from current country and region control state when target options render.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "Country choices are backed by current targetable regions; launch preparation rejects missing explicit assignments.",
+        status="verified_openpower",
+        action_required="Keep country options aligned to current targetable regions and require explicit region assignment.",
+        surface="StrategicPlanner._render_country_target",
+    ),
+})
+
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Strategic_Target_Multiple_Countries_Window", {}).update({
+    "frmTitle/lblTitle": _source_caption_binding(
+        "100284", "MULTIPLE TARGETS", "StrategicPlanner._render_multiple_targets",
+        _STRATEGIC_PLANNER_SOURCE, "Title for multi-target strategic planning.",
+    ),
+    "frmInner/frmList/lblMissileUsed": _source_caption_binding(
+        "100292", "SELECTED", "StrategicPlanner._render_multiple_targets",
+        _STRATEGIC_PLANNER_SOURCE, "Caption for the selected weapon-system count.",
+    ),
+    "frmInner/frmList/txtDamage": DisplayBinding(
+        "unavailable: strategic launch has no pre-resolution casualty or damage projection model",
+        "projected damage estimate",
+        "The UI says Not estimated until a strike resolves; no launch-time casualty or damage value is fabricated.",
+        "No projection is computed before authoritative strike resolution.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "A launch-time impact projection is not supported by current OpenPower combat rules.",
+        status="verified_unavailable",
+        action_required="Keep casualty and damage estimates unavailable until a validated impact model exists.",
+        surface="StrategicPlanner._render_multiple_targets",
+    ),
+    **{
+        f"frmInner/frmList/{path}": _source_caption_binding(
+            token,
+            caption,
+            "StrategicPlanner._render_multiple_targets",
+            _STRATEGIC_PLANNER_SOURCE,
+            meaning,
+        )
+        for path, token, caption, meaning in (
+            ("lblPotentialTargets", "100290", "REGION", "Heading for target regions."),
+            ("lblProjCasualities", "100296", "CASUALTIES", "Static heading only; OpenPower does not project casualties before resolution."),
+            ("lblNbTargets", "100293", "TARGETS", "Heading for target assignments."),
+            ("lblProjDamage", "100297", "DAMAGE", "Static heading only; OpenPower does not project damage before resolution."),
+            ("lblAvailMissiles", "100291", "AVAILABLE", "Heading for currently ready weapon inventory."),
+            ("lblAttackType", "100070", "TYPE", "Heading for target mode."),
+            ("lblCountry", "100068", "SYSTEM / TARGET", "Heading for target country and selected system details."),
+        )
+    },
+})
+
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Strategic_Warfare", {}).update({
+    "frmTitle/lblTitle": _source_caption_binding(
+        "100031", "STRATEGIC WARFARE", "StrategicWarfarePanel",
+        _STRATEGIC_PLANNER_SOURCE, "Title for the strategic warfare planner.",
+    ),
+    "frmInner/frmAttackType/lblTitle": _source_caption_binding(
+        "100070", "TARGET TYPE", "StrategicWarfarePanel",
+        _STRATEGIC_PLANNER_SOURCE, "Caption associated with Military/Civilian target-mode choices.",
+    ),
+    "frmInner/frmAttackType/cboAttackType": DisplayBinding(
+        "StrategicPlanner.plan.target_mode and weapon-row Military/Civilian action choices",
+        "strategic target mode",
+        "Military is the default target mode; Civilian is available where the planner supports it.",
+        "Reflects the planner draft and validated weapon-row actions; there is no direct GML combo in the OpenPower panel.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "An equivalent target-mode choice exists in the strategic planner but is not attached to this exact GML control path.",
+        status="partial",
+        action_required="Keep the target-mode action associated with the planner draft and preserve the source-slot mismatch.",
+        surface="StrategicWarfarePanel/StrategicPlanner",
+    ),
+    "frmInner/frmAttackStrength/lblTitle": DisplayBinding(
+        "StrategicWarfarePanel sections for payload profile, authorization context, and target defense",
+        "planner section headings",
+        "OpenPower shows section-specific headings; it does not use one general attack-strength heading.",
+        "Rendered from current planner context and selected weapon profile.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "The source frame heading has no single OpenPower one-to-one label.",
+        status="partial",
+        action_required="Keep the separate payload, authorization, and defense headings; do not imply a single strike-strength metric.",
+        surface="StrategicWarfarePanel/StrategicPlanner",
+    ),
+    "frmInner/frmAttackStrength/frmAttackStrengthValue": DisplayBinding(
+        "unavailable: OpenPower does not calculate a strategic attack-strength meter",
+        "source attack-strength meter",
+        "No meter is shown; interception/defense information is displayed separately when available.",
+        "No attack-strength value or fill is calculated.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "The OpenPower planner has no equivalent attack-strength meter.",
+        status="verified_unavailable",
+        action_required="Keep this meter unavailable; do not substitute a defense or payload value.",
+        surface="StrategicWarfarePanel/StrategicPlanner",
+    ),
+    "frmInner/frmAttackStrength/frmAttackStrengthValue/lblValue": DisplayBinding(
+        "unavailable: OpenPower does not calculate a strategic attack-strength scalar",
+        "source attack-strength scalar",
+        "No scalar is shown; available defense estimates use a separate contract.",
+        "No attack-strength value is calculated or refreshed.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "The OpenPower planner has no equivalent attack-strength scalar.",
+        status="verified_unavailable",
+        action_required="Keep this scalar unavailable until an authoritative combat projection is supported.",
+        surface="StrategicWarfarePanel/StrategicPlanner",
+    ),
+    "frmInner/frmCountry/lblTitle": _source_caption_binding(
+        "100068", "TARGET COUNTRY", "StrategicWarfarePanel",
+        _STRATEGIC_PLANNER_SOURCE, "Caption associated with the contextual target country.",
+    ),
+    "frmInner/frmCountry/cboCountry": DisplayBinding(
+        "PanelRenderContext.target_tag",
+        "contextual target country tag",
+        "The selected country panel is the target context; no separate country combo is rendered.",
+        "Updated from the active panel render context.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "The source combo path is not an OpenPower control; target country context comes from the selected country.",
+        status="verified_unavailable",
+        action_required="Keep country selection in the existing context/navigation flow; do not add a duplicate selector to this source slot.",
+        surface="StrategicWarfarePanel/StrategicPlanner",
+    ),
+})
+
+_UNIT_REORGANIZATION_SOURCE = (
+    "src/client/ui/panels/military/unit_reorganization_windows.py; "
+    "src/client/ui/panels/military/unit_list_panel.py; .codex/dialogs.gml"
+)
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Split_Group_Window", {}).update({
+    "frmTitle/lblTitle": _source_caption_binding(
+        "102091", "SPLIT GROUP", "UnitReorganizationWindows._split",
+        _UNIT_REORGANIZATION_SOURCE, "Title for splitting an owned unit group.",
+    ),
+    "frmInner/frmNew/lblTitle": _source_caption_binding(
+        "102093", "DETACHED UNIT", "UnitReorganizationWindows._split",
+        _UNIT_REORGANIZATION_SOURCE, "Heading for the detached unit preview.",
+    ),
+    "frmInner/frmOriginal/lblTitle": _source_caption_binding(
+        "102092", "ORIGINAL UNIT", "UnitReorganizationWindows._split",
+        _UNIT_REORGANIZATION_SOURCE, "Heading for the remaining original unit preview.",
+    ),
+})
+
+_STRATEGIC_MISSILE_LIST_CAPTIONS = (
+    ("frmTitle/lblTitle", "100271", "MISSILE LIST", "Title for current strategic systems."),
+    ("frmInner/frmList/lblYield", "100294", "YIELD", "Payload-profile yield column."),
+    ("frmInner/frmList/lblTarget", "100177", "TARGET", "Current target column."),
+    ("frmInner/frmList/lblMissiles", "100275", "MISSILES", "Ready missile-quantity column."),
+    ("frmInner/frmList/lblLocation", "100276", "LOCATION", "Origin or location column."),
+)
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Strategic_Missile_List_Window", {}).update({
+    path: _source_caption_binding(
+        token, caption, "StrategicPlanner._render_missile_list",
+        _STRATEGIC_PLANNER_SOURCE, meaning,
+    )
+    for path, token, caption, meaning in _STRATEGIC_MISSILE_LIST_CAPTIONS
+})
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Strategic_Select_Target_Window", {}).update({
+    "frmMessage/txtMessage": DisplayBinding(
+        "literal: Select target on map",
+        "map-selection instruction",
+        "Select target on map.",
+        "Static while the strategic target picker is open; a map click sets the current target.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "OpenPower instructs the player to select the explicit target on the map.",
+        status="partial",
+        action_required="Keep the instruction paired with explicit map target assignment and missing-target validation.",
+        surface="StrategicPlanner._select",
+    ),
+})
+
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Unit_Attack_Confirm_Window", {}).update({
+    path: DisplayBinding(
+        f"unavailable: {path} is a zero-area duplicate of the visible txtTransparentLabel{index} slot",
+        "unrendered zero-area source label",
+        "The 0x0 source label is not shown; its visible counterpart is rendered in txtTransparentLabel slots.",
+        "No value is written to this zero-area component.",
+        "src/client/ui/panels/military/unit_attack_confirmation.py; .codex/dialogs.gml",
+        "The actual confirmation text is bound to visible source-relative slots; this duplicate has no display area.",
+        status="verified_unavailable",
+        action_required="Keep confirmation copy in the visible txtTransparentLabel slots and do not render into this zero-area duplicate.",
+        surface="UnitAttackConfirmation.render",
+    )
+    for index, path in enumerate(("Label1", "Label2", "Label3"), start=1)
+})
+
+_UNIT_MARKET_CAPTIONS = (
+    ("frmDesignView/frmUnitName/lblUnitName", "100193", "DESIGN", "Selected design name field heading."),
+    ("frmBorder/frmInner/frmDesignList/lblProvider", "100883", "PROVIDER", "Seller/provider heading."),
+    ("frmBorder/frmInner/frmDesignList/lblUnitName2", "100230", "UNIT NAME", "Market listing name heading."),
+    ("frmBorder/frmInner/frmDesignList/lblUnitType", "101480", "UNIT TYPE", "Market listing type heading."),
+    ("frmBorder/frmInner/frmDesignList/lblUnitCost", "100194", "UNIT PRICE", "Per-unit price heading."),
+    ("frmBorder/frmInner/frmDesignList/lblQty", "100229", "QUANTITY", "Available quantity heading."),
+    ("frmBorder/frmTitle/lblTitle", "100882", "USED UNIT MARKET", "Title for the used-unit market."),
+)
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Unit_Buy_Used_Window", {}).update({
+    path: _source_caption_binding(
+        token, caption, "UnitMarketPanel._render_content",
+        "src/client/ui/panels/military/unit_market_panel.py; .codex/dialogs.gml",
+        meaning,
+    )
+    for path, token, caption, meaning in _UNIT_MARKET_CAPTIONS
+})
+
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Unit_List_Window", {}).update({
+    "frmTitle/lblTitle": DisplayBinding(
+        "selected owned or observed unit-group context",
+        "contextual unit-group title",
+        "Selected unit group while a group is active; otherwise the current unit-list context.",
+        "Updated from the current selected group and country scope.",
+        _UNIT_REORGANIZATION_SOURCE,
+        "OpenPower uses the selected group context instead of the original fixed source caption.",
+        status="partial",
+        action_required="Keep the title synchronized with the selected group and preserve owned-versus-foreign visibility limits.",
+        surface="UnitReorganizationWindows",
+    ),
+    "frmInner/frmInformationAccuracy/lblTitle": DisplayBinding(
+        "literal: INFORMATION ACCURACY",
+        "foreign-information heading",
+        "INFORMATION ACCURACY; the adjacent value is Unknown for foreign groups and owned groups show detailed rows.",
+        "Rendered with the current group ownership context.",
+        _UNIT_REORGANIZATION_SOURCE,
+        "OpenPower does not report a source-equivalent foreign sensor accuracy value.",
+        status="partial",
+        action_required="Retain Unknown for foreign groups; do not infer intelligence accuracy from OpenPower estimates.",
+        surface="UnitReorganizationWindows._legacy_list",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Unit_List_Window_New", {}).update({
+    "frmTitle/lblTitle": DisplayBinding(
+        "literal: UNIT LIST",
+        "window title",
+        "UNIT LIST; exact source localization is unavailable.",
+        "Rendered while the unit list is open.",
+        "src/client/ui/panels/military/unit_list_panel.py; .codex/dialogs.gml",
+        "OpenPower uses the source unit-list title slot with its current English title.",
+        status="partial",
+        action_required="Keep the title in the existing GML slot; use exact source localization only if the language tables are recovered.",
+        surface="UnitListPanel",
+    ),
+})
+
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Unit_Movement_Denial", {}).update({
+    "lblNormal1": DisplayBinding(
+        "latest unit_movement_routes reason or route_summary for the current blocked route",
+        "current movement-block reason description",
+        "No current blocked movement routes when the authoritative route projection is empty.",
+        "Updated from the latest movement-route state when the read-only denial view renders.",
+        "src/client/ui/panels/military/unit_list_panel.py; src/client/ui/panels/military/presenter.py; modules/base/systems/military/movement_progression.py",
+        "Shows the reason reported by the latest game state; there is no historical denial-event log.",
+        status="partial",
+        action_required="Show current recorded reasons only and do not invent past movement-denial events.",
+        surface="UnitListPanel._render_movement_denial",
+    ),
+    "lblRegion": DisplayBinding(
+        "current owned units whose latest route_summary starts with 'Blocked:'",
+        "current blocked-route section heading",
+        "CURRENT BLOCKED ROUTES; explicit empty state when no route is blocked.",
+        "Recomputed from current owned unit rows and latest route projections.",
+        "src/client/ui/panels/military/unit_list_panel.py; src/client/ui/panels/military/presenter.py; modules/base/systems/military/movement_progression.py",
+        "The view reports current route status only, not historical movement denials.",
+        status="partial",
+        action_required="Keep the heading tied to the current route list and label the time scope as current.",
+        surface="UnitListPanel._render_movement_denial",
+    ),
+    "lstDenialList": DisplayBinding(
+        "current own unit rows with blocked routes, joined to unit_movement_routes reason and location",
+        "current blocked owned-unit routes and reasons",
+        "No current blocked movement routes when the current owned-unit projection contains none.",
+        "Rebuilt from the latest game snapshot each time the read-only denial view renders.",
+        "src/client/ui/panels/military/unit_list_panel.py; src/client/ui/panels/military/presenter.py; modules/base/systems/military/movement_progression.py",
+        "OpenPower lists current owned blocked routes only; it has no historical denial-event data.",
+        status="verified_openpower",
+        action_required="Keep the list scoped to the player's own current units and use only reasons present in the latest state.",
+        surface="UnitListPanel._render_movement_denial",
+    ),
+})
+
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Unit_Split_Window", {}).update({
+    "frmSplit/txtTransparentLabel1": _source_caption_binding(
+        "100674", "REMAIN", "UnitReorganizationWindows._split",
+        _UNIT_REORGANIZATION_SOURCE, "Caption for personnel remaining in the original unit.",
+    ),
+    "frmSplit/txtTransparentLabel2": _source_caption_binding(
+        "100675", "TRANSFER", "UnitReorganizationWindows._split",
+        _UNIT_REORGANIZATION_SOURCE, "Caption for personnel transferred to the detached unit.",
+    ),
+    "frmTitle/txtTransparentLabel1": _source_caption_binding(
+        "100673", "TRANSFER PERSONNEL", "UnitReorganizationWindows._split",
+        _UNIT_REORGANIZATION_SOURCE, "Title for personnel-transfer split mode.",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Party_Selection_Window", {}).update({
+    "frmTitle/lblTitle": _source_caption_binding(
+        "100099", "SELECT POLITICAL PARTY", "PartySelectionWindow.render",
+        "src/client/ui/components/shared/party_selection_window.py; .codex/dialogs.gml",
+        "Title for the current gameplay-party selector; the separate 2001 historical roster is informational and is not submitted as a gameplay party.",
+    ),
+})
+
+_MULTIPLAYER_JOIN_SOURCE = (
+    "src/client/ui/components/shared/multiplayer_windows.py; .codex/dialogs.gml"
+)
+_MULTIPLAYER_JOIN_CAPTIONS = (
+    ("frmTitle/lblTitle", "100006", "JOIN GAME", "Server-browser window title."),
+    ("frmInner/tabGames/Tab1/lblServerName", "100126", "SERVER NAME", "Internet server-name column."),
+    ("frmInner/tabGames/Tab1/lblPlayers", "100142", "PLAYERS", "Internet player-count column."),
+    ("frmInner/tabGames/Tab1/lblMods", "100009", "MOD", "Internet server-mod column."),
+    ("frmInner/tabGames/Tab1/lblScenarios", "100144", "SCENARIO", "Internet scenario column."),
+    ("frmInner/tabGames/Tab2/lblServerName", "100126", "SERVER NAME", "LAN server-name column."),
+    ("frmInner/tabGames/Tab2/lblPlayers", "100142", "PLAYERS", "LAN player-count column."),
+    ("frmInner/tabGames/Tab2/lblMods", "100009", "MOD", "LAN server-mod column."),
+    ("frmInner/tabGames/Tab2/lblScenarios", "100144", "SCENARIO", "LAN scenario column."),
+)
+DISPLAY_BINDINGS_BY_WINDOW["Join_Multiplayer_Game"] = {
+    path: _explicit_gml_caption_binding(
+        token,
+        caption,
+        "JoinMultiplayerWindow._render_content",
+        _MULTIPLAYER_JOIN_SOURCE,
+        meaning,
+        "Keep the source column label in its matching tab; the live server values remain unavailable without server discovery.",
+    )
+    for path, token, caption, meaning in _MULTIPLAYER_JOIN_CAPTIONS
+}
+for _page in ("Tab1", "Tab2"):
+    DISPLAY_BINDINGS_BY_WINDOW["Join_Multiplayer_Game"][
+        f"frmInner/tabGames/{_page}/lstServer"
+    ] = DisplayBinding(
+        "no live server rows; JoinMultiplayerWindow._render_content displays the explicit discovery-unavailable message",
+        "server listing",
+        "Multiplayer server discovery is not available in OpenPower; no server, player-count, mod, or scenario rows are fabricated.",
+        "No polling or refresh occurs because no internet or LAN server-discovery service is connected.",
+        _MULTIPLAYER_JOIN_SOURCE,
+        f"{_page} source server list with an explicit OpenPower unavailable state.",
+        status="verified_unavailable",
+        action_required="Keep server rows empty and show the explicit unavailable message until a validated server-discovery service exists.",
+        surface="JoinMultiplayerWindow._render_content",
+    )
+
+_SERVER_INFO_SOURCE = "src/client/ui/components/shared/multiplayer_windows.py; .codex/dialogs.gml"
+_SERVER_INFO_CAPTIONS = (
+    ("frmTitle/lblTitle", "100141", "SERVER INFO", "Server-information window title."),
+    ("frmInner/frmInfo/lblName", "100126", "SERVER NAME", "Server-name field caption."),
+    ("frmInner/frmInfo/lblMod", "100009", "MOD", "Mod field caption."),
+    ("frmInner/frmInfo/lblScenario", "102177", "SCENARIO", "Scenario field caption."),
+    ("frmInner/frmInfo/lblPassword", "100127", "PASSWORD", "Password-required field caption."),
+    ("frmInner/frmInfo/lblIp", "102175", "IP ADDRESS", "Server-address field caption."),
+    ("frmInner/frmInfo/lblName3", "100142", "PLAYERS", "Player-count field caption."),
+)
+DISPLAY_BINDINGS_BY_WINDOW["Server_Info_Window"] = {
+    path: _explicit_gml_caption_binding(
+        token,
+        caption,
+        "ServerInfoWindow._render_content",
+        _SERVER_INFO_SOURCE,
+        meaning,
+        "Keep the source field caption adjacent to the matching server metadata value; render Unavailable when metadata is absent.",
+    )
+    for path, token, caption, meaning in _SERVER_INFO_CAPTIONS
 }
 
 
@@ -11187,6 +12459,17 @@ DISPLAY_BINDINGS_BY_WINDOW["Objectives_Window"] = {
     "frmInner/frmInner/tabInfo/Tab2/frmObjectives/lblGoals": _objectives_caption_binding(
         "100174", "OBJECTIVES", "ObjectivesWindowContent._render_goals_tab"
     ),
+    "frmInner/frmInner/tabInfo/Tab2/frmObjectives/lstGoals": DisplayBinding(
+        "CampaignOverview.objectives",
+        "scenario-authored campaign objectives with live status and deadline",
+        "Configured objective rows, or 'This campaign has no configured objectives.'",
+        "Rendered from the selected campaign overview on each Objectives tab render; objective status is evaluated at the current game minute.",
+        "src/client/ui/panels/service/objectives_window_content.py; src/client/ui/panels/service/campaign_presenter.py; .codex/dialogs.gml",
+        "OpenPower fills the source goals list with its configured objectives and current lifecycle status; it does not infer goals from the 2001 country baseline.",
+        status="partial",
+        action_required="Keep only scenario-authored objectives and explicit empty state; do not fabricate objectives when a campaign supplies none.",
+        surface="ObjectivesWindowContent._render_goals_tab",
+    ),
     "frmInner/frmInner/tabInfo/Tab2/frmObjectives/lblTimeLimit": DisplayBinding(
         "scenario.max_duration_minutes + campaign.started_at_minute + current game minute",
         "campaign time limit and remaining duration",
@@ -11210,6 +12493,587 @@ DISPLAY_BINDINGS_BY_WINDOW["Objectives_Window"] = {
         surface="ObjectivesWindowContent._render_tips_tab / Tab3/frmInner child",
     ),
 }
+
+
+# Bind remaining source list/value slots to their current OpenPower state or an explicit unavailable state.
+_REMAINING_DATA_SOURCE = (
+    "src/client/ui/panels; src/client/ui/components/shared; modules/base/systems; .codex/dialogs.gml"
+)
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Battle_Info_Window", {}).update({
+    "frmInner/frmInner/frmBattleInfo/lstCountriesA": DisplayBinding(
+        "selected battle defender_side country tags",
+        "defending participant flags and country tags",
+        "Unknown when the selected battle has no published defender country tags.",
+        "Resolved from the current selected battle row on every inspection render.",
+        _BATTLE_INSPECTION_SOURCE,
+        "The small battle view lists only public country participants, not individual foreign unit rosters.",
+        status="verified_openpower",
+        action_required="Keep the list scoped to current published defender tags and retain the explicit Unknown fallback.",
+        surface="BattleInspectionWindows._render_small",
+    ),
+    "frmInner/frmInner/frmBattleInfo/lstCountriesB": DisplayBinding(
+        "selected battle attacker_side country tags",
+        "attacking participant flags and country tags",
+        "Unknown when the selected battle has no published attacker country tags.",
+        "Resolved from the current selected battle row on every inspection render.",
+        _BATTLE_INSPECTION_SOURCE,
+        "The small battle view lists only public country participants, not individual foreign unit rosters.",
+        status="verified_openpower",
+        action_required="Keep the list scoped to current published attacker tags and retain the explicit Unknown fallback.",
+        surface="BattleInspectionWindows._render_small",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Battle_Overview_Small_Unit_Info", {}).update({
+    "lstUnits": DisplayBinding(
+        "unavailable: BattleOverviewPanel lists current battles and opens BattleInspectionWindows; it has no embedded per-battle unit list",
+        "embedded battle unit roster",
+        "No unit rows are rendered in this overview slot; inspect a selected battle for public force cards.",
+        "No data is written to this source slot by the OpenPower battle overview.",
+        "src/client/ui/panels/military/battle_overview_panel.py; src/client/ui/panels/military/battle_inspection_windows.py; .codex/dialogs.gml",
+        "OpenPower's battle overview has no one-to-one embedded-unit-list surface; detailed current forces are shown in the separate inspection dialog.",
+        status="verified_unavailable",
+        action_required="Keep the overview slot unavailable unless an embedded roster is added with an explicit public-visibility contract.",
+        surface="BattleOverviewPanel",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Battle_Window", {}).update({
+    "frmOverviewMeter": DisplayBinding(
+        "selected battles.balance clamped to 0..1 and oriented to the local country side",
+        "current battle balance ratio",
+        "Zero when the selected battle has no balance value; the meter reverses when the local country is defending.",
+        "Recomputed from the selected live battle row on each inspection render.",
+        _BATTLE_INSPECTION_SOURCE,
+        "The meter shows the simulation's current balance field; it is not a historical outcome or casualty forecast.",
+        status="verified_openpower",
+        action_required="Keep the meter oriented to the local battle side and clamp values to the supported 0..1 range.",
+        surface="BattleInspectionWindows._render_full",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Constitutional_Form"].update({
+    "frmInner/frmCapital/cboCapital": DisplayBinding(
+        "current country capital region plus regions politically controlled by the country and any staged capital choice",
+        "current or drafted capital region",
+        "The current capital remains as an option even if no controlled-region option is available.",
+        "Rebuilt from current country control state; a new choice stays staged until the validated capital action is applied.",
+        "src/client/ui/panels/politics/constitutional_form_panel.py; src/client/ui/panels/politics/presenter.py; .codex/dialogs.gml",
+        "The selector reflects current simulation capital/control data, not a historically verified 2001 capital record.",
+        status="partial",
+        action_required="Keep the selected capital tied to current region state and retain the current-capital fallback.",
+        surface="ConstitutionalFormPanel._render_content",
+    ),
+    "frmInner/frmNextElection/lblElectionDate": DisplayBinding(
+        "PoliticsPresenter.build_summary(state, country).next_election",
+        "current next-election date or schedule status",
+        "The presenter-provided value, including its explicit not-scheduled state when no election is defined.",
+        "Recomputed from current country government and election schedule state on each render.",
+        "src/client/ui/panels/politics/constitutional_form_panel.py; src/client/ui/panels/politics/presenter.py; .codex/dialogs.gml",
+        "This is OpenPower's current simulation schedule, not a backfilled historical election date.",
+        status="partial",
+        action_required="Preserve the presenter's no-schedule value; do not infer election dates from country names or government labels.",
+        surface="ConstitutionalFormPanel._render_content",
+    ),
+    "frmInner/frmConstitutionalForm/cboConstitutionalForm": DisplayBinding(
+        "government-form options from current policy definitions and the selected country's current form, including any staged choice",
+        "current or drafted government-form options",
+        "Current government form remains selectable as the displayed value when no alternative is eligible.",
+        "Rebuilt from current policy definitions; the selected change remains staged until validated and applied.",
+        "src/client/ui/panels/politics/constitutional_form_panel.py; src/client/ui/panels/politics/presenter.py; .codex/dialogs.gml",
+        "The catalog is OpenPower simulation policy data, not a historical 2001 government-form roster.",
+        status="partial",
+        action_required="Keep form options aligned with current policy rules and retain the validated-action gate.",
+        surface="ConstitutionalFormPanel._render_content",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Covert_Actions_Cell_Creation"].update({
+    "frmInner/frmCell/cboCountry": DisplayBinding(
+        "current legal target country tags excluding the acting country",
+        "eligible target country options",
+        "No target countries are available in the current state.",
+        "Recomputed from current country, region, and covert-operation rules when the creation dialog renders.",
+        "src/client/ui/panels/military/covert_action_windows.py; src/client/ui/panels/military/presenter.py; modules/base/systems/military/covert_policy.py; .codex/dialogs.gml",
+        "Target choices use current OpenPower rules; they are not a historical 2001 covert-presence listing.",
+        status="partial",
+        action_required="Keep only currently valid targets and preserve the explicit empty-option state.",
+        surface="CovertActionWindows._render_create",
+    ),
+    "frmInner/frmCell/txtTime": DisplayBinding(
+        "quote_cell_creation(...).deployment_minutes",
+        "quoted deployment time in minutes",
+        "Unavailable when the current setup cannot be quoted; an invalid route shows its explicit rejection reason.",
+        "Requoted when the acting country, target country, or selected training level changes.",
+        "src/client/ui/panels/military/covert_action_windows.py; modules/base/systems/military/covert_policy.py; .codex/dialogs.gml",
+        "This is an OpenPower setup estimate and has no source-backed historical 2001 counterpart.",
+        status="partial",
+        action_required="Show only the current quote or its rejection state; never substitute a generic deployment duration.",
+        surface="CovertActionWindows._render_create",
+    ),
+    "frmInner/frmCell/cboTraining": DisplayBinding(
+        "current covert skill_levels options and selected cell-creation training level",
+        "supported cell training-level choices",
+        "The current supported levels; no value is invented when the training service supplies none.",
+        "Options come from the registered covert skill-level service each time the dialog renders.",
+        "src/client/ui/panels/military/covert_action_windows.py; modules/base/systems/military/covert_policy.py; .codex/dialogs.gml",
+        "These are gameplay training tiers, not historical covert-agent capability measurements.",
+        status="partial",
+        action_required="Keep the combo limited to levels returned by the registered covert skill-level service.",
+        surface="CovertActionWindows._render_create",
+    ),
+    "frmInner/frmCell/txtCost": DisplayBinding(
+        "quote_cell_creation(...).setup_cost",
+        "quoted setup cost in current game currency",
+        "Unavailable when the setup quote cannot be produced.",
+        "Requoted when the acting country, target country, or selected training level changes.",
+        "src/client/ui/panels/military/covert_action_windows.py; modules/base/systems/military/covert_policy.py; .codex/dialogs.gml",
+        "The amount is a current OpenPower gameplay cost, not a historical 2001 covert-operation expenditure.",
+        status="partial",
+        action_required="Show only the authoritative current setup quote or Unavailable.",
+        surface="CovertActionWindows._render_create",
+    ),
+    "frmInner/frmCell/txtUpkeep": DisplayBinding(
+        "quote_cell_creation(...).daily_upkeep",
+        "quoted daily upkeep in current game currency",
+        "Unavailable when the setup quote cannot be produced.",
+        "Requoted when the acting country, target country, or selected training level changes.",
+        "src/client/ui/panels/military/covert_action_windows.py; modules/base/systems/military/covert_policy.py; .codex/dialogs.gml",
+        "The amount is a current OpenPower gameplay cost, not a historical 2001 covert-operation expenditure.",
+        status="partial",
+        action_required="Show only the authoritative current upkeep quote or Unavailable.",
+        surface="CovertActionWindows._render_create",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Covert_Actions_Cell_Training"].update({
+    "frmInner/frmCell/txtName": DisplayBinding(
+        "selected active or idle owned covert-cell IDs resolved to current cell names",
+        "selected training cell or cells",
+        "Shows the stale-selection message when a selected cell no longer exists; shows an empty state when none are trainable.",
+        "Options are rebuilt from the acting country's current active and idle cell rows.",
+        "src/client/ui/panels/military/covert_action_windows.py; src/client/ui/panels/military/presenter.py; .codex/dialogs.gml",
+        "Training selection is restricted to the player's current cells and does not expose foreign-cell details.",
+        status="verified_openpower",
+        action_required="Keep selection limited to active or idle owned cells and retain stale-selection handling.",
+        surface="CovertActionWindows._render_train",
+    ),
+    "frmInner/frmCell/txtTraining": DisplayBinding(
+        "CovertActionWindows._training_points local draft, clamped by slider to 1..100",
+        "requested training points",
+        "One training point at the minimum slider setting.",
+        "Updated locally by the slider and sent only with a validated training action for selected cells.",
+        "src/client/ui/panels/military/covert_action_windows.py; .codex/dialogs.gml",
+        "This is a requested simulation action amount, not measured agent training progress.",
+        status="partial",
+        action_required="Keep the displayed value tied to the 1..100 draft slider and do not label it as completed training.",
+        surface="CovertActionWindows._render_train",
+    ),
+    "frmInner/frmCell/txtTime": DisplayBinding(
+        "unavailable: the OpenPower covert training dialog does not display a training-time value",
+        "training duration",
+        "No training duration is shown in this dialog.",
+        "No training-time field is calculated or refreshed.",
+        "src/client/ui/panels/military/covert_action_windows.py; .codex/dialogs.gml",
+        "OpenPower does not currently expose a matching training-duration estimate.",
+        status="verified_unavailable",
+        action_required="Leave duration unavailable unless the simulation adds an authoritative training-time model.",
+        surface="CovertActionWindows._render_train",
+    ),
+    "frmInner/frmCell/txtCost": DisplayBinding(
+        "unavailable: the OpenPower covert training dialog does not display a training-cost value",
+        "training cost",
+        "No training cost is shown in this dialog.",
+        "No training-cost field is calculated or refreshed.",
+        "src/client/ui/panels/military/covert_action_windows.py; .codex/dialogs.gml",
+        "OpenPower does not currently expose a matching training-cost quote.",
+        status="verified_unavailable",
+        action_required="Leave cost unavailable unless an authoritative training-cost quote is added.",
+        surface="CovertActionWindows._render_train",
+    ),
+    "frmInner/frmCell/txtUpkeep": DisplayBinding(
+        "unavailable: the OpenPower covert training dialog does not display an upkeep value",
+        "cell upkeep",
+        "No upkeep value is shown in this dialog.",
+        "No upkeep field is calculated or refreshed by the training dialog.",
+        "src/client/ui/panels/military/covert_action_windows.py; .codex/dialogs.gml",
+        "OpenPower does not show a source-equivalent upkeep value in the training form.",
+        status="verified_unavailable",
+        action_required="Keep the training dialog free of an inferred upkeep amount.",
+        surface="CovertActionWindows._render_train",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW.setdefault("Generic_Input_Window", {}).update({
+    "lblMessage": DisplayBinding(
+        "GenericInputDialog._request.message",
+        "caller-provided input prompt",
+        "The dialog cannot open when the request prompt is blank.",
+        "Set once when the caller opens the one-shot prompt; cleared when the dialog closes.",
+        "src/client/ui/components/shared/multiplayer_windows.py; .codex/dialogs.gml",
+        "OpenPower displays the exact request message supplied by the active caller.",
+        status="verified_openpower",
+        action_required="Keep the prompt tied to the current input request and do not reuse stale caller text.",
+        surface="GenericInputDialog.render",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["History_Window"].update({
+    "frmInner/frmHistory/cboDisplay": DisplayBinding(
+        "enabled history_indicator_definitions ordered by history_indicator_sort_key and labeled by history_indicator_source_label",
+        "available historical indicator and subject-type options",
+        "A disabled No indicators available option when the current snapshot defines no enabled indicators.",
+        "Rebuilt from current indicator definitions on every render; changing the selection refreshes the selected series.",
+        "src/client/ui/panels/service/history_panel.py; src/client/services/history_indicator_catalog.py; src/client/services/history_query_service.py; .codex/dialogs.gml",
+        "The selector only offers defined indicators; minute-zero 2001 observations appear where the source-compatible history seed exists.",
+        status="verified_openpower",
+        action_required="Keep the selector synchronized with enabled definitions and retain the empty-indicator state.",
+        surface="HistoryPanel._render_indicator_selector",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Internal_Laws"].update({
+    "frmInner/frmOrganizations/lstOrganization": DisplayBinding(
+        "PoliticsPresenter.build(state, country).parties plus staged party-policy choices",
+        "current gameplay party names, available support shares, and policy status controls",
+        "No party records available; the generic incumbent fallback displays support as an em dash.",
+        "Recomputed from current politics tables and staged policy draft on each render.",
+        "src/client/ui/panels/politics/internal_laws_panel.py; src/client/ui/panels/politics/presenter.py; .codex/dialogs.gml",
+        "This is the gameplay roster and may contain modeled or unavailable support; the separately sourced 2001 Factbook roster is read-only context.",
+        status="partial",
+        action_required="Keep missing support and eligibility explicitly unknown; do not treat the historical name roster as game support data.",
+        surface="InternalLawsPanel._render_content",
+    ),
+    "frmInner/frmLaws/lstLaws": DisplayBinding(
+        "current country_laws rows joined to PoliticsPresenter law summaries and the local staged law draft",
+        "current law values, supported choices, and pending transitions",
+        "No law records available when the country has no defined laws; unsupported choices remain non-editable.",
+        "Read from the current snapshot and local draft; changes reach game state only after the validated apply action.",
+        "src/client/ui/panels/politics/internal_laws_panel.py; src/client/ui/panels/politics/presenter.py; .codex/dialogs.gml",
+        "Law values are OpenPower simulation policy, not a complete historical 2001 legal code transcription.",
+        status="partial",
+        action_required="Keep displayed values joined to the selected country's current law rows and preserve unavailable-option states.",
+        surface="InternalLawsPanel._render_laws",
+    ),
+    "frmInner/frmDemographicGroups/tabGroups/Tab1/lstGroups": DisplayBinding(
+        "country_identity_groups rows for the selected country and religion identity type",
+        "religion group names, estimated population shares, and policy statuses",
+        "No religion profile is available for the selected country when no matching rows exist.",
+        "Rebuilt from the current identity table; Tab1 selects religion groups and the compact GML list shows available rows.",
+        "src/client/ui/panels/politics/internal_laws_panel.py; src/client/ui/panels/politics/identity_policy_view.py; .codex/dialogs.gml",
+        "Numeric shares are labeled as gameplay estimates; source-year descriptions remain visible in the identity details view.",
+        status="partial",
+        action_required="Keep estimated shares labeled as gameplay estimates and do not derive unprovided 2001 population shares.",
+        surface="InternalLawsPanel._render_content / IdentityPolicyView.render",
+    ),
+    "frmInner/frmDemographicGroups/tabGroups/Tab2/lstGroups": DisplayBinding(
+        "country_identity_groups rows for the selected country and language identity type",
+        "language group names, estimated population shares, and policy statuses",
+        "No language profile is available for the selected country when no matching rows exist.",
+        "Rebuilt from the current identity table; Tab2 selects language groups and the compact GML list shows available rows.",
+        "src/client/ui/panels/politics/internal_laws_panel.py; src/client/ui/panels/politics/identity_policy_view.py; .codex/dialogs.gml",
+        "CIA Factbook 2001 language descriptions are shown as dated context; numeric group shares remain gameplay estimates.",
+        status="partial",
+        action_required="Keep the source description separate from gameplay shares and preserve the no-profile empty state.",
+        surface="InternalLawsPanel._render_content / IdentityPolicyView.render",
+    ),
+    "frmInner/frmHumanMigration/cboEmigrationStatus": DisplayBinding(
+        "unavailable: source combo slot is an OpenPower button that opens the detailed exit-policy editor",
+        "source emigration status combo",
+        "No source-style status value is rendered in this slot; the adjacent current exit rate and policy editor provide OpenPower data.",
+        "The source slot opens the authoritative migration editor; it is not populated with a fabricated boolean status.",
+        "src/client/ui/panels/politics/internal_laws_panel.py; src/client/ui/panels/politics/identity_policy_view.py; .codex/dialogs.gml",
+        "OpenPower migration policy uses rates and editable policy fields rather than the source's status combo.",
+        status="verified_unavailable",
+        action_required="Keep the source slot as navigation to the exit-policy editor and do not invent a status mapping.",
+        surface="InternalLawsPanel._render_migration",
+    ),
+    "frmInner/frmHumanMigration/cboImmigrationStatus": DisplayBinding(
+        "unavailable: source combo slot is an OpenPower button that opens the detailed entry-policy editor",
+        "source immigration status combo",
+        "No source-style status value is rendered in this slot; the adjacent current entry rate and policy editor provide OpenPower data.",
+        "The source slot opens the authoritative migration editor; it is not populated with a fabricated boolean status.",
+        "src/client/ui/panels/politics/internal_laws_panel.py; src/client/ui/panels/politics/identity_policy_view.py; .codex/dialogs.gml",
+        "OpenPower migration policy uses rates and editable policy fields rather than the source's status combo.",
+        status="verified_unavailable",
+        action_required="Keep the source slot as navigation to the entry-policy editor and do not invent a status mapping.",
+        surface="InternalLawsPanel._render_migration",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Party_Selection_Window"].update({
+    "frmInner/frmParties/lstParties": DisplayBinding(
+        "new-game political_parties rows for the selected country and the current political-roster fallback",
+        "selectable gameplay parties and only available support values",
+        "No political-party data available when the selected country has no gameplay party rows.",
+        "Loaded for the chosen new-game country; selection is a game party ID and is not drawn from the historical Factbook roster.",
+        "src/client/ui/components/shared/party_selection_window.py; src/client/views/new_game_view.py; .codex/dialogs.gml",
+        "The 2001 Factbook party names remain in a separate read-only overlay; missing support is displayed as an em dash.",
+        status="partial",
+        action_required="Keep the fallback explicit and never convert historical roster text into selectable game parties or support percentages.",
+        surface="PartySelectionWindow._render_content",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Server_Info_Window"].update({
+    "frmInner/frmInfo/txtIpAddress": DisplayBinding(
+        "MultiplayerServerInfo.ip_address",
+        "server address",
+        "Unavailable when the selected server metadata is absent.",
+        "Read from the selected server metadata object while the details dialog is open.",
+        _SERVER_INFO_SOURCE,
+        "No live discovery service supplies server addresses; an absent server is explicitly labeled Unavailable.",
+        status="partial",
+        action_required="Display only the selected server's supplied address or Unavailable; do not invent a local endpoint.",
+        surface="ServerInfoWindow._render_content",
+    ),
+    "frmInner/frmInfo/txtPlayers": DisplayBinding(
+        "MultiplayerServerInfo.players / MultiplayerServerInfo.max_players",
+        "current players and server capacity",
+        "Unavailable when selected server metadata is absent.",
+        "Read from the selected server metadata object while the details dialog is open.",
+        _SERVER_INFO_SOURCE,
+        "No authoritative lobby backend supplies live player presence in OpenPower.",
+        status="partial",
+        action_required="Keep the displayed count tied to supplied metadata and retain Unavailable when no server row exists.",
+        surface="ServerInfoWindow._render_content",
+    ),
+    "frmInner/frmInfo/txtScenario": DisplayBinding(
+        "MultiplayerServerInfo.scenario_name",
+        "server scenario name",
+        "Unavailable when selected server metadata is absent.",
+        "Read from the selected server metadata object while the details dialog is open.",
+        _SERVER_INFO_SOURCE,
+        "The dialog does not resolve or fabricate server scenario metadata through a multiplayer backend.",
+        status="partial",
+        action_required="Display the provided server scenario or Unavailable.",
+        surface="ServerInfoWindow._render_content",
+    ),
+    "frmInner/frmInfo/txtName": DisplayBinding(
+        "MultiplayerServerInfo.name",
+        "server name",
+        "Unavailable when selected server metadata is absent.",
+        "Read from the selected server metadata object while the details dialog is open.",
+        _SERVER_INFO_SOURCE,
+        "Server names are available only when a server metadata record is explicitly supplied.",
+        status="partial",
+        action_required="Display only supplied server names and retain the explicit missing-metadata fallback.",
+        surface="ServerInfoWindow._render_content",
+    ),
+    "frmInner/frmInfo/txtMods": DisplayBinding(
+        "MultiplayerServerInfo.mod_name",
+        "server mod name",
+        "Unavailable when selected server metadata is absent.",
+        "Read from the selected server metadata object while the details dialog is open.",
+        _SERVER_INFO_SOURCE,
+        "No live server discovery service supplies mod metadata in the current OpenPower client.",
+        status="partial",
+        action_required="Display only supplied mod metadata or Unavailable.",
+        surface="ServerInfoWindow._render_content",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Split_Group_Window"].update({
+    "frmInner/frmNew/lstGroup": DisplayBinding(
+        "selected owned unit design, type, detached personnel, training level, and proportional equipment quantity",
+        "detached-unit preview rows",
+        "A zero-personnel detached preview before a split amount is selected.",
+        "Recomputed from the selected current owned unit and local detached-personnel draft on each render.",
+        _UNIT_REORGANIZATION_SOURCE,
+        "The preview splits current simulation inventory and does not show foreign or historical force data.",
+        status="verified_openpower",
+        action_required="Keep detached personnel and equipment counts bounded by the selected unit's current totals.",
+        surface="UnitReorganizationWindows._split",
+    ),
+    "frmInner/frmOriginal/lstGroup": DisplayBinding(
+        "selected owned unit design, type, remaining personnel, training level, and proportional equipment quantity",
+        "remaining original-unit preview rows",
+        "The selected unit's full current quantity before a split amount is selected.",
+        "Recomputed from the selected current owned unit and local detached-personnel draft on each render.",
+        _UNIT_REORGANIZATION_SOURCE,
+        "The preview splits current simulation inventory and does not show foreign or historical force data.",
+        status="verified_openpower",
+        action_required="Keep remaining personnel and equipment counts consistent with the detached preview and source unit.",
+        surface="UnitReorganizationWindows._split",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Strategic_Missile_List_Window"].update({
+    "frmInner/frmList/lstMissileList": DisplayBinding(
+        "current acting-country strategic inventory joined with ready quantity, payload profile, origin region, and draft target region",
+        "owned strategic weapon systems and their current/planned details",
+        "Empty when the acting country has no strategic inventory.",
+        "Rebuilt from the current inventory and launch draft whenever the missile list renders.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "The list uses current owned OpenPower inventory; an unassigned target or missing payload profile remains an em dash.",
+        status="verified_openpower",
+        action_required="Keep inventory and locations scoped to the acting country and do not count non-ready systems as ready weapons.",
+        surface="StrategicPlanner._missiles",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Strategic_Target_Multiple_Countries_Window"].update({
+    "frmInner/frmList/lstAttackList": DisplayBinding(
+        "current acting-country strategic inventory with explicit per-system selected state, available target regions, and draft assignments",
+        "multi-target weapon assignment rows",
+        "Empty when the acting country has no strategic inventory; rows with no explicit target remain unassigned.",
+        "Rebuilt from current inventory and targetable region state; player assignments remain in the launch draft until validated.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "Each row shows current owned systems and explicit target assignment; attack preparation rejects missing assignments.",
+        status="verified_openpower",
+        action_required="Keep target assignment explicit per system and preserve the launch validation for unassigned rows.",
+        surface="StrategicPlanner._render_multiple_targets",
+    ),
+    "frmInner/frmList/txtCasualities": DisplayBinding(
+        "unavailable: OpenPower has no pre-resolution strategic casualty projection",
+        "projected casualties",
+        "Not estimated before a strike resolves.",
+        "No casualty estimate is calculated before authoritative strike resolution.",
+        _STRATEGIC_PLANNER_SOURCE,
+        "The planner deliberately avoids inventing projected impact numbers.",
+        status="verified_unavailable",
+        action_required="Keep the explicit Not estimated value until a validated combat-impact model exists.",
+        surface="StrategicPlanner._render_multiple_targets",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Treaties_Window"].update({
+    "frmInner/frmFilters/cboType": DisplayBinding(
+        "normalized types from current treaty definitions and current active/pending treaty rows",
+        "treaty type filter options",
+        "All types remains available when no treaty rows exist; known current type definitions populate the remaining choices.",
+        "Rebuilt from the current treaty snapshot before filtering the visible list.",
+        "src/client/ui/panels/politics/treaties_live.py; src/client/ui/panels/politics/treaty_filters.py; src/shared/treaties.py; .codex/dialogs.gml",
+        "The filter reflects current OpenPower treaty policy and live deals, not a historical 2001 treaty archive.",
+        status="verified_openpower",
+        action_required="Keep normalized type options aligned with defined and currently observed treaty rows.",
+        surface="TreatiesLivePanel._render_content",
+    ),
+    "frmInner/frmFilters/cboCountry": DisplayBinding(
+        "active country IDs in the current world snapshot plus participant tags from active/pending treaty rows",
+        "treaty member filter options",
+        "All members remains available; unavailable names fall back to their country tag.",
+        "Rebuilt from current countries and treaty participants before filtering the visible list.",
+        "src/client/ui/panels/politics/treaties_live.py; src/client/ui/panels/politics/treaty_filters.py; .codex/dialogs.gml",
+        "Country choices use current simulation members; they do not imply a historical treaty relationship.",
+        status="verified_openpower",
+        action_required="Keep the member filter sourced from current active countries and observed treaty participants.",
+        surface="TreatiesLivePanel._render_content",
+    ),
+    "frmInner/frmPendingTreaties/lstTreaties": DisplayBinding(
+        "current pending treaty proposals filtered by selected member/type and current detail-tab context",
+        "pending treaty proposal rows and member/status details",
+        "No pending treaty proposals match the current filters.",
+        "Rebuilt from the current treaty/proposal state whenever the treaty panel renders.",
+        "src/client/ui/panels/politics/treaties_live.py; src/client/ui/panels/politics/treaty_filters.py; .codex/dialogs.gml",
+        "Rows are live OpenPower proposals; no external historical treaty list is implied.",
+        status="verified_openpower",
+        action_required="Keep proposals filtered from current state and show an explicit empty result when none match.",
+        surface="TreatiesLivePanel._render_content",
+    ),
+    "frmInner/frmActiveTreaties/lstTreaties": DisplayBinding(
+        "current active treaties filtered by selected member/type and current detail-tab context",
+        "active treaty rows and member/status details",
+        "No active treaties match the current filters.",
+        "Rebuilt from the current treaty state whenever the treaty panel renders.",
+        "src/client/ui/panels/politics/treaties_live.py; src/client/ui/panels/politics/treaty_filters.py; .codex/dialogs.gml",
+        "Rows are live OpenPower treaty state and do not claim historical treaty completeness.",
+        status="verified_openpower",
+        action_required="Keep active rows filtered from the authoritative treaty snapshot with explicit empty feedback.",
+        surface="TreatiesLivePanel._render_content",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Unit_List_Window"].update({
+    "frmInner/frmInformationAccuracy/txtValue": DisplayBinding(
+        "mean confidence from current foreign_force_estimates for the selected country, clamped to 0..1",
+        "aggregate OpenPower foreign-force estimate confidence",
+        "An em dash when there are no foreign-force estimates for the selected country.",
+        "Recomputed from current aggregate intelligence estimates when the unit list renders.",
+        "src/client/ui/panels/military/unit_list_panel.py; src/client/ui/panels/military/presenter.py; .codex/dialogs.gml",
+        "This is OpenPower aggregate-estimate confidence, not REFERENCE sensor accuracy or a revealed foreign unit roster.",
+        status="partial",
+        action_required="Keep the estimate-confidence label and em-dash fallback; never treat the value as hidden foreign-force truth.",
+        surface="UnitListPanel._render_accuracy",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Unit_Production_Window"].update({
+    "frmRight/frmProduction/lstProduction": DisplayBinding(
+        "current production orders for the selected builder country joined to current design, status, priority, progress, and ETA",
+        "current production queue rows",
+        "An explicit empty production queue when no matching orders exist.",
+        "Rebuilt from the latest simulation snapshot and local queue-priority draft on each production-panel render.",
+        "src/client/ui/panels/military/unit_production_panel.py; src/client/ui/panels/military/presenter.py; .codex/dialogs.gml",
+        "Rows show current simulation orders and their queue state, not historical 2001 production records.",
+        status="verified_openpower",
+        action_required="Keep the queue joined to current order/design rows and preserve explicit missing-design or ETA states.",
+        surface="UnitProductionPanel._render_right_page",
+    ),
+    "frmRight/frmProduction/txtValue": DisplayBinding(
+        "production_snapshot.capacity_ratio for the selected builder country",
+        "allocated production capacity as a share of annual capacity",
+        "N/A when no authoritative aggregate capacity ratio is present in the current snapshot.",
+        "Recomputed from current production-order allocations for the selected builder country.",
+        "src/client/ui/panels/military/unit_production_panel.py; src/client/ui/panels/military/production_snapshot.py; .codex/dialogs.gml",
+        "The display reports OpenPower capacity allocation, not a historical industrial-capacity statistic.",
+        status="partial",
+        action_required="Keep N/A when no aggregate ratio exists and do not substitute a country-level industry estimate.",
+        surface="UnitProductionPanel._render_capacity",
+    ),
+    "frmDesignList/frmInfo/cboPriority": DisplayBinding(
+        "UnitProductionPanel._build_priority_index local design-order draft and supported build-priority labels",
+        "priority choice for the pending production order",
+        "The default draft priority when no new order has been configured.",
+        "Updated locally while preparing a quote; submitted only with the validated production action.",
+        "src/client/ui/panels/military/unit_production_panel.py; modules/base/systems/military/production_policy.py; .codex/dialogs.gml",
+        "This selector is the current OpenPower production-order draft, not a historical industrial priority.",
+        status="partial",
+        action_required="Keep the draft priority separate from existing queue orders and preserve authority checks before submission.",
+        surface="UnitProductionPanel._render_design_details",
+    ),
+    "frmDesignList/frmUnitName/txtUnitName": DisplayBinding(
+        "selected current unit design display_name, falling back to its name",
+        "selected unit design name",
+        "An em dash when no design is selected.",
+        "Updated from the currently selected design in the production-panel list.",
+        "src/client/ui/panels/military/unit_production_panel.py; .codex/dialogs.gml",
+        "The field displays the selected current OpenPower design and preserves the no-selection fallback.",
+        status="verified_openpower",
+        action_required="Keep the value tied to the selected current design and do not backfill an unrelated historical model name.",
+        surface="UnitProductionPanel._render_design_details",
+    ),
+    "frmDesignList/frmCost/txtTotalCost": DisplayBinding(
+        "authoritative production-order quote for current design unit cost, requested quantity, priority, and production speed",
+        "quoted total order cost in current game currency",
+        "An em dash when no design is selected.",
+        "Recomputed from the shared production-order quote whenever design, quantity, priority, or speed changes.",
+        "src/client/ui/panels/military/unit_production_panel.py; modules/base/systems/military/production_policy.py; .codex/dialogs.gml",
+        "This is an OpenPower gameplay quote; fast-production premium and work reduction are not historical unit-cost data.",
+        status="partial",
+        action_required="Keep displayed totals sourced from the common quote service and retain the explicit no-design value.",
+        surface="UnitProductionPanel._render_design_details",
+    ),
+    "frmDesignList/frmCost/lblUnitCost": DisplayBinding(
+        "selected design class determines UNIT COST heading or the POP. 15-64 working-age population heading for infantry",
+        "design cost or infantry population-capacity heading",
+        "The current class-specific heading; the selected design is required to show a value.",
+        "Updated with selected design class on each design-details render.",
+        "src/client/ui/panels/military/unit_production_panel.py; .codex/dialogs.gml",
+        "For infantry, the adjacent value is working-age population and is explicitly not an enlistment allowance; other designs show their current design cost.",
+        status="partial",
+        action_required="Keep the heading conditional on design class and preserve the distinction between population and recruitable manpower.",
+        surface="UnitProductionPanel._render_design_details",
+    ),
+    "frmDesignList/frmDesignList/cboCountry": DisplayBinding(
+        "selected builder country from the acting country plus countries with available foreign design rows",
+        "current production builder country options",
+        "The acting country remains the default builder; foreign options appear only when current designs are available.",
+        "Rebuilt from current foreign designs and country names when the production panel opens.",
+        "src/client/ui/panels/military/unit_production_panel.py; .codex/dialogs.gml",
+        "The selector is limited to current design providers; foreign requests require the selected seller to accept orders.",
+        status="partial",
+        action_required="Keep builder choices tied to actual current design rows and retain foreign-order eligibility checks.",
+        surface="UnitProductionPanel._render_builder_selector",
+    ),
+})
+DISPLAY_BINDINGS_BY_WINDOW["Unit_Split_Window"].update({
+    "frmSplit/frmSplit": DisplayBinding(
+        "UnitReorganizationWindows._quantity / current transfer capacity",
+        "requested personnel-transfer ratio",
+        "Zero transfer before the player selects a quantity; the ratio range is bounded by the selected transfer capacity.",
+        "Updated by the quantity slider and integer controls in the local split draft before the split action is submitted.",
+        _UNIT_REORGANIZATION_SOURCE,
+        "The meter is an interactive OpenPower quantity selector, not a source-equivalent force-readiness measure.",
+        status="partial",
+        action_required="Keep the slider bounded by available personnel and avoid presenting it as operational readiness.",
+        surface="UnitReorganizationWindows._quantity_window",
+    ),
+})
 
 
 def _component_kind(node: dict[str, Any]) -> str:
@@ -11601,7 +13465,6 @@ def _window_edges(index: dict[str, Any], catalog: dict[str, Any]) -> tuple[list[
     edges: list[dict[str, Any]] = []
     event_names = {"OnMouseClick", "OnCustomEvent", "OnMouseDown", "OnMouseUp", "OnKeyDown", "OnKeyUp", "OnChar"}
     for path, functions in file_functions.items():
-        source_text = index["texts"][path]
         functions_by_name: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for candidate in functions:
             functions_by_name[candidate["method"]].append(candidate)
@@ -12150,11 +14013,12 @@ def _navigation_journey_coverage_rows(
 def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | None = None) -> dict[str, Any]:
     catalog_path = resolve_reference_file(source_root, "reference_ui_catalog.json")
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
-    seed_navigation = json.loads(
-        resolve_reference_file(source_root, "reference_ui_navigation_verified.json").read_text(encoding="utf-8")
-    )
     templates = catalog["templates"]
-    validation = _validate_gml(source_root / "layout_catalog.gml", catalog)
+    layout_path = source_root / "layout_catalog.gml"
+    # Some reference bundles retain the original filename rather than the normalized alias.
+    if not layout_path.exists():
+        layout_path = source_root / "dialogs.gml"
+    validation = _validate_gml(layout_path, catalog)
     source_index = _source_index(source_root / "Client" / "Source")
     edges, bindings = _window_edges(source_index, catalog)
     panel_specs, _ = _panel_specs(REPO_ROOT / "src/client/ui/layouts/game_panel_registry.py")
@@ -12175,6 +14039,10 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
         for window, panel_id in panel_by_window.items()
     }
     surface_by_window.update({window: surface for window, (surface, _) in LAYOUT_SURFACES.items()})
+    surface_status_by_window = {
+        window: status for window, (_, status) in PANEL_ALIASES.items()
+    }
+    surface_status_by_window.update({window: status for window, (_, status) in LAYOUT_SURFACES.items()})
 
     window_rows: list[dict[str, Any]] = []
     template_usage = source_index["all_code"]
@@ -12290,12 +14158,10 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
         reverse_bindings = {path: member for member, path in class_bindings.items()}
         code = source_index["texts"].get(source_index["files"][0], "")
         if type_row:
-            source_path = source_index["texts"].get(source_index["files"][0], "")
             matching_path = next((p for p in source_index["files"] if p.name == type_row["file"]), None)
             code = source_index["texts"].get(matching_path, "") if matching_path else ""
         else:
             code = ""
-        all_paths = {record["path"]: record for record in paths_by_template[window]}
         for record in paths_by_template[window]:
             node = record["node"]
             path = record["path"]
@@ -12323,6 +14189,10 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
                     if path.removeprefix(window + "/") == suffix_key
                 ),
                 None,
+            )
+            unavailable_surface = (
+                display_binding is None
+                and surface_status_by_window.get(window) == "verified_unavailable"
             )
             component_rows.append({
                 "window_id": window,
@@ -12359,6 +14229,9 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
                 if display_binding is not None:
                     hint = display_binding.state_binding
                     unit = display_binding.units
+                elif unavailable_surface:
+                    hint = f"No OpenPower runtime route for source window {window}"
+                    unit = "unavailable source component"
                 is_generic_message_text = (
                     window == "Generic_Message_Window"
                     and path == "Generic_Message_Window/lblMessage"
@@ -12381,6 +14254,11 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
                         what_is_displayed = (
                             "TERRITORY GAINED or TERRITORY LOST followed by the names of regions "
                             "whose latest ownership transition affects the local country."
+                        )
+                    elif unavailable_surface:
+                        what_is_displayed = (
+                            f"Source component has no OpenPower runtime equivalent; GML token "
+                            f"{props.get('Text', '')!r} is retained as source evidence and is not shown as game data."
                         )
                     elif display_binding and display_binding.meaning:
                         what_is_displayed = f"{meaning}OpenPower binding {hint}."
@@ -12425,12 +14303,16 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
                         if is_generic_message_text else
                         "src/client/ui/panels/service/region_control_dispatches.py::region_control_dispatches"
                         if is_region_control_text else
+                        "utils/reference_ui_audit.py::LAYOUT_SURFACES (verified_unavailable)"
+                        if unavailable_surface else
                         display_binding.openpower_source if display_binding else ""
                     ),
                     "openpower_binding_status": (
                         display_binding.status if display_binding else
                         "verified_openpower"
                         if is_generic_message_text or is_region_control_text else
+                        "verified_unavailable"
+                        if unavailable_surface else
                         "assumption/unknown"
                     ),
                     "units": unit,
@@ -12439,6 +14321,8 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
                         if is_generic_message_text else
                         "Unknown region IDs display as 'Region <id>'; missing names do not create numeric data."
                         if is_region_control_text else
+                        "No OpenPower equivalent; do not substitute a fabricated runtime value."
+                        if unavailable_surface else
                         display_binding.fallback if display_binding else
                         "unavailable/unknown; do not substitute a numeric value"
                     ),
@@ -12447,8 +14331,10 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
                         if is_generic_message_text else
                         "Recomputed from the authoritative event journal when the local inbox is rendered; the latest local ownership transition determines each region's gained/lost group."
                         if is_region_control_text else
+                        "No runtime update; this source template has no OpenPower workflow."
+                        if unavailable_surface else
                         display_binding.update_rule if display_binding else
-                        f"C++ member operations are listed at source lines; refresh cadence is unresolved."
+                        "C++ member operations are listed at source lines; refresh cadence is unresolved."
                         if usages else
                         "No C++ member operation was found; refresh cadence is unresolved."
                     ),
@@ -12457,6 +14343,8 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
                         if is_generic_message_text else
                         "Preserve local-country scoping, latest-transition grouping, and the source-sized message dialog."
                         if is_region_control_text else
+                        "Keep source-only component data unavailable until an equivalent OpenPower runtime workflow exists."
+                        if unavailable_surface else
                         display_binding.action_required
                         if display_binding and display_binding.action_required else
                         "Keep this value explicitly unavailable until an authoritative OpenPower field is added; do not infer it from unrelated data."
@@ -12467,6 +14355,8 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
                     ),
                     "status": (
                         display_binding.status if display_binding else
+                        "verified_unavailable"
+                        if unavailable_surface else
                         "verified_cpp" if usages else "assumption/unknown"
                     ),
                 })
@@ -12649,7 +14539,7 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
                                      or EVENT_LOG_INTERACTION_BINDINGS.get(path)
                                      or MAIL_INTERACTION_BINDINGS.get(path)
                                      or RESOURCE_POLICY_INTERACTION_BINDINGS.get(path)
-                                     or RESOURCE_UNAVAILABLE_INTERACTION_BINDINGS.get(path)
+                                     or RESOURCE_MARKET_INTERACTION_BINDINGS.get(path)
                                      or BUDGET_RESOURCES_TITLE_INTERACTION_BINDINGS.get(path)
                                      or THEMATIC_MAP_LEGEND_INTERACTION_BINDINGS.get(path)
                                      or BATTLE_OVERVIEW_SMALL_UNIT_INFO_INTERACTION_BINDINGS.get(path)
@@ -12948,6 +14838,12 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
         })
     for data in data_rows:
         current_binding = data["openpower_state_binding"]
+        cpp_evidence = data["cpp_display_expressions"] or data["cpp_member_operations"]
+        evidence_parts = [f"layout_catalog.gml#L{data['gml_line']}", data["cpp_source"]]
+        if cpp_evidence:
+            evidence_parts.append(cpp_evidence)
+        if data["openpower_binding_source"]:
+            evidence_parts.append(f"OpenPower: {data['openpower_binding_source']}")
         gaps.append({
             "gml_node_or_behavior": data["component_path"],
             "reference_behavior": (
@@ -12960,9 +14856,7 @@ def generate(source_root: Path, output_dir: Path, journey_suite_path: Path | Non
             ),
             "action_required": data["action_required"],
             "status": data["openpower_binding_status"],
-            "evidence": f"layout_catalog.gml#L{data['gml_line']}; {data['cpp_source']} "
-            f"{data['cpp_display_expressions'] or data['cpp_member_operations']}; "
-            f"OpenPower: {data['openpower_binding_source']}",
+            "evidence": "; ".join(part for part in evidence_parts if part),
         })
     for edge in edges:
         destination = edge["target_window"]
@@ -13300,7 +15194,7 @@ def _write_readme(output_dir: Path, report: dict[str, Any]) -> None:
         "## UI verification",
         "",
         f"- Historical surface matrix: {report.get('surface_matrix_passed', 0)}/{report.get('surface_matrix_runs', 0)} runs across {report.get('surface_matrix_count', 0)} surfaces and four requested viewport sizes. Earlier runs did not validate the actual native viewport; see navigation_verification.md for the correction and current evidence. The merged `suite.json` points to the latest reports for surfaces rerun after layout fixes.",
-        f"- Current journey suite: {report.get('journey_suite_passed', 0)}/{report.get('journey_suite_total', 0)} JSON journeys, including {report.get('journey_action_assertions', 0)} exact GameAction assertions. {report.get('functional_matrix_suite_count', 0)} historical focused functional journeys passed their requested-size matrices ({report.get('functional_matrix_passed', 0)}/{report.get('functional_matrix_runs', 0)} runs).",
+        f"- Current journey suite: {report.get('journey_suite_passed', 0)}/{report.get('journey_suite_total', 0)} JSON journeys, including {report.get('journey_action_assertions', 0)} exact GameAction assertions. Focused functional matrix evidence is {report.get('functional_matrix_passed', 0)}/{report.get('functional_matrix_runs', 0)} recorded runs across {report.get('functional_matrix_suite_count', 0)} configured suites; missing suite reports are not counted as passing.",
         f"- Manually verified seed-transition journey coverage: `{json.dumps(report['seed_transition_journey_coverage_counts'], ensure_ascii=False)}`.",
         "- Crosswalk click IDs are OpenPower controls reviewed as equivalents for the source paths; they are not GML widget IDs.",
         "- Journey fixtures cover directed Relations values/history, treaty details, and covert-cell workflows; reviewed runs include action dispatch and geometry evidence.",

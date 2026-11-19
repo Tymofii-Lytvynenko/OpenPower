@@ -1,0 +1,33 @@
+{
+  "fixture": "tests/ui/fixtures/country-info-historical-2001.json",
+  "steps": [
+    {
+      "op": "click",
+      "target": "hud.more_info"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.hdi.country",
+      "label": "Ukraine: 72.8 %",
+      "inside": "country_more_info.panel"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.hdi.world",
+      "label": "World (2001): 65.7 %",
+      "inside": "country_more_info.panel"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.land_cover.label.txtNationalParks",
+      "label": "Protected areas (2000)",
+      "inside": "country_more_info.panel"
+    },
+    {
+      "op": "assert",
+      "target": "country.info.land_cover.txtNationalParks",
+      "label": "3.5 %",
+      "inside": "country_more_info.panel"
+    }
+  ]
+}

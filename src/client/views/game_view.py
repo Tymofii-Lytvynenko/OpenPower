@@ -1,12 +1,13 @@
 from contextlib import nullcontext
 from time import perf_counter_ns
 import arcade
+from src.core.paths import resolve_region_map_path
 from src.shared.config import GameConfig
 from src.client.services.network_client_service import NetworkClient
 from src.client.views.base_view import BaseImGuiView
 from typing import Optional
 
-from src.client.renderers.map_renderer import MapRenderer
+from src.client.renderers.map_renderer import MapRenderer, renderer_matches_map
 from src.client.renderers.unit_renderer import UnitRenderer
 from src.client.renderers.event_renderer import EventRenderer
 from src.client.renderers.battle_effect_renderer import BattleEffectRenderer
@@ -33,7 +34,7 @@ class GameView(BaseImGuiView):
 
         # 1. Initialize Camera & Renderer
         # We reuse the shared renderer from the Window to keep the state (position/zoom) intact.
-        if self.window.shared_renderer:
+        if renderer_matches_map(self.window.shared_renderer, session.map_data):
             self.renderer = self.window.shared_renderer
             self.cam_ctrl = self.renderer.camera
             
@@ -45,7 +46,7 @@ class GameView(BaseImGuiView):
         else:
             # Fallback if accessed directly without main menu (Debug scenarios)
             self.cam_ctrl = CameraController()
-            map_path = config.get_asset_path("map/regions.png")
+            map_path = resolve_region_map_path(config)
             terrain_path = config.get_asset_path("map/terrain.png")
             
             self.renderer = MapRenderer(
@@ -54,6 +55,8 @@ class GameView(BaseImGuiView):
                 map_img_path=map_path,
                 terrain_img_path=terrain_path
             )
+            self.renderer.set_overlay_style(enabled=True, opacity=0.90)
+            self.window.shared_renderer = self.renderer
 
         # Legacy 2D camera (kept for safety, though unused by 3D globe)
         self.world_cam = arcade.Camera2D()

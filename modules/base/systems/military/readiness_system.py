@@ -7,6 +7,7 @@ from typing import Any
 import polars as pl
 
 from modules.base.systems.politics.political_effect_policy import aggregate_political_effects
+from modules.base.systems.military.authority_policy import player_controls_country
 from modules.base.systems.military.readiness_policy import (
     READINESS_FORTIFIED,
     READINESS_PARKED,
@@ -47,6 +48,7 @@ PENDING_SCHEMA: dict[str, pl.DataType] = {
     "order_type": pl.Utf8, "target_region_id": pl.Int32,
     "target_latitude": pl.Float64, "target_longitude": pl.Float64,
     "target_unit_id": pl.Utf8, "via_region_ids": pl.List(pl.Int32),
+    "has_custom_destination": pl.Boolean, "is_naval_invasion": pl.Boolean,
     "created_at_minute": pl.Int64, "status": pl.Utf8,
 }
 
@@ -75,6 +77,19 @@ class ReadinessSystem(ISystem):
         return ["base.time", "base.diplomacy"]
 
     def update(self, state: GameState, delta_time: float) -> None:
+        if UNITS_TABLE not in state.tables or "id" not in state.tables[UNITS_TABLE].columns:
+            # A missing or unidentifiable snapshot is not an empty army; do not
+            # discard saved orders when their unit identities cannot be checked.
+            for action in state.current_actions:
+                if isinstance(action, ActionSetUnitReadiness):
+                    state.journal.append_command_result({
+                        "tick": int(state.globals.get("tick", 0)),
+                        "player_id": str(action.player_id),
+                        "action_type": type(action).__name__,
+                        "status": "rejected", "reason": "Unit data is unavailable.",
+                        "unit_id": str(action.unit_id),
+                    })
+            return
         units = self._ensure_units(state.tables.get(UNITS_TABLE))
         transitions = self._ensure_transitions(state.tables.get(TRANSITIONS_TABLE))
         now = int(state.time.total_minutes)
@@ -85,15 +100,43 @@ class ReadinessSystem(ISystem):
             if not isinstance(action, ActionSetUnitReadiness):
                 continue
             self._request_transition(state, units, transitions, action, now)
+            # Each request can replace both tables; subsequent requests in the
+            # same tick must see those changes instead of overwriting them.
+            units = self._ensure_units(state.tables.get(UNITS_TABLE))
+            transitions = self._ensure_transitions(state.tables.get(TRANSITIONS_TABLE))
 
         # A request may have materialized or replaced a transition table row.
         # Reload it before advancing progress so the command is visible in the
         # same server tick and is not overwritten by the stale local frame.
         transitions = self._ensure_transitions(state.tables.get(TRANSITIONS_TABLE))
         units = self._ensure_units(state.tables.get(UNITS_TABLE))
+        transitions = self._remove_orphaned_orders(state, units, transitions)
         updated_units, updated_transitions = self._advance_transitions(state, units, transitions, now)
         self._update_table_if_changed(state, UNITS_TABLE, updated_units)
         self._update_table_if_changed(state, TRANSITIONS_TABLE, updated_transitions)
+
+    def _remove_orphaned_orders(
+        self, state: GameState, units: pl.DataFrame, transitions: pl.DataFrame,
+    ) -> pl.DataFrame:
+        unit_ids = set(units.get_column("id").cast(pl.Utf8).to_list())
+        pending = state.tables.get(PENDING_TABLE)
+        if pending is not None and not pending.is_empty() and "unit_id" in pending.columns:
+            orphaned = pending.filter(~pl.col("unit_id").cast(pl.Utf8).is_in(list(unit_ids)))
+            for order in orphaned.iter_rows(named=True):
+                action_type = {"move": "ActionMoveUnit", "attack": "ActionAttackUnit"}.get(str(order.get("order_type") or ""))
+                if action_type and order.get("player_id"):
+                    # Disbanded units cannot finish their queued orders; inform the issuer.
+                    state.journal.append_command_result({
+                        "tick": int(state.globals.get("tick", 0)),
+                        "player_id": str(order["player_id"]),
+                        "action_type": action_type,
+                        "status": "rejected",
+                        "reason": "The queued order was cancelled because the unit no longer exists.",
+                        "unit_id": str(order.get("unit_id") or ""),
+                    })
+            if not orphaned.is_empty():
+                state.update_table(PENDING_TABLE, pending.filter(pl.col("unit_id").cast(pl.Utf8).is_in(list(unit_ids))))
+        return transitions.filter(pl.col("unit_id").cast(pl.Utf8).is_in(list(unit_ids)))
 
     def _advance_transitions(
         self,
@@ -301,7 +344,8 @@ class ReadinessSystem(ISystem):
             READINESS_READY,
             transition.stage,
             now,
-            transition.duration_minutes,
+            # Orders and explicit posture requests use the same national modifiers.
+            self._transition_duration_for_owner(state, str(unit.get("owner") or ""), transition.duration_minutes),
         )
         transition_row["pending_order_id"] = str(pending_order_id or "")
         updated_transitions = pl.concat(
@@ -364,20 +408,49 @@ class ReadinessSystem(ISystem):
         state.update_table(TRANSITIONS_TABLE, remaining)
         pending = state.tables.get(PENDING_TABLE)
         if pending is not None and not pending.is_empty() and "unit_id" in pending.columns:
+            if reason not in {"replaced", "order_posture_release"}:
+                for order in pending.filter(pl.col("unit_id") == unit_key).iter_rows(named=True):
+                    order_type = str(order.get("order_type") or "")
+                    action_type = {"move": "ActionMoveUnit", "attack": "ActionAttackUnit"}.get(order_type)
+                    if action_type and order.get("player_id"):
+                        state.journal.append_command_result({
+                            "tick": int(state.globals.get("tick", 0)),
+                            "player_id": str(order["player_id"]),
+                            "action_type": action_type,
+                            "status": "rejected",
+                            "reason": "The queued order was cancelled because the unit entered combat."
+                            if reason == "combat_contact" else f"The queued order was cancelled: {reason}.",
+                            "unit_id": unit_key,
+                        })
             state.update_table(PENDING_TABLE, pending.filter(pl.col("unit_id") != str(unit_id)))
 
     def _request_transition(self, state: GameState, units: pl.DataFrame, transitions: pl.DataFrame, action: ActionSetUnitReadiness, now: int) -> None:
         if str(action.target_status or "").strip().lower() not in READINESS_STATUSES:
+            # A transport acknowledgement must not silently hide an invalid posture.
+            state.journal.append_command_result({
+                "tick": int(state.globals.get("tick", 0)),
+                "player_id": str(action.player_id or ""),
+                "action_type": type(action).__name__,
+                "status": "rejected",
+                "reason": "The requested unit readiness posture is invalid.",
+                "unit_id": str(action.unit_id),
+            })
             return
         unit_key = str(action.unit_id)
         unit_rows = units.filter(pl.col("id") == unit_key).head(1).to_dicts()
         unit = unit_rows[0] if unit_rows else None
         actor_id = str(action.player_id or "").strip()
         owner_id = str(unit.get("owner") or "").strip() if unit is not None else ""
-        if unit is None or (
-            actor_id not in {owner_id, "server", "local_player", "local_admin"}
-            and actor_id.casefold() != owner_id.casefold()
-        ):
+        if unit is None or not player_controls_country(state, actor_id, owner_id):
+            # Use the same authority rules as movement and attack orders.
+            state.journal.append_command_result({
+                "tick": int(state.globals.get("tick", 0)),
+                "player_id": actor_id,
+                "action_type": type(action).__name__,
+                "status": "rejected",
+                "reason": "The selected unit is unavailable or is not controlled by the actor.",
+                "unit_id": unit_key,
+            })
             return
         current = self._policy.normalize(unit.get("readiness_status"))
         target = self._policy.normalize(action.target_status)
@@ -490,10 +563,14 @@ class ReadinessSystem(ISystem):
         if pending is None or pending.is_empty() or not {"unit_id", "status"}.issubset(pending.columns):
             return
         indexed = pending.with_row_index("_pending_row_order")
-        selected = indexed.filter(
+        eligible = indexed.filter(
             (pl.col("unit_id").cast(pl.Utf8) == unit_id)
             & pl.col("status").cast(pl.Utf8).fill_null("").replace("", "queued").eq("queued")
-        ).head(1)
+        )
+        if pending_order_id and "id" in eligible.columns:
+            # A completed transition must not release a newer replacement order.
+            eligible = eligible.filter(pl.col("id").cast(pl.Utf8) == str(pending_order_id))
+        selected = eligible.head(1)
         if selected.is_empty():
             return
         row_order = int(selected.get_column("_pending_row_order")[0])
@@ -501,14 +578,31 @@ class ReadinessSystem(ISystem):
         order_type = str(released.get("order_type") or "")
         player_id = str(released.get("player_id") or "server")
         if order_type == "move":
-            state.current_actions.append(ActionMoveUnit(
+            # Older saves have no presence flag and historically stored coordinates as floats.
+            custom_destination = released.get("has_custom_destination")
+            if custom_destination is None:
+                custom_destination = True
+            # Released orders predate commands received in this tick. Keep the
+            # new command last so movement arbitration honors the player's latest intent.
+            state.current_actions.insert(0, ActionMoveUnit(
                 player_id, unit_id, int(released.get("target_region_id") or 0),
-                float(released.get("target_latitude") or 0.0), float(released.get("target_longitude") or 0.0),
+                float(released.get("target_latitude") or 0.0) if custom_destination else None,
+                float(released.get("target_longitude") or 0.0) if custom_destination else None,
                 list(released.get("via_region_ids") or []),
+                bool(released.get("is_naval_invasion", False)),
             ))
         elif order_type == "attack":
             from src.shared.actions import ActionAttackUnit
-            state.current_actions.append(ActionAttackUnit(player_id, unit_id, str(released.get("target_unit_id") or "")))
+            state.current_actions.insert(0, ActionAttackUnit(player_id, unit_id, str(released.get("target_unit_id") or "")))
+        else:
+            state.journal.append_command_result({
+                "tick": int(state.globals.get("tick", 0)),
+                "player_id": player_id,
+                "action_type": "UnitOrder",
+                "status": "rejected",
+                "reason": f"The queued unit order has an unknown type: {order_type or 'empty'}.",
+                "unit_id": unit_id,
+            })
         remaining = indexed.filter(pl.col("_pending_row_order") != row_order).drop("_pending_row_order")
         state.update_table(PENDING_TABLE, remaining)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 
 from imgui_bundle import icons_fontawesome_6
 from src.client.ui.core.instrumented_imgui import imgui
@@ -245,6 +246,21 @@ class NewsPanel:
         if client is None:
             return
 
+        actor = str(client.player_id or "")
+        permissions = state.globals.get("command_permissions")
+        can_edit = actor == str(state.globals.get("scenario_admin_id", "local_player")) or (
+            isinstance(permissions, Mapping) and permissions.get(actor) == "*"
+        )
+        if not can_edit:
+            imgui.text_disabled("Only the scenario administrator may change event controls.")
+        imgui.begin_disabled(not can_edit)
+        try:
+            NewsPanel._render_event_control_buttons(state, client)
+        finally:
+            imgui.end_disabled()
+
+    @staticmethod
+    def _render_event_control_buttons(state, client) -> None:
         enabled = NewsPanel._read_bool(state.globals.get("random_events_enabled"), True)
         if imgui.button(
             f"Random events: {'ON' if enabled else 'OFF'}",

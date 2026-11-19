@@ -28,6 +28,7 @@ from src.shared.actions import (
 from src.shared.military_constants import (
     MAX_PRODUCTION_QUEUE_ORDERS,
     MAX_UNIT_PRODUCTION_QUANTITY,
+    production_order_occupies_queue,
 )
 from src.shared.mod_api import ClientPresentationKeys
 
@@ -70,6 +71,7 @@ class UnitProductionPanel:
         self._quantity = 50
         self._quantity_repeat = GMLValueRepeatPair()
         self._build_priority_index = 0
+        self._production_speed_index = 0
         self._right_page = "queue"
         self._queue_priority_overrides: dict[str, int] = {}
 
@@ -316,8 +318,8 @@ class UnitProductionPanel:
         ui: GMLWidgets,
         context: PanelRenderContext,
     ) -> None:
-        initial_production_eta_days = contribution_for(
-            state, ClientPresentationKeys.INITIAL_PRODUCTION_ETA_DAYS,
+        production_order_quote = contribution_for(
+            state, ClientPresentationKeys.PRODUCTION_ORDER_QUOTE,
         )
         name = str(
             (design or {}).get("display_name")
@@ -357,18 +359,20 @@ class UnitProductionPanel:
 
         ui.text("frmDesignList/frmInfo/lblSpeed", "SPEED")
         speed_slot = "frmDesignList/frmInfo/cboSpeed"
-        imgui.begin_disabled(True)
-        imgui.combo(
+        imgui.begin_disabled(not priority_enabled)
+        speed_changed, speed_index = imgui.combo(
             "##unit-production-speed",
-            0,
+            self._production_speed_index if not is_foreign_builder else 0,
             ["NORMAL", "FAST"],
             test_id="unit_production.speed",
             gml_id=ui.path(speed_slot),
         )
         imgui.end_disabled()
+        if speed_changed and priority_enabled:
+            self._production_speed_index = max(0, min(1, speed_index))
         if imgui.is_item_hovered(imgui.HoveredFlags_.allow_when_disabled):
             imgui.set_tooltip(
-                "REFERENCE supports a Fast option, but OpenPower's production action has no speed field."
+                "Domestic FAST production: 50% more cash, 25% less factory work. Foreign orders use seller terms."
             )
 
         if class_name == "infantry":
@@ -429,19 +433,22 @@ class UnitProductionPanel:
             )
             ui.text_at(slot, glyph, offset=(-1.0, -3.0), max_width=10.0)
 
-        total_cost = unit_cost * max(0, self._quantity)
+        production_speed = "fast" if self._production_speed_index and not is_foreign_builder else "normal"
+        quote = production_order_quote(unit_cost, self._quantity,
+                                       _BUILD_PRIORITY_VALUES[self._build_priority_index], production_speed)
+        total_cost = quote.total_cost
         ui.text("frmDesignList/frmCost/lblTotalCost", "TOTAL COST")
         ui.text(
             "frmDesignList/frmCost/txtTotalCost",
             self._format_money(total_cost) if design else "—",
             tooltip=(
-                f"Unit cost {self._format_money(unit_cost)} × {self._quantity}."
+                f"Unit cost {self._format_money(quote.unit_cost)} × {self._quantity} ({production_speed})."
                 if design else None
             ),
         )
         ui.text("frmDesignList/frmEta/lblEta", "ETA")
         if design is not None and not is_foreign_builder:
-            eta_text = f"{initial_production_eta_days(_BUILD_PRIORITY_VALUES[self._build_priority_index])}d"
+            eta_text = f"{quote.initial_eta_days}d"
             eta_tooltip = (
                 "Initial ETA from the domestic production action's selected priority. "
                 "Capacity allocation will recalculate it during simulation."
@@ -460,7 +467,9 @@ class UnitProductionPanel:
         )
 
         seller_accepts = foreign_design
-        production_order_count = len(self._presenter.production_orders_for_country(state, country_tag))
+        # Historical deliveries must not permanently fill the production queue.
+        production_order_count = sum(production_order_occupies_queue(order.get("status"))
+                                     for order in self._presenter.production_orders_for_country(state, country_tag))
         production_queue_full = production_order_count >= MAX_PRODUCTION_QUEUE_ORDERS
         can_build = bool(
             design
@@ -510,6 +519,7 @@ class UnitProductionPanel:
                     str(design.get("id") or ""),
                     self._quantity,
                     _BUILD_PRIORITY_VALUES[self._build_priority_index],
+                    production_speed=production_speed,
                 ))
 
     def _advance_quantity_stepper(
@@ -707,7 +717,7 @@ class UnitProductionPanel:
             )
             row_ui.text(
                 "txtUnit", design_name,
-                tooltip=design_name,
+                tooltip=f"{design_name}\nProduction: {str(order.get('production_speed') or 'normal').upper()}",
                 test_id=f"unit_production.queue.design.{order_id}",
             )
             row_ui.text("txtCodeFrom", country_code)

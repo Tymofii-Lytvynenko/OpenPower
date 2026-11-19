@@ -1,0 +1,11 @@
+{
+  "indicator": "NGDPD",
+  "release": "World Economic Outlook, October 2026",
+  "scenario_year_filter": 2001,
+  "url": "https://www.imf.org/external/datamapper/api/v2/NGDPD?periods=2001",
+  "country_catalog_url": "https://www.imf.org/external/datamapper/api/v2/countries",
+  "label": "GDP, current prices",
+  "unit": "Billions of U.S. dollars",
+  "source_last_modified": "2026-10-08 14:43:33",
+  "sha256": "baf886cc2d5b29bcd39977859cd5c02a74311e021fcaf7aa63a7befde21534d1"
+}

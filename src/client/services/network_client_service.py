@@ -1,6 +1,7 @@
 from dataclasses import replace
 from typing import TYPE_CHECKING
 from src.shared.actions import GameAction
+from src.shared.commands import LOCAL_SESSION_ACTOR_ID
 
 if TYPE_CHECKING:
     from src.shared.protocols import SessionPort
@@ -16,12 +17,16 @@ class NetworkClient:
     def __init__(self, session: "SessionPort"):
         self.session = session
         # In a real networked game, this ID comes from the handshake
-        self.player_id = "local_admin" 
+        self.player_id = LOCAL_SESSION_ACTOR_ID
 
     def get_system_errors(self) -> list:
         if hasattr(self.session, "system_errors"):
             return self.session.system_errors
         return []
+
+    def simulation_has_stopped(self) -> bool:
+        process = getattr(self.session, "process", None)
+        return isinstance(getattr(process, "exitcode", None), int)
 
     def clear_system_errors(self) -> None:
         if hasattr(self.session, "system_errors"):

@@ -374,6 +374,25 @@ def test_design_details_queues_domestic_order_and_updates_quantity(monkeypatch):
     assert any(call[0] == "tooltip" for call in fake_imgui.calls)
 
 
+def test_fast_selection_quotes_the_same_cost_as_the_dispatched_order(monkeypatch):
+    fake_imgui = FakeImGui(combo_results=[(False, 0), (True, 1)], input_result=(False, "2"))
+    monkeypatch.setattr(production_module, "imgui", fake_imgui)
+    panel = UnitProductionPanel()
+    panel._selected_builder_country = "USA"
+    panel._quantity = 2
+    panel._presenter = Mock()
+    panel._presenter.production_orders_for_country.return_value = []
+    client = Client()
+    ui = FakeUI(button_ids={"unit_production.build"})
+    panel._render_design_details(
+        client_state(tables={}), {"id": "D1", "class_name": "artillery", "cost": 100},
+        "USA", ui, PanelRenderContext(target_tag="USA", is_own_country=True, net_client=client),
+    )
+    assert client.actions[0].production_speed == "fast"
+    cost_calls = [call for call in ui.calls if call[0] == "text" and call[1][0].endswith("txtTotalCost")]
+    assert cost_calls[0][1][1] == panel._format_money(300.0)
+
+
 def test_design_details_without_selection_shows_build_hint_and_sends_nothing(monkeypatch):
     monkeypatch.setattr(production_module, "imgui", FakeImGui())
     panel = UnitProductionPanel()

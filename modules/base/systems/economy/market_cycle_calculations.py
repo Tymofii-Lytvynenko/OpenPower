@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import polars as pl
 
+from modules.base.systems.economy.resource_market_policy import (
+    apply_trade_targets,
+    remaining_market_stock,
+)
 from src.shared.numeric import stable_group_sums, stable_sum
 from src.shared.state import GameState
 
@@ -45,18 +49,7 @@ class MarketBalanceCalculator:
                 "local_supply"
             )
         )
-        market = market.with_columns(
-            [
-                pl.when(pl.col("local_supply") >= pl.col("demand"))
-                .then(pl.col("local_supply") - pl.col("demand"))
-                .otherwise(0.0)
-                .alias("export_desired"),
-                pl.when(pl.col("demand") > pl.col("local_supply"))
-                .then(pl.col("demand") - pl.col("local_supply"))
-                .otherwise(0.0)
-                .alias("import_desired"),
-            ]
-        )
+        market = apply_trade_targets(market)
         market = market.with_columns(
             (pl.col("import_desired") * pl.col("_economic_trade_modifier")).alias(
                 "affordable_import"
@@ -89,10 +82,12 @@ class MarketBalanceCalculator:
                 )
                 .otherwise(0.0)
             ).alias("export_actual"),
-            (pl.col("tax_rate") + 0.02).alias("total_tax"),
+            (pl.col("tax_rate") + (pl.col("_global_resource_tax_modifier")
+                if "_global_resource_tax_modifier" in market.collect_schema().names()
+                else pl.lit(0.02))).clip(0.0, 1.0).alias("total_tax"),
         )
 
-        unsold_amount = pl.col("export_desired") - pl.col("export_actual")
+        unsold_amount = remaining_market_stock()
         new_stock_amount = (
             pl.when(pl.col("is_storable"))
             .then(unsold_amount * (1.0 - pl.col("decay_rate") * fraction))
@@ -166,8 +161,9 @@ class ConstrainedMarketReconciler:
             base_production.alias("base_domestic_production")
         )
         reconciled = reconciled.with_columns(
-            (pl.col("export_desired") - pl.col("export_actual"))
-            .clip(0.0, None)
+            (remaining_market_stock() if {"local_supply", "demand"}.issubset(reconciled.columns)
+             # Older aggregate-only callers provide offered exports without a complete local balance.
+             else (pl.col("export_desired") - pl.col("export_actual")).clip(lower_bound=0.0))
             .alias("unsold_amount")
         )
         reconciled = reconciled.with_columns(

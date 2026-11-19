@@ -13,6 +13,7 @@ from src.shared.migrations import SAVE_FORMAT_VERSION
 from src.shared.state import GameState, persistent_state_field_names, persistent_state_fields
 from src.core.saves import (
     list_available_saves,
+    missing_checkpoint_tables,
     save_backup_path,
     validate_save_name,
 )
@@ -30,7 +31,6 @@ class SaveWriter:
     def __init__(self, config: GameConfig):
         self.config = config
         self.save_root = config.project_root / "user_data" / "saves"
-        self.save_root.mkdir(parents=True, exist_ok=True)
 
     def save_game(self, state: GameState, save_name: str) -> bool:
         """
@@ -50,6 +50,8 @@ class SaveWriter:
         print(f"[SaveWriter] Saving '{safe_name}'...")
 
         try:
+            # Directory creation can fail too. Keep it inside the save failure boundary.
+            self.save_root.mkdir(parents=True, exist_ok=True)
             # Stage on the same filesystem so the final directory rename is atomic.
             temp_path = Path(tempfile.mkdtemp(prefix=f".{safe_name}.tmp-", dir=self.save_root))
             self._write_state_to_disk(state, temp_path)
@@ -71,6 +73,27 @@ class SaveWriter:
 
     @staticmethod
     def _commit_staged_save(temp_path: Path, target_path: Path, backup_path: Path) -> None:
+        def complete_generation(path: Path) -> bool:
+            try:
+                metadata = orjson.loads((path / "meta.json").read_bytes())
+                return isinstance(metadata, dict) and not missing_checkpoint_tables(path, metadata)
+            except (OSError, ValueError, TypeError):
+                return False
+
+        if (
+            complete_generation(backup_path)
+            and target_path.exists()
+            and not complete_generation(target_path)
+        ):
+            # A primary with metadata can still be incomplete. Preserve the
+            # recoverable backup until its replacement is safely installed.
+            with tempfile.TemporaryDirectory(
+                prefix=".incomplete-save-", dir=target_path.parent, ignore_cleanup_errors=True
+            ) as quarantine:
+                target_path.rename(Path(quarantine) / "slot")
+                temp_path.rename(target_path)
+            return
+
         if backup_path.exists():
             if target_path.exists():
                 shutil.rmtree(backup_path)
@@ -95,6 +118,7 @@ class SaveWriter:
         meta_data = {
             "version": SAVE_FORMAT_VERSION,
             "timestamp": datetime.now().isoformat(),
+            "active_mods": list(self.config.active_mods),
             "schema_versions": (
                 state.schema_registry.versions() if state.schema_registry is not None else {}
             ),
@@ -111,9 +135,12 @@ class SaveWriter:
                 value.write_parquet(path / f"{key}.parquet")
 
             # Strategy B: Dict[str, DataFrame] -> Folder of Parquets
-            elif isinstance(value, dict) and value and isinstance(next(iter(value.values())), pl.DataFrame):
+            elif isinstance(value, dict) and (key == "tables" or (value and isinstance(next(iter(value.values())), pl.DataFrame))):
                 sub_dir = path / key
                 sub_dir.mkdir(exist_ok=True)
+                # Record expected tables so an incomplete checkpoint cannot load
+                # as a seemingly valid but empty or partially populated world.
+                meta_data.setdefault("dataframe_dict_members", {})[key] = sorted(value)
                 for tbl_name, df in value.items():
                     df.write_parquet(sub_dir / f"{tbl_name}.parquet")
 

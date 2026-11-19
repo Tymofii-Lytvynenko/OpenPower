@@ -144,6 +144,11 @@ class BattleRegionProcessor:
 
         conflict = request.wars.active_battle_for_region(present_owners)
         if conflict is None:
+            # A peace settlement or departure of the opposing force ends contact;
+            # stale engagement modes otherwise keep stationary units locked in combat.
+            for unit in local_units:
+                if str(unit.get("engagement_mode") or "").lower() in {"assault", "positional"}:
+                    unit["engagement_mode"] = ""
             result.occupation_rows = self._occupation_policy.update_uncontested_region(
                 region_id,
                 region_row,

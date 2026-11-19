@@ -20,9 +20,9 @@
 
 **Independent Test**: Start with a playable country and no scenario id; confirm the session reaches the game view with the selected player context and no campaign/objective row requirement.
 
-- [ ] T002 [P] [US1] Add no-scenario launch and startup-failure cases in `tests/test_new_game_view_coverage.py` and `tests/test_freeplay_start_task.py`.
-- [ ] T003 [US1] Create `src/client/ui/components/shared/freeplay_setup_window.py` from existing country and party selection components, then make it the direct default route in `src/client/views/new_game_view.py`; keep `SinglePlayerSetupWindow` for optional scenario setup.
-- [ ] T004 [US1] Implement `src/client/tasks/freeplay_start_task.py` using the shared operations in `src/client/tasks/session_startup.py`; report readiness from the initial authoritative world/player context, without `ActionStartCampaign` or a `campaigns` row, and preserve cancellation cleanup.
+- [X] T002 [P] [US1] Add no-scenario launch and startup-failure cases in `tests/test_new_game_view_coverage.py` and `tests/test_freeplay_start_task.py`.
+- [X] T003 [US1] Create `src/client/ui/components/shared/freeplay_setup_window.py` from existing country and party selection components, then make it the direct default route in `src/client/views/new_game_view.py`; keep `SinglePlayerSetupWindow` for optional scenario setup.
+- [X] T004 [US1] Implement `src/client/tasks/freeplay_start_task.py` using the shared operations in `src/client/tasks/session_startup.py`; report readiness from the initial authoritative world/player context, without `ActionStartCampaign` or a `campaigns` row, and preserve cancellation cleanup.
 
 ---
 
@@ -32,11 +32,11 @@
 
 **Independent Test**: Advance/pause time, perform one valid action in each core domain, and confirm the owning authoritative state changes; reject one invalid action and confirm its reason is visible.
 
-- [ ] T005 [P] [US2] Add deterministic session coverage for pause/speed, continued AI/world/event and scheduled demographic updates without campaign outcomes, and authoritative consequences of `ActionSetTax`, `ActionSetGovernmentForm`, `ActionMoveUnit`, and `ActionCreateTreaty` in `tests/test_freeplay_core_loop.py`.
-- [ ] T006 [P] [US2] Register a freeplay UI surface and deterministic fixture/journey in `src/client/ui/testing/catalog.py`, `tests/ui/fixtures/freeplay_core_loop.json`, and `tests/ui/journeys/freeplay_core_loop.json`; assert displayed date, pause/speed action dispatch, core-panel action dispatch, report status, and artifact paths.
-- [ ] T007 [US2] Trace and close any demonstrated economy or politics action gaps through `src/client/ui/layouts/game_panel_registry.py`, `src/client/ui/panels/economic_health_panel.py`, `src/client/ui/panels/politics/constitutional_form_panel.py`, `modules/base/systems/economy/economic_health_system.py`, and `modules/base/systems/politics/political_lifecycle_system.py`.
-- [ ] T008 [US2] Trace and close any demonstrated military or diplomacy action gaps through `src/client/controllers/unit_interaction_controller.py`, `src/client/ui/panels/politics/treaty_editor_live.py`, `modules/base/systems/military/military_system.py`, and `modules/base/systems/world/treaty_diplomacy.py`.
-- [ ] T009 [US2] Add accepted/rejected command and movement-order notice coverage, including actor filtering so AI-owned results do not appear as player errors, in `tests/test_command_feedback.py` and `tests/test_unit_order_feedback.py`; correct only proven presentation gaps in `src/client/ui/components/shared/command_feedback.py` and `src/client/ui/components/shared/unit_order_feedback.py`.
+- [X] T005 [P] [US2] Add deterministic session coverage for pause/speed, continued AI/world/event and scheduled demographic updates without campaign outcomes, and authoritative consequences of `ActionSetTax`, `ActionSetGovernmentForm`, `ActionMoveUnit`, and `ActionCreateTreaty` in `tests/test_freeplay_core_loop.py`.
+- [X] T006 [P] [US2] Register a freeplay UI surface and deterministic fixture/journey in `src/client/ui/testing/catalog.py`, `tests/ui/fixtures/freeplay_core_loop.json`, and `tests/ui/journeys/freeplay_core_loop.json`; assert displayed date, pause/speed action dispatch, core-panel action dispatch, report status, and artifact paths.
+- [X] T007 [US2] Trace and close any demonstrated economy or politics action gaps through `src/client/ui/layouts/game_panel_registry.py`, `src/client/ui/panels/economic_health_panel.py`, `src/client/ui/panels/politics/constitutional_form_panel.py`, `modules/base/systems/economy/economic_health_system.py`, and `modules/base/systems/politics/political_lifecycle_system.py`.
+- [X] T008 [US2] Trace and close any demonstrated military or diplomacy action gaps through `src/client/controllers/unit_interaction_controller.py`, `src/client/ui/panels/politics/treaty_editor_live.py`, `modules/base/systems/military/military_system.py`, and `modules/base/systems/world/treaty_diplomacy.py`.
+- [X] T009 [US2] Add accepted/rejected command and movement-order notice coverage, including actor filtering so AI-owned results do not appear as player errors, in `tests/test_command_feedback.py` and `tests/test_unit_order_feedback.py`; correct only proven presentation gaps in `src/client/ui/components/shared/command_feedback.py` and `src/client/ui/components/shared/unit_order_feedback.py`.
 
 ---
 
@@ -46,8 +46,8 @@
 
 **Independent Test**: Save and load a freeplay session with no campaign data; compare player country, date, tax policy, and a pending unit-movement order.
 
-- [ ] T010 [P] [US3] Add freeplay save/load continuation coverage without campaign metadata in `tests/test_freeplay_save_load.py`.
-- [ ] T011 [US3] Fix only persistence gaps demonstrated by T010 in `src/server/io/save_writer.py`, `src/server/io/data_load_manager.py`, or the owning session restore path; preserve legacy saves that do contain campaign data.
+- [X] T010 [P] [US3] Add freeplay save/load continuation coverage without campaign metadata in `tests/test_freeplay_save_load.py`.
+- [X] T011 [US3] Fix only persistence gaps demonstrated by T010 in `src/server/io/save_writer.py`, `src/server/io/data_load_manager.py`, or the owning session restore path; preserve legacy saves that do contain campaign data.
 
 ---
 
@@ -57,8 +57,8 @@
 
 **Independent Test**: Run the registered UI journey for direct freeplay setup, central time controls, representative gameplay panels, command feedback, and save/load affordances; assert success and the expected report/screenshot artifacts.
 
-- [ ] T012 [US4] Use automated journey output to fix confirmed navigation/discoverability issues in `src/client/ui/layouts/game_layout.py`, `src/client/ui/layouts/game_panel_registry.py`, and `src/client/ui/components/hud/central_bar.py`; keep each panel composed through its existing owner.
-- [ ] T013 [US4] Run the focused launch, core-loop, persistence, and UI journey commands from `specs/122-freeplay-core-loop-and-system-polish/quickstart.md`, then record exact commands, exit codes, and artifact paths in `specs/122-freeplay-core-loop-and-system-polish/research.md`.
+- [X] T012 [US4] Use automated journey output to fix confirmed navigation/discoverability issues in `src/client/ui/layouts/game_layout.py`, `src/client/ui/layouts/game_panel_registry.py`, and `src/client/ui/components/hud/central_bar.py`; keep each panel composed through its existing owner.
+- [X] T013 [US4] Run the focused launch, core-loop, persistence, and UI journey commands from `specs/122-freeplay-core-loop-and-system-polish/quickstart.md`, then record exact commands, exit codes, and artifact paths in `specs/122-freeplay-core-loop-and-system-polish/research.md`.
 
 ---
 

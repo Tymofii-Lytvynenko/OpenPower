@@ -1,0 +1,88 @@
+{
+  "data_year": 2001,
+  "data_file": "country_election_results_2001.tsv",
+  "data_sha256": "8fc311ef63453182e46fac8d0c524c4009a6df5f3642566c7ac15bbd5008a393",
+  "runtime_file": "modules/base/data/world/country_election_results.toml",
+  "runtime_sha256": "d67416b2612b051fa264f25e1515b3dee76318bd48a917d2fd18e569b9dbe8ba",
+  "record_count": 128,
+  "event_counts": {
+    "BGD_2001_parliamentary": 55,
+    "DNK_2001_folketing": 11,
+    "KOS_2001_assembly": 26,
+    "MNE_2001_parliamentary": 16,
+    "SRB_2000_assembly": 8,
+    "TLS_2001_constituent_assembly": 12
+  },
+  "events": {
+    "BGD_2001_parliamentary": {
+      "country_id": "BGD",
+      "election_date": "2001-10-01",
+      "additional_election_date": "",
+      "result_date": "",
+      "source_name": "Bangladesh Election Commission",
+      "source_reference": "Bangladesh Election Commission, Report on the Conduct of the Parliament Election 2001, “Share of Votes by Party,” pages 6–8.",
+      "source_url": "https://www.ecs.gov.bd/files/WqafvkDhpbk4kb1MV6PNWIHvIngSvbLWrVIhVxEK.pdf",
+      "record_count": 55
+    },
+    "DNK_2001_folketing": {
+      "country_id": "DNK",
+      "election_date": "2001-11-20",
+      "additional_election_date": "",
+      "result_date": "",
+      "source_name": "Danish Ministry of the Interior and Health",
+      "source_reference": "Ministry of the Interior and Health, “Endelig opgørelse af folketingsvalget den 20. november 2001,” final count table.",
+      "source_url": "https://www.valg.im.dk/noegletal/folketingsvalg/tidligere-folketingsvalg/endelig-opgoerelse-af-folketingsvalget-den-20-november-2001",
+      "record_count": 11
+    },
+    "KOS_2001_assembly": {
+      "country_id": "KOS",
+      "election_date": "2001-11-17",
+      "additional_election_date": "",
+      "result_date": "2001-11-26",
+      "source_name": "OSCE Mission in Kosovo / Kosovo Central Election Commission",
+      "source_reference": "Kosovo Central Election Commission, certified results, Election 2001, “Political entity results,” page 1.",
+      "source_url": "https://omik.osce.org/sites/default/files/f/documents/6/4/20466.pdf",
+      "record_count": 26
+    },
+    "MNE_2001_parliamentary": {
+      "country_id": "MNE",
+      "election_date": "2001-04-22",
+      "additional_election_date": "",
+      "result_date": "2001-05-05",
+      "source_name": "OSCE/ODIHR",
+      "source_reference": "OSCE/ODIHR Election Observation Mission Report, Republic of Montenegro/FRY, parliamentary election of 22 April 2001, final-results table, page 18; final results released 5 May 2001.",
+      "source_url": "https://www.osce.org/files/f/documents/a/2/15168.pdf",
+      "record_count": 16
+    },
+    "SRB_2000_assembly": {
+      "country_id": "SRB",
+      "election_date": "2000-12-23",
+      "additional_election_date": "2001-01-10",
+      "result_date": "2001-01-12",
+      "source_name": "Republic Election Commission of Serbia",
+      "source_reference": "Republic Election Commission, Report on Total Results of Elections for Deputies to the National Assembly held on 23 December 2000 and 10 January 2001, adopted 12 January 2001, pages 1–2.",
+      "source_url": "https://arhiva.rik.parlament.gov.rs/doc/arhiva/poslanici/2000/2.%20izvestaj%20o%20ukupnim%20rezultatima%202000.pdf",
+      "record_count": 8
+    },
+    "TLS_2001_constituent_assembly": {
+      "country_id": "TLS",
+      "election_date": "2001-08-30",
+      "additional_election_date": "",
+      "result_date": "2001-09-06",
+      "source_name": "UNTAET Independent Electoral Commission",
+      "source_reference": "UNTAET, final results announced 6 September 2001 for the 30 August 2001 Constituent Assembly election, national-seat allocation.",
+      "source_url": "https://peacekeeping.un.org/sites/default/files/past/etimor/DB/db060901.htm",
+      "record_count": 12
+    }
+  },
+  "limitations": [
+    "Election outcomes are historical event records and are not party support, eligibility, or ruling-party status.",
+    "Bangladesh includes the Election Commission's 55 party/independent aggregate rows for the 300 directly elected seats; it excludes reserved women’s seats and does not state a separate result-declaration date in the cited table.",
+    "Kosovo contains all 26 entities in the certified result table; the aggregate result is 788,303 votes and 120 seats.",
+    "Montenegro percentages preserve the source's printed values; listed votes sum to 363,404 while the report states 366,152 votes cast, including invalid votes in threshold calculations.",
+    "Denmark includes the final aggregate count for Denmark proper: 175 Folketing seats and 103 nomination districts. Greenland's and the Faroe Islands' separately elected seats are outside the cited table; the ministry page does not separately date publication of the count.",
+    "East Timor contains the 12 national-list parties with allocated seats; the source gives percentages but no per-party vote counts, and 13 district seats are separate.",
+    "Serbia contains all eight lists in the RIK result report, including four with no mandates. Its final report covers polling on 23 December 2000 and 10 January 2001.",
+    "PSE 1996 is intentionally omitted because this ledger covers the four election events requested for the 2001 roster gap."
+  ]
+}

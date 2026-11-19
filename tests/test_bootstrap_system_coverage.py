@@ -15,7 +15,6 @@ def test_country_builders_return_empty_without_country_rows():
         system._build_country_governments,
         system._build_country_laws,
         system._build_messages,
-        system._build_objectives,
         system._build_research_tracks,
         system._build_unit_designs,
         system._build_strategic_weapons,

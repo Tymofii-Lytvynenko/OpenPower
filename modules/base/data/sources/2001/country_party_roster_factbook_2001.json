@@ -1,0 +1,101 @@
+{
+  "source": "United States Central Intelligence Agency, The World Factbook 2001",
+  "source_url": "https://www.gutenberg.org/ebooks/27638",
+  "source_text_url": "https://www.gutenberg.org/cache/epub/27638/pg27638.txt",
+  "source_file": "factbook.txt",
+  "source_sha256": "a7bef458e703ea2ac49188f57deb3fe137e50b5d3916f46ee34ec23c2374537d",
+  "data_year": 2001,
+  "source_vintage_note": "The Factbook says information generally available as of 1 January 2001 was used; this field gives no field-specific estimate year, vote share, or support share.",
+  "extracted_file": "country_party_roster_factbook_2001.tsv",
+  "extracted_file_sha256": "7d313fa09b581deada04af84e555e8f240abe2639b1c3b64ae3394af23971997",
+  "coverage_file": "country_party_roster_coverage_2001.tsv",
+  "coverage_file_sha256": "cb14484052085ae809d516c7863b2c4f0c0709e87eae2d6033b1748d8cd38828",
+  "runtime_file": "modules/base/data/world/country_party_roster_2001.toml",
+  "runtime_file_sha256": "584ca608c786ec52ea3d636beeda046cbfab135689609b7611274fc3455e17f4",
+  "coverage_runtime_file": "modules/base/data/world/country_party_roster_coverage_2001.toml",
+  "coverage_runtime_file_sha256": "afc11492ff31982fa3b2c1097190b7b1d82dd68feb5a0023babdf19874bc9dad",
+  "method": "Extract each country entry's Political parties and leaders field, normalize line wraps, split only on semicolons outside parentheses and leader brackets, and retain named entries with exact source text and leader wording. Descriptive notes are retained as source notes, not emitted as generic parties.",
+  "counts": {
+    "source_country_entries": 267,
+    "source_party_fields": 231,
+    "game_country_count": 209,
+    "game_countries_with_party_field": 197,
+    "game_countries_with_party_records": 197,
+    "party_record_count": 1405,
+    "uncovered_game_country_ids": [
+      "ATA",
+      "ESH",
+      "KOS",
+      "MAC",
+      "MNE",
+      "PSE",
+      "SHN",
+      "SRB",
+      "SSD",
+      "SXM",
+      "TLS",
+      "UMI"
+    ],
+    "uncovered_game_statuses": {
+      "no_separate_country_entry": [
+        "KOS",
+        "MAC",
+        "MNE",
+        "SHN",
+        "SRB",
+        "SSD",
+        "SXM",
+        "TLS",
+        "UMI"
+      ],
+      "party_field_not_reported": [
+        "ATA",
+        "ESH",
+        "PSE"
+      ]
+    },
+    "unmapped_source_countries_with_party_fields": [
+      "Falkland Islands (Islas Malvinas)",
+      "Macau",
+      "Man, Isle of",
+      "Netherlands Antilles",
+      "Pitcairn Islands",
+      "Reunion",
+      "Saint Helena",
+      "Virgin Islands"
+    ],
+    "non_game_source_countries_with_party_fields": [
+      "American Samoa",
+      "Aruba",
+      "British Virgin Islands",
+      "Cayman Islands",
+      "Christmas Island",
+      "Cocos (Keeling) Islands",
+      "Cook Islands",
+      "Faroe Islands",
+      "French Guiana",
+      "French Polynesia",
+      "Gibraltar",
+      "Guadeloupe",
+      "Guam",
+      "Guernsey",
+      "Hong Kong",
+      "Jersey",
+      "Martinique",
+      "Mayotte",
+      "New Caledonia",
+      "Niue",
+      "Norfolk Island",
+      "Northern Mariana Islands",
+      "Saint Pierre and Miquelon",
+      "Tokelau",
+      "Turks and Caicos Islands",
+      "Yugoslavia"
+    ]
+  },
+  "limitations": [
+    "The Factbook provides no consistent vote shares, support shares, or ruling-party indicator in this field.",
+    "The source states general information availability as of 1 January 2001; no field-specific estimate year is given.",
+    "Country entries without the field and countries without a separate Factbook entry are explicitly unavailable; no parent-country list is assigned to successor or territory records."
+  ]
+}

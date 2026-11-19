@@ -132,7 +132,10 @@ def test_compact_render_uses_gml_rows_and_keeps_details_for_notice_window(monkey
     assert view._details_row["identity_id"] == "en"
     assert client.actions[0].identity_id == "en"
     assert imgui.begin_table.called is False
-    assert imgui.text_disabled.called is False
+    assert any(
+        "Shares are gameplay estimates." in str(call.args[0])
+        for call in imgui.text_disabled.call_args_list
+    )
 
     opened = False
 

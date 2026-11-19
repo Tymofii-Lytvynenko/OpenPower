@@ -2,6 +2,13 @@
 
 This document tracks the progress of the Minimum Viable Product (MVP) features for the OpenPower engine.
 
+## First Playable Readiness — 2026-11-18
+
+- The direct no-scenario freeplay launch, representative time/economy/politics/military/diplomacy loop, rejection feedback, and freeplay save/resume are implemented and pass their local automated acceptance checks.
+- English is the accepted first-release language. Network multiplayer and editor work are outside the single-player First Playable scope.
+- Native map appearance and interaction, target-hardware/long-run performance, graphical module combinations, historical source-by-source fact checking, and participant-based visual acceptance still need external evidence.
+- See [the audit closure record](../../docs/first-playable-audit-closure.md) and [the detailed verification record](../../specs/122-freeplay-core-loop-and-system-polish/research.md).
+
 ## 🚦 System Status
 
 - [x] **Core Architecture**
@@ -28,17 +35,17 @@ This document tracks the progress of the Minimum Viable Product (MVP) features f
     - [x] **Budget:** National budget calculations with revenue and expense tracking.
     - [x] **Politics:** Basic stability drift from approval/corruption metrics.
     - [x] **Population:** Basic population tracking per region.
-    - [x] **Territory:** System entry point exists, but the mechanic is not yet substantively implemented.
+    - [x] **Territory:** Owner and controller changes are processed for annex, occupy, and set-owner actions; broader occupation and political-progression depth remains in progress.
     - [x] **AI:** Functional `DeclarativeAIFramework` using Polars lazy evaluation. Implements financial survival scoring and military ROI scoring. Produces `ActionUpdateBudget` and `ActionBuildUnit` intents every real second.
-    - [x] **Military:** Unit spawning and geo-coordinated movement are implemented. Combat resolution and occupation logic are not yet implemented.
-    - [ ] **Diplomacy:** Treaty and war data (`countries_treaties.toml`, `countries_wars.toml`) are loaded into state and displayed in UI panels. No simulation system processes diplomatic actions yet.
+    - [x] **Military:** Unit spawning, geo-coordinated movement, combat resolution, and occupation actions are implemented. Broader battle and campaign depth remains in progress.
+    - [x] **Diplomacy:** Registered systems process treaty proposals and lifecycle, treaty effects, war actions, and structured peace deals. Balancing and full gameplay coverage remain in progress.
 
 - [ ] **Upcoming Features (In Progress)**
     - [ ] **AI System:** Country-level strategic agents using a decision-making framework.
-    - [ ] **Diplomacy:** Formal treaties, trade agreements, and war/peace declarations.
+    - [ ] **Diplomacy:** Further balance treaty effects, trade agreements, and war/peace feedback across complete player flows.
     - [x] **Advanced Economy:** Trade network, consumption ledger, stockpiles, and budget flow are in place.
-    - [ ] **Headless Server:** Ability to run the simulation process without an OpenGL context.
-    - [ ] **Military:** Unit spawning, movement, and combat resolution.
+    - [x] **Headless Server:** The simulation runs in a separate server process without an OpenGL context.
+    - [ ] **Military:** Expand combat depth with more unit roles, logistics, frontlines, and battle strategy controls.
 
 ## 🎯 Target Milestones
 1.  **Milestone 1 (Stable Core):** Core simulation, IPC, loading, map rendering, economy, budget, politics, and population are functional in single-player. AI and military remain partial.

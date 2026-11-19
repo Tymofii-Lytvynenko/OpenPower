@@ -43,3 +43,8 @@ ROLE_ALIASES = {
 
 MAX_PRODUCTION_QUEUE_ORDERS = 50
 MAX_UNIT_PRODUCTION_QUANTITY = 1_000_000
+
+
+def production_order_occupies_queue(status: object) -> bool:
+    """Historical orders remain visible but no longer consume queue capacity."""
+    return str(status or "").strip().lower() not in {"delivered", "cancelled", "canceled", "failed", "rejected"}
