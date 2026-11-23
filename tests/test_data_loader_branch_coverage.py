@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from types import SimpleNamespace
@@ -21,6 +22,7 @@ def _loader(
 ) -> DataLoader:
     config = SimpleNamespace(
         project_root=project_root,
+        active_mods=["base"],
         get_data_dirs=lambda: list(data_dirs),
         get_asset_path=lambda _asset: asset_path or project_root / "missing.png",
     )
@@ -58,16 +60,36 @@ def test_load_save_restores_table_parquet_and_metadata(tmp_path: Path) -> None:
     save_dir = tmp_path / "user_data" / "saves" / "with-data"
     tables_dir = save_dir / "tables"
     tables_dir.mkdir(parents=True)
-    (save_dir / "meta.json").write_text('{"globals":{"tick":42}}', encoding="utf-8")
-    expected = pl.DataFrame({"id": ["AAA"]})
-    expected.write_parquet(tables_dir / "countries.parquet")
-    loader = _loader(tmp_path)
+    keys = {"country_id": ["AAA"], "game_resource_id": ["grain"]}
+    expected = {
+        "countries": pl.DataFrame({"id": ["AAA"]}),
+        "domestic_production": pl.DataFrame({**keys, "domestic_production": [74.0]}),
+        "regional_production": pl.DataFrame({
+            **keys, "id": ["AAA:1:grain"], "region_id": [1], "domestic_production": [80.0],
+        }),
+    }
+    (save_dir / "meta.json").write_text(json.dumps({
+        "globals": {"tick": 42},
+        "active_mods": ["base"],
+        "dataframe_dict_members": {"tables": list(expected)},
+    }), encoding="utf-8")
+    for table, frame in expected.items():
+        frame.write_parquet(tables_dir / f"{table}.parquet")
+
+    assets = tmp_path / "countries" / "countries_res"
+    assets.mkdir(parents=True)
+    (assets / "AAA.toml").write_text('[regional_resources."1"]\ngrain = 5\n', encoding="utf-8")
+    loader = _loader(tmp_path, tmp_path)
     loader.migrations = Mock()
 
-    state = loader.load_save("with-data")
+    # The market can change national output while regions retain their capacity estimates.
+    with patch.object(loader, "_load_regional_production", wraps=loader._load_regional_production) as load_regions:
+        state = loader.load_save("with-data")
+    load_regions.assert_not_called()
 
     assert state.globals["tick"] == 42
-    assert_frame_equal(state.get_table("countries"), expected)
+    for table, frame in expected.items():
+        assert_frame_equal(state.get_table(table), frame)
 
 
 def test_load_save_reads_and_defaults_top_level_dataframes(tmp_path: Path) -> None:
@@ -78,6 +100,7 @@ def test_load_save_reads_and_defaults_top_level_dataframes(tmp_path: Path) -> No
 
     save_dir = tmp_path / "user_data" / "saves" / "frame-save"
     save_dir.mkdir(parents=True)
+    (save_dir / "meta.json").write_text("{}", encoding="utf-8")
     snapshot_path = save_dir / "snapshot.parquet"
     snapshot_path.write_bytes(b"parquet placeholder")
     expected = pl.DataFrame({"value": [7]})
