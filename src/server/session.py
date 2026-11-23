@@ -254,7 +254,8 @@ class GameSession:
             step_result = self.engine.step(
                 self.state, [command.action for command in simulation_commands], float(delta_time)
             )
-        status = CommandStatus.EXECUTED if step_result.success else CommandStatus.FAILED
+        # A successful batch tick does not prove that each command changed state.
+        status = CommandStatus.PROCESSED if step_result.success else CommandStatus.FAILED
         failure_message = (
             step_result.failures[0].error_message if step_result.failures else ""
         )

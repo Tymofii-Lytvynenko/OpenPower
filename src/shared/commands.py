@@ -30,6 +30,7 @@ class CommandEnvelope:
 
 class CommandStatus(str, Enum):
     EXECUTED = "executed"
+    PROCESSED = "processed"
     REJECTED = "rejected"
     FAILED = "failed"
 

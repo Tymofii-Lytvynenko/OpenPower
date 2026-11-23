@@ -131,7 +131,7 @@ class TestHeadlessServer(unittest.TestCase):
                     f"results={proxy.state.journal.command_results[-3:] if proxy.state else None}"
                 ),
             )
-            self.assertEqual(command_result["status"], "executed")
+            self.assertEqual(command_result["status"], "processed")
             self.assertTrue(proxy.state.time.is_paused)
         finally:
             proxy.shutdown()

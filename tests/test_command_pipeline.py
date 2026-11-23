@@ -112,7 +112,7 @@ class TestCommandPipeline(unittest.TestCase):
         session.receive_action(ActionSetPaused("player", True))
         session.tick(0.1)
         accepted = session.state.journal.command_results[-1]
-        self.assertEqual(accepted["status"], CommandStatus.EXECUTED.value)
+        self.assertEqual(accepted["status"], CommandStatus.PROCESSED.value)
         self.assertTrue(session.state.time.is_paused)
         self.assertEqual(session.state.determinism.id_sequence, 0)
 

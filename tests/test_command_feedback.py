@@ -27,6 +27,7 @@ def test_other_player_ai_and_accepted_transport_results_do_not_raise_notices():
         dict(result(), actor_id="AI_SYSTEM", player_id="local"),
         result("accepted"),
         result("executed"),
+        result("processed"),
     ]
     feedback.update(records, "local")
     assert not dialog.is_open
@@ -37,9 +38,23 @@ def test_domain_refusal_is_not_hidden_by_transport_success():
     feedback = CommandFeedback(dialog)
     records = [dict(player_id="local", action_type="ActionCreateUnitDesign",
                     status="rejected", reason="A name is required."),
-               result("executed")]
+               result("processed")]
     feedback.update(records, "local")
     assert dialog._content.message == "A name is required."
+
+
+def test_random_event_domain_response_is_shown_once_with_processed_receipt():
+    dialog = GenericMessageDialog()
+    feedback = CommandFeedback(dialog)
+    records = [
+        dict(player_id="local", action_type="ActionRespondToRandomEvent",
+             status="applied", reason="Response accepted."),
+        dict(result("processed"), action_type="ActionRespondToRandomEvent"),
+    ]
+    feedback.update(records, "local")
+    assert dialog._content.message == "Response accepted."
+    dialog.acknowledge()
+    assert not dialog.is_open
 
 
 def test_save_success_and_multiple_failures_are_queued_in_order():

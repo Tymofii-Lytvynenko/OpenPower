@@ -30,6 +30,8 @@ class CommandFeedback:
                 if action == "ActionSaveGame" and str(record.get("command_id") or "") in quiet_save_result_ids:
                     continue
                 self._dialog.enqueue(title, message or "The command could not be completed.", severity="error")
+            elif status == "applied" and action == "ActionRespondToRandomEvent" and message:
+                self._dialog.enqueue("Event response", message)
             elif status == "applied" and action in {"ActionCreateTreaty", "ActionRespondTreaty"} and message:
                 self._dialog.enqueue("Treaty proposal" if action == "ActionCreateTreaty" else "Treaty response", message)
             elif status == "applied" and action in {
