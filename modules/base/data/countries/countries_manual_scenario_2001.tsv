@@ -1,0 +1,11 @@
+id	countryinfo_scenario_values_2001_json
+ATA	"{""arable_land_pct"":0,""forest_area_pct"":0,""reference_land_area_km2"":14000000,""reference_total_area_km2"":14000000,""reference_water_area_km2"":0,""other_land_pct"":100,""terrestrial_protected_area_pct_2000"":0,""birth_rate"":0,""death_rate"":0,""reference_human_dev"":0.5}"
+KOS	"{""reference_land_area_km2"":10877,""reference_total_area_km2"":10887,""reference_water_area_km2"":10,""other_land_pct"":5.5}"
+NRU	"{""arable_land_pct"":0}"
+PSE	"{""terrestrial_protected_area_pct_2000"":2}"
+SMR	"{""terrestrial_protected_area_pct_2000"":1.5}"
+SRB	"{""arable_land_pct"":33,""forest_area_pct"":27,""reference_land_area_km2"":87500,""reference_water_area_km2"":860}"
+SSD	"{""arable_land_pct"":4,""forest_area_pct"":30,""reference_land_area_km2"":610952,""reference_total_area_km2"":644329,""reference_water_area_km2"":33377,""other_land_pct"":28,""terrestrial_protected_area_pct_2000"":10}"
+TUV	"{""arable_land_pct"":0}"
+TWN	"{""other_land_pct"":15}"
+VAT	"{""birth_rate"":1,""death_rate"":8,""reference_human_dev"":0.88,""terrestrial_protected_area_pct_2000"":0}"

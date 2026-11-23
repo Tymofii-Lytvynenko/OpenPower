@@ -1201,6 +1201,16 @@ class CountryMoreInfoPanel:
         if availability is None and key.endswith("_pct"):
             availability = row.get(f"{key[:-4]}_available")
         if availability in (False, "False", "false", 0):
+            # Missing source values are normalized to zero by the loader, so
+            # consult the separate country-specific scenario values instead.
+            raw = row.get("countryinfo_scenario_values_2001_json")
+            try:
+                estimates = json.loads(raw) if isinstance(raw, str) else raw
+            except (TypeError, ValueError):
+                return None
+            value = estimates.get(key) if isinstance(estimates, dict) else None
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(value):
+                return float(value)
             return None
         value = row.get(key)
         return safe_float(value) if value is not None else None
@@ -1404,6 +1414,13 @@ class CountryMoreInfoPanel:
                     else []
                 )
             )
+        if protected_area is not None and row.get("terrestrial_protected_area_pct_2000_available") in (False, "False", "false", 0):
+            result = f"Terrestrial protected area: {protected_area:.1f}%."
+            if safe_text(row.get("id"), "").upper() == "PSE":
+                result += " " + " ".join(
+                    CountryMoreInfoPanel._palestinian_reserve_context(row)
+                )
+            return result
         status = safe_text(row.get("national_park_status"), "")
         notes = safe_text(row.get("national_park_notes"), "")
         if status or notes:
@@ -1860,6 +1877,8 @@ class CountryMoreInfoPanel:
         }:
             return f"Historical HDI proxy, not a comparable UNDP 2001 country observation. {method} Source: {source}. {source_url}"
         if status in {"not_applicable", "not_reported"}:
+            if CountryMoreInfoPanel._historical_value(model, "reference_human_dev") is not None:
+                return "Human development index for 2001."
             return f"No historical country HDI is available. {method} The simulation uses a neutral 0.50 fallback, which is not displayed as an HDI."
         return "No historical HDI value or source classification is available."
 

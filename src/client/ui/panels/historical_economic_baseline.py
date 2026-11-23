@@ -25,6 +25,13 @@ HISTORICAL_ECONOMIC_BASELINES = {
     },
 }
 
+_COUNTRY_SCENARIO_KEYS = {
+    "historical_gdp_current_usd_2001": "gdp",
+    "historical_gdp_per_capita_current_usd_2001": "gdp_per_capita",
+    "historical_inflation_cpi_pct_2001": "inflation",
+    "historical_unemployment_modeled_ilo_pct_2001": "unemployment",
+}
+
 ALTERNATE_ECONOMIC_OBSERVATIONS = {
     "historical_gdp_current_usd_2001": (
         {
@@ -109,11 +116,22 @@ def historical_economic_tooltip(
         "This displayed value remains OpenPower simulation state.",
     ]
     available = _row_value(country_row, f"{field}_available")
+    manual_value = _read_json_record(
+        country_row, "countryinfo_economic_values_2001_json"
+    ).get(_COUNTRY_SCENARIO_KEYS[field])
+    if isinstance(manual_value, bool) or not isinstance(manual_value, (int, float)):
+        manual_value = None
+    elif not math.isfinite(manual_value):
+        manual_value = None
     if not _as_bool(available):
-        lines.append(
-            f"2001 historical baseline: unavailable for {definition['indicator']} "
-            "(no exact-year observation; no neighboring-year value was substituted)."
-        )
+        if manual_value is None:
+            lines.append(
+                f"2001 historical baseline: unavailable for {definition['indicator']} "
+                "(no exact-year observation; no neighboring-year value was substituted)."
+            )
+        else:
+            baseline = value_formatter(manual_value) if value_formatter else f"{manual_value:,.4g}"
+            lines.append(f"2001 baseline ({definition['label']}): {baseline}.")
     else:
         raw_value = _row_value(country_row, field)
         try:
@@ -157,7 +175,8 @@ def historical_economic_tooltip(
                 lines.append("Source URL: unavailable in the stored provenance record.")
 
     _append_alternate_economic_observations(lines, country_row, field, value_formatter)
-    _append_gameplay_proxy(lines, country_row, field, value_formatter, definition)
+    if _as_bool(available) or manual_value is None:
+        _append_gameplay_proxy(lines, country_row, field, value_formatter, definition)
     return "\n".join(lines)
 
 

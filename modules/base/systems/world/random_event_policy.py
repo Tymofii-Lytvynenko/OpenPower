@@ -86,17 +86,49 @@ _DISASTER_RESPONSE = (
         "emergency_relief", "region_owner", 10_000.0, 0, 0.25, 0.02,
         (("approval", -0.02, "index"),),
     ),
+    EventResponseDefinition(
+        "regional_reconstruction", "region_owner", 250_000.0, 0, 0.55, 0.05,
+        (("budget_pressure", 0.015, "ratio"),),
+    ),
 )
 _HEALTH_RESPONSE = (
     EventResponseDefinition(
         "public_health_response", "region_owner", 15_000.0, 0, 0.35, 0.04,
         (("labour", -0.02, "ratio"),),
     ),
+    EventResponseDefinition(
+        "expand_clinic_capacity", "region_owner", 200_000.0, 0, 0.60, 0.03,
+        (("budget_pressure", 0.015, "ratio"),),
+    ),
 )
-_ECONOMIC_RESPONSE = (
+_ECONOMIC_CRISIS_RESPONSE = (
     EventResponseDefinition(
         "stabilization_package", "region_owner", 12_500.0, 0, 0.30, 0.03,
         (("budget_pressure", 0.02, "ratio"),),
+    ),
+    EventResponseDefinition(
+        "targeted_recovery_fund", "region_owner", 175_000.0, 0, 0.55, 0.05,
+        (("approval", -0.015, "index"),),
+    ),
+)
+_POLITICAL_RESPONSE = (
+    EventResponseDefinition(
+        "publish_independent_audit", "region_owner", 25_000.0, 0, 0.35, 0.04,
+        (("approval", -0.02, "index"),),
+    ),
+    EventResponseDefinition(
+        "fund_transparent_inquiry", "region_owner", 150_000.0, 0, 0.60, 0.03,
+        (("budget_pressure", 0.015, "ratio"),),
+    ),
+)
+_LOGISTICS_RESPONSE = (
+    EventResponseDefinition(
+        "reroute_essential_freight", "region_owner", 20_000.0, 0, 0.30, 0.06,
+        (("budget_pressure", 0.01, "ratio"),),
+    ),
+    EventResponseDefinition(
+        "reserve_freight_capacity", "region_owner", 200_000.0, 0, 0.65, 0.03,
+        (("demand", -0.01, "ratio"),),
     ),
 )
 
@@ -120,15 +152,26 @@ EVENT_DEFINITIONS: tuple[EventDefinition, ...] = (
         EventEffectDefinition("employment", "country", 0.02, 0.0, 0.03, "ratio", "recurring"),
         EventEffectDefinition("demand", "country", 0.03, 0.0, 0.04, "ratio", "recurring"),
         EventEffectDefinition("approval", "country", 0.02, 0.0, 0.03, "index", "recurring"),
-    ), _ECONOMIC_RESPONSE),
+    ), ()),
     EventDefinition("strike", "✊ Strike", "economic", 0.8, 3, 45, 0.2, 1.0, "region", (
         EventEffectDefinition("production", "country", -0.08, -0.10, 0.0, "ratio", "recurring"),
         EventEffectDefinition("employment", "country", -0.03, -0.04, 0.0, "ratio", "recurring"),
         EventEffectDefinition("demand", "country", -0.03, -0.04, 0.0, "ratio", "recurring"),
         EventEffectDefinition("approval", "country", -0.02, -0.04, 0.0, "index", "recurring"),
         EventEffectDefinition("political_pressure", "country", 0.04, 0.0, 0.05, "index", "recurring"),
-    ), _ECONOMIC_RESPONSE),
+    ), _ECONOMIC_CRISIS_RESPONSE),
     EventDefinition("tsunami", "🌊 Tsunami", "disaster", 0.3, 4, 90, 0.2, 1.0, "region", _disaster_effects(health=0.06, production=0.04, migration=0.04, approval=0.025, budget_pressure=0.05, transport=0.16, utilities=0.15, industrial=0.06, telecom=0.12), _DISASTER_RESPONSE),
+    EventDefinition("public_integrity_scandal", "⚖️ Public Integrity Scandal", "politics", 0.55, 8, 90, 0.2, 1.0, "region", (
+        EventEffectDefinition("approval", "country", -0.04, -0.06, 0.0, "index", "recurring"),
+        EventEffectDefinition("political_pressure", "country", 0.06, 0.0, 0.08, "index", "recurring"),
+        EventEffectDefinition("budget_pressure", "country", 0.015, 0.0, 0.02, "ratio", "recurring"),
+    ), _POLITICAL_RESPONSE),
+    EventDefinition("supply_chain_disruption", "🚚 Supply Chain Disruption", "economic", 0.65, 6, 60, 0.2, 1.0, "region", (
+        *_infrastructure_effects(transport=0.12, industrial=0.08),
+        EventEffectDefinition("production", "country", -0.05, -0.07, 0.0, "ratio", "recurring"),
+        EventEffectDefinition("employment", "country", -0.015, -0.025, 0.0, "ratio", "recurring"),
+        EventEffectDefinition("budget_pressure", "country", 0.02, 0.0, 0.03, "ratio", "recurring"),
+    ), _LOGISTICS_RESPONSE),
 )
 
 EVENT_BY_TYPE = {definition.event_type: definition for definition in EVENT_DEFINITIONS}

@@ -15,6 +15,34 @@ from utils.generate_palestinian_reserve_context_2001 import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_manual_country_values_fill_only_unavailable_land_fields():
+    countries = StaticAssetLoader(GameConfig(REPO_ROOT))._load_countries()
+    rows = {row["id"]: row for row in countries.to_dicts()}
+
+    for country_id, field, expected in (
+        ("NRU", "arable_land_pct", 0.0),
+        ("SRB", "forest_area_pct", 27.0),
+        ("SSD", "reference_total_area_km2", 644329.0),
+        ("KOS", "other_land_pct", 5.5),
+        ("TWN", "other_land_pct", 15.0),
+        ("VAT", "reference_human_dev", 0.88),
+        ("ATA", "birth_rate", 0.0),
+        ("PSE", "terrestrial_protected_area_pct_2000", 2.0),
+    ):
+        model = SimpleNamespace(historical_metrics=rows[country_id])
+        assert CountryMoreInfoPanel._historical_value(model, field) == expected
+
+    model = SimpleNamespace(historical_metrics={
+        "arable_land_pct": 12.0,
+        "arable_land_pct_available": True,
+        "countryinfo_scenario_values_2001_json": '{"arable_land_pct":99}',
+    })
+    assert CountryMoreInfoPanel._historical_value(model, "arable_land_pct") == 12.0
+
+    vatican = SimpleNamespace(historical_metrics=rows["VAT"])
+    assert "unavailable" not in CountryMoreInfoPanel._country_hdi_tooltip(vatican).lower()
+
+
 def test_land_extensions_merge_without_multiplying_country_rows():
     countries = StaticAssetLoader(GameConfig(REPO_ROOT))._load_countries()
     montenegro = countries.filter(pl.col("id") == "MNE").row(0, named=True)
@@ -99,7 +127,7 @@ def test_palestinian_reserve_context_is_scoped_and_not_a_national_percentage():
     assert "West Bank" in tooltip
     assert "not a national-park value" in tooltip
     assert "Gaza row is blank" in tooltip
-    assert "%" not in tooltip
+    assert "Terrestrial protected area: 2.0%" in tooltip
 
 
 def test_palestinian_reserve_extension_keeps_one_row_for_both_observation_years():

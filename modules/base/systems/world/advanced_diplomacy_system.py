@@ -70,12 +70,18 @@ class AdvancedDiplomacySystem(ISystem):
         actions = tuple(state.current_actions)
         has_action = any(
             isinstance(action, (ActionSubmitPeaceDeal, ActionRespondPeaceDeal))
+            or (
+                isinstance(action, ActionOfferPeace)
+                and str(action.player_id or "").strip().upper() in {"AI", "AI_SYSTEM"}
+                and str(action.terms or "").strip().lower() != "war"
+            )
             for action in actions
         )
         deals = state.tables.get("peace_deals")
         has_pending = deals is not None and not deals.is_empty() and bool(
             deals.filter(pl.col("status") == "pending").height
         )
+        # AI peace offers must reach the conversion below even when no deal exists yet.
         if not has_action and not has_pending:
             return
 

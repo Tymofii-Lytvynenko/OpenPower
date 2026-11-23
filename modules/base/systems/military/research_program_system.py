@@ -137,21 +137,38 @@ class ResearchProgramSystem(ISystem):
             elif isinstance(action, ActionCancelProductionOrder):
                 target = next((row for row in orders if str(row.get("id") or "") == str(action.order_id)), None)
                 if target is not None and self._authorized(state, action.player_id, self._tag(target.get("country_id"))):
-                    self._cancel_production(orders, action)
+                    if str(target.get("status") or "").strip().lower() not in {"queued", "paused"}:
+                        # Completed orders cannot be changed, even if the UI has a stale snapshot.
+                        self._reject(state, action, "This production order can no longer be cancelled.")
+                    else:
+                        self._cancel_production(orders, action)
                 elif target is not None:
                     self._reject(state, action, "The issuer does not control this production order.")
+                else:
+                    self._reject(state, action, "The production order no longer exists.")
             elif isinstance(action, ActionSetProductionPaused):
                 target = next((row for row in orders if str(row.get("id") or "") == str(action.order_id)), None)
                 if target is not None and self._authorized(state, action.player_id, self._tag(target.get("country_id"))):
-                    self._set_production_paused(orders, action)
+                    if str(target.get("status") or "").strip().lower() not in {"queued", "paused"}:
+                        self._reject(state, action, "This production order can no longer be paused or resumed.")
+                    else:
+                        self._set_production_paused(orders, action)
                 elif target is not None:
                     self._reject(state, action, "The issuer does not control this production order.")
+                else:
+                    self._reject(state, action, "The production order no longer exists.")
             elif isinstance(action, ActionSetProductionPriority):
                 target = next((row for row in orders if str(row.get("id") or "") == str(action.order_id)), None)
                 if target is not None and self._authorized(state, action.player_id, self._tag(target.get("country_id"))):
-                    self._set_production_priority(orders, action)
+                    if str(target.get("status") or "").strip().lower() not in {"queued", "paused"}:
+                        self._reject(state, action, "This production order can no longer be reprioritized.")
+                    else:
+                        self._set_production_priority(orders, action)
                 elif target is not None:
                     self._reject(state, action, "The issuer does not control this production order.")
+                else:
+                    # Stale order IDs previously disappeared without any player feedback.
+                    self._reject(state, action, "The production order no longer exists.")
         if tracks_frame is not None:
             self._write_if_changed(state, "research_tracks", tracks, tracks_frame)
         if designs_frame is not None:

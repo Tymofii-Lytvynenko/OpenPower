@@ -327,8 +327,14 @@ class InternalEconomySystem(ISystem):
         if production_rows.height != 1:
             return "The domestic production row is missing or ambiguous."
         basis = production_increase_basis(state, country, resource)
-        if basis is None or estimate_production_increase_cost(basis.annual_value_usd, action.increase_percent) is None:
+        cost = None if basis is None else estimate_production_increase_cost(
+            basis.annual_value_usd, action.increase_percent
+        )
+        if cost is None:
             return "No positive production value is available in this country for the selected resource."
+        # Prevent an investment from silently spending more than the available treasury.
+        if reserves < cost:
+            return "The country lacks funds for this production increase."
         return ""
 
     @staticmethod

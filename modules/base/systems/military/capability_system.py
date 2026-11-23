@@ -193,22 +193,17 @@ class MilitaryCapabilitySystem(ISystem):
         facility, cost = plan["facility"], plan["cost"]
         country["money_reserves"] = self._number(country.get("money_reserves")) - cost
 
-        regions = state.tables.get("regions")
-        region = None
-        if regions is not None:
-            region = next((
-                row for row in regions.to_dicts()
-                if self._integer(row.get("id")) == training_region_id
-            ), None)
+        # Restoring a region's center displaced units that trained away from it.
+        # Preserve the unit's actual position before moving it into training.
         return_latitude = (
             self._number(unit.get("source_latitude"))
             if reserve_lifecycle
-            else self._number(region.get("latitude")) if region else self._number(unit.get("latitude"))
+            else self._number(unit.get("latitude"))
         )
         return_longitude = (
             self._number(unit.get("source_longitude"))
             if reserve_lifecycle
-            else self._number(region.get("longitude")) if region else self._number(unit.get("longitude"))
+            else self._number(unit.get("longitude"))
         )
         unit["training_state"] = "training"
         unit["unit_lifecycle"] = "training"

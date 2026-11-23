@@ -243,6 +243,7 @@ __marimo__/
 
 # Local source references and generated repository intelligence.
 /.codex/
+/.codex-attachments/
 /.repowise/
 
 # Local assistant configuration.

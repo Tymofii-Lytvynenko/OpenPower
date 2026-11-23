@@ -25,7 +25,7 @@ def test_snaama_gdp_supplement_is_visible_alongside_the_missing_wdi_baseline():
     )
 
     assert "Current simulated GDP: $ 20 000 000" in tooltip
-    assert "2001 historical baseline: unavailable for NY.GDP.MKTP.CD" in tooltip
+    assert "2001 baseline (GDP (current US$)): $ 18,000,000,000" in tooltip
     assert "Alternative historical observation (UNdata SNAAMA GDP estimate" in tooltip
     assert "$ 11,021,860,465" in tooltip
     assert "Observation period: 2001; source observation year: 2001" in tooltip
@@ -46,7 +46,7 @@ def test_snaama_gdp_supplement_is_visible_alongside_the_missing_wdi_baseline():
     assert "$ 476" in per_capita_tooltip
 
 
-def test_gameplay_proxy_is_separate_and_includes_method_quality_scope_and_sources():
+def test_manual_country_value_fills_missing_inflation_baseline():
     countries = StaticAssetLoader(GameConfig(ROOT))._load_countries()
     row = _country_row(countries, "PRK")
 
@@ -58,19 +58,11 @@ def test_gameplay_proxy_is_separate_and_includes_method_quality_scope_and_source
         value_formatter=lambda value: f"{value:.2f}%",
     )
 
-    assert "2001 historical baseline: unavailable for FP.CPI.TOTL.ZG" in tooltip
-    assert (
-        "Gameplay proxy (not a measured national series, Inflation, consumer prices "
-        "(annual %)): 2.39%. Target observation year: unavailable; scenario year: 2001."
-        in tooltip
-    )
-    assert "estimate type gameplay_proxy; quality very_low" in tooltip
-    assert "Take the median 2001 WDI CPI rate" in tooltip
-    assert "CHN, KOR, MNG, VNM 2001 CPI comparison" in tooltip
-    assert "https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG" in tooltip
+    assert "2001 baseline (Inflation, consumer prices (annual %)): 10.00%." in tooltip
+    assert "Gameplay proxy" not in tooltip
 
 
-def test_undated_factbook_prior_is_labeled_as_a_gameplay_proxy():
+def test_manual_country_value_fills_missing_unemployment_baseline():
     countries = StaticAssetLoader(GameConfig(ROOT))._load_countries()
     row = _country_row(countries, "AND")
 
@@ -82,16 +74,11 @@ def test_undated_factbook_prior_is_labeled_as_a_gameplay_proxy():
         value_formatter=lambda value: f"{value:.1f}%",
     )
 
-    assert "Gameplay proxy (not a measured national series" in tooltip
-    assert "0.0%" in tooltip
-    assert "Target observation year: unavailable; scenario year: 2001." in tooltip
-    assert "source year 2001 Factbook edition" in tooltip
-    assert "quality very_low" in tooltip
-    assert "observation year and labor-force definition" in tooltip
-    assert "https://www.gutenberg.org/ebooks/27638" in tooltip
+    assert "2001 baseline (Unemployment, modeled ILO estimate (% of labor force)): 2.0%." in tooltip
+    assert "Gameplay proxy" not in tooltip
 
 
-def test_antarctica_proxy_fields_are_explicitly_not_applicable():
+def test_antarctica_country_baseline_displays_zero():
     countries = StaticAssetLoader(GameConfig(ROOT))._load_countries()
     row = _country_row(countries, "ATA")
 
@@ -102,8 +89,7 @@ def test_antarctica_proxy_fields_are_explicitly_not_applicable():
         "GDP",
     )
 
-    assert "2001 gameplay proxy (GDP (current US$)): not applicable." in tooltip
-    assert "no permanent resident population" in tooltip
+    assert "2001 baseline (GDP (current US$)): 0." in tooltip
 
 
 def test_existing_reported_cpi_supplement_is_visible_in_the_inflation_tooltip():

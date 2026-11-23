@@ -39,6 +39,26 @@ MAX_ACTIVE_EVENTS = DEFAULT_MAX_ACTIVE_EVENTS
 _MINUTES_PER_DAY = MINUTES_PER_DAY
 _TOTAL_WEIGHT = sum(float(entry["weight"]) for entry in EVENT_CATALOG)
 MAX_SCENARIO_EVENT_SEED = (1 << 63) - 1
+# Their consumers turn positive values into expense, displacement, or political pressure.
+_POSITIVE_ADVERSE_EFFECT_CATEGORY_NAMES = frozenset(
+    {"budget_pressure", "migration", "political_pressure"}
+)
+_INFRASTRUCTURE_EFFECT_CATEGORIES = frozenset(
+    effect.category
+    for definition in EVENT_DEFINITIONS
+    for effect in definition.effects
+    if effect.category.startswith("infrastructure_")
+)
+# Keep positive mitigation limited to adverse categories present in event definitions.
+_POSITIVE_ADVERSE_EFFECT_CATEGORIES = frozenset(
+    effect.category
+    for definition in EVENT_DEFINITIONS
+    for effect in definition.effects
+    if (
+        effect.category in _POSITIVE_ADVERSE_EFFECT_CATEGORY_NAMES
+        and effect.magnitude_per_severity > 0.0
+    )
+)
 
 
 class RandomEventsSystem(ISystem):
@@ -565,16 +585,14 @@ class RandomEventsSystem(ISystem):
             ),
         )
         effects = state.tables["random_event_effects"]
-        infrastructure_categories = [
-            effect.category
-            for event_definition in EVENT_DEFINITIONS
-            for effect in event_definition.effects
-            if effect.category.startswith("infrastructure_")
-        ]
-        adverse = (pl.col("magnitude") < 0.0) | pl.col("category").is_in(
-            infrastructure_categories
+        infrastructure_effect = pl.col("category").is_in(
+            _INFRASTRUCTURE_EFFECT_CATEGORIES
         )
-        infrastructure_effect = pl.col("category").is_in(infrastructure_categories)
+        positive_adverse_effect = (
+            (pl.col("magnitude") > 0.0)
+            & pl.col("category").is_in(_POSITIVE_ADVERSE_EFFECT_CATEGORIES)
+        )
+        adverse = (pl.col("magnitude") < 0.0) | positive_adverse_effect | infrastructure_effect
         state.update_table(
             "random_event_effects",
             effects.with_columns(
@@ -599,17 +617,22 @@ class RandomEventsSystem(ISystem):
         self._append_rows(state, "random_event_responses", [response_record])
         self._append_rows(state, "random_event_effects", secondary_rows)
         self._persist_event_runtime(state, event_determinism)
+        response_notice = (
+            f"{response.response_id} cost {cost:,.2f}; "
+            f"mitigation {response.mitigation:.0%}; "
+            f"risk {'triggered' if risk_triggered else 'avoided'}."
+        )
         state.events.append(
             EventRandomEventLifecycleChanged(
                 event_id=event_id,
                 event_type=event_type,
                 status="response_applied",
-                reason=f"{response.response_id} cost {cost:.2f}; mitigation {response.mitigation:.0%}; risk {'triggered' if risk_triggered else 'avoided'}.",
+                reason=response_notice,
                 at_minute=now,
             )
         )
         state.globals["random_event_projection_dirty"] = True
-        self._record_result(state, action, "applied", "Event response accepted.")
+        self._record_result(state, action, "applied", response_notice)
 
     def _reject_response(
         self,
