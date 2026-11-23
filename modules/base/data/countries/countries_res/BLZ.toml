@@ -2,49 +2,41 @@
 # 2001 regional allocations: gameplay estimates; iron_and_steel=economic-center proxy, minerals=economic-center proxy, precious_stones=economic-center proxy.
 
 [resources.appliances]
-production = 1045503
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.arms_and_ammunition]
-production = 522921
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.business_services]
-production = 60092363
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.cereals]
-production = 97209045
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.chemicals]
-production = 6814504
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.commodities]
-production = 16638932
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.construction_materials]
-production = 2923674
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.construction_services]
-production = 39334456
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
@@ -52,169 +44,141 @@ tax_rate = 0.0
 # Precision balance
 # Target: 800,000,000. Current Sum w/o Cereals: 550,065,000.
 [resources.dairy]
-production = 5110955
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.drugs_and_raw_plants]
-production = 157
 is_legal = false
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.education_services]
-production = 34052129
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.electricity]
-production = 9165070
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.fabrics_and_leather]
-production = 2867763
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.financial_services]
-production = 39103763
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.fossil_fuels]
-production = 0
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.government_services]
-production = 212798693
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.health_services]
-production = 27473572
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.industrial_services]
-production = 5988986
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.iron_and_steel]
-production = 17336325
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.it_and_telecom_services]
-production = 36350745
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.luxury_commodities]
-production = 264341
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.machinery_and_instruments]
-production = 3683150
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.meat_and_fish]
-production = 7011205
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.minerals]
-production = 962
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.non_ferrous_metals]
-production = 1344709
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.other_food_and_beverages]
-production = 164440257
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.pharmaceuticals]
-production = 1972033
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.plastics_and_rubber]
-production = 2576617
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.precious_stones]
-production = 23720
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.recreational_services]
-production = 10871803
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.tobacco]
-production = 1083006
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.tourism_services]
-production = 237338618
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.transport_services]
-production = 109977726
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.vegetables_and_fruits]
-production = 9923044
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.vehicles]
-production = 2629853
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.wood_and_paper]
-production = 4074550
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0

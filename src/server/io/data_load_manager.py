@@ -200,9 +200,9 @@ class DataLoader:
             print(f"[DataLoader] Loading world table: {table_name}")
             state.update_table(table_name, world_df)
 
-        prod_df = self._load_domestic_production()
-        state.update_table("domestic_production", prod_df)
         regional_prod_df = self._load_regional_production(regions_df)
+        prod_df = self._load_domestic_production(regional_prod_df)
+        state.update_table("domestic_production", prod_df)
         state.update_table("regional_production", regional_prod_df)
 
         self._apply_schema_registry(state)
@@ -405,44 +405,57 @@ class DataLoader:
 
         return pl.from_dicts(rows) if rows else pl.DataFrame()
 
-    def _load_domestic_production(self) -> pl.DataFrame:
-        print("[DataLoader] Reading TOMLs for dynamic domestic production...")
-        records = []
+    def _load_domestic_production(self, regional_production: pl.DataFrame) -> pl.DataFrame:
+        """Build initial national production from the final layered regional records."""
+        keys = ("country_id", "game_resource_id")
+        policies = {}
         for data_dir in self.config.get_data_dirs():
             target_dir = data_dir / "countries" / "countries_res"
-            if not target_dir.exists():
-                continue
+            for file_path in sorted(target_dir.glob("*.toml")):
+                country_id = file_path.stem.strip().upper()
+                data = self._read_required_toml(file_path, "country resource")
+                resources = data.get("resources", {})
+                if not isinstance(resources, dict):
+                    raise ValueError(f"{file_path.name}: resources must be a policy table.")
+                for resource_id, policy in resources.items():
+                    if not isinstance(policy, dict) or "production" in policy:
+                        raise ValueError(
+                            f"{file_path.name}: {resource_id} production belongs in regional_resources."
+                        )
+                    current = policies.setdefault((country_id, resource_id), {})
+                    current.update(policy)
 
-            for file_path in target_dir.glob("*.toml"):
-                country_id = file_path.stem
-                try:
-                    data = self._read_required_toml(file_path, "country resource")
-                    if "resources" in data:
-                        for res_id, res_data in data["resources"].items():
-                            row = {
-                                "country_id": country_id,
-                                "game_resource_id": res_id,
-                            }
-                            if isinstance(res_data, dict):
-                                row["domestic_production"] = float(res_data.get("production", 0))
-                                row["is_legal"] = bool(res_data.get("is_legal", True))
-                                row["is_gov_controlled"] = bool(res_data.get("is_gov_controlled", False))
-                                row["tax_rate"] = float(res_data.get("tax_rate", 0.0))
-                            else:
-                                row["domestic_production"] = float(res_data)
-                                row["is_legal"] = True
-                                row["is_gov_controlled"] = False
-                                row["tax_rate"] = 0.0
-
-                            records.append(row)
-                except Exception as error:
-                    raise RuntimeError(f"Failed to parse required country resource TOML: {file_path}") from error
-
-        if records:
-            return pl.DataFrame(records)
-        return pl.DataFrame(
-            {"country_id": [], "game_resource_id": [], "domestic_production": []},
-            schema={"country_id": pl.Utf8, "game_resource_id": pl.Utf8, "domestic_production": pl.Float64},
+        schema = {
+            "country_id": pl.String,
+            "game_resource_id": pl.String,
+            "is_legal": pl.Boolean,
+            "is_gov_controlled": pl.Boolean,
+            "tax_rate": pl.Float64,
+        }
+        metadata = pl.DataFrame(
+            [
+                {
+                    "country_id": country_id,
+                    "game_resource_id": resource_id,
+                    "is_legal": bool(policy.get("is_legal", True)),
+                    "is_gov_controlled": bool(policy.get("is_gov_controlled", False)),
+                    "tax_rate": float(policy.get("tax_rate", 0.0)),
+                }
+                for (country_id, resource_id), policy in policies.items()
+            ],
+            schema=schema,
+        )
+        totals = regional_production.group_by(*keys).agg(pl.col("domestic_production").sum())
+        return (
+            metadata.join(totals, on=list(keys), how="full", coalesce=True)
+            .with_columns(
+                pl.col("domestic_production").fill_null(0.0),
+                pl.col("is_legal").fill_null(True),
+                pl.col("is_gov_controlled").fill_null(False),
+                pl.col("tax_rate").fill_null(0.0),
+            )
+            .select(*keys, "domestic_production", "is_legal", "is_gov_controlled", "tax_rate")
+            .sort(*keys)
         )
 
     def _load_regional_production(self, regions: pl.DataFrame) -> pl.DataFrame:

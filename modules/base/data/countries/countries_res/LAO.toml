@@ -2,61 +2,51 @@
 # 2001 regional allocations: gameplay estimates; fossil_fuels=economic-center proxy, iron_and_steel=economic-center proxy, precious_stones=economic-center proxy.
 
 [resources.appliances]
-production = 1266903
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.arms_and_ammunition]
-production = 630605
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.business_services]
-production = 75630952
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.cereals]
-production = 437393301
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.chemicals]
-production = 8901116
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.commodities]
-production = 20051661
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.construction_materials]
-production = 3600492
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.construction_services]
-production = 21224418
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.dairy]
-production = 25934171
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.drugs_and_raw_plants]
-production = 148
 is_legal = false
 is_gov_controlled = false
 tax_rate = 0.0
@@ -64,157 +54,131 @@ tax_rate = 0.0
 # Precision balance
 # Target: 1,700,000,000. Current: 1,390,390,000. Needs +309,610,000
 [resources.education_services]
-production = 33667682
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.electricity]
-production = 12057932
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.fabrics_and_leather]
-production = 3466293
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.financial_services]
-production = 84151608
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.fossil_fuels]
-production = 2216619
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.government_services]
-production = 311520212
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.health_services]
-production = 26795937
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.industrial_services]
-production = 6260623
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.iron_and_steel]
-production = 21419817
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.it_and_telecom_services]
-production = 58967329
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.luxury_commodities]
-production = 323842
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.machinery_and_instruments]
-production = 4491500
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.meat_and_fish]
-production = 96355329
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.minerals]
-production = 0
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.non_ferrous_metals]
-production = 1985072
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.other_food_and_beverages]
-production = 217742482
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.pharmaceuticals]
-production = 2396216
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.plastics_and_rubber]
-production = 3388752
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.precious_stones]
-production = 56933
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.recreational_services]
-production = 3253364
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.tobacco]
-production = 5466048
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.tourism_services]
-production = 1887694
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.transport_services]
-production = 206410166
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.vegetables_and_fruits]
-production = 47725409
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.vehicles]
-production = 3205890
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.wood_and_paper]
-production = 18772542
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0

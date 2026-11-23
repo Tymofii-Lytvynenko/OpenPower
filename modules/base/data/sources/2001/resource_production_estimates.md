@@ -1,6 +1,6 @@
 # 2001 resource production estimates
 
-The base scenario allocates each country's nominal GDP across its existing OpenPower resource categories in whole US dollars. The values are gameplay estimates of contributions to GDP. Physical production statistics can inform the regional proportions.
+The base scenario stores production in whole US dollars in `[regional_resources]`. The new-game loader applies mod layers before summing the final regional entries by country and resource. The national `[resources]` tables contain policy settings such as legality, public control, and tax rates. Regions with no positive entries contribute zero. The amounts are gameplay estimates of contributions to GDP. Physical production statistics can inform the regional proportions.
 
 ## National totals
 

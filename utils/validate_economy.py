@@ -1,4 +1,3 @@
-import os
 import rtoml
 import csv
 import math
@@ -8,7 +7,7 @@ from pathlib import Path
 # Path to the directory containing country economy TOML files
 TARGET_DIR = Path("modules/base/data/countries/countries_res")
 # Path to the master GDP file
-GDP_FILE = Path("modules/base/data/countries/countries_eco.tsv")
+GDP_FILE = Path("modules/base/data/countries/countries_economic_historical.tsv")
 
 # Complete list of resources as defined in src/shared/economy_meta.py
 ALL_RESOURCES = [
@@ -27,7 +26,7 @@ ALL_RESOURCES = [
 
 def load_gdp_data():
     """
-    Loads GDP data from countries_eco.tsv and returns a dict mapping country ID to GDP.
+    Loads GDP data from countries_economic_historical.tsv and returns a dict mapping country ID to GDP.
     """
     gdp_map = {}
     if not GDP_FILE.exists():
@@ -38,7 +37,8 @@ def load_gdp_data():
         with open(GDP_FILE, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter='\t')
             for row in reader:
-                gdp_map[row['id']] = float(row['gdp'])
+                if row["historical_gdp_current_usd_2001_available"].lower() == "true":
+                    gdp_map[row["id"]] = round(float(row["historical_gdp_current_usd_2001"]))
     except Exception as e:
         print(f"Error loading GDP data: {e}")
     
@@ -48,9 +48,8 @@ def validate_file(file_path: Path, target_gdp: float):
     """
     Validates a TOML file:
     - Checks for [resources] section.
-    - Checks for all 3 category presence.
-    - Checks for zero values.
-    - Checks if sum matches target_gdp.
+    - Checks resource policies and nonnegative regional production.
+    - Checks if the regional sum matches the available 2001 GDP target.
     """
     errors = []
     try:
@@ -70,70 +69,44 @@ def validate_file(file_path: Path, target_gdp: float):
     if not isinstance(resources, dict):
         return ["[resources] must contain a table"]
     
-    # 1. Check for missing categories
-    missing = [res for res in ALL_RESOURCES if res not in resources]
-    if missing:
-        errors.append(f"Missing categories: {', '.join(missing)}")
-    
-    # 2. Check for zero or negative production values
-    zeros = []
-    invalid_production = []
-    total_sum = 0.0
-    for name, entry in resources.items():
-        if not isinstance(entry, dict):
-            continue
-        production = entry.get("production", 0)
-        if isinstance(production, bool) or not isinstance(production, Real):
-            invalid_production.append(name)
-            continue
-        production = float(production)
-        if not math.isfinite(production):
-            invalid_production.append(name)
-            continue
-        total_sum += production
-        if production <= 0:
-            zeros.append(name)
-
-    if invalid_production:
-        errors.append(
-            "Invalid production values (expected finite numbers): "
-            + ", ".join(invalid_production)
-        )
-    valid_target_gdp = (
-        target_gdp is None
-        or (
-            not isinstance(target_gdp, bool)
-            and isinstance(target_gdp, Real)
-            and math.isfinite(float(target_gdp))
-        )
-    )
-    if target_gdp is not None and not valid_target_gdp:
-        errors.append("Target GDP must be a finite number")
-    if zeros:
-        if valid_target_gdp and target_gdp and target_gdp > 0:
-            errors.append(f"Zero/Negative production values found: {', '.join(zeros)}")
-    
-    # 3. Check for missing fields in dict
-    required_fields = ['production', 'legal', 'is_gov_controlled', 'tax_rate']
-    for k, v in resources.items():
-        if not isinstance(v, dict):
-            errors.append(f"Resource {k} is not a dictionary (old format?)")
-            continue
-        for field in required_fields:
-            if field not in v:
-                errors.append(f"Resource {k} missing required field: {field}")
-
-    # 4. Check sum if target_gdp is provided
-    if target_gdp is not None:
-        if valid_target_gdp:
-            diff = abs(total_sum - float(target_gdp))
-            if diff > 1000:
-                errors.append(f"Sum mismatch: Found {total_sum:,.0f}, Expected {target_gdp:,.0f} (Diff: {diff:,.0f})")
-    
-    # 5. Check for extra categories not in the master list
-    extra = [k for k in resources.keys() if k not in ALL_RESOURCES]
+    regional = data.get("regional_resources", {})
+    if not isinstance(regional, dict):
+        return ["[regional_resources] must contain a table"]
+    allowed = set(ALL_RESOURCES) | {
+        "electronics", "textiles_and_leather", "wood_product_services",
+        "sugar", "precous_stones", "minerals_alt", "tabacco",
+    }
+    extra = set(resources) - allowed
     if extra:
-        errors.append(f"Extra categories found: {', '.join(extra)}")
+        errors.append(f"Extra categories found: {', '.join(sorted(extra))}")
+    for name, policy in resources.items():
+        if not isinstance(policy, dict) or "production" in policy:
+            errors.append(f"{name}: production belongs in regional_resources")
+            continue
+        for field in ("is_legal", "is_gov_controlled", "tax_rate"):
+            if field not in policy:
+                errors.append(f"Resource {name} missing required field: {field}")
+
+    amounts = []
+    for region, entries in regional.items():
+        if not isinstance(entries, dict):
+            errors.append(f"Invalid regional table: {region}")
+            continue
+        for name, entry in entries.items():
+            if name not in resources:
+                errors.append(f"Missing categories: {name} has regional output without a policy")
+            if isinstance(entry, dict):
+                entry = entry.get("production", entry.get("domestic_production"))
+            if isinstance(entry, bool) or not isinstance(entry, Real) or not math.isfinite(entry) or entry < 0:
+                errors.append(f"Invalid production for {region}/{name}: expected a finite nonnegative number")
+            else:
+                amounts.append(entry)
+
+    if target_gdp is not None:
+        if isinstance(target_gdp, bool) or not isinstance(target_gdp, Real) or not math.isfinite(target_gdp):
+            errors.append("Target GDP must be a finite number")
+        elif (total := math.fsum(amounts)) != float(target_gdp):
+            errors.append(f"Sum mismatch: Found {total:,.0f}, Expected {target_gdp:,.0f}")
 
     return errors
 

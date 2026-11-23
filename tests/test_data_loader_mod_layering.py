@@ -392,7 +392,7 @@ class TestDataLoaderModLayering(unittest.TestCase):
                 "\n".join(
                     [
                         "[resources.cereals]",
-                        "production = 100.0",
+                        "is_legal = false",
                         "",
                         '[regional_resources."AA-X01".cereals]',
                         "production = 40.0",
@@ -410,7 +410,9 @@ class TestDataLoaderModLayering(unittest.TestCase):
             self.assertEqual(regional["country_id"][0], "AAA")
             self.assertEqual(regional["game_resource_id"][0], "cereals")
             self.assertEqual(regional["domestic_production"][0], 40.0)
-            self.assertEqual(state.get_table("domestic_production")["domestic_production"][0], 100.0)
+            national = state.get_table("domestic_production")
+            self.assertEqual(national["domestic_production"][0], 40.0)
+            self.assertFalse(national["is_legal"][0])
         finally:
             shutil.rmtree(project_root, ignore_errors=True)
 

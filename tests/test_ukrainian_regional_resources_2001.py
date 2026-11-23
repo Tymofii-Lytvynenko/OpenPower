@@ -16,11 +16,12 @@ def resource_data():
     static_loader = StaticAssetLoader(config)
     loader = DataLoader(config)
     regions = static_loader._load_regions()
+    regional = loader._load_regional_production(regions)
     return (
         static_loader._load_countries(),
         regions,
-        loader._load_domestic_production(),
-        loader._load_regional_production(regions),
+        loader._load_domestic_production(regional),
+        regional,
     )
 
 

@@ -263,13 +263,18 @@ def test_world_matrix_ignores_non_mapping_targets(tmp_path: Path) -> None:
     ]
 
 
-def test_domestic_production_accepts_scalars_and_wraps_invalid_data(tmp_path: Path) -> None:
+def test_domestic_production_aggregates_regions_and_rejects_duplicate_totals(tmp_path: Path) -> None:
     resources_dir = tmp_path / "countries" / "countries_res"
     resources_dir.mkdir(parents=True)
-    (resources_dir / "AAA.toml").write_text("[resources]\ngrain = 12\n", encoding="utf-8")
+    (resources_dir / "AAA.toml").write_text("[resources.grain]\n", encoding="utf-8")
     loader = _loader(tmp_path, tmp_path)
+    regional = pl.DataFrame({
+        "country_id": ["AAA", "AAA"],
+        "game_resource_id": ["grain", "grain"],
+        "domestic_production": [5.0, 7.0],
+    })
 
-    rows = loader._load_domestic_production().to_dicts()
+    rows = loader._load_domestic_production(regional).to_dicts()
     assert rows == [
         {
             "country_id": "AAA",
@@ -281,9 +286,31 @@ def test_domestic_production_accepts_scalars_and_wraps_invalid_data(tmp_path: Pa
         }
     ]
 
-    (resources_dir / "AAA.toml").write_text('[resources]\ngrain = "invalid"\n', encoding="utf-8")
-    with pytest.raises(RuntimeError, match="Failed to parse required country resource TOML"):
-        loader._load_domestic_production()
+    (resources_dir / "AAA.toml").write_text("[resources.grain]\nproduction = 12\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="production belongs in regional_resources"):
+        loader._load_domestic_production(regional)
+
+
+def test_national_production_uses_final_layered_regions_and_policies(tmp_path: Path) -> None:
+    for layer, content in (
+        ("base", '[resources.grain]\nis_legal = false\n[regional_resources."1"]\ngrain = 5\n'),
+        ("mod", '[resources.grain]\ntax_rate = 0.1\n[regional_resources."1"]\ngrain = 0\n'
+         '[regional_resources."2"]\ngrain = 8\n'),
+    ):
+        directory = tmp_path / layer / "countries" / "countries_res"
+        directory.mkdir(parents=True)
+        (directory / "AAA.toml").write_text(content, encoding="utf-8")
+
+    loader = _loader(tmp_path, tmp_path / "base", tmp_path / "mod")
+    regional = loader._load_regional_production(pl.DataFrame({"id": [1, 2]}))
+    assert loader._load_domestic_production(regional).row(0, named=True) == {
+        "country_id": "AAA",
+        "game_resource_id": "grain",
+        "domestic_production": 8.0,
+        "is_legal": False,
+        "is_gov_controlled": False,
+        "tax_rate": 0.1,
+    }
 
 
 def test_regional_production_accepts_list_entries_and_scalar_values(tmp_path: Path) -> None:

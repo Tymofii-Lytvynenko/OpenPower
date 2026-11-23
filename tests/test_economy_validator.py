@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import rtoml
@@ -11,8 +10,7 @@ from utils import validate_economy
 def _valid_resources() -> dict[str, dict[str, object]]:
     return {
         resource: {
-            "production": 1.0,
-            "legal": True,
+            "is_legal": True,
             "is_gov_controlled": False,
             "tax_rate": 0.05,
         }
@@ -23,7 +21,8 @@ def _valid_resources() -> dict[str, dict[str, object]]:
 def test_validator_accepts_complete_file_with_matching_gdp(tmp_path: Path) -> None:
     file_path = tmp_path / "AAA.toml"
     resources = _valid_resources()
-    file_path.write_text(rtoml.dumps({"resources": resources}), encoding="utf-8")
+    output = dict.fromkeys(resources, 1.0)
+    file_path.write_text(rtoml.dumps({"resources": resources, "regional_resources": {"region": output}}), encoding="utf-8")
 
     assert validate_economy.validate_file(file_path, float(len(resources))) == []
 
@@ -31,9 +30,10 @@ def test_validator_accepts_complete_file_with_matching_gdp(tmp_path: Path) -> No
 def test_validator_reports_missing_extra_and_malformed_resource_rows(tmp_path: Path) -> None:
     file_path = tmp_path / "AAA.toml"
     resources = _valid_resources()
+    output = dict.fromkeys(resources, 1.0)
     resources.pop(validate_economy.ALL_RESOURCES[0])
-    resources["unlisted_resource"] = {"production": 1.0}
-    file_path.write_text(rtoml.dumps({"resources": resources}), encoding="utf-8")
+    resources["unlisted_resource"] = {}
+    file_path.write_text(rtoml.dumps({"resources": resources, "regional_resources": {"region": output}}), encoding="utf-8")
 
     errors = validate_economy.validate_file(file_path, 1.0)
 
@@ -45,9 +45,10 @@ def test_validator_reports_missing_extra_and_malformed_resource_rows(tmp_path: P
 def test_validator_rejects_nonnumeric_and_nonfinite_production_without_crashing(tmp_path: Path) -> None:
     file_path = tmp_path / "AAA.toml"
     resources = _valid_resources()
-    resources[validate_economy.ALL_RESOURCES[0]]["production"] = "not-a-number"
-    resources[validate_economy.ALL_RESOURCES[1]]["production"] = float("nan")
-    file_path.write_text(rtoml.dumps({"resources": resources}), encoding="utf-8")
+    output = dict.fromkeys(resources, 1.0)
+    output[validate_economy.ALL_RESOURCES[0]] = "not-a-number"
+    output[validate_economy.ALL_RESOURCES[1]] = float("nan")
+    file_path.write_text(rtoml.dumps({"resources": resources, "regional_resources": {"region": output}}), encoding="utf-8")
 
     errors = validate_economy.validate_file(file_path, 36.0)
 
