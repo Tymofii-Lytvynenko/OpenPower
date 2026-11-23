@@ -185,6 +185,35 @@ def test_regional_output_must_be_backed_by_national_production_without_being_inf
         )
 
 
+def test_live_production_decline_caps_attributed_regional_exports():
+    market = pl.DataFrame({
+        "country_id": ["AAA", "BBB"],
+        "game_resource_id": ["cereals", "cereals"],
+        "export_desired": [100.0, 0.0],
+        "affordable_import": [0.0, 100.0],
+        "domestic_production": [55.0, 0.0],
+    })
+    regional_capacity = pl.DataFrame({
+        "country_id": ["AAA", "AAA"],
+        "game_resource_id": ["cereals", "cereals"],
+        "region_id": [17, 23],
+        "domestic_production": [60.0, 40.0],
+    })
+    baseline = market.with_columns(pl.Series("domestic_production", [70.0, 0.0]))
+
+    flows = TreatyTradePolicy().allocate_with_regional_sources(
+        market,
+        pl.DataFrame(),
+        regional_capacity,
+        lambda *_: True,
+        national_production_baseline=baseline,
+    )
+
+    assert dict(flows.select("source_region_id", "trade_value_usd").iter_rows()) == {
+        17: 42.0, 23: 28.0, None: 30.0,
+    }
+
+
 def test_trade_system_publishes_region_provenance_and_blocks_nonrecognizing_importer():
     state = _recognition_state("passed", ("BBB",))
     state.update_table(

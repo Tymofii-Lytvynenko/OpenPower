@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import polars as pl
@@ -226,6 +227,47 @@ def regional_trade_access_allowed(
     if not has_current_case and not has_current_status:
         return True
     return regional_economic_access_allowed(state, int(region_id), importer)
+
+
+def regional_trade_access_for_cycle(state: Any) -> Callable[[int, str, str], bool]:
+    """Index ordinary regions so each trade lot can check its owner without scanning a table."""
+    regions = state.tables.get("regions")
+    owners: dict[int, str] = {}
+    if regions is not None and {"id", "owner"}.issubset(regions.columns):
+        columns = [key for key in ("id", "owner", "controller") if key in regions.columns]
+        for row in regions.select(columns).iter_rows(named=True):
+            owner = _tag(row["owner"])
+            if owner and _region_controller(row, owner) == owner:
+                owners.setdefault(row["id"], owner)
+
+    gated: set[int] = set()
+    cases = state.tables.get("recognition_cases")
+    if cases is not None and {"region_id", "claimant_id", "status"}.issubset(cases.columns):
+        current_cases = cases.filter(pl.col("status").is_in(["pending", "passed", "rejected"]))
+        gated.update(
+            region for region, claimant in current_cases.select("region_id", "claimant_id").iter_rows()
+            if owners.get(region) == claimant
+        )
+    statuses = state.tables.get("regional_recognition_status")
+    if statuses is not None and {"region_id", "claimant_id"}.issubset(statuses.columns):
+        if "withdrawn_at_minute" in statuses.columns:
+            statuses = statuses.filter(pl.col("withdrawn_at_minute") == 0)
+        gated.update(
+            region for region, claimant in statuses.select("region_id", "claimant_id").iter_rows()
+            if owners.get(region) == claimant
+        )
+
+    def allows(region_id: int, exporter_id: str, importer_id: str) -> bool:
+        owner = owners.get(region_id)
+        if not owner or _tag(exporter_id) != owner:
+            return False
+        return (
+            region_id not in gated
+            or _tag(importer_id) == owner
+            or regional_economic_access_allowed(state, region_id, importer_id)
+        )
+
+    return allows
 
 
 def _region_controller(region: dict[str, Any], owner: str) -> str:

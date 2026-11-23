@@ -19,7 +19,7 @@ from modules.base.systems.economy.market_data import _MarketIndexCache
 from modules.base.systems.economy.unconstrained_market_simulator import (
     UnconstrainedMarketSimulator,
 )
-from modules.base.systems.world.recognition_policy import regional_trade_access_allowed
+from modules.base.systems.world.recognition_policy import regional_trade_access_for_cycle
 
 
 class TradeSystem(ISystem):
@@ -142,7 +142,7 @@ class TradeSystem(ISystem):
                 self._market_input_validator,
                 self._market_frame_builder,
                 self._treaty_trade_policy,
-                regional_trade_access_allowed,
+                regional_trade_access_for_cycle,
             )
         )
 

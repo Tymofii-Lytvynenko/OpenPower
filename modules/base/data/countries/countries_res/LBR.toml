@@ -1,48 +1,50 @@
+# 2001 national GDP allocation: WDI broad sectors with modeled category shares; GDP total source: WDI. Amounts in whole nominal US dollars.
+# 2001 regional allocations: gameplay estimates; iron_and_steel=economic-center proxy, minerals=economic-center proxy, precious_stones=economic-center proxy.
+
 [resources.appliances]
-production = 8500
+production = 368490
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.arms_and_ammunition]
-production = 2500
+production = 183756
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.business_services]
-production = 3500000
+production = 15977752
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.cereals]
-production = 183785500
+production = 545908608
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
-# LBR 2001 Sum: 500,000,000.
 [resources.chemicals]
-production = 350000
+production = 2294417
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.commodities]
-production = 2500
+production = 5858560
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.construction_materials]
-production = 65000
+production = 1024968
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.construction_services]
-production = 250000
+production = 3181789
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
@@ -50,170 +52,688 @@ tax_rate = 0.0
 # Precision balance
 # Target: 500,000,000. Current Sum w/o Cereals: 316,214,500.
 [resources.dairy]
-production = 12500
+production = 28463398
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.drugs_and_raw_plants]
-production = 500
+production = 1200
 is_legal = false
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.education_services]
-production = 1250000
+production = 9017815
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.electricity]
-production = 450000
+production = 3054570
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.fabrics_and_leather]
-production = 12500
+production = 1010310
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.financial_services]
-production = 8500000
+production = 15990726
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.fossil_fuels]
-production = 125000000
+production = 0
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.government_services]
-production = 45000000
+production = 77926757
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.health_services]
-production = 1250000
+production = 7526683
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.industrial_services]
-production = 4500
+production = 1362174
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.iron_and_steel]
-production = 250000
+production = 6019190
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.it_and_telecom_services]
-production = 4500000
+production = 11208724
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.luxury_commodities]
-production = 6500
+production = 93344
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.machinery_and_instruments]
-production = 45000
+production = 1293971
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.meat_and_fish]
-production = 2250000
+production = 38323718
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.minerals]
-production = 85000000
+production = 138240
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.non_ferrous_metals]
-production = 185000
+production = 417768
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.other_food_and_beverages]
-production = 22500000
+production = 10492292
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.pharmaceuticals]
-production = 85000
+production = 664435
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.plastics_and_rubber]
-production = 125000
+production = 858662
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.precious_stones]
-production = 25000
+production = 6980
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.recreational_services]
-production = 1250000
+production = 2375499
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.tobacco]
-production = 18500
+production = 6030384
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.tourism_services]
-production = 4500
+production = 413272
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.transport_services]
-production = 12500000
+production = 33650688
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.vegetables_and_fruits]
-production = 850000
+production = 52921127
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.vehicles]
-production = 35000
+production = 925063
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
 [resources.wood_and_paper]
-production = 650000
+production = 21014670
 is_legal = true
 is_gov_controlled = false
 tax_rate = 0.0
 
+[regional_resources."#116C14"]
+appliances = 54095
+arms_and_ammunition = 26976
+business_services = 2277332
+cereals = 76851829
+chemicals = 336823
+commodities = 860044
+construction_materials = 150467
+construction_services = 467091
+dairy = 4236521
+drugs_and_raw_plants = 169
+education_services = 1305931
+electricity = 448415
+fabrics_and_leather = 148315
+financial_services = 2279181
+government_services = 11285105
+health_services = 1089990
+industrial_services = 194153
+iron_and_steel = 1427558
+it_and_telecom_services = 1597596
+luxury_commodities = 13703
+machinery_and_instruments = 189957
+meat_and_fish = 5704140
+minerals = 32786
+non_ferrous_metals = 61329
+other_food_and_beverages = 1540281
+pharmaceuticals = 97540
+plastics_and_rubber = 126053
+precious_stones = 1655
+recreational_services = 338583
+tobacco = 848944
+tourism_services = 58904
+transport_services = 4796281
+vegetables_and_fruits = 7450121
+vehicles = 135800
+wood_and_paper = 2836830
+
+[regional_resources."#169326"]
+appliances = 132215
+arms_and_ammunition = 65932
+business_services = 5072081
+cereals = 30389455
+chemicals = 823241
+commodities = 2102061
+construction_materials = 367760
+construction_services = 1141631
+dairy = 3526558
+drugs_and_raw_plants = 67
+education_services = 2358817
+electricity = 1095985
+fabrics_and_leather = 362501
+financial_services = 5076199
+government_services = 20383534
+health_services = 1968777
+industrial_services = 432417
+iron_and_steel = 3489142
+it_and_telecom_services = 3558170
+luxury_commodities = 33492
+machinery_and_instruments = 464279
+meat_and_fish = 4748232
+minerals = 80134
+non_ferrous_metals = 149896
+other_food_and_beverages = 3764652
+pharmaceuticals = 238400
+plastics_and_rubber = 308089
+precious_stones = 4046
+recreational_services = 754094
+tobacco = 335697
+tourism_services = 131192
+transport_services = 10682292
+vegetables_and_fruits = 2945995
+vehicles = 331914
+wood_and_paper = 845826
+
+[regional_resources."#200CD8"]
+appliances = 20432
+arms_and_ammunition = 10189
+business_services = 951807
+cereals = 45258862
+chemicals = 127218
+commodities = 324837
+construction_materials = 56831
+construction_services = 176420
+dairy = 2228288
+drugs_and_raw_plants = 99
+education_services = 579068
+electricity = 169366
+fabrics_and_leather = 56018
+financial_services = 952579
+government_services = 5003976
+health_services = 483317
+industrial_services = 81146
+it_and_telecom_services = 667712
+luxury_commodities = 5176
+machinery_and_instruments = 71746
+meat_and_fish = 3000214
+non_ferrous_metals = 23164
+other_food_and_beverages = 581762
+pharmaceuticals = 36841
+plastics_and_rubber = 47610
+recreational_services = 141510
+tobacco = 499952
+tourism_services = 24619
+transport_services = 2004597
+vegetables_and_fruits = 4387456
+vehicles = 51292
+wood_and_paper = 1743821
+
+[regional_resources."#403CF4"]
+appliances = 19883
+arms_and_ammunition = 9915
+business_services = 928874
+cereals = 21018991
+chemicals = 123801
+commodities = 316115
+construction_materials = 55305
+construction_services = 171682
+dairy = 1450530
+drugs_and_raw_plants = 46
+education_services = 553318
+electricity = 164818
+fabrics_and_leather = 54514
+financial_services = 929628
+government_services = 4781453
+health_services = 461825
+industrial_services = 79191
+it_and_telecom_services = 651624
+luxury_commodities = 5037
+machinery_and_instruments = 69820
+meat_and_fish = 1953024
+non_ferrous_metals = 22542
+other_food_and_beverages = 566140
+pharmaceuticals = 35851
+plastics_and_rubber = 46332
+recreational_services = 138101
+tobacco = 232186
+tourism_services = 24026
+transport_services = 1956298
+vegetables_and_fruits = 2037610
+vehicles = 49914
+wood_and_paper = 712501
+
+[regional_resources."#4B87A8"]
+appliances = 11707
+arms_and_ammunition = 5838
+business_services = 577908
+cereals = 48681479
+chemicals = 72896
+commodities = 186133
+construction_materials = 32564
+construction_services = 101089
+dairy = 1895042
+drugs_and_raw_plants = 107
+education_services = 336858
+electricity = 97047
+fabrics_and_leather = 32099
+financial_services = 578377
+government_services = 2910933
+health_services = 281157
+industrial_services = 49269
+it_and_telecom_services = 405414
+luxury_commodities = 2966
+machinery_and_instruments = 41111
+meat_and_fish = 2551525
+non_ferrous_metals = 13273
+other_food_and_beverages = 333352
+pharmaceuticals = 21110
+plastics_and_rubber = 27281
+recreational_services = 85921
+tobacco = 537760
+tourism_services = 14948
+transport_services = 1217129
+vegetables_and_fruits = 4719249
+vehicles = 29390
+wood_and_paper = 2050485
+
+[regional_resources."#4E0B3C"]
+appliances = 5443
+arms_and_ammunition = 2714
+business_services = 290973
+cereals = 20332989
+chemicals = 33893
+commodities = 86542
+construction_materials = 15141
+construction_services = 47001
+dairy = 890638
+drugs_and_raw_plants = 45
+education_services = 205694
+electricity = 45122
+fabrics_and_leather = 14924
+financial_services = 291209
+government_services = 1777485
+health_services = 171681
+industrial_services = 24807
+it_and_telecom_services = 204124
+luxury_commodities = 1379
+machinery_and_instruments = 19114
+meat_and_fish = 1199174
+non_ferrous_metals = 6171
+other_food_and_beverages = 154992
+pharmaceuticals = 9815
+plastics_and_rubber = 12684
+recreational_services = 43261
+tobacco = 224609
+tourism_services = 7526
+transport_services = 612817
+vegetables_and_fruits = 1971108
+vehicles = 13665
+wood_and_paper = 818948
+
+[regional_resources."#75976D"]
+appliances = 6883
+arms_and_ammunition = 3432
+business_services = 359060
+cereals = 38758797
+chemicals = 42857
+commodities = 109432
+construction_materials = 19145
+construction_services = 59432
+dairy = 1379944
+drugs_and_raw_plants = 85
+education_services = 237629
+electricity = 57056
+fabrics_and_leather = 18872
+financial_services = 359352
+government_services = 2053453
+health_services = 198336
+industrial_services = 30611
+it_and_telecom_services = 251888
+luxury_commodities = 1743
+machinery_and_instruments = 24170
+meat_and_fish = 1857985
+non_ferrous_metals = 7803
+other_food_and_beverages = 195985
+pharmaceuticals = 12411
+plastics_and_rubber = 16039
+recreational_services = 53383
+tobacco = 428149
+tourism_services = 9287
+transport_services = 756216
+vegetables_and_fruits = 3757331
+vehicles = 17279
+wood_and_paper = 1688755
+
+[regional_resources."#780EE7"]
+appliances = 28835
+arms_and_ammunition = 14379
+business_services = 1295987
+cereals = 56650526
+chemicals = 179539
+commodities = 458435
+construction_materials = 80204
+construction_services = 248976
+dairy = 2854471
+drugs_and_raw_plants = 124
+education_services = 779910
+electricity = 239021
+fabrics_and_leather = 79057
+financial_services = 1297040
+government_services = 6739535
+health_services = 650949
+industrial_services = 110489
+it_and_telecom_services = 909162
+luxury_commodities = 7304
+machinery_and_instruments = 101254
+meat_and_fish = 3843320
+non_ferrous_metals = 32690
+other_food_and_beverages = 821026
+pharmaceuticals = 51992
+plastics_and_rubber = 67191
+recreational_services = 192681
+tobacco = 625791
+tourism_services = 33521
+transport_services = 2729474
+vegetables_and_fruits = 5491780
+vehicles = 72387
+wood_and_paper = 2163659
+
+[regional_resources."#79AFF7"]
+appliances = 4818
+arms_and_ammunition = 2403
+business_services = 260848
+cereals = 23490543
+chemicals = 30001
+commodities = 76604
+construction_materials = 13402
+construction_services = 41604
+dairy = 922110
+drugs_and_raw_plants = 52
+education_services = 182164
+electricity = 39940
+fabrics_and_leather = 13210
+financial_services = 261060
+government_services = 1574161
+health_services = 152043
+industrial_services = 22238
+it_and_telecom_services = 182990
+luxury_commodities = 1220
+machinery_and_instruments = 16919
+meat_and_fish = 1241548
+non_ferrous_metals = 5463
+other_food_and_beverages = 137193
+pharmaceuticals = 8688
+plastics_and_rubber = 11228
+recreational_services = 38782
+tobacco = 259489
+tourism_services = 6747
+transport_services = 549370
+vegetables_and_fruits = 2277205
+vehicles = 12096
+wood_and_paper = 986296
+
+[regional_resources."#9D812A"]
+appliances = 8792
+arms_and_ammunition = 4385
+business_services = 447138
+cereals = 15359963
+chemicals = 54747
+commodities = 139790
+construction_materials = 24456
+construction_services = 75920
+dairy = 909020
+drugs_and_raw_plants = 34
+education_services = 301278
+electricity = 72884
+fabrics_and_leather = 24107
+financial_services = 447502
+government_services = 2603469
+health_services = 251460
+industrial_services = 38120
+it_and_telecom_services = 313677
+luxury_commodities = 2227
+machinery_and_instruments = 30875
+meat_and_fish = 1223924
+non_ferrous_metals = 9968
+other_food_and_beverages = 250354
+pharmaceuticals = 15854
+plastics_and_rubber = 20488
+recreational_services = 66478
+tobacco = 169674
+tourism_services = 11565
+transport_services = 941717
+vegetables_and_fruits = 1489016
+vehicles = 22073
+wood_and_paper = 551920
+
+[regional_resources."#AD301A"]
+appliances = 7545
+arms_and_ammunition = 3762
+business_services = 389853
+cereals = 37782800
+chemicals = 46979
+commodities = 119956
+construction_materials = 20987
+construction_services = 65148
+dairy = 1406891
+drugs_and_raw_plants = 83
+education_services = 255688
+electricity = 62543
+fabrics_and_leather = 20687
+financial_services = 390169
+government_services = 2209507
+health_services = 213409
+industrial_services = 33237
+it_and_telecom_services = 273490
+luxury_commodities = 1911
+machinery_and_instruments = 26495
+meat_and_fish = 1894268
+non_ferrous_metals = 8554
+other_food_and_beverages = 214834
+pharmaceuticals = 13605
+plastics_and_rubber = 17581
+recreational_services = 57962
+tobacco = 417368
+tourism_services = 10084
+transport_services = 821067
+vegetables_and_fruits = 3662716
+vehicles = 18941
+wood_and_paper = 1618465
+
+[regional_resources."#BF77F2"]
+appliances = 9522
+arms_and_ammunition = 4748
+business_services = 480255
+cereals = 17109763
+chemicals = 59291
+commodities = 151394
+construction_materials = 26487
+construction_services = 82222
+dairy = 992545
+drugs_and_raw_plants = 38
+education_services = 316935
+electricity = 78934
+fabrics_and_leather = 26108
+financial_services = 480645
+government_services = 2738767
+health_services = 264528
+industrial_services = 40944
+it_and_telecom_services = 336909
+luxury_commodities = 2412
+machinery_and_instruments = 33438
+meat_and_fish = 1336384
+non_ferrous_metals = 10796
+other_food_and_beverages = 271136
+pharmaceuticals = 17170
+plastics_and_rubber = 22189
+recreational_services = 71402
+tobacco = 189003
+tourism_services = 12422
+transport_services = 1011464
+vegetables_and_fruits = 1658644
+vehicles = 23905
+wood_and_paper = 619471
+
+[regional_resources."#C888DC"]
+appliances = 4692
+arms_and_ammunition = 2340
+business_services = 254731
+cereals = 22590178
+chemicals = 29217
+commodities = 74602
+construction_materials = 13052
+construction_services = 40517
+dairy = 893988
+drugs_and_raw_plants = 50
+education_services = 186839
+electricity = 38897
+fabrics_and_leather = 12865
+financial_services = 254938
+government_services = 1614556
+health_services = 155945
+industrial_services = 21717
+it_and_telecom_services = 178699
+luxury_commodities = 1189
+machinery_and_instruments = 16477
+meat_and_fish = 1203684
+non_ferrous_metals = 5320
+other_food_and_beverages = 133608
+pharmaceuticals = 8461
+plastics_and_rubber = 10934
+recreational_services = 37872
+tobacco = 249543
+tourism_services = 6589
+transport_services = 536489
+vegetables_and_fruits = 2189923
+vehicles = 11780
+wood_and_paper = 945579
+
+[regional_resources."#DFFFD6"]
+appliances = 11851
+arms_and_ammunition = 5910
+business_services = 584238
+cereals = 30750133
+chemicals = 73788
+commodities = 188411
+construction_materials = 32963
+construction_services = 102326
+dairy = 1480548
+drugs_and_raw_plants = 67
+education_services = 375038
+electricity = 98235
+fabrics_and_leather = 32491
+financial_services = 584713
+government_services = 3240864
+health_services = 313024
+industrial_services = 49809
+it_and_telecom_services = 409855
+luxury_commodities = 3002
+machinery_and_instruments = 41614
+meat_and_fish = 1993441
+non_ferrous_metals = 13435
+other_food_and_beverages = 337431
+pharmaceuticals = 21368
+plastics_and_rubber = 27614
+recreational_services = 86862
+tobacco = 339682
+tourism_services = 15112
+transport_services = 1230462
+vegetables_and_fruits = 2980960
+vehicles = 29750
+wood_and_paper = 1194873
+
+[regional_resources."#E80A88"]
+appliances = 41777
+arms_and_ammunition = 20833
+business_services = 1806667
+cereals = 60882300
+chemicals = 260126
+commodities = 664204
+construction_materials = 116204
+construction_services = 360730
+dairy = 3396304
+drugs_and_raw_plants = 134
+education_services = 1042648
+electricity = 346307
+fabrics_and_leather = 114542
+financial_services = 1808134
+government_services = 9009959
+health_services = 870242
+industrial_services = 154026
+iron_and_steel = 1102490
+it_and_telecom_services = 1267414
+luxury_commodities = 10583
+machinery_and_instruments = 146702
+meat_and_fish = 4572855
+minerals = 25320
+non_ferrous_metals = 47364
+other_food_and_beverages = 1189546
+pharmaceuticals = 75329
+plastics_and_rubber = 97349
+precious_stones = 1279
+recreational_services = 268607
+tobacco = 672537
+tourism_services = 46730
+transport_services = 3805015
+vegetables_and_fruits = 5902013
+vehicles = 104877
+wood_and_paper = 2237241

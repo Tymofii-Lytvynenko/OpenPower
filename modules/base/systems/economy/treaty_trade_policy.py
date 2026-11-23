@@ -5,7 +5,7 @@ from __future__ import annotations
 import heapq
 import json
 import math
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import Any, Callable
 
 import polars as pl
@@ -61,6 +61,8 @@ class TreatyTradePolicy:
         effects: pl.DataFrame,
         regional_production: pl.DataFrame,
         regional_access: Callable[[int, str, str], bool],
+        *,
+        national_production_baseline: pl.DataFrame | None = None,
     ) -> pl.DataFrame:
         """Allocate bilateral demand without erasing explicitly declared source regions."""
 
@@ -85,7 +87,9 @@ class TreatyTradePolicy:
         exports: dict[tuple[str, str], float] = defaultdict(float)
         demands: dict[tuple[str, str], float] = defaultdict(float)
         national_production: dict[tuple[str, str], float] = defaultdict(float)
-        has_national_production = "domestic_production" in market.columns
+        # Live national production can decline while regional records retain their base capacities.
+        baseline = market if national_production_baseline is None else national_production_baseline
+        has_national_production = "domestic_production" in baseline.columns
         for row in market.select(sorted(required_market_columns)).sort(
             ["game_resource_id", "country_id"]
         ).to_dicts():
@@ -93,7 +97,7 @@ class TreatyTradePolicy:
             exports[key] += self._finite_nonnegative(row.get("export_desired"))
             demands[key] += self._finite_nonnegative(row.get("affordable_import"))
         if has_national_production:
-            for row in market.select(
+            for row in baseline.select(
                 "country_id", "game_resource_id", "domestic_production"
             ).to_dicts():
                 key = (self._tag(row.get("country_id")), str(row.get("game_resource_id") or ""))
@@ -123,9 +127,11 @@ class TreatyTradePolicy:
                     )
                 regional_supply[key][region_id] += amount
 
-        if has_national_production:
+        if has_national_production and national_production_baseline is None:
             for key, sources in regional_supply.items():
-                if sum(sources.values()) > national_production.get(key, 0.0) + 1e-9:
+                national = national_production.get(key, 0.0)
+                rounding_tolerance = max(1e-9, math.ulp(national))
+                if math.fsum(sources.values()) > national + rounding_tolerance:
                     raise ValueError(
                         f"Explicit regional output exceeds national production for {key[0]}/{key[1]}."
                     )
@@ -142,7 +148,10 @@ class TreatyTradePolicy:
                 available = exports.get((country, resource), 0.0)
                 regional_by_id = regional_supply.get((country, resource), {})
                 declared_total = sum(regional_by_id.values())
-                tagged_total = min(available, declared_total)
+                attributable = declared_total
+                if national_production_baseline is not None:
+                    attributable = min(attributable, national_production.get((country, resource), 0.0))
+                tagged_total = min(available, attributable)
                 scale = tagged_total / declared_total if declared_total > 0.0 else 0.0
                 for region_id, amount in sorted(regional_by_id.items()):
                     tagged_amount = amount * scale
@@ -161,40 +170,44 @@ class TreatyTradePolicy:
                 for (country, item_resource), amount in demands.items()
                 if item_resource == resource and amount > 0.0
             }
-            ordered_lots = sorted(
-                lots,
-                key=lambda lot: (
-                    -lot["amount"],
-                    lot["exporter"],
-                    -1 if lot["region_id"] is None else lot["region_id"],
-                ),
+            available_lots = deque(
+                sorted(
+                    lots,
+                    key=lambda lot: (
+                        -lot["amount"],
+                        lot["exporter"],
+                        -1 if lot["region_id"] is None else lot["region_id"],
+                    ),
+                )
             )
 
             for common_only in (True, False):
                 for importer in sorted(resource_demands):
-                    demand = resource_demands[importer]
-                    if demand <= 0.0:
+                    if common_only and not common_peers.get(importer):
                         continue
-                    for lot in ordered_lots:
+                    demand = resource_demands[importer]
+                    # Remember skipped lots for the next importer, but retire exhausted supply.
+                    skipped_lots = []
+                    while demand > 0.0 and available_lots:
+                        lot = available_lots.popleft()
                         exporter = lot["exporter"]
                         amount = lot["amount"]
                         preferred = exporter in common_peers.get(importer, set())
                         if (
-                            amount <= 0.0
-                            or exporter == importer
+                            exporter == importer
                             or (common_only and not preferred)
                             or (not common_only and preferred)
                             or frozenset((exporter, importer)) in embargoes
                         ):
+                            skipped_lots.append(lot)
                             continue
                         region_id = lot["region_id"]
                         if region_id is not None and not regional_access(
                             region_id, exporter, importer
                         ):
+                            skipped_lots.append(lot)
                             continue
                         allocated = min(demand, amount)
-                        if allocated <= 0.0:
-                            continue
                         flows.append(
                             {
                                 "exporter_id": exporter,
@@ -205,10 +218,11 @@ class TreatyTradePolicy:
                             }
                         )
                         lot["amount"] -= allocated
+                        if lot["amount"] > 0.0:
+                            available_lots.appendleft(lot)
                         demand -= allocated
-                        resource_demands[importer] = demand
-                        if demand <= 0.0:
-                            break
+                    available_lots.extendleft(reversed(skipped_lots))
+                    resource_demands[importer] = demand
 
         return (
             pl.DataFrame(flows, schema=REGIONAL_TRADE_FLOW_SCHEMA, strict=False)

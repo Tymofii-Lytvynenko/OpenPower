@@ -49,7 +49,7 @@ class MarketFlowResolver:
         treaty_trade_policy: TreatyTradePolicy,
         constrained_market_reconciler: ConstrainedMarketReconciler,
         country_budget_updater: MarketCountryBudgetUpdater,
-        regional_trade_access: Callable[[GameState, int, str, str], bool],
+        regional_trade_access: Callable[[GameState], Callable[[int, str, str], bool]],
     ) -> None:
         self._treaty_trade_policy = treaty_trade_policy
         self._constrained_market_reconciler = constrained_market_reconciler
@@ -72,12 +72,8 @@ class MarketFlowResolver:
                 market,
                 effects,
                 regional_production,
-                lambda region_id, exporter_id, importer_id: self._regional_trade_access(
-                    state,
-                    region_id,
-                    exporter_id,
-                    importer_id,
-                ),
+                self._regional_trade_access(state),
+                national_production_baseline=state.tables.get("domestic_production"),
             )
         elif self._treaty_trade_policy.has_constraints(treaty_effects):
             constrained_flows = self._treaty_trade_policy.allocate(market, treaty_effects)

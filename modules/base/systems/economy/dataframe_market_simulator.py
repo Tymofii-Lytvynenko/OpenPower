@@ -48,7 +48,7 @@ class DataFrameMarketSimulator:
         input_validator: MarketInputValidator,
         frame_builder: MarketFrameBuilder,
         treaty_trade_policy: TreatyTradePolicy,
-        regional_trade_access: Callable[[GameState, int, str, str], bool],
+        regional_trade_access: Callable[[GameState], Callable[[int, str, str], bool]],
     ) -> DataFrameMarketSimulator:
         flow_resolver = MarketFlowResolver(
             treaty_trade_policy=treaty_trade_policy,
