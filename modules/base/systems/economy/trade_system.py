@@ -5,7 +5,8 @@ import polars as pl
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE, SYSTEM_STATE_HELPER
 from src.shared.state import GameState
-from src.shared.events import EventRealSecond
+from src.shared.actions import ActionOccupyRegion
+from src.shared.events import EventOccupationChanged, EventRealSecond, EventTerritoryOwnershipChanged
 from modules.base.systems.economy.treaty_trade_policy import TreatyTradePolicy
 from modules.base.systems.economy.market_input_validator import MarketInputValidator
 from modules.base.systems.economy.market_frame_builder import MarketFrameBuilder
@@ -16,6 +17,10 @@ from modules.base.systems.economy.missing_column_warning_registry import (
     MissingColumnWarningRegistry,
 )
 from modules.base.systems.economy.market_data import _MarketIndexCache
+from modules.base.systems.economy.regional_production_cycle import (
+    apply_national_production_changes,
+    refresh_regional_production,
+)
 from modules.base.systems.economy.unconstrained_market_simulator import (
     UnconstrainedMarketSimulator,
 )
@@ -34,7 +39,7 @@ class TradeSystem(ISystem):
             'resource_ledger', 'stockpiles', 'regional_production', 'regions',
             'recognition_cases', 'regional_recognition_status',
         }),
-        writes=frozenset({'countries', 'domestic_production', 'resource_ledger', 'stockpiles', 'trade_network'}),
+        writes=frozenset({'countries', 'domestic_production', 'regional_production', 'resource_ledger', 'stockpiles', 'trade_network'}),
         phase=SystemPhase.TRADE,
     )
 
@@ -172,11 +177,18 @@ class TradeSystem(ISystem):
 
     def update(self, state: GameState, delta_time: float) -> None:
         real_sec_events = [e for e in state.events if isinstance(e, EventRealSecond)]
+        ran_market = False
         for event in real_sec_events:
             if event.is_paused or event.game_seconds_passed <= 0:
                 continue
             fraction = event.game_seconds_passed / (365.25 * 24 * 3600)
             self._simulate_market_cycle(state, fraction)
+            ran_market = True
+        if not ran_market and (
+            any(isinstance(event, (EventOccupationChanged, EventTerritoryOwnershipChanged)) for event in state.events)
+            or any(isinstance(action, ActionOccupyRegion) for action in state.current_actions)
+        ):
+            refresh_regional_production(state)
 
     def _simulate_market_cycle(self, state: GameState, fraction: float):
         if "countries" not in state.tables or "domestic_production" not in state.tables:
@@ -185,12 +197,15 @@ class TradeSystem(ISystem):
             raise ValueError("Trade elapsed-year fraction must be finite and non-negative.")
         if self._simulate_market_cycle_fast(state, fraction):
             return
+        refresh_regional_production(state)
+        previous = state.get_table("domestic_production")
         self._dataframe_market_simulator.simulate(
             state,
             fraction,
             _resource_physics_table(),
             self._market_column_warning_registry,
         )
+        apply_national_production_changes(state, previous)
 
     def _simulate_market_cycle_fast(self, state: GameState, fraction: float) -> bool:
         """Delegate eligible unconstrained cycles to the composed NumPy simulator."""

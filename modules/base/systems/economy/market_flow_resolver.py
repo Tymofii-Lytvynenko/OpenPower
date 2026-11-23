@@ -9,6 +9,7 @@ from modules.base.systems.economy.market_cycle_calculations import (
     ConstrainedMarketReconciler,
 )
 from modules.base.systems.economy.treaty_trade_policy import TreatyTradePolicy
+from modules.base.systems.economy.regional_production_cycle import operating_regional_production
 from src.shared.numeric import stable_group_sums
 from src.shared.state import GameState
 
@@ -71,7 +72,7 @@ class MarketFlowResolver:
             constrained_flows = self._treaty_trade_policy.allocate_with_regional_sources(
                 market,
                 effects,
-                regional_production,
+                operating_regional_production(state, regional_production),
                 self._regional_trade_access(state),
                 national_production_baseline=state.tables.get("domestic_production"),
             )

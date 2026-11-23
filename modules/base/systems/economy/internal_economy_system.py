@@ -16,6 +16,7 @@ from modules.base.systems.economy.consumption_fast_path import (
 )
 from modules.base.systems.economy.input_validation import validate_numeric_columns
 from modules.base.systems.economy.production_basis_builder import ProductionBasisBuilder
+from modules.base.systems.economy.regional_production_cycle import apply_national_production_changes
 from modules.base.systems.economy.resource_market_policy import (
     validate_market_policy_update,
 )
@@ -193,7 +194,10 @@ class InternalEconomySystem(ISystem):
                 continue
             
             fraction_of_year = event.game_seconds_passed / (365.25 * 24 * 3600)
+            previous_production = state.tables.get("domestic_production")
             self._process_economy(state, fraction_of_year, population)
+            if previous_production is not None:
+                apply_national_production_changes(state, previous_production)
             
             if "domestic_production" in state.tables:
                 rebuild_ledger = True

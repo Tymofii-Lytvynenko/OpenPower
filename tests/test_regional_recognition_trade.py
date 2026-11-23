@@ -4,6 +4,10 @@ import polars as pl
 import pytest
 
 from modules.base.systems.economy.trade_system import TradeSystem
+from modules.base.systems.economy.regional_production_cycle import (
+    apply_national_production_changes,
+    refresh_regional_production,
+)
 from modules.base.systems.economy.treaty_trade_policy import TreatyTradePolicy
 from modules.base.systems.world.recognition_policy import regional_trade_access_allowed
 from src.shared.state import GameState
@@ -263,6 +267,68 @@ def test_trade_system_publishes_region_provenance_and_blocks_nonrecognizing_impo
         {"exporter_id": "AAA", "importer_id": "BBB", "source_region_id": 17}
     ]
     assert flows["trade_value_usd"].to_list() == [70.0]
+
+
+@pytest.mark.parametrize("final_owner", ["AAA", "BBB"])
+def test_occupation_suspends_output_until_liberation_or_annexation(final_owner):
+    state = _recognition_state(None)
+    state.update_table("countries", pl.DataFrame({"id": ["AAA", "BBB"]}))
+    state.update_table("domestic_production", pl.DataFrame({
+        "country_id": ["AAA"],
+        "game_resource_id": ["cereals"],
+        "domestic_production": [100.0],
+    }))
+    state.update_table("regional_production", pl.DataFrame({
+        "id": ["AAA:17:cereals"],
+        "country_id": ["AAA"],
+        "region_id": [17],
+        "game_resource_id": ["cereals"],
+        "domestic_production": [100.0],
+    }))
+    state.update_table("resource_ledger", pl.DataFrame({
+        "country_id": ["AAA", "BBB"],
+        "game_resource_id": ["cereals", "cereals"],
+        "consumption_usd": [0.0, 0.0],
+    }))
+    trade = TradeSystem()
+
+    state.update_table("regions", pl.DataFrame({"id": [17], "owner": ["AAA"], "controller": ["BBB"]}))
+    for _ in range(2):
+        trade._simulate_market_cycle(state, 0.0)
+        assert state.get_table("domestic_production")["domestic_production"].sum() == 0.0
+        assert state.get_table("regional_production")["domestic_production"].item() == 100.0
+        assert state.get_table("trade_network").is_empty()
+
+    state.update_table("regions", pl.DataFrame({
+        "id": [17], "owner": [final_owner], "controller": [final_owner],
+    }))
+    trade._simulate_market_cycle(state, 0.0)
+    national = dict(state.get_table("domestic_production").select("country_id", "domestic_production").iter_rows())
+    assert national[final_owner] == 100.0
+    assert sum(national.values()) == 100.0
+    assert state.get_table("regional_production")["country_id"].item() == final_owner
+
+
+def test_production_change_excludes_occupied_regions():
+    state = GameState(tables={
+        "regions": pl.DataFrame({"id": [17, 18], "owner": ["AAA", "AAA"], "controller": ["BBB", "AAA"]}),
+        "regional_production": pl.DataFrame({
+            "id": ["AAA:17:cereals", "AAA:18:cereals"],
+            "country_id": ["AAA", "AAA"],
+            "region_id": [17, 18],
+            "game_resource_id": ["cereals", "cereals"],
+            "domestic_production": [60.0, 40.0],
+        }),
+        "domestic_production": pl.DataFrame({
+            "country_id": ["AAA"], "game_resource_id": ["cereals"], "domestic_production": [100.0],
+        }),
+    })
+    refresh_regional_production(state)
+    previous = state.get_table("domestic_production")
+    assert previous["domestic_production"].item() == 40.0
+    state.update_table("domestic_production", previous.with_columns(pl.lit(50.0).alias("domestic_production")))
+    apply_national_production_changes(state, previous)
+    assert state.get_table("regional_production")["domestic_production"].to_list() == [60.0, 50.0]
 
 
 def test_empty_regional_source_table_preserves_existing_world_market_flow_contract():

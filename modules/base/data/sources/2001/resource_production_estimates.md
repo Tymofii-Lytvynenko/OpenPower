@@ -12,6 +12,10 @@ The base scenario stores production in whole US dollars in `[regional_resources]
 
 ## Regional estimates
 
+### Runtime rule for occupied regions
+
+An occupied region contributes zero effective production to both the legal owner and the occupier. Its stored regional production survives the interruption. The economy projects output under the new owner once annexation is complete, or under the existing owner if control is restored before annexation. Market and economic growth changes are allocated only to operating regions.
+
 - Use country-specific production geography where available. Map coastal/offshore production to regional proxies where the game has no offshore region.
 - Otherwise use the bundled 2001 population and working-age estimates, with area and biome as additional signals for agriculture and forestry. Unanchored extraction and steel use low-confidence economic-center proxies. These placements require local review.
 - Use the map's unique region colors for generated records. When a source names only a shared subdivision code, use the largest map region carrying that code in the country.
