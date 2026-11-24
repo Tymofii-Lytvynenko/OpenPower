@@ -214,8 +214,7 @@ class CountryMoreInfoPresenter:
             population_available=population_available,
             birth_rate_per_1000=self._population_weighted_rate(country_regions, "birth_rate_per_1000")
             if population_available else None,
-            death_rate_per_1000=self._population_weighted_rate(country_regions, "death_rate_per_1000")
-            if population_available else None,
+            death_rate_per_1000=country_row.get("death_rate_per_1000"),
             density_per_km2=(population_total / land_area) if land_area > 0 else 0.0,
             human_dev_pct=as_percent(country_row["human_dev"])
             if country_row.get("human_dev") is not None
@@ -1054,7 +1053,7 @@ class CountryMoreInfoPanel:
                 f"frmPopulation/txt{widget}",
                 f"{rate:.1f} ‰" if rate is not None else "—",
                 tooltip=(
-                    f"Modeled {event} per year per 1,000 residents in currently controlled regions."
+                    f"Modeled {event} per year per 1,000 residents."
                     if rate is not None else f"Current {label.lower()} data is unavailable."
                 ),
                 test_id=f"country.info.{label.lower().replace(' ', '_')}.value",

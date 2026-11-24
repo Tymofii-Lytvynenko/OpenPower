@@ -30,7 +30,7 @@ class TestPopulationSystem(unittest.TestCase):
         )
         self.assertEqual(
             with_flow.get_table("regions").select("pop_14", "pop_15_64", "pop_65").row(0),
-            (10, 99, 20),
+            (10, 100, 20),
         )
 
     def test_demographic_formulas_match_one_year_cohort_transitions(self):
@@ -49,7 +49,8 @@ class TestPopulationSystem(unittest.TestCase):
                     {
                         "id": ["AAA"],
                         "fertility_rate": [2.0],
-                        "life_expectancy": [50.0],
+                        "death_rate": [10.0],
+                        "death_rate_available": [True],
                     }
                 ),
             }
@@ -59,8 +60,10 @@ class TestPopulationSystem(unittest.TestCase):
 
         self.assertEqual(
             state.get_table("regions").select("pop_14", "pop_15_64", "pop_65").row(0),
-            (14_500, 35_300, 10_500),
+            (14_360, 34_947, 10_593),
         )
+        self.assertEqual(state.get_table("countries").item(0, "death_rate_per_1000"), 10.0)
+        self.assertNotIn("death_rate_per_1000", state.get_table("regions").columns)
 
     def test_large_elapsed_time_never_moves_more_than_a_cohort_or_creates_negative_people(self):
         state = self._state()

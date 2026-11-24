@@ -5,18 +5,23 @@ from modules.base.systems.demographics.population_growth import (
     DAILY_CHILDREN_AGING,
     DAILY_WORKING_AGE_AGING,
     FEMALE_RATIO,
+    COHORT_COLUMNS,
+    DEATH_RATE_COLUMN,
     calculate_population_growth,
-    with_demographic_rates,
+    store_cohorts,
+    with_birth_rate,
 )
-from modules.base.systems.world.random_event_effects import aggregate_active_effects
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
 from src.shared.system_state import SYSTEM_STATE_CACHE
 from src.shared.state import GameState
 from src.shared.events import EventRealSecond
 
+DEFAULT_DEATH_RATE_PER_1000 = 10.0
+
+
 class PopulationSystem(ISystem):
     access = SystemAccess(
-        reads=frozenset({'countries', 'regions', 'random_event_effects'}),
+        reads=frozenset({'countries', 'regions'}),
         writes=frozenset({'countries', 'regions'}),
         phase=SystemPhase.POPULATION,
     )
@@ -52,152 +57,85 @@ class PopulationSystem(ISystem):
         days_passed = max(0.0, days_passed)
         regions = state.get_table("regions")
         
-        # Ensure core population columns exist in regions
-        required_regions = {"pop_14": 0, "pop_15_64": 0, "pop_65": 0}
-        for col, default in required_regions.items():
-            if col not in regions.columns:
-                if col not in self._missing_columns:
-                    print(f"[{self.id}] Column '{col}' not found in 'regions'. Defaulting to {default}.")
-                    self._missing_columns.add(col)
-                regions = regions.with_columns(pl.lit(default).alias(col))
-        output_region_columns = regions.columns
-
         countries = state.get_table("countries")
+        for column in COHORT_COLUMNS:
+            if column not in regions.columns:
+                self._warn_missing("regions", column, 0)
+                regions = regions.with_columns(pl.lit(0).alias(column))
 
-        event_health = aggregate_active_effects(
-            state.tables.get("random_event_effects"),
-            int(state.time.total_minutes),
-            categories={"health"},
-            subject_type="region",
-        )
-        event_health_by_region = {}
-        if event_health and "id" in regions.columns:
-            event_health_by_region = {
-                int(subject_id): max(-0.5, min(0.25, magnitude))
-                for (_, subject_id, _), magnitude in event_health.items()
-                if subject_id.lstrip("-").isdigit()
-            }
-        
-        # Merge regions with country demographics
-        # We need fertility_rate and life_expectancy
-        required = {"fertility_rate": 2.7, "life_expectancy": 67.0}
-        required["economic_health"] = 1.0
-        for col, default in required.items():
-            if col not in countries.columns:
-                if col not in self._missing_columns:
-                    print(f"[{self.id}] Column '{col}' not found in 'countries'. Defaulting to {default}.")
-                    self._missing_columns.add(col)
-                countries = countries.with_columns(pl.lit(default).alias(col))
+        if "fertility_rate" not in countries.columns:
+            self._warn_missing("countries", "fertility_rate", 2.7)
+            countries = countries.with_columns(pl.lit(2.7).alias("fertility_rate"))
 
-        regional_health_capacity = (
-            pl.col("health_capacity").fill_null(1.0).clip(0.0, 1.0)
-            if "health_capacity" in regions.columns
-            else pl.lit(1.0)
-        )
-        fertility_values, life_expectancy_values, economic_health_values = self._get_region_parameters(
-            state, regions, countries
-        )
-        updated_regions = calculate_population_growth(
-            regions,
-            days_passed=days_passed,
-            fertility_rates=fertility_values,
-            life_expectancies=life_expectancy_values,
-            economic_health=economic_health_values,
-            event_health_by_region=event_health_by_region,
-        )
-        if updated_regions is not None:
-            self._store_updated_regions(state, updated_regions)
-            return
-
-        parameter_columns = [
-            fertility_values.alias("_fertility_rate"),
-            life_expectancy_values.alias("_life_expectancy"),
-            economic_health_values.alias("_economic_health"),
-        ]
-        if event_health_by_region:
-            region_ids = regions.get_column("id").to_list()
-            event_health_values = pl.Series(
-                "_event_health_modifier",
-                [event_health_by_region.get(region_id, 0.0) for region_id in region_ids],
-                dtype=pl.Float64,
+        if DEATH_RATE_COLUMN not in countries.columns:
+            rate = pl.lit(None, dtype=pl.Float64)
+            if "death_rate" in countries.columns:
+                rate = pl.col("death_rate").cast(pl.Float64, strict=False)
+                if "death_rate_available" in countries.columns:
+                    rate = pl.when(pl.col("death_rate_available").fill_null(False)).then(rate)
+            # Use one explicit scenario fallback where the national observation is missing.
+            countries = countries.with_columns(
+                pl.when(rate.is_finite() & rate.is_between(0.0, 1000.0))
+                .then(rate)
+                .otherwise(DEFAULT_DEATH_RATE_PER_1000)
+                .alias(DEATH_RATE_COLUMN)
             )
-            parameter_columns.append(event_health_values)
-        regions_with_parameters = regions.hstack(parameter_columns)
-        pop_data = regions_with_parameters.lazy()
-
-        # A delayed tick may span years; one population update cannot move more than one full cohort.
-        aging_kids_step = min(1.0, DAILY_CHILDREN_AGING * days_passed)
-        aging_work_step = min(1.0, DAILY_WORKING_AGE_AGING * days_passed)
-
-        fertility_rate = pl.col("_fertility_rate")
-        life_expectancy = pl.col("_life_expectancy")
-        regional_life_expectancy = (
-            life_expectancy
-            * (0.9 + 0.1 * regional_health_capacity)
-            * (0.9 + 0.1 * pl.col("_economic_health"))
-            * (
-                1.0 + pl.col("_event_health_modifier").clip(-0.5, 0.25)
-                if event_health_by_region
-                else 1.0
+            state.update_table(
+                "countries",
+                state.get_table("countries").with_columns(countries.get_column(DEATH_RATE_COLUMN)),
             )
-        ).clip(lower_bound=1.0)
-        annual_births_per_worker = fertility_rate * FEMALE_RATIO / CHILDBEARING_YEARS
-        birth_step = annual_births_per_worker / DAYS_PER_YEAR * days_passed
-        death_step = (
-            1.0 / (regional_life_expectancy * DAYS_PER_YEAR) * days_passed
-        ).clip(0.0, 1.0)
 
-        updated = pop_data.with_columns([
-            (
-                pl.col("pop_14").fill_null(0).clip(lower_bound=0)
-                + pl.col("pop_15_64").fill_null(0).clip(lower_bound=0) * birth_step
-                - pl.col("pop_14").fill_null(0).clip(lower_bound=0) * aging_kids_step
-            ).clip(lower_bound=0).cast(pl.Int64).alias("pop_14"),
-            (
-                pl.col("pop_15_64").fill_null(0).clip(lower_bound=0)
-                + pl.col("pop_14").fill_null(0).clip(lower_bound=0) * aging_kids_step
-                - pl.col("pop_15_64").fill_null(0).clip(lower_bound=0) * aging_work_step
-            ).clip(lower_bound=0).cast(pl.Int64).alias("pop_15_64"),
-            (
-                pl.col("pop_65").fill_null(0).clip(lower_bound=0)
-                + pl.col("pop_15_64").fill_null(0).clip(lower_bound=0) * aging_work_step
-                - pl.col("pop_65").fill_null(0).clip(lower_bound=0) * death_step
-            ).clip(lower_bound=0).cast(pl.Int64).alias("pop_65"),
-        ])
-        # Keep formula evaluation in one Polars plan to avoid repeated eager materialization per tick.
-        updated = updated.select(
-            *output_region_columns,
-            annual_births_per_worker.alias("_annual_births_per_worker"),
-            regional_life_expectancy.alias("_adjusted_life_expectancy"),
-        ).collect()
-        self._store_updated_regions(
-            state,
-            with_demographic_rates(
-                updated.select(output_region_columns),
-                updated.get_column("_annual_births_per_worker"),
-                updated.get_column("_adjusted_life_expectancy"),
-            ),
+        fertility, mortality = self._get_region_parameters(state, regions, countries)
+        updated = calculate_population_growth(
+            regions, days_passed=days_passed, fertility_rates=fertility, death_rates=mortality,
         )
+        if updated is None:
+            updated = self._update_cohorts_polars(regions, fertility, mortality, days_passed)
+        self._store_updated_regions(state, updated)
+
+    def _warn_missing(self, table: str, column: str, default: float) -> None:
+        if column not in self._missing_columns:
+            print(f"[{self.id}] Column '{column}' not found in '{table}'. Defaulting to {default}.")
+            self._missing_columns.add(column)
+
+    @staticmethod
+    def _update_cohorts_polars(
+        regions: pl.DataFrame, fertility: pl.Series, mortality: pl.Series, days: float
+    ) -> pl.DataFrame:
+        survival = 1.0 - (mortality / 1000.0 / DAYS_PER_YEAR * days).clip(0.0, 1.0)
+        children, working, older = (
+            pl.col(column).fill_null(0).clip(lower_bound=0)
+            for column in COHORT_COLUMNS
+        )
+        annual_births = fertility * FEMALE_RATIO / CHILDBEARING_YEARS
+        aged_children = children * survival * min(1.0, DAILY_CHILDREN_AGING * days)
+        aged_workers = working * survival * min(1.0, DAILY_WORKING_AGE_AGING * days)
+        cohorts = regions.select(
+            (children * survival + working * (annual_births / DAYS_PER_YEAR * days) - aged_children).alias("children"),
+            (working * survival + aged_children - aged_workers).alias("working"),
+            (older * survival + aged_workers).alias("older"),
+        )
+        return with_birth_rate(store_cohorts(regions, cohorts.get_columns()), annual_births)
 
     def _store_updated_regions(self, state: GameState, regions: pl.DataFrame) -> None:
         state.update_table("regions", regions)
         if self._parameter_cache is not None:
             cache = self._parameter_cache
-            self._parameter_cache = (*cache[:6], state.get_table("regions"))
+            self._parameter_cache = (*cache[:5], state.get_table("regions"))
 
     def _get_region_parameters(
         self,
         state: GameState,
         regions: pl.DataFrame,
         countries: pl.DataFrame,
-    ) -> tuple[pl.Series, pl.Series, pl.Series]:
+    ) -> tuple[pl.Series, pl.Series]:
         country_revision = state.table_revisions.get("countries", 0)
         cached = self._parameter_cache
         if cached is not None and cached[0] == country_revision:
             # Reuse the join after population-only updates; replaced frames still validate
             # owner alignment below.
-            if cached[6] is regions:
-                return cached[3], cached[4], cached[5]
+            if cached[5] is regions:
+                return cached[3], cached[4]
         region_ids = (
             regions.get_column("id")
             if "id" in regions.columns
@@ -206,16 +144,20 @@ class PopulationSystem(ISystem):
         if cached is not None and cached[0] == country_revision:
             region_owners = regions.get_column("owner")
             if cached[1].equals(region_ids) and cached[2].equals(region_owners):
-                self._parameter_cache = (*cached[:6], regions)
-                return cached[3], cached[4], cached[5]
+                self._parameter_cache = (*cached[:5], regions)
+                return cached[3], cached[4]
 
         region_owners = regions.get_column("owner")
 
+        if DEATH_RATE_COLUMN not in countries.columns:
+            countries = countries.with_columns(
+                pl.lit(DEFAULT_DEATH_RATE_PER_1000).alias(DEATH_RATE_COLUMN)
+            )
         indexed_regions = regions.with_row_index("_region_order").select(
             ["_region_order", "owner"]
         )
         parameter_frame = indexed_regions.join(
-            countries.select(["id", "fertility_rate", "life_expectancy", "economic_health"]),
+            countries.select("id", "fertility_rate", DEATH_RATE_COLUMN),
             left_on="owner",
             right_on="id",
             how="left",
@@ -227,27 +169,19 @@ class PopulationSystem(ISystem):
             .fill_nan(2.7)
             .clip(lower_bound=0.0)
         )
-        life_expectancy_values = (
-            parameter_frame.get_column("life_expectancy")
+        mortality_values = (
+            parameter_frame.get_column(DEATH_RATE_COLUMN)
             .cast(pl.Float64)
-            .fill_null(67.0)
-            .fill_nan(67.0)
-            .clip(lower_bound=1.0)
-        )
-        economic_health_values = (
-            parameter_frame.get_column("economic_health")
-            .cast(pl.Float64)
-            .fill_null(1.0)
-            .fill_nan(1.0)
-            .clip(0.0, 1.0)
+            .fill_null(DEFAULT_DEATH_RATE_PER_1000)
+            .fill_nan(DEFAULT_DEATH_RATE_PER_1000)
+            .clip(0.0, 1000.0)
         )
         self._parameter_cache = (
             country_revision,
             region_ids.clone(),
             region_owners.clone(),
             fertility_values,
-            life_expectancy_values,
-            economic_health_values,
+            mortality_values,
             regions,
         )
-        return fertility_values, life_expectancy_values, economic_health_values
+        return fertility_values, mortality_values

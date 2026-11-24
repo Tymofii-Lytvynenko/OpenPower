@@ -41,11 +41,11 @@ class PopulationSystemCoverageTest(unittest.TestCase):
             system._apply_tfr_growth(state, days_passed=1.0)
 
         warnings = output.getvalue().splitlines()
-        self.assertEqual(len(warnings), 6)
+        self.assertEqual(len(warnings), 4)
         for column in ("pop_14", "pop_15_64", "pop_65"):
             self.assertEqual(state.get_table("regions")[column].to_list(), [0])
-        for column in ("birth_rate_per_1000", "death_rate_per_1000"):
-            self.assertIsNone(state.get_table("regions").item(0, column))
+        self.assertIsNone(state.get_table("regions").item(0, "birth_rate_per_1000"))
+        self.assertEqual(state.get_table("countries").item(0, "death_rate_per_1000"), 10.0)
         self.assertEqual(
             {"fertility_rate", "life_expectancy", "economic_health"}.intersection(
                 state.get_table("countries").columns
@@ -53,37 +53,26 @@ class PopulationSystemCoverageTest(unittest.TestCase):
             set(),
         )
 
-    def test_compatibility_path_applies_event_health_and_preserves_region_columns(self) -> None:
-        state = self._state()
-        system = PopulationSystem()
-        effects = {
-            ("event-a", "1", "health"): 0.5,
-            ("event-b", "not-a-region-id", "health"): -1.0,
-        }
-
-        with (
-            patch(
-                "modules.base.systems.demographics.population_system.aggregate_active_effects",
-                return_value=effects,
-            ),
-            patch(
-                "modules.base.systems.demographics.population_system.calculate_population_growth",
-                return_value=None,
-            ) as fast_path,
+    def test_compatibility_path_matches_fast_path(self) -> None:
+        fast_state = self._state()
+        fallback_state = self._state()
+        PopulationSystem()._apply_tfr_growth(fast_state, days_passed=365.25)
+        with patch(
+            "modules.base.systems.demographics.population_system.calculate_population_growth",
+            return_value=None,
         ):
-            system._apply_tfr_growth(state, days_passed=365.25)
+            PopulationSystem()._apply_tfr_growth(fallback_state, days_passed=365.25)
 
-        self.assertEqual(fast_path.call_args.kwargs["event_health_by_region"], {1: 0.25})
-        regions = state.get_table("regions")
+        fast = fast_state.get_table("regions")
+        fallback = fallback_state.get_table("regions")
         self.assertEqual(
-            regions.select("pop_14", "pop_15_64", "pop_65").row(0),
-            (14_500, 35_300, 10_540),
+            fast.select("pop_14", "pop_15_64", "pop_65").rows(),
+            fallback.select("pop_14", "pop_15_64", "pop_65").rows(),
         )
-        self.assertIn("health_capacity", regions.columns)
-        self.assertNotIn("_event_health_modifier", regions.columns)
-        population = 14_500 + 35_300 + 10_540
-        self.assertAlmostEqual(regions.item(0, "birth_rate_per_1000"), 1000 * 35_300 * 2 * 0.25 / 35 / population)
-        self.assertAlmostEqual(regions.item(0, "death_rate_per_1000"), 1000 * 10_540 / 62.5 / population)
+        self.assertAlmostEqual(
+            fast.item(0, "birth_rate_per_1000"), fallback.item(0, "birth_rate_per_1000")
+        )
+        self.assertIn("health_capacity", fallback.columns)
 
     def test_parameter_cache_reuses_values_for_replaced_aligned_regions(self) -> None:
         state = self._state()
@@ -96,7 +85,7 @@ class PopulationSystemCoverageTest(unittest.TestCase):
         reused = system._get_region_parameters(state, replacement, countries)
 
         self.assertIs(original[0], reused[0])
-        self.assertIs(system._parameter_cache[6], replacement)
+        self.assertIs(system._parameter_cache[5], replacement)
 
     @staticmethod
     def _state() -> GameState:

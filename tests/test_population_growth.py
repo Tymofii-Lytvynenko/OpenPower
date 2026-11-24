@@ -23,53 +23,46 @@ def test_vectorized_growth_matches_cohort_formula_and_preserves_region_columns()
         regions,
         days_passed=365.25,
         fertility_rates=pl.Series([2.0], dtype=pl.Float64),
-        life_expectancies=pl.Series([50.0], dtype=pl.Float64),
-        economic_health=pl.Series([1.0], dtype=pl.Float64),
+        death_rates=pl.Series([10.0]),
     )
 
     assert updated is not None
     assert updated.select("pop_14", "pop_15_64", "pop_65").row(0) == (
-        14_500,
-        35_300,
-        10_500,
+        14_360,
+        34_947,
+        10_593,
     )
     assert updated.get_column("custom_region_data").to_list() == ["retained"]
     assert updated.schema["pop_14"] == pl.Int64
-    population = 14_500 + 35_300 + 10_500
-    assert updated.item(0, "birth_rate_per_1000") == pytest.approx(1000 * 35_300 * 2 * 0.25 / 35 / population)
-    assert updated.item(0, "death_rate_per_1000") == pytest.approx(1000 * 10_500 / 50 / population)
+    population = 14_360 + 34_947 + 10_593
+    assert updated.item(0, "birth_rate_per_1000") == pytest.approx(1000 * 34_947 * 2 * 0.25 / 35 / population)
 
 
-def test_health_event_modifier_is_aligned_by_region_without_changing_order() -> None:
-    regions = pl.DataFrame(
-        {
-            "id": [1, 2],
-            "owner": ["AAA", "AAA"],
-            "pop_14": [0, 0],
-            "pop_15_64": [0, 0],
-            "pop_65": [100_000, 100_000],
-            "health_capacity": [1.0, 1.0],
-        }
-    )
-
+def test_mortality_applies_even_without_retirement_age_residents() -> None:
+    regions = pl.DataFrame({"pop_14": [0], "pop_15_64": [10_000], "pop_65": [0]})
     updated = calculate_population_growth(
         regions,
         days_passed=365.25,
-        fertility_rates=pl.Series([2.0, 2.0], dtype=pl.Float64),
-        life_expectancies=pl.Series([50.0, 50.0], dtype=pl.Float64),
-        economic_health=pl.Series([1.0, 1.0], dtype=pl.Float64),
-        event_health_by_region={2: 0.25},
+        fertility_rates=pl.Series([0.0]),
+        death_rates=pl.Series([10.0]),
     )
-
     assert updated is not None
-    assert updated.get_column("id").to_list() == [1, 2]
-    assert updated.item(1, "pop_65") > updated.item(0, "pop_65")
+    assert sum(updated.select("pop_14", "pop_15_64", "pop_65").row(0)) == 9_900
+
+    for _ in range(10):
+        regions = calculate_population_growth(
+            regions,
+            days_passed=365.25 / 1000,
+            fertility_rates=pl.Series([0.0]),
+            death_rates=pl.Series([10.0]),
+        )
+        assert regions is not None
+    assert sum(regions.select("pop_14", "pop_15_64", "pop_65").row(0)) == 9_999
 
 
 def test_nonstandard_or_unsafe_population_values_request_polars_fallback() -> None:
     fertility = pl.Series([2.0], dtype=pl.Float64)
-    life_expectancy = pl.Series([67.0], dtype=pl.Float64)
-    economic_health = pl.Series([1.0], dtype=pl.Float64)
+    mortality = pl.Series([10.0])
     nonnumeric = pl.DataFrame(
         {
             "pop_14": ["unknown"],
@@ -90,8 +83,7 @@ def test_nonstandard_or_unsafe_population_values_request_polars_fallback() -> No
             regions,
             days_passed=1.0,
             fertility_rates=fertility,
-            life_expectancies=life_expectancy,
-            economic_health=economic_health,
+            death_rates=mortality,
         ) is None
 
 
@@ -102,27 +94,7 @@ def test_missing_population_cohort_column_requests_polars_fallback() -> None:
         regions,
         days_passed=1.0,
         fertility_rates=pl.Series([2.0], dtype=pl.Float64),
-        life_expectancies=pl.Series([67.0], dtype=pl.Float64),
-        economic_health=pl.Series([1.0], dtype=pl.Float64),
-    ) is None
-
-
-def test_unsupported_health_capacity_dtype_requests_polars_fallback() -> None:
-    regions = pl.DataFrame(
-        {
-            "pop_14": [10],
-            "pop_15_64": [20],
-            "pop_65": [5],
-            "health_capacity": ["unknown"],
-        }
-    )
-
-    assert calculate_population_growth(
-        regions,
-        days_passed=1.0,
-        fertility_rates=pl.Series([2.0], dtype=pl.Float64),
-        life_expectancies=pl.Series([67.0], dtype=pl.Float64),
-        economic_health=pl.Series([1.0], dtype=pl.Float64),
+        death_rates=pl.Series([10.0]),
     ) is None
 
 
@@ -135,6 +107,5 @@ def test_parameter_array_length_mismatch_requests_polars_fallback() -> None:
         regions,
         days_passed=1.0,
         fertility_rates=pl.Series([2.0], dtype=pl.Float64),
-        life_expectancies=pl.Series([67.0, 68.0], dtype=pl.Float64),
-        economic_health=pl.Series([1.0, 1.0], dtype=pl.Float64),
+        death_rates=pl.Series([10.0]),
     ) is None
