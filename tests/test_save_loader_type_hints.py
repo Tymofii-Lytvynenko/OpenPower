@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from src.server.io.data_load_manager import DataLoader
+from src.server.io.save_writer import SaveWriter
 from src.shared.state import GameState
 
 
@@ -19,10 +20,9 @@ class TestSaveLoaderTypeHints(unittest.TestCase):
         shutil.rmtree(self.project_root, ignore_errors=True)
 
     def test_load_save_resolves_game_state_forward_references(self):
-        save_dir = self.project_root / "user_data" / "saves" / "quicksave"
-        save_dir.mkdir(parents=True, exist_ok=True)
-
-        loader = DataLoader(SimpleNamespace(project_root=self.project_root))
+        config = SimpleNamespace(project_root=self.project_root, active_mods=[])
+        self.assertTrue(SaveWriter(config).save_game(GameState(), "quicksave"))
+        loader = DataLoader(config)
         state = loader.load_save("quicksave")
 
         self.assertIsInstance(state, GameState)

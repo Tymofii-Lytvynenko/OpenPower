@@ -39,6 +39,8 @@ class CountryMoreInfoPresenterTest(unittest.TestCase):
                             "pop_14": 10,
                             "pop_15_64": 80,
                             "pop_65": 10,
+                            "birth_rate_per_1000": 10.0,
+                            "death_rate_per_1000": 6.0,
                             "type": "State",
                             "macro_region": "North America",
                         },
@@ -50,6 +52,8 @@ class CountryMoreInfoPresenterTest(unittest.TestCase):
                             "pop_14": 20,
                             "pop_15_64": 130,
                             "pop_65": 50,
+                            "birth_rate_per_1000": 25.0,
+                            "death_rate_per_1000": 12.0,
                             "type": "State",
                             "macro_region": "North America",
                         },
@@ -61,6 +65,8 @@ class CountryMoreInfoPresenterTest(unittest.TestCase):
                             "pop_14": 1,
                             "pop_15_64": 2,
                             "pop_65": 3,
+                            "birth_rate_per_1000": 99.0,
+                            "death_rate_per_1000": 99.0,
                             "type": "Province",
                             "macro_region": "North America",
                         },
@@ -82,10 +88,12 @@ class CountryMoreInfoPresenterTest(unittest.TestCase):
         self.assertEqual(model.region_ids, (11, 12))
         self.assertEqual(model.region_count, 2)
         self.assertEqual(model.population_total, 300)
+        self.assertAlmostEqual(model.birth_rate_per_1000, 20.0)
+        self.assertAlmostEqual(model.death_rate_per_1000, 10.0)
         self.assertAlmostEqual(model.land_area_km2, 400.0)
         self.assertAlmostEqual(model.world_area_share_pct, 40.0)
         self.assertAlmostEqual(model.human_dev_pct, 90.0)
-        self.assertIsNone(model.world_human_dev_pct)
+        self.assertAlmostEqual(model.world_human_dev_pct, 85.0)
         self.assertAlmostEqual(model.infrastructure_pct, 17.0)
         self.assertAlmostEqual(model.telecom_pct, 61.0)
         self.assertTrue(model.population_available)

@@ -6,6 +6,7 @@ from modules.base.systems.demographics.population_growth import (
     DAILY_WORKING_AGE_AGING,
     FEMALE_RATIO,
     calculate_population_growth,
+    with_demographic_rates,
 )
 from modules.base.systems.world.random_event_effects import aggregate_active_effects
 from src.shared.system_interfaces import ISystem, SystemAccess, SystemPhase
@@ -124,9 +125,6 @@ class PopulationSystem(ISystem):
         regions_with_parameters = regions.hstack(parameter_columns)
         pop_data = regions_with_parameters.lazy()
 
-        # 1. Calculate Births based on TFR
-        # Math: (Total Pop * % Women * TFR) / (Years of fertility) = Births per Year
-        # Then multiply by (days_passed / 365) to get current step.
         # A delayed tick may span years; one population update cannot move more than one full cohort.
         aging_kids_step = min(1.0, DAILY_CHILDREN_AGING * days_passed)
         aging_work_step = min(1.0, DAILY_WORKING_AGE_AGING * days_passed)
@@ -143,10 +141,8 @@ class PopulationSystem(ISystem):
                 else 1.0
             )
         ).clip(lower_bound=1.0)
-        birth_step = (
-            fertility_rate * FEMALE_RATIO / CHILDBEARING_YEARS / DAYS_PER_YEAR
-            * days_passed
-        )
+        annual_births_per_worker = fertility_rate * FEMALE_RATIO / CHILDBEARING_YEARS
+        birth_step = annual_births_per_worker / DAYS_PER_YEAR * days_passed
         death_step = (
             1.0 / (regional_life_expectancy * DAYS_PER_YEAR) * days_passed
         ).clip(0.0, 1.0)
@@ -169,7 +165,19 @@ class PopulationSystem(ISystem):
             ).clip(lower_bound=0).cast(pl.Int64).alias("pop_65"),
         ])
         # Keep formula evaluation in one Polars plan to avoid repeated eager materialization per tick.
-        self._store_updated_regions(state, updated.select(output_region_columns).collect())
+        updated = updated.select(
+            *output_region_columns,
+            annual_births_per_worker.alias("_annual_births_per_worker"),
+            regional_life_expectancy.alias("_adjusted_life_expectancy"),
+        ).collect()
+        self._store_updated_regions(
+            state,
+            with_demographic_rates(
+                updated.select(output_region_columns),
+                updated.get_column("_annual_births_per_worker"),
+                updated.get_column("_adjusted_life_expectancy"),
+            ),
+        )
 
     def _store_updated_regions(self, state: GameState, regions: pl.DataFrame) -> None:
         state.update_table("regions", regions)

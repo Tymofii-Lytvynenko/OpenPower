@@ -135,7 +135,7 @@ class CountryMoreInfoModel:
     population_bands: tuple[PopulationBand, ...]
     population_available: bool
     density_per_km2: float
-    human_dev_pct: float
+    human_dev_pct: float | None
     world_human_dev_pct: float | None
     infrastructure_pct: float
     telecom_pct: float
@@ -146,6 +146,10 @@ class CountryMoreInfoModel:
     composition_rows: tuple[ShareRow, ...]
     production_rows: tuple[ShareRow, ...]
     region_summary: str
+    land_use_areas_km2: dict[str, float] = field(default_factory=dict)
+    inland_water_area_km2: float | None = None
+    birth_rate_per_1000: float | None = None
+    death_rate_per_1000: float | None = None
     historical_metrics: dict = field(default_factory=dict)
     world_human_dev_year: int | None = None
     party_roster_2001: PartyRosterContext2001 = field(
@@ -165,19 +169,36 @@ class CountryMoreInfoPresenter:
         region_ids = self._region_ids(country_regions)
         population_bands = self._population_bands(country_regions)
         population_total = sum(band.value for band in population_bands)
-        land_area = self._sum_column(country_regions, "area_km2")
-        world_area = self._sum_column(
-            getattr(state, "tables", {}).get("regions"), "area_km2"
-        )
+        land_column = "land_area_km2" if "land_area_km2" in country_regions.columns else "area_km2"
+        land_area = self._sum_column(country_regions, land_column)
+        world_area = self._sum_column(getattr(state, "tables", {}).get("regions"), land_column)
+        regional_areas = {}
+        for column in (
+            "arable_area_km2", "forest_area_km2", "protected_area_km2",
+            "other_land_area_km2", "inland_water_area_km2",
+        ):
+            available = f"{column}_available"
+            if (
+                not country_regions.is_empty()
+                and {column, available}.issubset(country_regions.columns)
+                and country_regions.get_column(available).fill_null(False).all()
+            ):
+                regional_areas[column] = self._sum_column(country_regions, column)
         population_available = not country_regions.is_empty() and {
             "pop_14",
             "pop_15_64",
             "pop_65",
         }.issubset(country_regions.columns)
         land_area_available = (
-            not country_regions.is_empty() and "area_km2" in country_regions.columns
+            not country_regions.is_empty() and land_column in country_regions.columns
         )
-        world_hdi, world_hdi_year = self._historical_world_hdi(state)
+        countries = getattr(state, "tables", {}).get("countries")
+        world_hdi = None
+        if countries is not None and "human_dev" in countries.columns:
+            values = countries.get_column("human_dev").cast(pl.Float64, strict=False).drop_nulls()
+            valid = [value for value in values if isfinite(value) and 0 <= value <= 1]
+            if valid:
+                world_hdi = sum(valid) / len(valid) * 100.0
 
         return CountryMoreInfoModel(
             tag=tag,
@@ -191,8 +212,14 @@ class CountryMoreInfoPresenter:
             population_total=population_total,
             population_bands=population_bands,
             population_available=population_available,
+            birth_rate_per_1000=self._population_weighted_rate(country_regions, "birth_rate_per_1000")
+            if population_available else None,
+            death_rate_per_1000=self._population_weighted_rate(country_regions, "death_rate_per_1000")
+            if population_available else None,
             density_per_km2=(population_total / land_area) if land_area > 0 else 0.0,
-            human_dev_pct=as_percent(country_row.get("human_dev")),
+            human_dev_pct=as_percent(country_row["human_dev"])
+            if country_row.get("human_dev") is not None
+            else None,
             world_human_dev_pct=world_hdi,
             # These are national service indices; budget ratios describe spending allocation.
             infrastructure_pct=as_percent(country_row.get("infrastructure_index")),
@@ -204,8 +231,10 @@ class CountryMoreInfoPresenter:
             composition_rows=self._composition_rows(country_regions),
             production_rows=self._production_rows(state, tag),
             region_summary=self._region_summary(country_regions),
+            land_use_areas_km2=regional_areas,
+            inland_water_area_km2=regional_areas.get("inland_water_area_km2"),
             historical_metrics=dict(country_row),
-            world_human_dev_year=world_hdi_year,
+            world_human_dev_year=None,
             party_roster_2001=self._party_roster_2001(state, tag),
             election_results_2001=self._election_results_2001(state, tag),
         )
@@ -423,6 +452,18 @@ class CountryMoreInfoPresenter:
             for value in regions["id"].drop_nulls().to_list()
             if int(value) > 0
         )
+
+    def _population_weighted_rate(self, regions: pl.DataFrame, column: str) -> float | None:
+        if column not in regions.columns:
+            return None
+        population = pl.sum_horizontal("pop_14", "pop_15_64", "pop_65")
+        populated = regions.filter(population > 0)
+        rate = pl.col(column)
+        if populated.is_empty() or not populated.select(
+            rate.is_finite().fill_null(False).all()
+        ).item():
+            return None
+        return populated.select((rate * population).sum() / population.sum()).item()
 
     def _population_bands(self, regions: pl.DataFrame) -> tuple[PopulationBand, ...]:
         values = (
@@ -893,67 +934,20 @@ class CountryMoreInfoPanel:
             "frmLand/frmMap/frmMap",
             lambda width, height: self._draw_region_map(model, width, height),
         )
-        for label_slot, meter_slot, value_slot, label, key in (
-            (
-                "lblArableLand",
-                "frmArableLand",
-                "txtArableLand",
-                "Arable land",
-                "arable_land_pct",
-            ),
-            ("lblForests", "frmForests", "txtForests", "Forests", "forest_area_pct"),
-            (
-                "lblNationalParks",
-                "frmNationalParks",
-                "txtNationalParks",
-                "Protected areas (2000)",
-                "terrestrial_protected_area_pct_2000",
-            ),
-            (
-                "lblUnusable",
-                "frmUnusable",
-                "txtUnusable",
-                "Other land (2001)",
-                "other_land_pct",
-            ),
+        for label_slot, meter_slot, value_slot, label, column in (
+            ("lblArableLand", "frmArableLand", "txtArableLand", "Arable land", "arable_area_km2"),
+            ("lblForests", "frmForests", "txtForests", "Forests", "forest_area_km2"),
+            ("lblNationalParks", "frmNationalParks", "txtNationalParks", "Protected areas", "protected_area_km2"),
+            ("lblUnusable", "frmUnusable", "txtUnusable", "Other land", "other_land_area_km2"),
         ):
-            value = self._historical_value(model, key)
-            display_label = label
-            tooltip = (
-                self._other_land_tooltip(model)
-                if key == "other_land_pct"
-                else self._land_metric_tooltip(model, key)
-                if key in {"arable_land_pct", "forest_area_pct"}
-                else "Historical national land share (2001); unknown observations remain unreported."
-            )
-            if key == "other_land_pct":
-                value, display_label = self._other_land_display_value(
-                    model, value, display_label
-                )
-            if key == "terrestrial_protected_area_pct_2000":
-                park_coverage = self._historical_value(
-                    model, "national_park_land_coverage_pct_2001"
-                )
-                if value is None and park_coverage is not None:
-                    value = park_coverage
-                    display_label = "National parks (2001)"
-                    tooltip = self._national_park_tooltip(model)
-                else:
-                    tooltip = self._protected_area_tooltip(model)
+            area = model.land_use_areas_km2.get(column)
+            share = area / model.land_area_km2 if area is not None and model.land_area_km2 > 0 else None
+            ui.text(f"frmLand/{label_slot}", label, test_id=f"country.info.land_cover.label.{value_slot}")
+            ui.meter(f"frmLand/{meter_slot}", share if share is not None else 0.0, GAMETHEME.colors.info)
             ui.text(
-                f"frmLand/{label_slot}",
-                display_label,
-                test_id=f"country.info.land_cover.label.{value_slot}",
-            )
-            ui.meter(
-                f"frmLand/{meter_slot}",
-                value / 100.0 if value is not None else 0.0,
-                GAMETHEME.colors.info,
-            )
-            ui.text(
-                f"frmLand/{value_slot}",
-                self._format_percent(value) if value is not None else "—",
-                tooltip=tooltip,
+                f"frmLand/{value_slot}", self._format_percent(share * 100) if share is not None else "—",
+                tooltip="Share of the land in currently controlled regions."
+                if share is not None else "Current land-use data is incomplete.",
                 test_id=f"country.info.land_cover.{value_slot}",
             )
 
@@ -963,9 +957,8 @@ class CountryMoreInfoPanel:
         ui.text(
             "frmHumanDevelopment/lblTitle",
             "HUMAN DEVELOPMENT",
-            tooltip=self._development_supplement_tooltip(model),
         )
-        country_hdi = self._historical_value(model, "reference_human_dev")
+        country_hdi = model.human_dev_pct / 100.0 if model.human_dev_pct is not None else None
         country_value = (
             self._format_percent(country_hdi * 100.0)
             if country_hdi is not None
@@ -979,7 +972,6 @@ class CountryMoreInfoPanel:
         ui.text(
             "frmHumanDevelopment/frmInner/lblCountry",
             f"{model.name}: {country_value}",
-            tooltip=self._country_hdi_tooltip(model),
             test_id="country.info.hdi.country",
         )
         ui.meter(
@@ -989,14 +981,8 @@ class CountryMoreInfoPanel:
         )
         ui.text(
             "frmHumanDevelopment/frmInner/lblWorld",
-            f"World ({model.world_human_dev_year}): {world_value}"
-            if model.world_human_dev_year
-            else f"World: {world_value}",
-            tooltip=(
-                "UNDP HDR 2025, world aggregate for 2001. Historical baseline; does not change with the simulation."
-                if model.world_human_dev_year
-                else "No dated world HDI observation is available."
-            ),
+            f"World: {world_value}",
+            tooltip="Arithmetic mean of available country development indices in the current simulation.",
             test_id="country.info.hdi.world",
         )
         ui.meter(
@@ -1028,10 +1014,6 @@ class CountryMoreInfoPanel:
         ui.text(
             "frmPopulation/lblTitle",
             "POPULATION",
-            tooltip=(
-                f"{POPULATION_SOURCE_TOOLTIP} "
-                f"{self._historical_demographics_tooltip(model)}"
-            ),
         )
         fields = (
             ("lbl15", "txt15", "txt15Ratio", model.population_bands[0], "0–14"),
@@ -1063,20 +1045,20 @@ class CountryMoreInfoPanel:
         draw_gml_separator(
             ui.path("frmPopulation/picSep"), color=GAMETHEME.colors.text_dim
         )
-        ui.text("frmPopulation/lblBirthRate", "Birth rate")
-        ui.text(
-            "frmPopulation/txtBirthRate",
-            self._historical_rate(model, "birth_rate"),
-            tooltip=self._historical_demographics_tooltip(model),
-            test_id="country.info.birth_rate.value",
-        )
-        ui.text("frmPopulation/lblDeathRate", "Death rate")
-        ui.text(
-            "frmPopulation/txtDeathRate",
-            self._historical_rate(model, "death_rate"),
-            tooltip=self._historical_demographics_tooltip(model),
-            test_id="country.info.death_rate.value",
-        )
+        for widget, label, event, rate in (
+            ("BirthRate", "Birth rate", "births", model.birth_rate_per_1000),
+            ("DeathRate", "Death rate", "deaths", model.death_rate_per_1000),
+        ):
+            ui.text(f"frmPopulation/lbl{widget}", label)
+            ui.text(
+                f"frmPopulation/txt{widget}",
+                f"{rate:.1f} ‰" if rate is not None else "—",
+                tooltip=(
+                    f"Modeled {event} per year per 1,000 residents in currently controlled regions."
+                    if rate is not None else f"Current {label.lower()} data is unavailable."
+                ),
+                test_id=f"country.info.{label.lower().replace(' ', '_')}.value",
+            )
 
     def _render_terrain_frame(
         self, ui: GMLWidgets, model: CountryMoreInfoModel
@@ -1095,18 +1077,19 @@ class CountryMoreInfoPanel:
             ),
             test_id="country.info.land_area.value",
         )
-        ui.text("frmTerrain/lblWaterArea", "Water area (2001 km²)")
+        ui.text("frmTerrain/lblWaterArea", "Water area (km²)")
         ui.text(
             "frmTerrain/txtWaterArea",
-            self._historical_area(model, "reference_water_area_km2"),
-            tooltip=self._historical_area_tooltip(model, "reference_water_area_km2"),
+            self._format_int(model.inland_water_area_km2) if model.inland_water_area_km2 is not None else "—",
+            tooltip="Inland water across currently controlled regions.",
             test_id="country.info.water_area.value",
         )
-        ui.text("frmTerrain/lblTotalArea", "Total area (2001 km²)")
+        ui.text("frmTerrain/lblTotalArea", "Total area (km²)")
         ui.text(
             "frmTerrain/txtTotalArea",
-            self._historical_area(model, "reference_total_area_km2"),
-            tooltip=self._historical_area_tooltip(model, "reference_total_area_km2"),
+            self._format_int(model.land_area_km2 + model.inland_water_area_km2)
+            if model.land_area_available and model.inland_water_area_km2 is not None else "—",
+            tooltip="Land and inland water across currently controlled regions.",
             test_id="country.info.total_area.value",
         )
 
@@ -1116,14 +1099,8 @@ class CountryMoreInfoPanel:
         ui.text("frmClimate/lblTitle", "CLIMATE")
         ui.text(
             "frmClimate/frmInner/lblClimate",
-            str(model.historical_metrics.get("climate_description") or "—")
-            if model
-            else "—",
-            tooltip=(
-                self._climate_context_tooltip(model)
-                if model
-                else "Historical climate context for the 2001 scenario."
-            ),
+            "—",
+            tooltip="Current climate data is unavailable.",
             test_id="country.info.climate.value",
         )
 

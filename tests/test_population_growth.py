@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import polars as pl
+import pytest
 
 from modules.base.systems.demographics.population_growth import calculate_population_growth
 
@@ -34,6 +35,9 @@ def test_vectorized_growth_matches_cohort_formula_and_preserves_region_columns()
     )
     assert updated.get_column("custom_region_data").to_list() == ["retained"]
     assert updated.schema["pop_14"] == pl.Int64
+    population = 14_500 + 35_300 + 10_500
+    assert updated.item(0, "birth_rate_per_1000") == pytest.approx(1000 * 35_300 * 2 * 0.25 / 35 / population)
+    assert updated.item(0, "death_rate_per_1000") == pytest.approx(1000 * 10_500 / 50 / population)
 
 
 def test_health_event_modifier_is_aligned_by_region_without_changing_order() -> None:

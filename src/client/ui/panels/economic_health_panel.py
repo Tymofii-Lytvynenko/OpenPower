@@ -23,9 +23,6 @@ from src.client.ui.layouts.gml_layout import (
     suspend_gml_layout,
 )
 from src.client.ui.panels.economy_presenter import EconomyPresenter
-from src.client.ui.panels.historical_economic_baseline import (
-    historical_economic_tooltip,
-)
 from src.client.ui.panels.shared.panel_widgets import draw_empty_state
 from src.shared.actions import (
     ActionChangeEconomicPolicy,
@@ -197,26 +194,12 @@ class EconomicHealthPanel:
         ui.text(
             "frmInner/frmGdp/txtTotal",
             formatted_gdp,
-            tooltip=historical_economic_tooltip(
-                country_row,
-                "historical_gdp_current_usd_2001",
-                formatted_gdp,
-                "GDP",
-                value_formatter=self._fmt_money,
-            ),
             test_id="economic_health.gdp",
         )
         formatted_per_capita = self._fmt_money(per_capita) if per_capita is not None else "N/A"
         ui.text(
             "frmInner/frmGdp/txtCapita",
             formatted_per_capita,
-            tooltip=historical_economic_tooltip(
-                country_row,
-                "historical_gdp_per_capita_current_usd_2001",
-                formatted_per_capita,
-                "GDP per capita, calculated using currently controlled regional population",
-                value_formatter=self._fmt_money,
-            ),
             test_id="economic_health.gdp_per_capita",
             font_size=9.0,
         )
@@ -229,13 +212,6 @@ class EconomicHealthPanel:
         ui.text(
             "frmInner/frmPopulation/txtUnemployment",
             formatted_unemployment,
-            tooltip=historical_economic_tooltip(
-                country_row,
-                "historical_unemployment_modeled_ilo_pct_2001",
-                formatted_unemployment,
-                "unemployment rate",
-                value_formatter=lambda value: f"{value:.1f}%",
-            ),
             test_id="economic_health.unemployment",
             font_size=9.0,
         )
@@ -253,13 +229,6 @@ class EconomicHealthPanel:
         ui.text(
             "frmInner/frmInflation/txtInflation",
             formatted_inflation,
-            tooltip=historical_economic_tooltip(
-                country_row,
-                "historical_inflation_cpi_pct_2001",
-                formatted_inflation,
-                "inflation rate",
-                value_formatter=lambda value: f"{value:.1f}%",
-            ),
             test_id="economic_health.inflation",
             font_size=9.0,
         )

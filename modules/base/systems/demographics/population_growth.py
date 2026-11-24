@@ -28,6 +28,8 @@ CHILDREN_BRACKET_YEARS = 15
 WORKING_AGE_BRACKET_YEARS = 50
 DAILY_CHILDREN_AGING = 1 / (CHILDREN_BRACKET_YEARS * DAYS_PER_YEAR)
 DAILY_WORKING_AGE_AGING = 1 / (WORKING_AGE_BRACKET_YEARS * DAYS_PER_YEAR)
+BIRTH_RATE_COLUMN = "birth_rate_per_1000"
+DEATH_RATE_COLUMN = "death_rate_per_1000"
 
 
 def calculate_population_growth(
@@ -109,13 +111,8 @@ def calculate_population_growth(
             * (1.0 + event_modifier),
             1.0,
         )
-        birth_step = (
-            fertility
-            * FEMALE_RATIO
-            / CHILDBEARING_YEARS
-            / DAYS_PER_YEAR
-            * days
-        )
+        annual_births_per_worker = fertility * FEMALE_RATIO / CHILDBEARING_YEARS
+        birth_step = annual_births_per_worker / DAYS_PER_YEAR * days
         death_step = np.clip(
             1.0 / (adjusted_life_expectancy * DAYS_PER_YEAR) * days,
             0.0,
@@ -142,7 +139,27 @@ def calculate_population_growth(
     ):
         return None
 
-    return regions.with_columns(
+    updated = regions.with_columns(
         pl.Series(column, values.astype(np.int64), dtype=pl.Int64)
         for column, values in zip(cohort_columns, updated_cohorts)
+    )
+    return with_demographic_rates(updated, annual_births_per_worker, adjusted_life_expectancy)
+
+
+def with_demographic_rates(
+    regions: pl.DataFrame,
+    annual_births_per_worker: np.ndarray | pl.Series,
+    adjusted_life_expectancy: np.ndarray | pl.Series,
+) -> pl.DataFrame:
+    population = pl.sum_horizontal("pop_14", "pop_15_64", "pop_65")
+    denominator = pl.when(population > 0).then(population)
+    return regions.with_columns(
+        (
+            1000.0 * pl.col("pop_15_64") * pl.Series(annual_births_per_worker)
+            / denominator
+        ).alias(BIRTH_RATE_COLUMN),
+        (
+            1000.0 * pl.col("pop_65") / pl.Series(adjusted_life_expectancy)
+            / denominator
+        ).alias(DEATH_RATE_COLUMN),
     )

@@ -44,6 +44,8 @@ class PopulationSystemCoverageTest(unittest.TestCase):
         self.assertEqual(len(warnings), 6)
         for column in ("pop_14", "pop_15_64", "pop_65"):
             self.assertEqual(state.get_table("regions")[column].to_list(), [0])
+        for column in ("birth_rate_per_1000", "death_rate_per_1000"):
+            self.assertIsNone(state.get_table("regions").item(0, column))
         self.assertEqual(
             {"fertility_rate", "life_expectancy", "economic_health"}.intersection(
                 state.get_table("countries").columns
@@ -79,6 +81,9 @@ class PopulationSystemCoverageTest(unittest.TestCase):
         )
         self.assertIn("health_capacity", regions.columns)
         self.assertNotIn("_event_health_modifier", regions.columns)
+        population = 14_500 + 35_300 + 10_540
+        self.assertAlmostEqual(regions.item(0, "birth_rate_per_1000"), 1000 * 35_300 * 2 * 0.25 / 35 / population)
+        self.assertAlmostEqual(regions.item(0, "death_rate_per_1000"), 1000 * 10_540 / 62.5 / population)
 
     def test_parameter_cache_reuses_values_for_replaced_aligned_regions(self) -> None:
         state = self._state()
